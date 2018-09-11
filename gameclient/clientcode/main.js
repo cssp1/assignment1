@@ -1084,15 +1084,23 @@ Aura.prototype.apply = function(world, obj) {
     if('client' in this.spec && !this.spec['client']) { return; }
     goog.array.forEach(this.spec['effects'], function(effect) {
         var code = effect['code'];
-        if(code === 'speed_boosted' && !obj.is_destroyed()) {
-            obj.combat_stats.maxvel *= (1 + this.strength);
-        } else if(code === 'defense_boosted' && !obj.is_destroyed()) {
-            obj.combat_stats.damage_taken *= (1-this.strength);
-        } else if(code === 'defense_weakened' && !obj.is_destroyed()) {
-            obj.combat_stats.damage_taken *= (1+this.strength);
-        } else if(code === 'radiation_hardened' && !obj.is_destroyed()) {
-            var val = obj.combat_stats.damage_taken_from['radiation'] || 1.0;
-            obj.combat_stats.damage_taken_from['radiation'] = val * this.strength;
+        if(code === 'speed_boosted') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.maxvel *= (1 + this.strength);
+            }
+        } else if(code === 'defense_boosted') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.damage_taken *= (1-this.strength);
+            }
+        } else if(code === 'defense_weakened') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.damage_taken *= (1+this.strength);
+            }
+        } else if(code === 'radiation_hardened') {
+            if(!obj.is_destroyed()) {
+                var val = obj.combat_stats.damage_taken_from['radiation'] || 1.0;
+                obj.combat_stats.damage_taken_from['radiation'] = val * this.strength;
+            }
         } else if(code === 'frozen') {
             if(obj.is_mobile() && !obj.is_destroyed()) {
                 obj.combat_stats.maxvel *= (1 - this.strength);
@@ -1100,7 +1108,9 @@ Aura.prototype.apply = function(world, obj) {
                 obj.combat_stats.erratic_flight = Math.max(obj.combat_stats.erratic_flight, this.strength);
             }
         } else if(code === 'ice_shielded') {
-            obj.combat_stats.ice_effects *= this.strength;
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.ice_effects *= this.strength;
+            }
         } else if(code === 'ice_encrusted') {
             // note: like "frozen", but reduce by ice_shielded/ice_effects
             if(obj.is_mobile() && !obj.is_destroyed()) {
@@ -1109,59 +1119,83 @@ Aura.prototype.apply = function(world, obj) {
                 obj.combat_stats.erratic_flight = Math.max(obj.combat_stats.erratic_flight, obj.combat_stats.ice_effects*this.strength);
             }
         } else if(code === 'swamp_shielded') {
-            obj.combat_stats.swamp_effects *= this.strength;
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.swamp_effects *= this.strength;
+            }
         } else if(code === 'moving_in_swamp') {
             if(obj.is_mobile() && !obj.is_destroyed()) {
                 obj.combat_stats.maxvel *= (1 - obj.combat_stats.swamp_effects*this.strength);
                 obj.combat_stats.turn_rate *= (1 - obj.combat_stats.swamp_effects*this.strength);
             }
-        } else if(code === 'rate_of_fire_boosted' && !obj.is_destroyed()) {
-            obj.combat_stats.rate_of_fire *= (1 + this.strength);
-        } else if(code === 'damage_boosted' && !obj.is_destroyed()) {
-            obj.combat_stats.weapon_damage *= (1 + this.strength);
-        } else if(code === 'armor_boosted' && !obj.is_destroyed()) {
-            obj.combat_stats.extra_armor = Math.max(obj.combat_stats.extra_armor, this.strength);
+        } else if(code === 'rate_of_fire_boosted') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.rate_of_fire *= (1 + this.strength);
+            }
+        } else if(code === 'damage_boosted') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.weapon_damage *= (1 + this.strength);
+            }
+        } else if(code === 'armor_boosted') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.extra_armor = Math.max(obj.combat_stats.extra_armor, this.strength);
+            }
         } else if(code === 'defense_booster') {
-            // apply the defense_boosted aura to this and nearby units
-            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
-                                                               gamedata['map']['range_conversion'] * this.range,
-                                                               { only_team: obj.team, mobile_only: true });
-            for(var i = 0; i < obj_list.length; i++) {
-                var o = obj_list[i].obj;
-                o.create_aura(world, obj.id, obj.team, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
+            if(!obj.is_destroyed()) {
+                // apply the defense_boosted aura to this and nearby units
+                var obj_list = world.query_objects_within_distance(obj.raw_pos(),
+                                                                    gamedata['map']['range_conversion'] * this.range,
+                                                                    { only_team: obj.team, mobile_only: true });
+                for(var i = 0; i < obj_list.length; i++) {
+                    var o = obj_list[i].obj;
+                    o.create_aura(world, obj.id, obj.team, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
+                }
             }
         } else if(code === 'damage_booster') {
-            // apply the damage_boosted aura to this and nearby units
-            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
-                                                               gamedata['map']['range_conversion'] * this.range,
-                                                               { only_team: obj.team, mobile_only: true });
-            for(var i = 0; i < obj_list.length; i++) {
-                var o2 = obj_list[i].obj;
-                o2.create_aura(world, obj.id, obj.team, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
+            if(!obj.is_destroyed()) {
+                // apply the damage_boosted aura to this and nearby units
+                var obj_list = world.query_objects_within_distance(obj.raw_pos(),
+                                                                   gamedata['map']['range_conversion'] * this.range,
+                                                                   { only_team: obj.team, mobile_only: true });
+                for(var i = 0; i < obj_list.length; i++) {
+                    var o2 = obj_list[i].obj;
+                    o2.create_aura(world, obj.id, obj.team, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
+                }
             }
-        } else if(code === 'stunned' && !obj.is_destroyed()) {
-            obj.combat_stats.stunned += this.strength;
-        } else if(code === 'disarmed' && !obj.is_destroyed()) {
-            obj.combat_stats.disarmed += this.strength;
-        } else if(code === 'range_reduction' && !obj.is_destroyed()) {
-            obj.combat_stats.weapon_range *= Math.max(0, (1-this.strength));
-            obj.combat_stats.effective_weapon_range *= Math.max(0, (1-this.strength));
-        } else if(code === 'range_boosted' && !obj.is_destroyed()) {
-            obj.combat_stats.weapon_range *= Math.max(0, (1+this.strength));
-            obj.combat_stats.effective_weapon_range *= Math.max(0, (1+this.strength));
-        } else if(code === 'weak_zombie' && !obj.is_destroyed()) {
+        } else if(code === 'stunned') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.stunned += this.strength;
+            }
+        } else if(code === 'disarmed') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.disarmed += this.strength;
+            }
+        } else if(code === 'range_reduction') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.weapon_range *= Math.max(0, (1-this.strength));
+                obj.combat_stats.effective_weapon_range *= Math.max(0, (1-this.strength));
+            }
+        } else if(code === 'range_boosted') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.weapon_range *= Math.max(0, (1+this.strength));
+                obj.combat_stats.effective_weapon_range *= Math.max(0, (1+this.strength));
+            }
+        } else if(code === 'weak_zombie') {
             obj.combat_stats.maxvel *= this.spec['zombie_speed'];
             obj.combat_stats.weapon_damage *= this.spec['zombie_damage'];
-        } else if(code === 'on_fire' && !obj.is_destroyed()) {
-            var apply_interval = effect['apply_interval'] || TICK_INTERVAL;
-            // apply effect every N ticks
-            var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
-            if(n_ticks <= 1 || (((world.combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
-                var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
-                world.combat_engine.queue_damage_effect(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, this.source_team, obj.id, dmg, effect['damage_vs'] || this.vs_table));
+        } else if(code === 'on_fire') {
+            if(!obj.is_destroyed()) {
+                var apply_interval = effect['apply_interval'] || TICK_INTERVAL;
+                // apply effect every N ticks
+                var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
+                if(n_ticks <= 1 || (((world.combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
+                    var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
+                    world.combat_engine.queue_damage_effect(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, this.source_team, obj.id, dmg, effect['damage_vs'] || this.vs_table));
+                }
             }
-        } else if(code === 'projectile_speed_reduced' && !obj.is_destroyed()) {
-            obj.combat_stats.projectile_speed *= (1 - this.strength);
+        } else if(code === 'projectile_speed_reduced') {
+            if(!obj.is_destroyed()) {
+                obj.combat_stats.projectile_speed *= (1 - this.strength);
+            }
         } else if(code === 'cast_spell_continuously') {
             if(!obj.is_destroyed()) {
                 var spellname = effect['spell'];
@@ -1831,6 +1865,24 @@ GameObject.prototype.modify_stats_by_modstats_table = function(table) {
 GameObject.prototype.update_and_apply_auras = function(world) {
     for(var i = 0; i < this.auras.length; i++) {
         var a = this.auras[i];
+        if(this.is_destroyed()) {
+            spec = a.spec;
+            code = "";
+            if('effects' in spec && spec['effects'].length > 0) {
+                for(var j = 0; j < spec['effects'].length; j++) {
+                    code = a.spec['effects'][j]['code'];
+                    if(code === 'speed_boosted' || code === 'defense_boosted' || code === 'defense_weakened' || code === 'radiation_hardened' ||
+                       code === 'frozen' || code === 'ice_shielded' || code === 'ice_encrusted' || code === 'swamp_shielded' ||
+                       code === 'moving_in_swamp' || code === 'rate_of_fire_boosted' || code === 'damage_boosted' || code === 'armor_boosted' ||
+                       code === 'defense_booster' || code === 'damage_booster' || code === 'stunned' || code === 'disarmed' ||
+                       code === 'range_reduction' || code === 'range_boosted' || code === 'on_fire' || code === 'projectile_speed_reduced') {
+                           this.auras.splice(i,1);
+                           a.end(this);
+                           continue;
+                       }
+                   }
+               }
+           }
         if(!a.expire_tick.is_infinite() && GameTypes.TickCount.gt(session.get_real_world().combat_engine.cur_tick, a.expire_tick)) {
             this.auras.splice(i,1);
             a.end(this);
@@ -54138,8 +54190,10 @@ function draw_building_or_inert(world, obj, powerfac) {
         for(var i = 0; i < obj.auras.length; i++) {
             var aura = obj.auras[i];
             if(world && aura.visual_effect) {
-                var pos = obj.interpolate_pos(world);
-                aura.visual_effect.reposition([pos[0], 0, pos[1]]);
+                if(!obj.is_destroyed()) {
+                    var pos = obj.interpolate_pos(world);
+                    aura.visual_effect.reposition([pos[0], 0, pos[1]]);
+                }
             }
             if(aura.expire_tick.is_infinite()) {
                 // don't draw permanent auras on buildings
