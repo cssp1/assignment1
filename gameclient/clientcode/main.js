@@ -1081,7 +1081,7 @@ Aura.unserialize = function(snap) {
 /** @param {!World.World} world
     @param {!GameObject} obj */
 Aura.prototype.apply = function(world, obj) {
-    if('client' in this.spec && !this.spec['client']) { return; }
+    if('client' in this.spec && !this.spec['client'] && !obj.is_destroyed()) { return; }
     goog.array.forEach(this.spec['effects'], function(effect) {
         var code = effect['code'];
         if(code === 'speed_boosted') {
