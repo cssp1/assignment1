@@ -1081,20 +1081,20 @@ Aura.unserialize = function(snap) {
 /** @param {!World.World} world
     @param {!GameObject} obj */
 Aura.prototype.apply = function(world, obj) {
-    if('client' in this.spec && !this.spec['client'] && !obj.is_destroyed()) { return; }
+    if('client' in this.spec && !this.spec['client']) { return; }
     goog.array.forEach(this.spec['effects'], function(effect) {
         var code = effect['code'];
-        if(code === 'speed_boosted') {
+        if(code === 'speed_boosted' && !obj.is_destroyed()) {
             obj.combat_stats.maxvel *= (1 + this.strength);
-        } else if(code === 'defense_boosted') {
+        } else if(code === 'defense_boosted' && !obj.is_destroyed()) {
             obj.combat_stats.damage_taken *= (1-this.strength);
-        } else if(code === 'defense_weakened') {
+        } else if(code === 'defense_weakened' && !obj.is_destroyed()) {
             obj.combat_stats.damage_taken *= (1+this.strength);
-        } else if(code === 'radiation_hardened') {
+        } else if(code === 'radiation_hardened' && !obj.is_destroyed()) {
             var val = obj.combat_stats.damage_taken_from['radiation'] || 1.0;
             obj.combat_stats.damage_taken_from['radiation'] = val * this.strength;
         } else if(code === 'frozen') {
-            if(obj.is_mobile()) {
+            if(obj.is_mobile() && !obj.is_destroyed()) {
                 obj.combat_stats.maxvel *= (1 - this.strength);
                 obj.combat_stats.turn_rate *= (1 - this.strength);
                 obj.combat_stats.erratic_flight = Math.max(obj.combat_stats.erratic_flight, this.strength);
@@ -1103,7 +1103,7 @@ Aura.prototype.apply = function(world, obj) {
             obj.combat_stats.ice_effects *= this.strength;
         } else if(code === 'ice_encrusted') {
             // note: like "frozen", but reduce by ice_shielded/ice_effects
-            if(obj.is_mobile()) {
+            if(obj.is_mobile() && !obj.is_destroyed()) {
                 obj.combat_stats.maxvel *= (1 - obj.combat_stats.ice_effects*this.strength);
                 obj.combat_stats.turn_rate *= (1 - obj.combat_stats.ice_effects*this.strength);
                 obj.combat_stats.erratic_flight = Math.max(obj.combat_stats.erratic_flight, obj.combat_stats.ice_effects*this.strength);
@@ -1111,15 +1111,15 @@ Aura.prototype.apply = function(world, obj) {
         } else if(code === 'swamp_shielded') {
             obj.combat_stats.swamp_effects *= this.strength;
         } else if(code === 'moving_in_swamp') {
-            if(obj.is_mobile()) {
+            if(obj.is_mobile() && !obj.is_destroyed()) {
                 obj.combat_stats.maxvel *= (1 - obj.combat_stats.swamp_effects*this.strength);
                 obj.combat_stats.turn_rate *= (1 - obj.combat_stats.swamp_effects*this.strength);
             }
-        } else if(code === 'rate_of_fire_boosted') {
+        } else if(code === 'rate_of_fire_boosted' && !obj.is_destroyed()) {
             obj.combat_stats.rate_of_fire *= (1 + this.strength);
-        } else if(code === 'damage_boosted') {
+        } else if(code === 'damage_boosted' && !obj.is_destroyed()) {
             obj.combat_stats.weapon_damage *= (1 + this.strength);
-        } else if(code === 'armor_boosted') {
+        } else if(code === 'armor_boosted' && !obj.is_destroyed()) {
             obj.combat_stats.extra_armor = Math.max(obj.combat_stats.extra_armor, this.strength);
         } else if(code === 'defense_booster') {
             // apply the defense_boosted aura to this and nearby units
@@ -1139,20 +1139,20 @@ Aura.prototype.apply = function(world, obj) {
                 var o2 = obj_list[i].obj;
                 o2.create_aura(world, obj.id, obj.team, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
-        } else if(code === 'stunned') {
+        } else if(code === 'stunned' && !obj.is_destroyed()) {
             obj.combat_stats.stunned += this.strength;
-        } else if(code === 'disarmed') {
+        } else if(code === 'disarmed' && !obj.is_destroyed()) {
             obj.combat_stats.disarmed += this.strength;
-        } else if(code === 'range_reduction') {
+        } else if(code === 'range_reduction' && !obj.is_destroyed()) {
             obj.combat_stats.weapon_range *= Math.max(0, (1-this.strength));
             obj.combat_stats.effective_weapon_range *= Math.max(0, (1-this.strength));
-        } else if(code === 'range_boosted') {
+        } else if(code === 'range_boosted' && !obj.is_destroyed()) {
             obj.combat_stats.weapon_range *= Math.max(0, (1+this.strength));
             obj.combat_stats.effective_weapon_range *= Math.max(0, (1+this.strength));
-        } else if(code === 'weak_zombie') {
+        } else if(code === 'weak_zombie' && !obj.is_destroyed()) {
             obj.combat_stats.maxvel *= this.spec['zombie_speed'];
             obj.combat_stats.weapon_damage *= this.spec['zombie_damage'];
-        } else if(code === 'on_fire') {
+        } else if(code === 'on_fire' && !obj.is_destroyed()) {
             var apply_interval = effect['apply_interval'] || TICK_INTERVAL;
             // apply effect every N ticks
             var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
@@ -1160,7 +1160,7 @@ Aura.prototype.apply = function(world, obj) {
                 var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
                 world.combat_engine.queue_damage_effect(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, this.source_team, obj.id, dmg, effect['damage_vs'] || this.vs_table));
             }
-        } else if(code === 'projectile_speed_reduced') {
+        } else if(code === 'projectile_speed_reduced' && !obj.is_destroyed()) {
             obj.combat_stats.projectile_speed *= (1 - this.strength);
         } else if(code === 'cast_spell_continuously') {
             if(!obj.is_destroyed()) {
