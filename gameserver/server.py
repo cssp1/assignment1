@@ -21710,17 +21710,24 @@ class GAMEAPI(resource.Resource):
         d.addErrback(report_and_absorb_deferred_failure, session)
 
         # failure AND success path (failure indicated by buf being None or the 404 'NOTFOUND' value)
-        def cb(buf, session, tag):
+        def cb(buf, session, tag, battle_time, attacker_id, defender_id, base_id):
+            ret = None
+
             if buf and (buf != 'NOTFOUND'):
+                raw_ret = None
                 with admin_stats.latency_measurer('GET_BATTLE_REPLAY(gunzip)'):
-                    raw_ret = gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).read()
-                with admin_stats.latency_measurer('GET_BATTLE_REPLAY(compress)'):
-                    ret = compress_and_wrap_string(raw_ret)
-            else:
-                ret = None
+                    try:
+                        raw_ret = gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).read()
+                    except:
+                        gamesite.exception_log.event(server_time, 'player %d: error loading replay %d-%d-vs-%d at %s: %s' % (session.player.user_id, battle_time, attacker_id, defender_id, base_id, traceback.format_exc().strip()))
+
+                if raw_ret:
+                    with admin_stats.latency_measurer('GET_BATTLE_REPLAY(compress)'):
+                        ret = compress_and_wrap_string(raw_ret)
+
             session.send([["GET_BATTLE_REPLAY_RESULT", tag, ret]])
 
-        d.addCallback(cb, session, tag)
+        d.addCallback(cb, session, tag, battle_time, attacker, defender, base_id)
 
         return session.start_async_request(d) # go async
 

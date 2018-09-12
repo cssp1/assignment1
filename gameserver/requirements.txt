@@ -2,10 +2,13 @@
 # Newer versions of these will probably work, but have not been tested.
 # note: security-critical modules use ">=" versioning, others use "=="
 
-awscli==1.16.5
+# note: aws/botocore/boto3 should generally use ">=" to avoid conflicts
+# with updates pushed by Amazon Linux and other external tools.
+
+awscli>=1.16.9
 bcrypt==3.1.4
-botocore==1.11.5
-boto3==1.8.5
+botocore>=1.11.9
+boto3>=1.8.9
 Brotli==1.0.4
 brotlipy==0.7.0
 certifi>=2018.1.18
