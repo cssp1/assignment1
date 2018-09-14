@@ -4430,16 +4430,46 @@ class Session(object):
         return channel
 
     def do_chat_catchup(self, true_channel, retmsg):
+        num_received = 0
+        min_time = server_time
         for x in gamesite.nosql_client.chat_catchup(true_channel, limit = gamedata['server']['chat_memory'], reason='catchup'):
             self.chat_recv(true_channel, x.get('id',None), x['sender'], x.get('text',''), retmsg = retmsg)
+            num_received += 1
+            if 'time' in x['sender']:
+                min_time = min(min_time, x['sender']['time'])
+
+        no_more_messages = (num_received < gamedata['server']['chat_memory'])
+
+        # tell client whether we can get more
+        self.chat_recv(true_channel, None, {'chat_name':'System',
+                                            'type':'cannot_get_more' if no_more_messages else 'can_get_more',
+                                            'time': min_time, 'user_id':-1},
+                       'cannot_get_more' if no_more_messages else 'can_get_more',
+                       retmsg = retmsg, is_prepend = True)
+
     def do_chat_getmore(self, true_channel, end_time, end_msg_id, retmsg):
         msg_list = gamesite.nosql_client.chat_catchup(true_channel, end_time = end_time, end_msg_id = end_msg_id,
                                                       order = SpinNoSQL.NoSQLClient.CHAT_NEWEST_FIRST,
                                                       limit = gamedata['server']['chat_memory'],
                                                       reason = 'getmore')
+        min_time = server_time
         for x in msg_list:
             self.chat_recv(true_channel, x.get('id',None), x['sender'], x.get('text',''), retmsg = retmsg, is_prepend = True)
-        return len(msg_list) < gamedata['server']['chat_memory'] # is_final
+            if 'time' in x['sender']:
+                min_time = min(min_time, x['sender']['time'])
+
+        # if we got fewer messages than chat_memory, that means the next query won't return any at all
+        # so tell the client this is the final "getmore"
+        no_more_messages = len(msg_list) < gamedata['server']['chat_memory']
+
+        self.chat_recv(true_channel, None, {'chat_name':'System',
+                                            'type':'cannot_get_more' if no_more_messages else 'can_get_more',
+                                            'time': min_time, 'user_id':-1},
+                       'cannot_get_more' if no_more_messages else 'can_get_more',
+                       retmsg = retmsg, is_prepend = True)
+
+        return no_more_messages
+
 
     def init_alliance(self, retmsg, chat_catchup = True, reason = 'Session.init_alliance'):
         if self.alliance_chat_channel:

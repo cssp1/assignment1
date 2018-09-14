@@ -16082,6 +16082,8 @@ function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_bo
     goog.array.forEach(tablist, goog.partial(chat_tab_accept_message, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend||false));
 }
 
+var chat_getmore_serial = 0;
+
 /** @param {string} channel_name
     @param {!Object<string,?>} sender_info
     @param {string} wrapped_body
@@ -16089,6 +16091,14 @@ function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_bo
     @param {boolean} is_prepend
     @param {!SPUI.Dialog} tab */
 function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend, tab) {
+
+    // for can_get_more messages, invent a fake chat_msg_id so that the message can reference
+    // itself for deletion. But make sure it won't conflict with a true message ID.
+    if(sender_info['type'] == 'can_get_more') {
+        if(!chat_msg_id) {
+            chat_msg_id = 'getmore' + chat_getmore_serial.toString(); chat_getmore_serial += 1;
+        }
+    }
 
     if(sender_info['type'] == 'unit_donation_request') { // new unit donation request
         if(!player.unit_donation_enabled()) { return; }
@@ -16253,6 +16263,11 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
         // set up a default onclick handler for the entire blob of text
         if(report_args) {
             base_props.onclick = bbcode_click_handlers['player']['onclick'](report_args.user_id.toString(), report_args.ui_name);
+        }
+
+        // replace message ID
+        if(bb_text.indexOf('%chat_message_id') != -1 && chat_msg_id) {
+                bb_text = bb_text.replace('%chat_message_id', chat_msg_id);
         }
 
         // replace alliance chat tag
@@ -16444,7 +16459,23 @@ var system_chat_bbcode_click_handlers = {
         invoke_store('exact_path', _path);
         // play sound effect
         GameArt.play_canned_sound('action_button_resizable');
-    }; })(path); } }
+    }; })(path); } },
+    'getmore': { 'onclick': function(chat_msg_id) { return (function (_chat_msg_id) { return function(w, mloc) {
+        // for the "Click here to load earlier chat messages" message
+
+        // find and delete this one message
+        var tab = w.parent;
+        if(tab && _chat_msg_id in tab.user_data['chat_messages_by_id']) {
+            w.remove_text(tab.user_data['chat_messages_by_id'][_chat_msg_id]);
+        }
+
+        // perform the same checks as SPUI.ScrollingTextField.scroll_up(),
+        // and then send the scrolling command.
+        if(w.can_scroll_up() && w.buf_top >= w.buffer.length && !w.getmore_final && !w.getmore_pending) {
+            w.scroll_up();
+        }
+
+    }; })(chat_msg_id); } }
 };
 
 
@@ -16667,6 +16698,18 @@ function init_chat_frame() {
         tab.widgets['output'].scroll_down_button = tab.widgets[(invert ? 'scroll_up' : 'scroll_down')];
         tab.widgets['output'].getmore_cb = (gamedata['client']['enable_chat_getmore'] ? function(w) {
             var tab = w.parent;
+
+            // remove any lingering 'can_get_more' messages
+            var to_remove = [];
+            for(var chat_msg_id in tab.user_data['chat_messages_by_id']) {
+                if(chat_msg_id.indexOf('getmore') === 0) {
+                    to_remove.push(chat_msg_id);
+                }
+            }
+            goog.array.forEach(to_remove, function(chat_msg_id) {
+                tab.widgets['output'].remove_text(tab.user_data['chat_messages_by_id'][chat_msg_id]);
+            });
+
             var tag = 'cgm'+(last_query_tag++).toString();
             chat_getmore_receiver.listenOnce(tag, (function (_tab) { return function(event) {
                 goog.array.forEach(event.response, function(data) {
