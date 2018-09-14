@@ -82,7 +82,7 @@
     "log_scores2": 2, // Scores2 API logging level
     "scores2_publish_refresh": 1397194667, // force publish of all Scores2 stats (to hot MongoDB) if not already published since this UNIX time
 
-    "chat_memory": 30, // number of recent chat messages to send to newly-joined clients (per channel)
+    "chat_memory": 90, // number of recent chat messages to send to newly-joined clients (per channel)
     "chat_alliance_logins": false, // whether to shout alliance member logins to chat
     "chat_alliance_membership": true, // whether to shout alliance leave/join messages to chat
 

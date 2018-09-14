@@ -303,6 +303,10 @@
         "welcome": ":: [color=#00ff00]%sender_name: Welcome to %channel_name chat! Please be respectful. Offensive behavior is not tolerated.[/color] ::\n",
         "alliance_welcome": ":: [color=#00ff00]%sender_name: %body[/color] ::\n",
 
+        // get_more/cannot_get_more
+        "can_get_more": "[color=#808080][getmore=%chat_message_id]Click ▼ to see older messages[/getmore][/color]",
+        "cannot_get_more": "[color=#808080]--- No More Messages ---[/color]",
+
         // system-wide announcements
         "system": "\n[color=#fff000]*** %sender_name: %body ***[/color]\n\n",
 
