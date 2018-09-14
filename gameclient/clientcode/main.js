@@ -16096,7 +16096,8 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
     // itself for deletion. But make sure it won't conflict with a true message ID.
     if(sender_info['type'] == 'can_get_more') {
         if(!chat_msg_id) {
-            chat_msg_id = 'getmore' + chat_getmore_serial.toString(); chat_getmore_serial += 1;
+            // note: the '*' first charcter signals that GETMORE should ignore this ID for query purposes
+            chat_msg_id = '*getmore' + chat_getmore_serial.toString(); chat_getmore_serial += 1;
         }
     }
 
@@ -16347,7 +16348,8 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
             node.on_destroy = (function (_tab, _chat_msg_id) { return function(_node) {
                 delete _tab.user_data['chat_messages_by_id'][_chat_msg_id];
             }; })(tab, chat_msg_id);
-            if(tab.user_data['earliest_id'] === null || chat_msg_id < tab.user_data['earliest_id']) {
+            if(chat_msg_id[0] != '*' && /* ignore fake IDs generated for 'can_get_more' messages */
+               (tab.user_data['earliest_id'] === null || chat_msg_id < tab.user_data['earliest_id'])) {
                 tab.user_data['earliest_id'] = chat_msg_id;
             }
         }
