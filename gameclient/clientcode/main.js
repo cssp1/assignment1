@@ -16191,6 +16191,13 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
                     // wrong region - offer to relocate
                     invoke_find_on_map(_req['region_id'], [0,0]);
                     return;
+                } else if('requires' in gamedata['spells']['GIVE_ALLIANCE_HELP']) {
+                    var pred = read_predicate(gamedata['spells']['GIVE_ALLIANCE_HELP']['requires']);
+                    if(!pred.is_satisfied(player)) {
+                        var helper = get_requirements_help(pred);
+                        if(helper) { helper(); }
+                        return;
+                    }
                 }
 
                 send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "GIVE_ALLIANCE_HELP", _req['recipient_id'], _req['req_id']]);

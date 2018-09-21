@@ -474,6 +474,10 @@
         "cooldown": 3600,
         "cooldown_name": "REQUEST_ALLIANCE_HELP"
     },
+    "GIVE_ALLIANCE_HELP": {
+        "ui_name": "Give Help",
+        "requires": {"predicate": "HOME_REGION", "is_nosql": 1, "ui_name": "You must be on the map to give help"}
+    },
     "ALLIANCE_GIFT_LOOT": {
         "ui_name": "Send a gift to a member of your Clan.",
         "activation": "targeted_alliance_mate",

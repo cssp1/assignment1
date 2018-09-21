@@ -32267,12 +32267,10 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
                         success = False
 
-                if success:
-                    if gamedata.get('alliance_help_restrict_region', True) and (not session.player.home_region):
-                        retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
-                        success = False
+                # you may request alliance help even if you aren't on the map yet
 
                 if success:
+                    # note: region_id may be None if the player is not on the map
                     region_id = session.player.home_region if gamedata.get('alliance_help_restrict_region', True) else None
                     expire_time = server_time + gamedata['alliance_help_request_duration']
                     req_props = {'obj_id': object.obj_id, 'obj_spec': object.spec.name, 'obj_level': object.level,
@@ -32317,8 +32315,10 @@ class GAMEAPI(resource.Resource):
                                                            '%DESCR': '%s L%d' % (gamedata['buildings'][req_props['action_spec']]['ui_name'], req_props['action_level'])})
                             for member, pinfo in zip(member_list, pcache_data):
                                 if member['user_id'] != session.user.user_id:
-                                    if gamedata.get('alliance_help_restrict_region', True) and pinfo and pinfo.get('home_region',None) != region_id:
-                                        continue # different region - don't notify
+                                    # don't notify if the region restriction would prevent you from responding
+                                    if region_id and gamedata.get('alliance_help_restrict_region', True) and \
+                                       pinfo and pinfo.get('home_region',None) != region_id:
+                                        continue
                                     gamesite.do_CONTROLAPI(session.user.user_id, {'method': 'send_notification', # 'reliable': 1,
                                                                                   'ignore_if_online': 1, # only send to offline people
                                                                                   'user_id': member['user_id'],
@@ -32333,6 +32333,13 @@ class GAMEAPI(resource.Resource):
                 success = True
                 error_reason = None
 
+                spell = gamedata['spells'][spellname]
+
+                for PRED in ('show_if', 'requires'):
+                    if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
+                        error_reason = "REQUIREMENTS_NOT_SATISFIED"
+                        success = False
+
                 if success:
                     if session.has_attacked:
                         error_reason = "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"
@@ -32342,11 +32349,6 @@ class GAMEAPI(resource.Resource):
                     if (not session.player.alliance_help_enabled()) or \
                        (not gamesite.sql_client) or (not session.alliance_chat_channel):
                         retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])
-                        success = False
-
-                if success:
-                    if gamedata.get('alliance_help_restrict_region', True) and (not session.player.home_region):
-                        error_reason = "REQUIREMENTS_NOT_SATISFIED"
                         success = False
 
                 if success:
