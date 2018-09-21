@@ -26539,7 +26539,7 @@ class GAMEAPI(resource.Resource):
                 if update_viewing_player and session.has_attacked:
                     retmsg.append(["ENEMY_STATE_UPDATE", session.viewing_player.resources.calc_snapshot().serialize(enemy = True)])
 
-    def fire_on_approach(self, session, retmsg, id, xy, trigger_obj_id):
+    def fire_on_approach(self, session, retmsg, id, xy, trigger_obj_id, client_time):
         if not session.has_object(id): return
         obj = session.get_object(id)
         if obj.on_approach_fired: return
@@ -26559,6 +26559,8 @@ class GAMEAPI(resource.Resource):
             obj.on_approach_fired = True
             for cons in cons_list:
                 session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y] if obj.is_building() else map(int, xy), 'trigger_obj': trigger_obj}, reason='on_approach(%s)' % obj.spec.name)
+
+        retmsg.append(["ON_APPROACH_RESULT", obj.owner.user_id, id, client_time, server_time])
 
     def recycle_unit(self, session, retmsg, id):
         obj = session.player.get_object_by_obj_id(id, fail_missing = False)
@@ -29159,7 +29161,7 @@ class GAMEAPI(resource.Resource):
             self.object_combat_updates(session, retmsg, arg[1])
 
         elif arg[0] == "ON_APPROACH":
-            self.fire_on_approach(session, retmsg, arg[1], arg[2], arg[3])
+            self.fire_on_approach(session, retmsg, arg[1], arg[2], arg[3], arg[4])
 
         elif arg[0] == "AUTO_RESOLVE":
             self.auto_resolve(session, retmsg)

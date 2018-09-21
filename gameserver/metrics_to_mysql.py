@@ -163,6 +163,12 @@ if __name__ == '__main__':
             elif row['event_name'] == '3832_battle_replay_uploaded':
                 keyvals.append(('stack', row.get('wire_length')))
 
+            elif row['event_name'] == '3973_on_approach_latency':
+                # "spec" = the latency (a float), but stored as a string
+                # "stack" = the defending player ID
+                keyvals.append(('spec', '%.2f' % row.get('latency',-1.0)))
+                keyvals.append(('stack', row.get('defender_id')))
+
             elif row['event_name'] in ('0113_account_deauthorized',
                                        '0140_tutorial_oneway_ticket',
                                        '0140_tutorial_start',

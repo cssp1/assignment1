@@ -4738,9 +4738,7 @@ GameObject.prototype.run_ai = function(world) {
     // on_approach handling - XXX convert this to a special_ai ?
 
     // @type {Array<Object<string,?>>|null} List of consequents
-    var on_approach = (this.is_mobile() ? get_unit_stat(this.team === 'player' ? player.stattab : enemy.stattab,
-                                                        this.spec['name'], 'on_approach', null) :
-                       this.is_building() ? this.get_stat('on_approach', null) : null);
+    var on_approach = this.get_on_approach_consequents();
 
     if(!session.is_replay() && on_approach && !this.on_approach_fired) {
         var pred = read_predicate({'predicate': 'HOSTILE_UNIT_NEAR'});
@@ -4749,15 +4747,30 @@ GameObject.prototype.run_ai = function(world) {
                      'distance': gamedata['map']['aggro_radius'][this.team]['defense']
                     };
         if(pred.is_satisfied(player, qdata)) {
-            goog.array.forEach(on_approach, function(cons) {
-                if(this.on_approach_fired) { return; }
-                if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
-                    send_to_server.func(["ON_APPROACH", this.id, this.raw_pos(), qdata['hostile_obj'].id]);
-                    this.on_approach_fired = true;
-                }
-            }, this);
+            this.fire_on_approach_secteams(on_approach, qdata['hostile_obj'].id);
         }
     }
+};
+
+/** Get a list of (JSON) consequents that this object should run when enemies approach
+    @return {Array<Object<string,?>>|null} List of consequents */
+GameObject.prototype.get_on_approach_consequents = function() {
+    return (this.is_mobile() ? get_unit_stat(this.team === 'player' ? player.stattab : enemy.stattab,
+                                             this.spec['name'], 'on_approach', null) :
+            this.is_building() ? this.get_stat('on_approach', null) : null);
+};
+
+/** Tell the server we are firing our ON_APPROACH consequent
+    @param {Array<Object<string,?>>|null} on_approach consequent list from above
+    @param {GameObjectId|null} source_obj_id that triggered this */
+GameObject.prototype.fire_on_approach_secteams = function(on_approach, source_obj_id) {
+    goog.array.forEach(on_approach, function(cons) {
+        if(this.on_approach_fired) { return; }
+        if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
+            send_to_server.func(["ON_APPROACH", this.id, this.raw_pos(), source_obj_id, client_time]);
+            this.on_approach_fired = true;
+        }
+    }, this);
 };
 
 /**
@@ -49081,6 +49094,14 @@ function handle_server_message(data) {
                 }
             }
         }
+    } else if(msg == "ON_APPROACH_RESULT") {
+        var defender_id = data[1], obj_id = data[2], client_start_time = data[3], server_receipt_time = data[4];
+        if(!gamedata['client']['report_on_approach_latency']) { return; }
+        metric_event('3973_on_approach_latency', {'client_start_time': client_start_time,
+                                                  'client_end_time': client_time,
+                                                  'server_receipt_time': server_receipt_time,
+                                                  'latency': client_time - client_start_time,
+                                                  'defender_id': defender_id});
     } else if(msg == "EQUIP_BUILDING_RESULT") {
         var my_arg = data[1], success = data[2];
         var unit_id = my_arg[1], addr = my_arg[2], inv_slot = my_arg[3], add_item = my_arg[4], remove_item = my_arg[5], ui_slot = my_arg[6];
