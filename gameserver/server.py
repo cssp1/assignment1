@@ -4906,9 +4906,9 @@ class Session(object):
             if climate and ('applies_aura' in climate):
                 if obj.auras is None: obj.auras = []
                 Aura.apply_aura(obj.auras, climate['applies_aura'], climate['aura_strength'], session_only = True)
-            if obj.spec.permanent_auras:
-                for aura in obj.spec.permanent_auras:
-                    if 'required_climate' in aura and aura['required_climate'] == climate['name']:
+            if obj.spec.climate_auras:
+                for aura in obj.spec.climate_auras:
+                    if aura['required_climate'] == climate['name']:
                         if obj.auras is None: obj.auras = []
                         Aura.apply_aura(obj.auras, aura['aura_name'], aura['aura_strength'], session_only = True)
 
@@ -6754,6 +6754,7 @@ class GameObjectSpec(Spec):
         ["quarry_invul", False],
         ["equip_slots", None],
         ["permanent_auras", None],
+        ["climate_auras", None],
         ["permanent_modstats", None],
         ["auto_spawn", False],
         ["on_destroy", None],
@@ -6988,8 +6989,7 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
         if perm:
             if not auras: auras = []
             for a in perm:
-                if (not 'required_climate' in a):
-                    Aura.apply_aura(auras, a['aura_name'], a.get('aura_strength',1), range = a.get('aura_range',-1), duration = a.get('aura_duration',-1))
+                Aura.apply_aura(auras, a['aura_name'], a.get('aura_strength',1), range = a.get('aura_range',-1), duration = a.get('aura_duration',-1))
 
     if obj_id is None: obj_id = gamesite.nosql_id_generator.generate() # for on-the-fly creation not associated with file loads - like new unit production
 
@@ -7222,8 +7222,7 @@ class GameObject(object):
         if auras_to_apply:
             if self.auras is None: self.auras = []
             for a in auras_to_apply:
-                if (not 'required_climate' in a):
-                    Aura.apply_aura(self.auras, a, 1, session_only = True)
+                Aura.apply_aura(self.auras, a, 1, session_only = True)
 
         return auras_to_apply
 
@@ -12440,8 +12439,7 @@ class Player(AbstractPlayer):
                     if permanent_auras:
                         if obj.auras is None: obj.auras = []
                         for data in permanent_auras:
-                            if (not 'required_climate' in data):
-                                Aura.apply_aura(obj.auras, data['aura_name'], data.get('aura_strength',1), from_stattab = True)
+                            Aura.apply_aura(obj.auras, data['aura_name'], data.get('aura_strength',1), from_stattab = True)
 
             # even when squads are off, make sure total_space is enough for the whole of base defenders
             self.total_space = max(self.total_space, self.main_squad_space)
