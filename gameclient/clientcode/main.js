@@ -54581,8 +54581,6 @@ function draw_aura(xy, indicator_xy, aura) {
         color = 'rgba(0,50,255,';
     } else if('harm' in aura.spec) {
         color = 'rgba(255,50,0,';
-    } else if('hide_duration' in aura.spec) {
-        color = 'rgba(255,255,255,';
     } else {
         color = 'rgba(200,200,200,'
     }
@@ -54603,9 +54601,7 @@ function draw_aura(xy, indicator_xy, aura) {
         ctx.restore();
     }
 
-    if('hide_duration' in aura.spec) {
-        draw_clock(indicator_xy, color+'0.0)', aura.start_tick, aura.expire_tick);
-    } else {
+    if(!('hide_duration' in aura.spec)) {
         draw_clock(indicator_xy, color+'1.0)', aura.start_tick, aura.expire_tick);
     }
     return true;
