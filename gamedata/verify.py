@@ -437,7 +437,7 @@ def check_levels(specname, spec):
               # note: the 3D weapon_offset must be a per-level array, since there is no easy way to distinguish it from a 3-level scalar
               'max_ui_level',
               'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories', 'enhancement_categories',
-              'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras', 'permanent_modstats',
+              'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras', 'climate_auras', 'permanent_modstats',
               'upgrade_ingredients', 'remove_ingredients', 'research_ingredients',
               'quarry_control_auras')
     error = 0
