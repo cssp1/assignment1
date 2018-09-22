@@ -283,6 +283,26 @@ def check_mandatory_fields(specname, spec, kind):
                         error |= 1
                         print '%s:permanent_auras refers to an aura that does not exist (%s)' % (specname, a['aura_name'])
 
+    if spec.get('climate_auras',None):
+        alist_list = spec['climate_auras']
+        if len(alist_list) >= 1 and (isinstance(alist_list[0], list) or alist_list[0] is None):
+            pass
+        else:
+            alist_list = [alist_list]
+        for alist in alist_list:
+            if alist:
+                for a in alist:
+                    if a['aura_name'] not in gamedata['auras']:
+                        error |= 1
+                        print '%s:climate_auras refers to an aura that does not exist (%s)' % (specname, a['aura_name'])
+                    if not a['required_climate']:
+                        error |= 1
+                        print '%s:climate_auras aura (%s) does not have a required_climate key' % (specname, a['aura_name'])
+                    if a['required_climate'] not in gamedata['climates']:
+                        error |= 1;
+                        print '%s:climate_auras aura (%s) requires invalid climate "%s"' % (specname, a['aura_name'], a['required_climate'])
+
+
     if spec.get('permanent_modstats', None):
         mlist_list = spec['permanent_modstats']
         if len(mlist_list) >= 1 and (isinstance(mlist_list[0], list) or mlist_list[0] is None):
