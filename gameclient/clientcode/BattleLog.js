@@ -184,6 +184,7 @@ BattleLog.compress = function(metlist) {
            met['user_id'] == group[0]['user_id'] &&
            met['attacker_obj_id'] == group[0]['attacker_obj_id'] &&
            met['attacker_type'] == group[0]['attacker_type'] &&
+           met['source_obj_specname'] == group[0]['source_obj_specname'] &&
            met['unit_type'] &&
            !(met['event_name'] == '3920_building_destroyed' && ('level' in met) && ('attacker_type' in met))) {
 

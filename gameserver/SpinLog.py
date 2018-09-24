@@ -239,6 +239,7 @@ def MetricsLogFilter(child):
 
                                   # these can be turned on temporarily for analytics
                                   '3350_no_miss_hack',
+                                  '3973_on_approach_latency', # temporary, for gathering data on typical latency for ON_APPROACH consequents
                                   #'4010_quest_complete',
                                   #'4011_quest_complete_again',
                                   '4120_send_gift_completed',

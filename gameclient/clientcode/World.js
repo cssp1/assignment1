@@ -710,17 +710,9 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source) {
 
         // on_approach needs to fire here, if it hasn't already
         // @type {Array<Object<string,?>>|null} List of consequents
-        var on_approach = (target.is_mobile() ? get_unit_stat(target.team === 'player' ? player.stattab : enemy.stattab,
-                                                              target.spec['name'], 'on_approach', null) :
-                           target.is_building() ? target.get_stat('on_approach', null) : null);
+        var on_approach = target.get_on_approach_consequents();
         if(!session.is_replay() && on_approach && !target.on_approach_fired) {
-            goog.array.forEach(on_approach, function(cons) {
-                if(target.on_approach_fired) { return; }
-                if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
-                    send_to_server.func(["ON_APPROACH", target.id, target.raw_pos(), (source ? source.id : null)]);
-                    target.on_approach_fired = true;
-                }
-            });
+            target.fire_on_approach_secteams(on_approach, (source ? source.id : null));
         }
     }
 
