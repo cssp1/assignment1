@@ -27577,6 +27577,8 @@ class GAMEAPI(resource.Resource):
 
         # update profile fields
         if frame_platform == 'fb':
+            # ideally we should extend this token, in case the gameplay session lasts longer than the normal 2-hour expiration
+            # https://developers.facebook.com/docs/facebook-login/access-tokens/refreshing/
             user.fb_oauth_token = auth_token
 
             user.facebook_id = social_id[2:]

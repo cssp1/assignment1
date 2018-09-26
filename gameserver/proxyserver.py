@@ -1608,6 +1608,8 @@ class GameProxy(proxy.ReverseProxyResource):
             # but don't reset oauth info
             pass
 
+        proposed_oauth_token = None
+
         if visitor.raw_signed_request:
 
             try:
@@ -1655,11 +1657,11 @@ class GameProxy(proxy.ReverseProxyResource):
                     visitor.set_facebook_id(None)
 
                 if 'oauth_token' in signed_request:
-                    visitor.oauth_token = signed_request['oauth_token']
+                    proposed_oauth_token = signed_request['oauth_token']
 
                 # accept raw oauth_token from client flow (?)
-                elif (not visitor.oauth_token) and ('spin_oauth_token' in request.args):
-                    visitor.oauth_token = request.args['spin_oauth_token'][-1]
+                elif (not proposed_oauth_token) and ('spin_oauth_token' in request.args):
+                    proposed_oauth_token = request.args['spin_oauth_token'][-1]
 
                 else:
                     # don't reset?
@@ -1720,14 +1722,16 @@ class GameProxy(proxy.ReverseProxyResource):
         # this MIGHT come together inside the signed_request, or we might have to retrieve them if we get a "code" argument (after an auth redirect)
 
         if SpinConfig.config['proxyserver'].get('log_auth_scope', 0) >= 2:
-            exception_log.event(proxy_time, 'index visitor: fbid "%s" oauth_token "%s" args: %s' % (repr(visitor.facebook_id), repr(visitor.oauth_token), repr(request.args)))
+            exception_log.event(proxy_time, 'index visitor: fbid "%s" proposed_oauth_token "%s" args: %s' % (repr(visitor.facebook_id), repr(proposed_oauth_token), repr(request.args)))
 
-        if visitor.facebook_id and visitor.oauth_token:
-            if SpinConfig.config.get('enable_facebook',0): # and SpinConfig.config['proxyserver'].get('check_auth_scope', True): this is mandatory now, to pass permissions proxy->client->server
-                # perform deferred /permissions check
-                return self.index_visit_check_scope(request, visitor)
+        if visitor.facebook_id and proposed_oauth_token:
+            if SpinConfig.config.get('enable_facebook',0):
+                # this is mandatory to check the token (it might have expired) and pass permissions proxy->client->server
+                return self.index_visit_verify_oauth_token(request, visitor, proposed_oauth_token)
+                #return self.index_visit_check_scope(request, visitor)
             else:
                 # immediate entry to game
+                visitor.oauth_token = proposed_oauth_token
                 return self.index_visit_authorized(request, visitor)
 
         if 'code' in request.args:
@@ -1839,8 +1843,14 @@ class GameProxy(proxy.ReverseProxyResource):
                             scope_data['installed'] = 1
                             scope_data['public_profile'] = 1
                             return self.index_visit_check_scope_response(request, visitor, None, preload_data = scope_data)
+                else:
+                    # the oauth token has expired
+                    if verbose():
+                        raw_log.event(proxy_time, ('browser presented an expired Facebook OAuth token (expires at %d, current time %d): ' % (int(data['expires_at']), proxy_time))+log_request(request))
+                    # no problem, just redirect to auth
+                    return self.index_visit_do_fb_auth(request, visitor)
 
-        # fail, request auth again
+        # some other failure - request auth again
         exception_log.event(proxy_time, 'failed to verify oauth token: '+repr(request)+' args '+repr(request.args)+' signed_request '+repr(visitor.raw_signed_request)+' token '+repr(token)+' response '+repr(response))
         return self.index_visit_do_fb_auth(request, visitor)
 
