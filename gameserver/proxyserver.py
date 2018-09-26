@@ -1843,6 +1843,14 @@ class GameProxy(proxy.ReverseProxyResource):
                             scope_data['installed'] = 1
                             scope_data['public_profile'] = 1
                             return self.index_visit_check_scope_response(request, visitor, None, preload_data = scope_data)
+                    else:
+                        # NOT a valid oauth token
+                        # check for known harmless reasons here
+                        # any other case falls down to "some other failure" below
+                        if 'error' in data and data['error'].get('code') == 190 and data['error'].get('subcode') == 467:
+                            # "Error validating access token: The session is invalid because the user logged out." (of Facebook)
+                            return self.index_visit_do_fb_auth(request, visitor)
+
                 else:
                     # the oauth token has expired
                     if verbose():
