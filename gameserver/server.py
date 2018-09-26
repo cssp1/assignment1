@@ -2941,12 +2941,22 @@ class User:
 
         endpoint = str(self.facebook_id)
 
-        # XXXXXX now we always have to use using app_tok here because of appsecret_proof.
-        # This results in no birthday info and no is_eligible_promo data.
-        # We'll need to do client-side queries for those
+        # Facebook has been messing around with which of the app or user access tokens can be used to retrieve data.
+
+        # Note, if using a user access token, then it is not possible to apply appsecret_proof verification
+        # That option seems to be busted as of 2018.
+
+        # note: when using app access token, Facebook has stopped sending: birthday, is_eligible_promo
+        # and also the /friends endpoint returns nothing.
 
         profile_url = SpinFacebook.versioned_graph_endpoint_secure('user', endpoint)+'&fields=id,birthday,email,name,first_name,last_name,gender,locale,timezone,third_party_id,currency,is_eligible_promo,permissions'
-        friends_url = SpinFacebook.versioned_graph_endpoint_secure('friend', endpoint+'/friends')+'?limit=500&offset=0'
+
+        # as of 20180925, Facebook doesn't return any friends here if you use the app_tok instead of the user's fb_oauth_token
+        if 'facebook_api_token_choice' in SpinConfig.config and SpinConfig.config['facebook_api_token_choice'].get('friend') == 'user' and self.fb_oauth_token:
+            friends_url = SpinFacebook.versioned_graph_endpoint('friend', endpoint+'/friends')+'?limit=500&offset=0&' + urllib.urlencode({'access_token': self.fb_oauth_token})
+        else:
+            friends_url = SpinFacebook.versioned_graph_endpoint_secure('friend', endpoint+'/friends')+'?limit=500&offset=0'
+
         likes_url = SpinFacebook.versioned_graph_endpoint_secure('like', endpoint+'/likes')+'?limit=500&offset=0'
 
         # keep track of outstanding requests
