@@ -118,6 +118,8 @@ if [[ $DO_SNAPSHOT == 1 ]]; then
     echo "Created snapshot $SNAPREF"
 fi
 if [[ $DO_COMPARE == 1 ]]; then
-    echo "Checking against snapshot:"
-    (cd ${SPIN_GAMEDATA} && diff -s $SNAPSRC $SNAPREF)
+    echo "Comparing against snapshot:"
+    if ! (cd ${SPIN_GAMEDATA} && diff -sq $SNAPSRC $SNAPREF); then
+	(cd ${SPIN_GAMEDATA} && ./diff.py $SNAPSRC $SNAPREF)
+    fi
 fi

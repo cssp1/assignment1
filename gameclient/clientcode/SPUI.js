@@ -3857,9 +3857,16 @@ SPUI.ScrollingTextField.prototype.scroll_to_top = function() {
 
 /** The getmore_cb should call this (asynchronously) once the request has finished */
 SPUI.ScrollingTextField.prototype.getmore_responded = function(is_final) {
-    this.getmore_pending = false;
     this.getmore_final = is_final;
     this.scroll_up();
+
+    // clear this after scrolling, otherwise it can trigger getmore_cb again!
+    this.getmore_pending = false;
+
+    // set state for the "scroll up" button
+    if(this.scroll_up_button) {
+        this.scroll_up_button.state = (this.can_scroll_up() ? 'normal' : 'disabled');
+    }
 };
 
 

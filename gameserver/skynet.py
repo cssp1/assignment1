@@ -2288,6 +2288,11 @@ def adcampaigns_garbage_collect(db):
     unused_campaign_ids = list(campaign_ids.difference(used_campaign_ids))
     print len(campaign_ids), 'campaigns', len(used_campaign_ids), 'used', len(unused_campaign_ids), 'unused'
     if unused_campaign_ids:
+        if verbose:
+            print 'unused campaigns:'
+            for row in db.fb_adcampaigns.find({'id':{'$in': unused_campaign_ids}}, {'id': 1, 'name': 1}):
+                print row['id'], row['name']
+
         for campaign_id, result in zip(unused_campaign_ids,
                                        fb_api_batch(SpinFacebook.versioned_graph_endpoint('adset', ''),
                                                     [{'method':'POST', 'relative_url': campaign_id,

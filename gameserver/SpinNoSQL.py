@@ -2376,8 +2376,8 @@ class NoSQLClient (object):
         if member_access: FIELDS += ['chat_motd']
         return dict(((field,1) for field in FIELDS))
 
-    def get_alliance_list(self, limit, members_fewer_than = -1, open_join_only = False, match_continent = None, has_activity_since = -1, reason=''): return self.instrument('get_alliance_list(%s)'%reason, self._get_alliance_list, (limit, members_fewer_than, open_join_only, match_continent, has_activity_since))
-    def _get_alliance_list(self, limit, members_fewer_than, open_join_only, match_continent, has_activity_since):
+    def get_alliance_list(self, limit, members_fewer_than = -1, open_join_only = False, match_continent = None, has_activity_since = -1, exclude_alliance_id = -1, reason=''): return self.instrument('get_alliance_list(%s)'%reason, self._get_alliance_list, (limit, members_fewer_than, open_join_only, match_continent, has_activity_since, exclude_alliance_id))
+    def _get_alliance_list(self, limit, members_fewer_than, open_join_only, match_continent, has_activity_since, exclude_alliance_id):
         qs = {}
         if open_join_only:
             qs['join_type'] = 'anyone'
@@ -2387,7 +2387,8 @@ class NoSQLClient (object):
             qs['continent'] = match_continent
         if has_activity_since > 0:
             qs['last_active_time'] = {'$gte': has_activity_since}
-
+        if exclude_alliance_id >= 0:
+            qs['_id'] = {'$ne': exclude_alliance_id}
         cur = self.alliance_table('alliances').find(qs, self.alliance_query_fields(False))
         if limit >= 1:
             # only return first 'limit' alliances, ordered with largest number of vacancies first (or fewest, if members_fewer_than is active)
@@ -2661,10 +2662,20 @@ class NoSQLClient (object):
         # of space_array in sequence (it should be sorted largest to smallest), stopping when we find an amount
         # of space such that cur_space + donated_space <= max_space.
         for donated_space in space_array:
-            qs = {'_id':recipient_id, 'alliance_id':alliance_id, 'tag':tag,
-                  'space_left': { '$gte': donated_space } }
+            # consider the region to match if it is equal to supplied region_id, or if the request is "regionless"
+            region_qs = {'$or': [
+                {'region_id': {'$exists': False}}, # no region_id on the request
+                {'region_id': {'$type':10}}, # region_id on the request is null
+                ] }
             if region_id:
-                qs['region_id'] = region_id
+                region_qs['$or'].append({'region_id': region_id}) # matches supplied non-null region_id
+
+            qs = {'$and':[{'_id':recipient_id,
+                           'alliance_id':alliance_id,
+                           'tag':tag,
+                           'space_left': { '$gte': donated_space }
+                           },
+                          region_qs]}
             ret = self.unit_donation_requests_table().find_one_and_update(qs,
                                                                           {'$inc':{'space_left':-donated_space}},
                                                                           upsert = False,
@@ -2704,13 +2715,22 @@ class NoSQLClient (object):
         return self.instrument('help_request_help', self._help_request_help, (req_id, helper_id, alliance_id, region_id))
     def _help_request_help(self, req_id, helper_id, alliance_id, region_id):
         assert req_id and helper_id and alliance_id
-        match_qs = {'_id': self.encode_object_id(req_id),
-                    'expire_time': {'$gte': self.time},
-                    'user_id': {'$ne': helper_id}, # can't help yourself
-                    'alliance_id': alliance_id,
-                    'helper_ids': {'$nin': [helper_id]}}
+
+        # consider the region to match if it is equal to supplied region_id, or if the request is "regionless"
+        region_qs = {'$or': [
+            {'region_id': {'$exists': False}}, # no region_id on the request
+            {'region_id': {'$type':10}}, # region_id on the request is null
+            ] }
         if region_id:
-            match_qs['region_id'] = region_id
+            region_qs['$or'].append({'region_id': region_id}) # matches supplied non-null region_id
+
+        match_qs = {'$and':[{'_id': self.encode_object_id(req_id),
+                             'expire_time': {'$gte': self.time},
+                             'user_id': {'$ne': helper_id}, # can't help yourself
+                             'alliance_id': alliance_id,
+                             'helper_ids': {'$nin': [helper_id]}
+                             },
+                            region_qs]}
         ret = self.help_requests_table().find_one_and_update(match_qs,
                                                              {'$addToSet': {'helper_ids': helper_id}},
                                                              return_document = pymongo.ReturnDocument.AFTER)

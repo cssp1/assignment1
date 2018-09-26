@@ -31,6 +31,7 @@ def compute_dps(shooter, target, session):
         for aura in spell['impact_auras']:
             aura_spec = session.player.get_abtest_aura(aura['spec'])
             aura_strength = shooter.get_leveled_quantity(aura.get('strength',1))
+            # XXX note: this does not support duration_vs!
             aura_duration = shooter.get_leveled_quantity(aura.get('duration',1))
             uptime = 1
             if aura_duration < cooldown:
@@ -53,6 +54,7 @@ def compute_dps(shooter, target, session):
         if not target.spec.defense_types:
             damage_coeff_pre_armor *= damage_vs_table.get('default',1)
         else:
+            # XXX note: this does not support compound keys - see main.js: get_damage_modifier()
             for key in target.spec.defense_types:
                 if key in damage_vs_table:
                     damage_coeff_pre_armor *= shooter.get_leveled_quantity(damage_vs_table[key])

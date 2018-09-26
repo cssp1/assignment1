@@ -2521,7 +2521,18 @@ GameObject.prototype.speak = function(name) {
     GameArt.play_canned_sound(this.spec[field]);
 };
 
-/** Modify damage by vs_table coefficients
+/** Modify damage by vs_table coefficients on the weapon vs. a specific target
+
+    This multiplies matching damage_vs values on the weapon by defense_types that the target is marked with.
+
+    It also supports compound keys, which are multiple defense_types separated by commas.
+    The keys are ANDded together, and can be negated by prefixing a key with "!".
+
+    e.g., "building,!turret" means (building AND (NOT turret))
+          "building,'turret" means (building AND turret)
+
+    Finally, we also apply the target's damage_taken_from modifiers to the weapon.
+
     @param {Object.<string,number>} vs_table
     @param {GameObject} target
     @return {CombatEngine.Coeff} */
@@ -2540,8 +2551,40 @@ function get_damage_modifier(vs_table, target) {
                     damage_mod *= coeff;
                 }
             }
+
+            // check for compound terms in the vs_table
+            for(var kind in vs_table) {
+                if(kind.indexOf(',') !== -1) {
+                    var terms = kind.split(',');
+                    var match = true;
+                    for(var j = 0; j < terms.length; j++) {
+                        var term = terms[j];
+                        // check for negated terms
+                        var negate = false
+                        if(term[0] === '!') {
+                            negate = true;
+                            term = term.slice(1);
+                        }
+                        // is this term present in defense_types?
+                        if(goog.array.contains(target.spec['defense_types'], term)) {
+                            if(negate) {
+                                match = false;
+                                break;
+                            }
+                        } else if(!negate) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if(match) {
+                        damage_mod *= vs_table[kind];
+                        // console.log('match '+target.spec.name +' by '+kind+' -> '+vs_table[kind].toString());
+                    }
+                }
+            }
         }
 
+        // check the target's damage_taken_from stat
         for(var kind in vs_table) {
             if(kind in target.combat_stats.damage_taken_from) {
                 damage_mod *= vs_table[kind] * target.combat_stats.damage_taken_from[kind];
@@ -4695,9 +4738,7 @@ GameObject.prototype.run_ai = function(world) {
     // on_approach handling - XXX convert this to a special_ai ?
 
     // @type {Array<Object<string,?>>|null} List of consequents
-    var on_approach = (this.is_mobile() ? get_unit_stat(this.team === 'player' ? player.stattab : enemy.stattab,
-                                                        this.spec['name'], 'on_approach', null) :
-                       this.is_building() ? this.get_stat('on_approach', null) : null);
+    var on_approach = this.get_on_approach_consequents();
 
     if(!session.is_replay() && on_approach && !this.on_approach_fired) {
         var pred = read_predicate({'predicate': 'HOSTILE_UNIT_NEAR'});
@@ -4706,15 +4747,30 @@ GameObject.prototype.run_ai = function(world) {
                      'distance': gamedata['map']['aggro_radius'][this.team]['defense']
                     };
         if(pred.is_satisfied(player, qdata)) {
-            goog.array.forEach(on_approach, function(cons) {
-                if(this.on_approach_fired) { return; }
-                if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
-                    send_to_server.func(["ON_APPROACH", this.id, this.raw_pos(), qdata['hostile_obj'].id]);
-                    this.on_approach_fired = true;
-                }
-            }, this);
+            this.fire_on_approach_secteams(on_approach, qdata['hostile_obj'].id);
         }
     }
+};
+
+/** Get a list of (JSON) consequents that this object should run when enemies approach
+    @return {Array<Object<string,?>>|null} List of consequents */
+GameObject.prototype.get_on_approach_consequents = function() {
+    return (this.is_mobile() ? get_unit_stat(this.team === 'player' ? player.stattab : enemy.stattab,
+                                             this.spec['name'], 'on_approach', null) :
+            this.is_building() ? this.get_stat('on_approach', null) : null);
+};
+
+/** Tell the server we are firing our ON_APPROACH consequent
+    @param {Array<Object<string,?>>|null} on_approach consequent list from above
+    @param {GameObjectId|null} source_obj_id that triggered this */
+GameObject.prototype.fire_on_approach_secteams = function(on_approach, source_obj_id) {
+    goog.array.forEach(on_approach, function(cons) {
+        if(this.on_approach_fired) { return; }
+        if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
+            send_to_server.func(["ON_APPROACH", this.id, this.raw_pos(), source_obj_id, client_time]);
+            this.on_approach_fired = true;
+        }
+    }, this);
 };
 
 /**
@@ -16039,6 +16095,8 @@ function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_bo
     goog.array.forEach(tablist, goog.partial(chat_tab_accept_message, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend||false));
 }
 
+var chat_getmore_serial = 0;
+
 /** @param {string} channel_name
     @param {!Object<string,?>} sender_info
     @param {string} wrapped_body
@@ -16046,6 +16104,15 @@ function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_bo
     @param {boolean} is_prepend
     @param {!SPUI.Dialog} tab */
 function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend, tab) {
+
+    // for can_get_more messages, invent a fake chat_msg_id so that the message can reference
+    // itself for deletion. But make sure it won't conflict with a true message ID.
+    if(sender_info['type'] == 'can_get_more') {
+        if(!chat_msg_id) {
+            // note: the '*' first charcter signals that GETMORE should ignore this ID for query purposes
+            chat_msg_id = '*getmore' + chat_getmore_serial.toString(); chat_getmore_serial += 1;
+        }
+    }
 
     if(sender_info['type'] == 'unit_donation_request') { // new unit donation request
         if(!player.unit_donation_enabled()) { return; }
@@ -16137,6 +16204,13 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
                     // wrong region - offer to relocate
                     invoke_find_on_map(_req['region_id'], [0,0]);
                     return;
+                } else if('requires' in gamedata['spells']['GIVE_ALLIANCE_HELP']) {
+                    var pred = read_predicate(gamedata['spells']['GIVE_ALLIANCE_HELP']['requires']);
+                    if(!pred.is_satisfied(player)) {
+                        var helper = get_requirements_help(pred);
+                        if(helper) { helper(); }
+                        return;
+                    }
                 }
 
                 send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "GIVE_ALLIANCE_HELP", _req['recipient_id'], _req['req_id']]);
@@ -16210,6 +16284,11 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
         // set up a default onclick handler for the entire blob of text
         if(report_args) {
             base_props.onclick = bbcode_click_handlers['player']['onclick'](report_args.user_id.toString(), report_args.ui_name);
+        }
+
+        // replace message ID
+        if(bb_text.indexOf('%chat_message_id') != -1 && chat_msg_id) {
+                bb_text = bb_text.replace('%chat_message_id', chat_msg_id);
         }
 
         // replace alliance chat tag
@@ -16289,7 +16368,8 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
             node.on_destroy = (function (_tab, _chat_msg_id) { return function(_node) {
                 delete _tab.user_data['chat_messages_by_id'][_chat_msg_id];
             }; })(tab, chat_msg_id);
-            if(tab.user_data['earliest_id'] === null || chat_msg_id < tab.user_data['earliest_id']) {
+            if(chat_msg_id[0] != '*' && /* ignore fake IDs generated for 'can_get_more' messages */
+               (tab.user_data['earliest_id'] === null || chat_msg_id < tab.user_data['earliest_id'])) {
                 tab.user_data['earliest_id'] = chat_msg_id;
             }
         }
@@ -16401,7 +16481,23 @@ var system_chat_bbcode_click_handlers = {
         invoke_store('exact_path', _path);
         // play sound effect
         GameArt.play_canned_sound('action_button_resizable');
-    }; })(path); } }
+    }; })(path); } },
+    'getmore': { 'onclick': function(chat_msg_id) { return (function (_chat_msg_id) { return function(w, mloc) {
+        // for the "Click here to load earlier chat messages" message
+
+        // find and delete this one message
+        var tab = w.parent;
+        if(tab && _chat_msg_id in tab.user_data['chat_messages_by_id']) {
+            w.remove_text(tab.user_data['chat_messages_by_id'][_chat_msg_id]);
+        }
+
+        // perform the same checks as SPUI.ScrollingTextField.scroll_up(),
+        // and then send the scrolling command.
+        if(w.can_scroll_up() && w.buf_top >= w.buffer.length && !w.getmore_final && !w.getmore_pending) {
+            w.scroll_up();
+        }
+
+    }; })(chat_msg_id); } }
 };
 
 
@@ -16624,6 +16720,18 @@ function init_chat_frame() {
         tab.widgets['output'].scroll_down_button = tab.widgets[(invert ? 'scroll_up' : 'scroll_down')];
         tab.widgets['output'].getmore_cb = (gamedata['client']['enable_chat_getmore'] ? function(w) {
             var tab = w.parent;
+
+            // remove any lingering 'can_get_more' messages
+            var to_remove = [];
+            for(var chat_msg_id in tab.user_data['chat_messages_by_id']) {
+                if(chat_msg_id.indexOf('getmore') === 0) {
+                    to_remove.push(chat_msg_id);
+                }
+            }
+            goog.array.forEach(to_remove, function(chat_msg_id) {
+                tab.widgets['output'].remove_text(tab.user_data['chat_messages_by_id'][chat_msg_id]);
+            });
+
             var tag = 'cgm'+(last_query_tag++).toString();
             chat_getmore_receiver.listenOnce(tag, (function (_tab) { return function(event) {
                 goog.array.forEach(event.response, function(data) {
@@ -29985,9 +30093,16 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
                 _d.user_data['pending'] = false;
                 _d.widgets['loading_rect'].show = _d.widgets['loading_text'].show = _d.widgets['loading_spinner'].show = false;
 
-                // sort by open join first, then number of members (so alliances with *fewer* vacant spots appear first)
+                // sort by ui_priority, then join type ('anyone' perferred), then number of members DESC (so alliances with *fewer* vacant spots appear first)
                 var compare_for_list = function (a,b) {
-                    if(a['join_type'] == 'anyone' && b['join_type'] != 'anyone') {
+                    var a_ui_priority = ('ui_priority' in a ? a['ui_priority'] : 0);
+                    var b_ui_priority = ('ui_priority' in b ? b['ui_priority'] : 0);
+                    if(a_ui_priority > b_ui_priority) {
+                        // prefer higher ui_priority
+                        return -1;
+                    } else if(a_ui_priority < b_ui_priority) {
+                        return 1;
+                    } else if(a['join_type'] == 'anyone' && b['join_type'] != 'anyone') {
                         return -1;
                     } else if(a['join_type'] != 'anyone' && b['join_type'] == 'anyone') {
                         return 1;
@@ -49009,6 +49124,14 @@ function handle_server_message(data) {
                 }
             }
         }
+    } else if(msg == "ON_APPROACH_RESULT") {
+        var defender_id = data[1], obj_id = data[2], client_start_time = data[3], server_receipt_time = data[4];
+        if(!gamedata['client']['report_on_approach_latency']) { return; }
+        metric_event('3973_on_approach_latency', {'client_start_time': client_start_time,
+                                                  'client_end_time': client_time,
+                                                  'server_receipt_time': server_receipt_time,
+                                                  'latency': client_time - client_start_time,
+                                                  'defender_id': defender_id});
     } else if(msg == "EQUIP_BUILDING_RESULT") {
         var my_arg = data[1], success = data[2];
         var unit_id = my_arg[1], addr = my_arg[2], inv_slot = my_arg[3], add_item = my_arg[4], remove_item = my_arg[5], ui_slot = my_arg[6];
