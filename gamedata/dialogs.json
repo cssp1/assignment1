@@ -8606,7 +8606,7 @@
 
             // AI
             "ai_frame": { "kind": "SolidRect", "xy": [25,113], "dimensions": [157,168], "outline_color": [1,1,1,0.5], "outline_width": 1.5 },
-            "ai": {"kind": "StaticImage", "xy":[26,114], "dimensions":[155,166] }, // this gets an attack_portait image
+            "ai": {"kind": "StaticImage", "xy":[26,114], "dimensions":[155,166] }, // this gets an attack_portrait image
             "ai_text": { "kind": "TextField", "xy": [17,254], "dimensions": [175, 25], "text_size": 15, "text_style": "thick", "text_hjustify": "center" },
 
             // COUNTDOWN

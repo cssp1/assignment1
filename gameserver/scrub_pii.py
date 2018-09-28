@@ -117,7 +117,7 @@ class NullFD(object):
 def run_batch(batch_num, total_batches, batch, batch_size, total_count, limit, dry_run, verbose, only_frame_platform, test_mode):
     msg_fd = sys.stderr if verbose else NullFD()
 
-    # reconnect to DB to avoid subprocesses sharing conenctions
+    # reconnect to DB to avoid subprocesses sharing connections
     db_client = connect_to_db()
 
     sender = Sender(db_client, dry_run = dry_run, msg_fd = msg_fd)

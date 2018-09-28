@@ -221,7 +221,7 @@ def __fb_api_urllib2(url, url_params, post_params, upload_files, add_access_toke
 # +++ Python-2.7.1/Lib/httplib.py       2011-04-21 15:38:15.855787301 +0200
 # @@ -792,8 +792,13 @@ class HTTPConnection:
 #          # it will avoid performance problems caused by the interaction
-#          # between delayed ack and the Nagle algorithim.
+#          # between delayed ack and the Nagle algorithm.
 #          if isinstance(message_body, str):
 # -            msg += message_body
 # -            message_body = None

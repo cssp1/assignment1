@@ -3706,7 +3706,7 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
 
     // compute bullet origin in map coordinates
     // note: this is only for visual effect, the combat-engine firing position is always unit origin,
-    // to avoid pathfinding issues wiht facing
+    // to avoid pathfinding issues with facing
 
     if('muzzle_offset' in this.spec) {
         var facing = this.interpolate_facing(world);
@@ -7632,7 +7632,7 @@ player.stored_item_iter = function(func) {
     @param {string} slot_type
     @param {Object} espec of the equipment item
     @param {Object} einstance of the equipment item
-    @param {boolean=} ignore_min_level ignore the min_level requirment
+    @param {boolean=} ignore_min_level ignore the min_level requirement
     @return {Object|null} */
 function equip_is_compatible_with_slot(host_spec, host_level, slot_type, espec, einstance, ignore_min_level) {
     if(!('equip' in espec)) { return null; }
@@ -10020,7 +10020,7 @@ function set_view_limits() {
     if(view_limits[1][1] < view_limits[1][0]) { view_limits[1] = [0,0]; };
 }
 
-// note: sound/music, fullscren, and settings buttons
+// note: sound/music, fullscreen, and settings buttons
 function invoke_playfield_controls_bar() {
     var orient = (gamedata['client']['playfield_controls_bar_layout'] || 'vertical');
     var dialog = new SPUI.Dialog(gamedata['dialogs']['playfield_controls_bar_'+orient]);
@@ -10595,7 +10595,7 @@ function NotificationQueue() {
 NotificationQueue.TUTORIAL_MIN_PRIO = 200;
 
 // fire the next notification message in the queue
-// return true if one was succesfully fired
+// return true if one was successfully fired
 NotificationQueue.prototype.fire_next = function(min_prio) {
     if(this.hold_time > 0 && client_time < this.hold_time) { return false; }
 
@@ -13253,7 +13253,7 @@ function update_desktop_dialogs() {
     var droid_factory = null, robotics_lab = null;
 
     var basic_manuf_category = goog.object.getKeys(gamedata['strings']['manufacture_categories'])[0]; // most basic manufacture category
-    var basic_research_category = gamedata['strings']['research_categories']['army'][0]['name']; // most basic army reserach category
+    var basic_research_category = gamedata['strings']['research_categories']['army'][0]['name']; // most basic army research category
 
     if(session.home_base) {
         // scan player's buildings to find a few things
@@ -14762,7 +14762,7 @@ function inventory_item_is_usable_in_combat(spec, session) {
             if(use['spellname'] == 'APPLY_AURA') {
                 var aura_name = use['spellarg'][1];
 
-                // ignore boosts that you wouldn't want to use in combat, even though you technicaly could
+                // ignore boosts that you wouldn't want to use in combat, even though you technically could
                 if(aura_name.indexOf('repair_boosted') !== -1 ||
                    aura_name.indexOf('research_boosted') !== -1 ||
                    aura_name.indexOf('production_boosted') !== -1) {
@@ -18700,7 +18700,7 @@ function surrender_to_ai_attack() {
     world.objects.for_each(function(obj) {
         if(obj.team === 'player' && obj.spec['name'] === gamedata['townhall'] && !obj.is_destroyed()) {
 
-            // change HP immediately just for visual effect - will get overriden by the upcoming OBJECT_STATE_UPDATE
+            // change HP immediately just for visual effect - will get overridden by the upcoming OBJECT_STATE_UPDATE
             obj.hp = Math.max(1, Math.floor(0.5*obj.hp));
 
             if('explosion_effect' in obj.spec) {
@@ -22973,7 +22973,7 @@ function update_region_map_scroll_help(dialog) {
     }
 }
 
-// if a home_base_relocator_anywhere item is availble, return a function that will open the Store to it, otherwise null
+// if a home_base_relocator_anywhere item is available, return a function that will open the Store to it, otherwise null
 /** @param {Array.<Object>=} skulist
     @param {Array.<Object>=} path */
 function continent_bridge_available(skulist, path) {
@@ -43152,7 +43152,7 @@ function get_requirements_help(kind, arg, options) {
             // player has an under-leveled storage
             verb = 'upgrade'; target = need_to_upgrade_obj;
         } else if(cc && cc.level < cc.get_max_ui_level()) {
-            // player must ugprade CC
+            // player must upgrade CC
             verb = 'upgrade_cc'; target = cc;
         } else {
             console.log('unable to help with '+kind+' problem!');  return null;
@@ -43305,7 +43305,7 @@ function get_requirements_help(kind, arg, options) {
         goog.object.forEach(gamedata['buildings'], function(spec) { if('provides_foremen' in spec) { builder_spec = spec; } });
 
         if(builder_spec && (num_built < get_leveled_quantity(builder_spec['limit'], player.get_townhall_level()))) {
-            // player can build more foremen buidlings
+            // player can build more foremen buildings
             noun = 'foreman'; verb = (num_built < 1 ? 'build_first' : 'build_more'); target = builder_spec['name'];
             ui_arg_s = builder_spec[(num_built < 1 ? 'ui_name_indefinite' : 'ui_name')];
         } else if(need_to_upgrade_obj) {
@@ -45125,7 +45125,7 @@ function update_upgrade_dialog(dialog) {
         price = Store.get_user_currency_price(unit.id, gamedata['spells']['UPGRADE_FOR_MONEY'], null);
     }
 
-    // just for diagnotics - price should always be -1 if requirements are not met
+    // just for diagnostics - price should always be -1 if requirements are not met
     if(!instant_requirements_ok && price >= 0 && !player.is_cheater) {
         console.log('requirements/price mismatch!');
     }
@@ -50160,7 +50160,7 @@ function handle_server_message(data) {
         var currency_url = data[1];
 
         // note: offer_payer_promo() must be triggered from a
-        // mouse-click event in order to avoid being surpressed by
+        // mouse-click event in order to avoid being suppressed by
         // pop-up blockers, since FB.ui({'method':'fbpromotion})
         // requires an old-fashioned popup window instead of the
         // iframe-compatible div popup.
@@ -50452,7 +50452,7 @@ function invoke_timeout_message(event_name, props, options) {
             if(spin_user_id) { props['user_id'] = spin_user_id; }
 
             // note: force metric to be sent via the GIF fetch method rather than with the normal client/server stream,
-            // beacuse the normal stream may have been corrupted by this point
+            // because the normal stream may have been corrupted by this point
             SPLWMetrics.send_event(spin_metrics_anon_id, event_name, add_demographics(props));
         }
     }
@@ -54537,7 +54537,7 @@ function draw_unit(world, unit) {
             }
         }
         if(GameTypes.TickCount.lt(world.combat_engine.cur_tick, unit.ai_leash_after)) {
-            draw_centered_text(ctx, '(leashing surpressed)', [xy[0],xy[1]+90]);
+            draw_centered_text(ctx, '(leashing suppressed)', [xy[0],xy[1]+90]);
         } else if(unit.is_leashing) {
             draw_centered_text(ctx, 'LEASHING', [xy[0],xy[1]+90]);
         }

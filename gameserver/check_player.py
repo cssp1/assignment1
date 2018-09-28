@@ -719,7 +719,7 @@ if __name__ == '__main__':
                 elif 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and entry.get('logins',1) < 100:
                     # ignore logins more than 90d ago
                     continue
-                print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultanous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
+                print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
                                                                                                 pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                 entry.get('last_ip','Unknown')))
 

@@ -12,7 +12,7 @@ goog.require('goog.array');
 goog.require('goog.object');
 
 // client-side player info cache
-// this is a central respository for things we know about other players
+// this is a central repository for things we know about other players
 
 // imports from main.js: send_to_server
 

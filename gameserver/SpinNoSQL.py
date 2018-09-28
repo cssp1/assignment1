@@ -1427,7 +1427,7 @@ class NoSQLClient (object):
                                                    {'val': {'$gt': score_range_qs['$lte']}}]},
                                           {'_id':0,'user_id':1})]
 
-                # return any one random player maching the cache_qs query, but exclude those with unacceptable scores
+                # return any one random player matching the cache_qs query, but exclude those with unacceptable scores
                 if exclude_user_ids:
                     #open('/tmp/ladder-debug.txt','ab').write('%d\n' % len(exclude_user_ids))
                     cache_qs['$and'].append({'_id':{'$nin':exclude_user_ids}})
@@ -3116,7 +3116,7 @@ if __name__ == '__main__':
                         spend_data = '$%05.02f' % member.get('money_spent',0)
 
                     if my_prize <= 0: # or (not ladder_player):
-                        print "    #%2d %-24s with %5s points does not win %s (id %7d continent %s spend %s participaton %d)" % (j+1, detail, display_point_count(gamedata, member['absolute'], tournament_stat), gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])
+                        print "    #%2d %-24s with %5s points does not win %s (id %7d continent %s spend %s participation %d)" % (j+1, detail, display_point_count(gamedata, member['absolute'], tournament_stat), gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])
                     else:
                         print "    #%2d%s %-24s with %5s points WINS %6d %s (id %7d continent %s spend %s participation %d)" % (j+1 if (not is_tie) else WINNERS, '(tie)' if is_tie else '',
                                                                                         detail, display_point_count(gamedata, member['absolute'], tournament_stat), my_prize, gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])

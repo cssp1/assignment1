@@ -611,7 +611,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
 
         var price = Store.get_user_currency_price(emplacement_obj.id, gamedata['spells']['CRAFT_FOR_MONEY'], craft_spellarg);
 
-        // just for diagnotics - price should always be -1 if requirements are not met
+        // just for diagnostics - price should always be -1 if requirements are not met
         if(!instant_requirements_ok && price >= 0 && !player.is_cheater) {
             throw Error('requirements/price mismatch for '+recipe_name);
         }
@@ -711,7 +711,7 @@ TurretHeadDialog._remove_turret_head_anti_missile_mod = function(modchain) {
     @param {GameObject} emplacement_obj it will go onto
     @param {!Object} item - the turret head item
     @param {Object|null} relative_to - another turret head item to compare this one to
-    @param {boolean} is_downleveled - to show an asterisk for down-leveled turrest */
+    @param {boolean} is_downleveled - to show an asterisk for down-leveled turrets */
 TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, item, relative_to, is_downleveled) {
     var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
     var level = ItemDisplay.get_inventory_item_level(item);

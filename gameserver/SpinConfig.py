@@ -9,7 +9,7 @@ import time, calendar
 import SpinJSON
 
 
-# Unfortuantely the load() functions duplicate much of what preprocess.py does. We should eventually unify them.
+# Unfortunately the load() functions duplicate much of what preprocess.py does. We should eventually unify them.
 
 # regular expression that matches C++-style comments (see gamedata/preprocess.py for a better explanation)
 comment_remover = re.compile('(?<!tp:|ps:|: "|":"|=\\\\")//.*?$')

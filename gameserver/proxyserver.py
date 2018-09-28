@@ -1639,7 +1639,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 if 'user' in signed_request:
                     udata = signed_request['user']
                     if 'country' in udata:
-                        # note: allow this to override our geo-location. Facebok doesn't always provide it though!
+                        # note: allow this to override our geo-location. Facebook doesn't always provide it though!
                         visitor.demographics['country'] = udata['country']
                     if 'locale' in udata and ('locale' not in visitor.demographics):
                         visitor.demographics['locale'] = udata['locale']

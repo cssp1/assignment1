@@ -88,7 +88,7 @@ fi
 
 alias sd='ssh -q -X dcine2.dyndns.org'
 
-# surpress GDB annoyance
+# suppress GDB annoyance
 alias gdb='gdb -quiet'
 
 # tell wget to resume all downloads, and retry forever

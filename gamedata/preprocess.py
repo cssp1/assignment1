@@ -41,7 +41,7 @@ def filename_replace_vars(filename, game_id):
 # contents of the file as a string.
 
 # If 'stripped' is true, then assume that the file contains the
-# "inner" part of a JSON dictionary without the surounding curly
+# "inner" part of a JSON dictionary without the surrounding curly
 # braces. (this allows a master file to build a single dictionary by
 # combining several different individual "stripped" JSON subfiles).
 

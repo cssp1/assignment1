@@ -788,7 +788,7 @@ def get_progression_reward_items(loot, include_resource_boosts, include_random_l
             if not table_name.startswith('event_loot_'):
                 return filter_progression_loot(gamedata['loot_tables'][table_name]['loot'])
             else:
-                # only include guarenteed random loot drops (event_loot_*_item) if specified in the skeleton
+                # only include guaranteed random loot drops (event_loot_*_item) if specified in the skeleton
                 if include_random_loot and table_name.endswith('_item'):
                     return {'spec': 'random_loot'}
                 else:
