@@ -30,12 +30,11 @@ class AlwaysFalsePredicate(Predicate):
         return False
 
 class ClimatePredicate(Predicate):
-    def is_satisfied(self, player, qdata):
-        self.climate = data['climate']
-        if self.climate == player.base_climate:
-            return True
-        else:
-            return False
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.climates = data['climates']
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        return session.viewing_base.base_climate in self.climates
 
 class RandomPredicate(Predicate):
     def __init__(self, data):
