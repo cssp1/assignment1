@@ -295,12 +295,13 @@ def check_mandatory_fields(specname, spec, kind):
                     if a['aura_name'] not in gamedata['auras']:
                         error |= 1
                         print '%s:climate_auras refers to an aura that does not exist (%s)' % (specname, a['aura_name'])
-                    if not a['required_climate']:
+                    if 'required_climates' not in a:
                         error |= 1
-                        print '%s:climate_auras aura (%s) does not have a required_climate key' % (specname, a['aura_name'])
-                    if a['required_climate'] not in gamedata['climates']:
-                        error |= 1;
-                        print '%s:climate_auras aura (%s) requires invalid climate "%s"' % (specname, a['aura_name'], a['required_climate'])
+                        print '%s:climate_auras aura (%s) does not have a required_climates key' % (specname, a['aura_name'])
+                    for climate_name in a['required_climates']:
+                        if climate_name not in gamedata['climates']:
+                            error |= 1;
+                            print '%s:climate_auras aura (%s) requires invalid climate "%s"' % (specname, a['aura_name'], climate_name)
 
 
     if spec.get('permanent_modstats', None):

@@ -4933,14 +4933,15 @@ class Session(object):
         # set up environmental auras
         if obj.is_mobile():
             climate = gamedata['climates'].get(self.viewing_base.base_climate, None)
-            if climate and ('applies_aura' in climate):
-                if obj.auras is None: obj.auras = []
-                Aura.apply_aura(obj.auras, climate['applies_aura'], climate['aura_strength'], session_only = True)
-            if obj.spec.climate_auras:
-                for aura in obj.spec.climate_auras:
-                    if aura['required_climate'] == climate['name']:
-                        if obj.auras is None: obj.auras = []
-                        Aura.apply_aura(obj.auras, aura['aura_name'], aura['aura_strength'], session_only = True)
+            if climate:
+                if ('applies_aura' in climate):
+                    if obj.auras is None: obj.auras = []
+                    Aura.apply_aura(obj.auras, climate['applies_aura'], climate['aura_strength'], session_only = True)
+                if obj.spec.climate_auras:
+                    for aura in obj.spec.climate_auras:
+                        if climate['name'] in aura['required_climates']:
+                            if obj.auras is None: obj.auras = []
+                            Aura.apply_aura(obj.auras, aura['aura_name'], aura['aura_strength'], session_only = True)
 
         return self.cur_objects.add_object(obj)
 
