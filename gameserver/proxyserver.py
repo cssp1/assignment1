@@ -1806,7 +1806,8 @@ class GameProxy(proxy.ReverseProxyResource):
               urllib.urlencode({'input_token':token})
         if SpinConfig.config['proxyserver'].get('log_auth_scope', 0) >= 2:
             exception_log.event(proxy_time, 'verifying OAuth token: ' + url)
-        fb_queue_request('oauth/debug_token', proxy_time, url, sc.on_response, error_callback = sc.on_error)
+        fb_queue_request('oauth/debug_token', proxy_time, url, sc.on_response, error_callback = sc.on_error,
+                         callback_type = AsyncHTTP.AsyncHTTPRequester.CALLBACK_FULL)
         return twisted.web.server.NOT_DONE_YET
 
     class OAuthVerifier:
@@ -1816,12 +1817,12 @@ class GameProxy(proxy.ReverseProxyResource):
             self.visitor = visitor
             self.token = token
             self.d = d
-        def on_response(self, response):
-            self.d.callback(self.parent.index_visit_verify_oauth_token_response(self.request, self.visitor, self.token, response))
-        def on_error(self, reason):
-            self.d.callback(self.parent.index_visit_verify_oauth_token_response(self.request, self.visitor, self.token, 'false'))
+        def on_response(self, body = '', headers = {}, status = 500):
+            self.d.callback(self.parent.index_visit_verify_oauth_token_response(self.request, self.visitor, self.token, body))
+        def on_error(self, body = '', headers = {}, status = 500, ui_reason = None):
+            self.d.callback(self.parent.index_visit_verify_oauth_token_response(self.request, self.visitor, self.token, 'false', http_error_message = ui_reason))
 
-    def index_visit_verify_oauth_token_response(self, request, visitor, token, response):
+    def index_visit_verify_oauth_token_response(self, request, visitor, token, response, http_error_message = None):
         response = SpinJSON.loads(response)
         # carefully check for a valid token
 
@@ -1859,7 +1860,7 @@ class GameProxy(proxy.ReverseProxyResource):
                     return self.index_visit_do_fb_auth(request, visitor)
 
         # some other failure - request auth again
-        exception_log.event(proxy_time, 'failed to verify oauth token: '+repr(request)+' args '+repr(request.args)+' signed_request '+repr(visitor.raw_signed_request)+' token '+repr(token)+' response '+repr(response))
+        exception_log.event(proxy_time, 'failed to verify oauth token: '+repr(request)+' args '+repr(request.args)+' signed_request '+repr(visitor.raw_signed_request)+' token '+repr(token)+' response '+repr(response)+' http_error_message '+repr(http_error_message))
         return self.index_visit_do_fb_auth(request, visitor)
 
     #
