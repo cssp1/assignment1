@@ -1123,6 +1123,12 @@ Aura.prototype.apply = function(world, obj) {
             obj.combat_stats.extra_armor = Math.max(obj.combat_stats.extra_armor, this.strength);
         } else if(code === 'defense_booster') {
             // apply the defense_boosted aura to this and nearby units
+
+            if(obj.is_destroyed()) {
+                // but don't apply if the booster is dead
+                return;
+            }
+
             var obj_list = world.query_objects_within_distance(obj.raw_pos(),
                                                                gamedata['map']['range_conversion'] * this.range,
                                                                { only_team: obj.team, mobile_only: true });
@@ -1132,6 +1138,12 @@ Aura.prototype.apply = function(world, obj) {
             }
         } else if(code === 'damage_booster') {
             // apply the damage_boosted aura to this and nearby units
+
+            if(obj.is_destroyed()) {
+                // but don't apply if the booster is dead
+                return;
+            }
+
             var obj_list = world.query_objects_within_distance(obj.raw_pos(),
                                                                gamedata['map']['range_conversion'] * this.range,
                                                                { only_team: obj.team, mobile_only: true });
@@ -54214,10 +54226,17 @@ function draw_building_or_inert(world, obj, powerfac) {
                 var pos = obj.interpolate_pos(world);
                 aura.visual_effect.reposition([pos[0], 0, pos[1]]);
             }
+
             if(aura.expire_tick.is_infinite()) {
                 // don't draw permanent auras on buildings
                 continue;
             }
+
+            if(obj.is_destroyed()) {
+                // don't draw auras if the building/inert is dead
+                continue;
+            }
+
             if(draw_aura(xy, [xy[0]+30+20*count, xy[1]-default_text_height+5], aura)) {
                 count++;
             }
