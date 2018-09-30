@@ -4608,12 +4608,6 @@
                                                 "composite_mode": "lighter", "opacity": 0.5, "sprite_scale": [5,1.7], "offset":[0,0,0] },
                                               { "layer": "ui", "translate": [0,3,0], "type": "explosion", "sprite": "fx/glow_static",
                                                 "delay": 6, "duration": 1.5, "fade": 0.5,
-                                                "composite_mode": "lighter", "opacity": 0.5, "sprite_scale": [5,1.7], "offset":[0,0,0] },
-                                              { "layer": "ui", "translate": [0,3,0], "type": "explosion", "sprite": "fx/glow_static",
-                                                "delay": 8, "duration": 1.5, "fade": 0.5,
-                                                "composite_mode": "lighter", "opacity": 0.5, "sprite_scale": [5,1.7], "offset":[0,0,0] },
-                                              { "layer": "ui", "translate": [0,3,0], "type": "explosion", "sprite": "fx/glow_static",
-                                                "delay": 10, "duration": 1.5, "fade": 0.5,
                                                 "composite_mode": "lighter", "opacity": 0.5, "sprite_scale": [5,1.7], "offset":[0,0,0] }]}}],
             "fb_share_icon": { "type": "fadein", "start_time": 1.2, "end_time": 1.4 },
 
@@ -4852,7 +4846,7 @@
             "you_won":  { "kind": "TextField", "xy": [18,42], "dimensions": [202,46], "text_size": 40,
                           "ui_name": "You Won!", "text_style": "bold italic", "drop_shadow": 1 },
 
-            "fb_share_button": { "show": 0, "kind": "ActionButton", "xy": [36,98], "dimensions": [174,37], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_offset": [0,0], "text_size": 13, "text_style": "bold", "ui_name": "Share Replay", "ui_tooltip": "Share a Battle Replay to Facebook for a free\nPlayer Appreciation Loot Pack every day!", "tooltip_delay": 0, "fixed_tooltip_offset": [26,155]},
+            "fb_share_button": { "show": 0, "kind": "ActionButton", "xy": [36,98], "dimensions": [170,37], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_offset": [0,0], "text_size": 13, "text_style": "bold", "ui_name": "Share Replay", "ui_tooltip": "Share a Battle Replay to Facebook for a free\nPlayer Appreciation Loot Pack every day!", "tooltip_delay": 0, "fixed_tooltip_offset": [26,155]},
             "fb_share_incentive_icon": { "show": 0, "kind": "StaticImage", "xy":[170,102], "dimensions":[48,48], "asset": "facebook_incentive_icon"},
             "fb_share_icon": { "show": 0, "kind": "StaticImage", "xy":[45,102], "dimensions":[32,32], "asset": "facebook_icon"},
 
@@ -6849,7 +6843,7 @@
             "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[210,26], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
                                   "ui_caption": "%PLAYER - Battle Log"},
 
-            "fb_share_button": { "show": 0, "kind": "ActionButton", "xy": [450,15], "dimensions": [174, 41], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_offset": [0,0], "text_size": 13, "text_style": "bold", "ui_name": "Share Replay", "ui_tooltip": "Share a Battle Replay to Facebook for a free\nPlayer Appreciation Loot Pack every day!", "tooltip_delay": 0, "fixed_tooltip_offset": [440,75]},
+            "fb_share_button": { "show": 0, "kind": "ActionButton", "xy": [450,15], "dimensions": [170, 41], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_offset": [0,0], "text_size": 13, "text_style": "bold", "ui_name": "Share Replay", "ui_tooltip": "Share a Battle Replay to Facebook for a free\nPlayer Appreciation Loot Pack every day!", "tooltip_delay": 0, "fixed_tooltip_offset": [440,75]},
             "fb_share_incentive_icon": { "show": 0, "kind": "StaticImage", "xy":[580,20], "dimensions":[50,50], "asset": "facebook_incentive_icon"},
             "fb_share_icon": { "show": 0, "kind": "StaticImage", "xy":[456,21], "dimensions":[32,32], "asset": "facebook_icon"},
 

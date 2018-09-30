@@ -28536,6 +28536,12 @@ function set_up_replay_sharing_button(dialog, battle_summary, replay_signature, 
         FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
     }; })(link_qs, text);
 
+    if(!gamedata['show_fb_share_replay_incentive']) {
+        // checks for the fb_share_replay_incentive flag in main_options.json. If not there, the flashing icon is not needed.
+        // Nothing to do.
+        return;
+    }
+
     // Check if a quest named "share_battle_replay" or "share_battle_replay_again" exists, is active, but is not complete yet.
     // If so, show the incentive icon on top of the button.
 
