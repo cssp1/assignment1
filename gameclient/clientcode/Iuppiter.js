@@ -53,7 +53,7 @@ $Revision: 3026 $
  * Because of weak of javascript's natural, many compression algorithm
  * become useless in javascript implementation. The main problem is
  * performance, even the simple Huffman, LZ77/78 algorithm will take many
- * many time to operate. We use LZJB algorithm to do that, it suprisingly
+ * many time to operate. We use LZJB algorithm to do that, it surprisingly
  * fulfills our requirement to compress string fastly and efficiently.
  *
  * Our implementation is based on

@@ -1123,6 +1123,12 @@ Aura.prototype.apply = function(world, obj) {
             obj.combat_stats.extra_armor = Math.max(obj.combat_stats.extra_armor, this.strength);
         } else if(code === 'defense_booster') {
             // apply the defense_boosted aura to this and nearby units
+
+            if(obj.is_destroyed()) {
+                // but don't apply if the booster is dead
+                return;
+            }
+
             var obj_list = world.query_objects_within_distance(obj.raw_pos(),
                                                                gamedata['map']['range_conversion'] * this.range,
                                                                { only_team: obj.team, mobile_only: true });
@@ -1132,6 +1138,12 @@ Aura.prototype.apply = function(world, obj) {
             }
         } else if(code === 'damage_booster') {
             // apply the damage_boosted aura to this and nearby units
+
+            if(obj.is_destroyed()) {
+                // but don't apply if the booster is dead
+                return;
+            }
+
             var obj_list = world.query_objects_within_distance(obj.raw_pos(),
                                                                gamedata['map']['range_conversion'] * this.range,
                                                                { only_team: obj.team, mobile_only: true });
@@ -2521,7 +2533,18 @@ GameObject.prototype.speak = function(name) {
     GameArt.play_canned_sound(this.spec[field]);
 };
 
-/** Modify damage by vs_table coefficients
+/** Modify damage by vs_table coefficients on the weapon vs. a specific target
+
+    This multiplies matching damage_vs values on the weapon by defense_types that the target is marked with.
+
+    It also supports compound keys, which are multiple defense_types separated by commas.
+    The keys are ANDded together, and can be negated by prefixing a key with "!".
+
+    e.g., "building,!turret" means (building AND (NOT turret))
+          "building,'turret" means (building AND turret)
+
+    Finally, we also apply the target's damage_taken_from modifiers to the weapon.
+
     @param {Object.<string,number>} vs_table
     @param {GameObject} target
     @return {CombatEngine.Coeff} */
@@ -2540,8 +2563,40 @@ function get_damage_modifier(vs_table, target) {
                     damage_mod *= coeff;
                 }
             }
+
+            // check for compound terms in the vs_table
+            for(var kind in vs_table) {
+                if(kind.indexOf(',') !== -1) {
+                    var terms = kind.split(',');
+                    var match = true;
+                    for(var j = 0; j < terms.length; j++) {
+                        var term = terms[j];
+                        // check for negated terms
+                        var negate = false
+                        if(term[0] === '!') {
+                            negate = true;
+                            term = term.slice(1);
+                        }
+                        // is this term present in defense_types?
+                        if(goog.array.contains(target.spec['defense_types'], term)) {
+                            if(negate) {
+                                match = false;
+                                break;
+                            }
+                        } else if(!negate) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if(match) {
+                        damage_mod *= vs_table[kind];
+                        // console.log('match '+target.spec.name +' by '+kind+' -> '+vs_table[kind].toString());
+                    }
+                }
+            }
         }
 
+        // check the target's damage_taken_from stat
         for(var kind in vs_table) {
             if(kind in target.combat_stats.damage_taken_from) {
                 damage_mod *= vs_table[kind] * target.combat_stats.damage_taken_from[kind];
@@ -3663,7 +3718,7 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
 
     // compute bullet origin in map coordinates
     // note: this is only for visual effect, the combat-engine firing position is always unit origin,
-    // to avoid pathfinding issues wiht facing
+    // to avoid pathfinding issues with facing
 
     if('muzzle_offset' in this.spec) {
         var facing = this.interpolate_facing(world);
@@ -4695,9 +4750,7 @@ GameObject.prototype.run_ai = function(world) {
     // on_approach handling - XXX convert this to a special_ai ?
 
     // @type {Array<Object<string,?>>|null} List of consequents
-    var on_approach = (this.is_mobile() ? get_unit_stat(this.team === 'player' ? player.stattab : enemy.stattab,
-                                                        this.spec['name'], 'on_approach', null) :
-                       this.is_building() ? this.get_stat('on_approach', null) : null);
+    var on_approach = this.get_on_approach_consequents();
 
     if(!session.is_replay() && on_approach && !this.on_approach_fired) {
         var pred = read_predicate({'predicate': 'HOSTILE_UNIT_NEAR'});
@@ -4706,15 +4759,30 @@ GameObject.prototype.run_ai = function(world) {
                      'distance': gamedata['map']['aggro_radius'][this.team]['defense']
                     };
         if(pred.is_satisfied(player, qdata)) {
-            goog.array.forEach(on_approach, function(cons) {
-                if(this.on_approach_fired) { return; }
-                if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
-                    send_to_server.func(["ON_APPROACH", this.id, this.raw_pos(), qdata['hostile_obj'].id]);
-                    this.on_approach_fired = true;
-                }
-            }, this);
+            this.fire_on_approach_secteams(on_approach, qdata['hostile_obj'].id);
         }
     }
+};
+
+/** Get a list of (JSON) consequents that this object should run when enemies approach
+    @return {Array<Object<string,?>>|null} List of consequents */
+GameObject.prototype.get_on_approach_consequents = function() {
+    return (this.is_mobile() ? get_unit_stat(this.team === 'player' ? player.stattab : enemy.stattab,
+                                             this.spec['name'], 'on_approach', null) :
+            this.is_building() ? this.get_stat('on_approach', null) : null);
+};
+
+/** Tell the server we are firing our ON_APPROACH consequent
+    @param {Array<Object<string,?>>|null} on_approach consequent list from above
+    @param {GameObjectId|null} source_obj_id that triggered this */
+GameObject.prototype.fire_on_approach_secteams = function(on_approach, source_obj_id) {
+    goog.array.forEach(on_approach, function(cons) {
+        if(this.on_approach_fired) { return; }
+        if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
+            send_to_server.func(["ON_APPROACH", this.id, this.raw_pos(), source_obj_id, client_time]);
+            this.on_approach_fired = true;
+        }
+    }, this);
 };
 
 /**
@@ -7603,7 +7671,7 @@ player.stored_item_iter = function(func) {
     @param {string} slot_type
     @param {Object} espec of the equipment item
     @param {Object} einstance of the equipment item
-    @param {boolean=} ignore_min_level ignore the min_level requirment
+    @param {boolean=} ignore_min_level ignore the min_level requirement
     @return {Object|null} */
 function equip_is_compatible_with_slot(host_spec, host_level, slot_type, espec, einstance, ignore_min_level) {
     if(!('equip' in espec)) { return null; }
@@ -9993,7 +10061,7 @@ function set_view_limits() {
     if(view_limits[1][1] < view_limits[1][0]) { view_limits[1] = [0,0]; };
 }
 
-// note: sound/music, fullscren, and settings buttons
+// note: sound/music, fullscreen, and settings buttons
 function invoke_playfield_controls_bar() {
     var orient = (gamedata['client']['playfield_controls_bar_layout'] || 'vertical');
     var dialog = new SPUI.Dialog(gamedata['dialogs']['playfield_controls_bar_'+orient]);
@@ -10568,7 +10636,7 @@ function NotificationQueue() {
 NotificationQueue.TUTORIAL_MIN_PRIO = 200;
 
 // fire the next notification message in the queue
-// return true if one was succesfully fired
+// return true if one was successfully fired
 NotificationQueue.prototype.fire_next = function(min_prio) {
     if(this.hold_time > 0 && client_time < this.hold_time) { return false; }
 
@@ -13226,7 +13294,7 @@ function update_desktop_dialogs() {
     var droid_factory = null, robotics_lab = null;
 
     var basic_manuf_category = goog.object.getKeys(gamedata['strings']['manufacture_categories'])[0]; // most basic manufacture category
-    var basic_research_category = gamedata['strings']['research_categories']['army'][0]['name']; // most basic army reserach category
+    var basic_research_category = gamedata['strings']['research_categories']['army'][0]['name']; // most basic army research category
 
     if(session.home_base) {
         // scan player's buildings to find a few things
@@ -14735,7 +14803,7 @@ function inventory_item_is_usable_in_combat(spec, session) {
             if(use['spellname'] == 'APPLY_AURA') {
                 var aura_name = use['spellarg'][1];
 
-                // ignore boosts that you wouldn't want to use in combat, even though you technicaly could
+                // ignore boosts that you wouldn't want to use in combat, even though you technically could
                 if(aura_name.indexOf('repair_boosted') !== -1 ||
                    aura_name.indexOf('research_boosted') !== -1 ||
                    aura_name.indexOf('production_boosted') !== -1) {
@@ -16068,6 +16136,8 @@ function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_bo
     goog.array.forEach(tablist, goog.partial(chat_tab_accept_message, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend||false));
 }
 
+var chat_getmore_serial = 0;
+
 /** @param {string} channel_name
     @param {!Object<string,?>} sender_info
     @param {string} wrapped_body
@@ -16075,6 +16145,15 @@ function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_bo
     @param {boolean} is_prepend
     @param {!SPUI.Dialog} tab */
 function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend, tab) {
+
+    // for can_get_more messages, invent a fake chat_msg_id so that the message can reference
+    // itself for deletion. But make sure it won't conflict with a true message ID.
+    if(sender_info['type'] == 'can_get_more') {
+        if(!chat_msg_id) {
+            // note: the '*' first charcter signals that GETMORE should ignore this ID for query purposes
+            chat_msg_id = '*getmore' + chat_getmore_serial.toString(); chat_getmore_serial += 1;
+        }
+    }
 
     if(sender_info['type'] == 'unit_donation_request') { // new unit donation request
         if(!player.unit_donation_enabled()) { return; }
@@ -16166,6 +16245,13 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
                     // wrong region - offer to relocate
                     invoke_find_on_map(_req['region_id'], [0,0]);
                     return;
+                } else if('requires' in gamedata['spells']['GIVE_ALLIANCE_HELP']) {
+                    var pred = read_predicate(gamedata['spells']['GIVE_ALLIANCE_HELP']['requires']);
+                    if(!pred.is_satisfied(player)) {
+                        var helper = get_requirements_help(pred);
+                        if(helper) { helper(); }
+                        return;
+                    }
                 }
 
                 send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "GIVE_ALLIANCE_HELP", _req['recipient_id'], _req['req_id']]);
@@ -16239,6 +16325,11 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
         // set up a default onclick handler for the entire blob of text
         if(report_args) {
             base_props.onclick = bbcode_click_handlers['player']['onclick'](report_args.user_id.toString(), report_args.ui_name);
+        }
+
+        // replace message ID
+        if(bb_text.indexOf('%chat_message_id') != -1 && chat_msg_id) {
+                bb_text = bb_text.replace('%chat_message_id', chat_msg_id);
         }
 
         // replace alliance chat tag
@@ -16318,7 +16409,8 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
             node.on_destroy = (function (_tab, _chat_msg_id) { return function(_node) {
                 delete _tab.user_data['chat_messages_by_id'][_chat_msg_id];
             }; })(tab, chat_msg_id);
-            if(tab.user_data['earliest_id'] === null || chat_msg_id < tab.user_data['earliest_id']) {
+            if(chat_msg_id[0] != '*' && /* ignore fake IDs generated for 'can_get_more' messages */
+               (tab.user_data['earliest_id'] === null || chat_msg_id < tab.user_data['earliest_id'])) {
                 tab.user_data['earliest_id'] = chat_msg_id;
             }
         }
@@ -16430,7 +16522,23 @@ var system_chat_bbcode_click_handlers = {
         invoke_store('exact_path', _path);
         // play sound effect
         GameArt.play_canned_sound('action_button_resizable');
-    }; })(path); } }
+    }; })(path); } },
+    'getmore': { 'onclick': function(chat_msg_id) { return (function (_chat_msg_id) { return function(w, mloc) {
+        // for the "Click here to load earlier chat messages" message
+
+        // find and delete this one message
+        var tab = w.parent;
+        if(tab && _chat_msg_id in tab.user_data['chat_messages_by_id']) {
+            w.remove_text(tab.user_data['chat_messages_by_id'][_chat_msg_id]);
+        }
+
+        // perform the same checks as SPUI.ScrollingTextField.scroll_up(),
+        // and then send the scrolling command.
+        if(w.can_scroll_up() && w.buf_top >= w.buffer.length && !w.getmore_final && !w.getmore_pending) {
+            w.scroll_up();
+        }
+
+    }; })(chat_msg_id); } }
 };
 
 
@@ -16653,6 +16761,18 @@ function init_chat_frame() {
         tab.widgets['output'].scroll_down_button = tab.widgets[(invert ? 'scroll_up' : 'scroll_down')];
         tab.widgets['output'].getmore_cb = (gamedata['client']['enable_chat_getmore'] ? function(w) {
             var tab = w.parent;
+
+            // remove any lingering 'can_get_more' messages
+            var to_remove = [];
+            for(var chat_msg_id in tab.user_data['chat_messages_by_id']) {
+                if(chat_msg_id.indexOf('getmore') === 0) {
+                    to_remove.push(chat_msg_id);
+                }
+            }
+            goog.array.forEach(to_remove, function(chat_msg_id) {
+                tab.widgets['output'].remove_text(tab.user_data['chat_messages_by_id'][chat_msg_id]);
+            });
+
             var tag = 'cgm'+(last_query_tag++).toString();
             chat_getmore_receiver.listenOnce(tag, (function (_tab) { return function(event) {
                 goog.array.forEach(event.response, function(data) {
@@ -18621,7 +18741,7 @@ function surrender_to_ai_attack() {
     world.objects.for_each(function(obj) {
         if(obj.team === 'player' && obj.spec['name'] === gamedata['townhall'] && !obj.is_destroyed()) {
 
-            // change HP immediately just for visual effect - will get overriden by the upcoming OBJECT_STATE_UPDATE
+            // change HP immediately just for visual effect - will get overridden by the upcoming OBJECT_STATE_UPDATE
             obj.hp = Math.max(1, Math.floor(0.5*obj.hp));
 
             if('explosion_effect' in obj.spec) {
@@ -21189,17 +21309,7 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
 
     if(player.tutorial_state == 'COMPLETE' && session.enable_progress_timers &&
        can_show_replay_for_battle_summary(battle_summary)) {
-        var link_qs = battle_replay_link_qs(battle_summary['time'], battle_summary['attacker_id'], battle_summary['defender_id'], battle_summary['base_id'], dialog.user_data['replay_signature']);
-        if(link_qs && FBShare.supported()) {
-            dialog.widgets['fb_share_button'].show =
-                dialog.widgets['fb_share_icon'].show = true;
-            var text = gamedata['virals']['replay']['ui_post_headline']
-                .replace('%ATTACKER', player.get_ui_name()) // battle_summary['attacker_name'])
-                .replace('%DEFENDER', battle_opponent_name); //  battle_summary['defender_name']);
-            dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
-                FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
-            }; })(link_qs, text);
-        }
+        set_up_replay_sharing_button(dialog, battle_summary, dialog.user_data['replay_signature'], player.get_ui_name(), battle_opponent_name);
     }
 
     dialog.widgets['winner_name'].str = player.get_ui_name();
@@ -22898,7 +23008,7 @@ function update_region_map_scroll_help(dialog) {
     }
 }
 
-// if a home_base_relocator_anywhere item is availble, return a function that will open the Store to it, otherwise null
+// if a home_base_relocator_anywhere item is available, return a function that will open the Store to it, otherwise null
 /** @param {Array.<Object>=} skulist
     @param {Array.<Object>=} path */
 function continent_bridge_available(skulist, path) {
@@ -28433,6 +28543,62 @@ function can_show_replay_for_battle_summary(summary) {
     return their_replay_version === cur_replay_version;
 }
 
+/** @param {!SPUI.Dialog} dialog
+    @param {Object<string,*>} battle_summary
+    @param {string} replay_signature
+    @param {string} attacker_name
+    @param {string} defender_name
+
+    Drives a "Share replay on Facebook" button on the UI.
+    Common code for both the battle_log and fancy_victory dialogs.
+*/
+function set_up_replay_sharing_button(dialog, battle_summary, replay_signature, attacker_name, defender_name) {
+    // initialize to blank state
+    dialog.widgets['fb_share_button'].show =
+        dialog.widgets['fb_share_icon'].show =
+        dialog.widgets['fb_share_incentive_icon'].show = false;
+
+    // get the URL link for sharing a battle replay
+    var link_qs = battle_replay_link_qs(
+        /** @type {number} */ (battle_summary['time']),
+        /** @type {number} */ (battle_summary['attacker_id']),
+        /** @type {number} */ (battle_summary['defender_id']),
+        /** @type {string|null} */ (battle_summary['base_id']),
+        replay_signature);
+
+    if(!link_qs || !FBShare.supported()) {
+        // no link or FB sharing is not available. Nothing to do.
+        return;
+    }
+
+    // show button and icon
+    dialog.widgets['fb_share_button'].show =
+        dialog.widgets['fb_share_icon'].show = true;
+
+    var text = gamedata['virals']['replay']['ui_post_headline'].replace('%ATTACKER', attacker_name).replace('%DEFENDER', defender_name);
+
+    dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
+        FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
+    }; })(link_qs, text);
+
+    if(!gamedata['show_fb_share_replay_incentive']) {
+        // checks for the fb_share_replay_incentive flag in main_options.json. If not there, the flashing icon is not needed.
+        // Nothing to do.
+        return;
+    }
+
+    // Check if a quest named "share_battle_replay" or "share_battle_replay_again" exists, is active, but is not complete yet.
+    // If so, show the incentive icon on top of the button.
+
+    goog.array.forEach(['share_battle_replay', 'share_battle_replay_again'], function(quest_name) {
+        if(quest_name in gamedata['quests'] &&
+           player.can_activate_quest(gamedata['quests'][quest_name]) &&
+           !player.can_complete_quest(gamedata['quests'][quest_name])) {
+            dialog.widgets['fb_share_incentive_icon'].show = true;
+        }
+    });
+}
+
 function receive_battle_log_result(dialog, ret) {
     var log, replay_exists;
     if(!ret) {
@@ -28477,17 +28643,7 @@ function receive_battle_log_result(dialog, ret) {
                                          dialog.user_data['signature'], fail_cb);
             };
 
-            var link_qs = battle_replay_link_qs(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'], dialog.user_data['signature']);
-            if(link_qs && FBShare.supported()) {
-                dialog.widgets['fb_share_button'].show =
-                    dialog.widgets['fb_share_icon'].show = true;
-                var text = gamedata['virals']['replay']['ui_post_headline']
-                    .replace('%ATTACKER', dialog.widgets['attacker_name'].str)
-                    .replace('%DEFENDER', dialog.widgets['defender_name'].str);
-                dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
-                    FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
-                }; })(link_qs, text);
-            }
+            set_up_replay_sharing_button(dialog, summary, dialog.user_data['signature'], dialog.widgets['attacker_name'].str, dialog.widgets['defender_name'].str);
         }
     }
     dialog.widgets['log'].scroll_to_top();
@@ -43083,7 +43239,7 @@ function get_requirements_help(kind, arg, options) {
             // player has an under-leveled storage
             verb = 'upgrade'; target = need_to_upgrade_obj;
         } else if(cc && cc.level < cc.get_max_ui_level()) {
-            // player must ugprade CC
+            // player must upgrade CC
             verb = 'upgrade_cc'; target = cc;
         } else {
             console.log('unable to help with '+kind+' problem!');  return null;
@@ -43236,7 +43392,7 @@ function get_requirements_help(kind, arg, options) {
         goog.object.forEach(gamedata['buildings'], function(spec) { if('provides_foremen' in spec) { builder_spec = spec; } });
 
         if(builder_spec && (num_built < get_leveled_quantity(builder_spec['limit'], player.get_townhall_level()))) {
-            // player can build more foremen buidlings
+            // player can build more foremen buildings
             noun = 'foreman'; verb = (num_built < 1 ? 'build_first' : 'build_more'); target = builder_spec['name'];
             ui_arg_s = builder_spec[(num_built < 1 ? 'ui_name_indefinite' : 'ui_name')];
         } else if(need_to_upgrade_obj) {
@@ -45056,7 +45212,7 @@ function update_upgrade_dialog(dialog) {
         price = Store.get_user_currency_price(unit.id, gamedata['spells']['UPGRADE_FOR_MONEY'], null);
     }
 
-    // just for diagnotics - price should always be -1 if requirements are not met
+    // just for diagnostics - price should always be -1 if requirements are not met
     if(!instant_requirements_ok && price >= 0 && !player.is_cheater) {
         console.log('requirements/price mismatch!');
     }
@@ -49025,6 +49181,14 @@ function handle_server_message(data) {
                 }
             }
         }
+    } else if(msg == "ON_APPROACH_RESULT") {
+        var defender_id = data[1], obj_id = data[2], client_start_time = data[3], server_receipt_time = data[4];
+        if(!gamedata['client']['report_on_approach_latency']) { return; }
+        metric_event('3973_on_approach_latency', {'client_start_time': client_start_time,
+                                                  'client_end_time': client_time,
+                                                  'server_receipt_time': server_receipt_time,
+                                                  'latency': client_time - client_start_time,
+                                                  'defender_id': defender_id});
     } else if(msg == "EQUIP_BUILDING_RESULT") {
         var my_arg = data[1], success = data[2];
         var unit_id = my_arg[1], addr = my_arg[2], inv_slot = my_arg[3], add_item = my_arg[4], remove_item = my_arg[5], ui_slot = my_arg[6];
@@ -50083,7 +50247,7 @@ function handle_server_message(data) {
         var currency_url = data[1];
 
         // note: offer_payer_promo() must be triggered from a
-        // mouse-click event in order to avoid being surpressed by
+        // mouse-click event in order to avoid being suppressed by
         // pop-up blockers, since FB.ui({'method':'fbpromotion})
         // requires an old-fashioned popup window instead of the
         // iframe-compatible div popup.
@@ -50375,7 +50539,7 @@ function invoke_timeout_message(event_name, props, options) {
             if(spin_user_id) { props['user_id'] = spin_user_id; }
 
             // note: force metric to be sent via the GIF fetch method rather than with the normal client/server stream,
-            // beacuse the normal stream may have been corrupted by this point
+            // because the normal stream may have been corrupted by this point
             SPLWMetrics.send_event(spin_metrics_anon_id, event_name, add_demographics(props));
         }
     }
@@ -54148,10 +54312,17 @@ function draw_building_or_inert(world, obj, powerfac) {
                 var pos = obj.interpolate_pos(world);
                 aura.visual_effect.reposition([pos[0], 0, pos[1]]);
             }
+
             if(aura.expire_tick.is_infinite()) {
                 // don't draw permanent auras on buildings
                 continue;
             }
+
+            if(obj.is_destroyed()) {
+                // don't draw auras if the building/inert is dead
+                continue;
+            }
+
             if(draw_aura(xy, [xy[0]+30+20*count, xy[1]-default_text_height+5], aura)) {
                 count++;
             }
@@ -54471,7 +54642,7 @@ function draw_unit(world, unit) {
             }
         }
         if(GameTypes.TickCount.lt(world.combat_engine.cur_tick, unit.ai_leash_after)) {
-            draw_centered_text(ctx, '(leashing surpressed)', [xy[0],xy[1]+90]);
+            draw_centered_text(ctx, '(leashing suppressed)', [xy[0],xy[1]+90]);
         } else if(unit.is_leashing) {
             draw_centered_text(ctx, 'LEASHING', [xy[0],xy[1]+90]);
         }

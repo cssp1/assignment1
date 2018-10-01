@@ -88,7 +88,7 @@ class Client:
 
     def set_time(self, t): pass # for drop-in compatibility with SpinNoSQL
 
-    # retreive an arbitrarily long string result with the minimum number of round-trips
+    # retrieve an arbitrarily long string result with the minimum number of round-trips
     # assumes 'result' is a dictionary containing an in-line 'result' field and a 'long_len' field
     # if the 'long_len' value is > 0, then retrieve the result as a string using get_long_result(),
     # otherwise return the inline 'result'

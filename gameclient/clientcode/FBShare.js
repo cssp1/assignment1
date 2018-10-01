@@ -85,22 +85,26 @@ FBShare.invoke_share = function(options) {
     if(spin_frame_platform == 'fb') {
         if(!spin_facebook_enabled) { console.log('FBShare.invoke_share: '+url); return; }
 
-        SPFB.ui({'method': 'share',
-                 'href': url,
-                 'show_error': !spin_secure_mode || player.is_developer()},
+        var fb_ui_param = {'method': 'share',
+                           'href': url,
+                           'show_error': !spin_secure_mode || player.is_developer()};
+        var fb_ui_cb = /** @param {!FBShare.Options} _options */
+            (function (_options) {
+                return /** @type {function(?Object.<string,string>)} */ (function(result) {
+                    if(result && ('post_id' in result)) {
+                        metric_event('7271_feed_post_completed',
+                                     {'method':_options.ref, 'api':'share',
+                                      'facebook_post_id':result['post_id'],
+                                      'sum': player.get_denormalized_summary_props('brief')});
+                        send_to_server.func(["FB_FEED_POST_COMPLETED", {'method': _options.ref}]);
+                    }
+                }); })(options);
 
-                /** @param {!FBShare.Options} _options */
-                (function (_options) {
-                    return /** @type {function(?Object.<string,string>)} */ (function(result) {
-                        if(result && ('post_id' in result)) {
-                            metric_event('7271_feed_post_completed',
-                                         {'method':_options.ref, 'api':'share',
-                                          'facebook_post_id':result['post_id'],
-                                          'sum': player.get_denormalized_summary_props('brief')});
-                            send_to_server.func(["FB_FEED_POST_COMPLETED", {'method': _options.ref}]);
-                        }
-                    }); })(options)
-               );
+        // we need to have the publish_actions permission for this to work
+        call_with_facebook_permissions('publish_actions', (function (_fb_ui_param, _fb_ui_cb) { return function() {
+            SPFB.ui(_fb_ui_param, _fb_ui_cb);
+        }; })(fb_ui_param, fb_ui_cb));
+
     } else if(spin_frame_platform == 'bh' && spin_battlehouse_fb_app_id) {
             // if Facebook SDK is loaded, use that
             if(window['FB']) {

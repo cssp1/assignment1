@@ -9,7 +9,7 @@ goog.provide('AllianceCache');
 */
 
 // client-side alliance info cache
-// this is a central respository for things we know about alliances
+// this is a central repository for things we know about alliances
 
 goog.require('goog.object');
 goog.require('SPHTTP');

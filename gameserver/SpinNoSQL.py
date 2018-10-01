@@ -1427,7 +1427,7 @@ class NoSQLClient (object):
                                                    {'val': {'$gt': score_range_qs['$lte']}}]},
                                           {'_id':0,'user_id':1})]
 
-                # return any one random player maching the cache_qs query, but exclude those with unacceptable scores
+                # return any one random player matching the cache_qs query, but exclude those with unacceptable scores
                 if exclude_user_ids:
                     #open('/tmp/ladder-debug.txt','ab').write('%d\n' % len(exclude_user_ids))
                     cache_qs['$and'].append({'_id':{'$nin':exclude_user_ids}})
@@ -2662,10 +2662,20 @@ class NoSQLClient (object):
         # of space_array in sequence (it should be sorted largest to smallest), stopping when we find an amount
         # of space such that cur_space + donated_space <= max_space.
         for donated_space in space_array:
-            qs = {'_id':recipient_id, 'alliance_id':alliance_id, 'tag':tag,
-                  'space_left': { '$gte': donated_space } }
+            # consider the region to match if it is equal to supplied region_id, or if the request is "regionless"
+            region_qs = {'$or': [
+                {'region_id': {'$exists': False}}, # no region_id on the request
+                {'region_id': {'$type':10}}, # region_id on the request is null
+                ] }
             if region_id:
-                qs['region_id'] = region_id
+                region_qs['$or'].append({'region_id': region_id}) # matches supplied non-null region_id
+
+            qs = {'$and':[{'_id':recipient_id,
+                           'alliance_id':alliance_id,
+                           'tag':tag,
+                           'space_left': { '$gte': donated_space }
+                           },
+                          region_qs]}
             ret = self.unit_donation_requests_table().find_one_and_update(qs,
                                                                           {'$inc':{'space_left':-donated_space}},
                                                                           upsert = False,
@@ -2705,13 +2715,22 @@ class NoSQLClient (object):
         return self.instrument('help_request_help', self._help_request_help, (req_id, helper_id, alliance_id, region_id))
     def _help_request_help(self, req_id, helper_id, alliance_id, region_id):
         assert req_id and helper_id and alliance_id
-        match_qs = {'_id': self.encode_object_id(req_id),
-                    'expire_time': {'$gte': self.time},
-                    'user_id': {'$ne': helper_id}, # can't help yourself
-                    'alliance_id': alliance_id,
-                    'helper_ids': {'$nin': [helper_id]}}
+
+        # consider the region to match if it is equal to supplied region_id, or if the request is "regionless"
+        region_qs = {'$or': [
+            {'region_id': {'$exists': False}}, # no region_id on the request
+            {'region_id': {'$type':10}}, # region_id on the request is null
+            ] }
         if region_id:
-            match_qs['region_id'] = region_id
+            region_qs['$or'].append({'region_id': region_id}) # matches supplied non-null region_id
+
+        match_qs = {'$and':[{'_id': self.encode_object_id(req_id),
+                             'expire_time': {'$gte': self.time},
+                             'user_id': {'$ne': helper_id}, # can't help yourself
+                             'alliance_id': alliance_id,
+                             'helper_ids': {'$nin': [helper_id]}
+                             },
+                            region_qs]}
         ret = self.help_requests_table().find_one_and_update(match_qs,
                                                              {'$addToSet': {'helper_ids': helper_id}},
                                                              return_document = pymongo.ReturnDocument.AFTER)
@@ -3097,7 +3116,7 @@ if __name__ == '__main__':
                         spend_data = '$%05.02f' % member.get('money_spent',0)
 
                     if my_prize <= 0: # or (not ladder_player):
-                        print "    #%2d %-24s with %5s points does not win %s (id %7d continent %s spend %s participaton %d)" % (j+1, detail, display_point_count(gamedata, member['absolute'], tournament_stat), gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])
+                        print "    #%2d %-24s with %5s points does not win %s (id %7d continent %s spend %s participation %d)" % (j+1, detail, display_point_count(gamedata, member['absolute'], tournament_stat), gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])
                     else:
                         print "    #%2d%s %-24s with %5s points WINS %6d %s (id %7d continent %s spend %s participation %d)" % (j+1 if (not is_tie) else WINNERS, '(tie)' if is_tie else '',
                                                                                         detail, display_point_count(gamedata, member['absolute'], tournament_stat), my_prize, gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])

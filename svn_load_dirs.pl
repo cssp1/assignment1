@@ -77,7 +77,7 @@ my $opt_glob_ignores;
 # Message to use for the final commit.
 my $opt_final_commit_msg;
 
-# This is the character used to separate regular expressions occuring
+# This is the character used to separate regular expressions occurring
 # in the tag directory path from the path itself.
 my $REGEX_SEP_CHAR = '@';
 

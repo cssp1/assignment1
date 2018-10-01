@@ -283,6 +283,27 @@ def check_mandatory_fields(specname, spec, kind):
                         error |= 1
                         print '%s:permanent_auras refers to an aura that does not exist (%s)' % (specname, a['aura_name'])
 
+    if spec.get('climate_auras',None):
+        alist_list = spec['climate_auras']
+        if len(alist_list) >= 1 and (isinstance(alist_list[0], list) or alist_list[0] is None):
+            pass
+        else:
+            alist_list = [alist_list]
+        for alist in alist_list:
+            if alist:
+                for a in alist:
+                    if a['aura_name'] not in gamedata['auras']:
+                        error |= 1
+                        print '%s:climate_auras refers to an aura that does not exist (%s)' % (specname, a['aura_name'])
+                    if 'required_climates' not in a:
+                        error |= 1
+                        print '%s:climate_auras aura (%s) does not have a required_climates key' % (specname, a['aura_name'])
+                    for climate_name in a['required_climates']:
+                        if climate_name not in gamedata['climates']:
+                            error |= 1;
+                            print '%s:climate_auras aura (%s) requires invalid climate "%s"' % (specname, a['aura_name'], climate_name)
+
+
     if spec.get('permanent_modstats', None):
         mlist_list = spec['permanent_modstats']
         if len(mlist_list) >= 1 and (isinstance(mlist_list[0], list) or mlist_list[0] is None):
@@ -417,7 +438,7 @@ def check_levels(specname, spec):
               # note: the 3D weapon_offset must be a per-level array, since there is no easy way to distinguish it from a 3-level scalar
               'max_ui_level',
               'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories', 'enhancement_categories',
-              'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras', 'permanent_modstats',
+              'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras', 'climate_auras', 'permanent_modstats',
               'upgrade_ingredients', 'remove_ingredients', 'research_ingredients',
               'quarry_control_auras')
     error = 0
@@ -3320,6 +3341,7 @@ def check_store_sku(sku_name, sku, state):
             else: # non-per-level blueprint
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_unlocked')
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_available')
+                expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_release')
 
 
     for PRED in ('activation', 'requires', 'collected', 'show_if'):

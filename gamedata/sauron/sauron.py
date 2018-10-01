@@ -295,7 +295,7 @@ def collect_hive_data(events):
         event['hives'] = hives.get(event['start_time'], {})
 
 # XXX hacky implementation, needs to be cleaner
-# returns False if the end_time of an ABSOLUTE_TIME predicate has passed (the event has already occured)
+# returns False if the end_time of an ABSOLUTE_TIME predicate has passed (the event has already occurred)
 def check_time_predicate(pred):
     passes = True
     # if we have nesting, dig deeper with recursion

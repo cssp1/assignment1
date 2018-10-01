@@ -140,7 +140,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     }
     if(goodies_list === null) { goodies_list = []; }
 
-    // XXX eventualy, we want to be able to inject predicates into BBCode, e.g. [predicate="{\"predicate\":\"BUILDING_LEVEL\",...
+    // XXX eventually, we want to be able to inject predicates into BBCode, e.g. [predicate="{\"predicate\":\"BUILDING_LEVEL\",...
     // but this will require careful updating of the SPText BBCode parser/quoter. For now, just track predicates by giving
     // them a number and referring to them via this map attached to the onclick handler
     var predicate_map = {}; // map from integer index -> raw predicate dict

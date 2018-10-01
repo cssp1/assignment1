@@ -569,7 +569,7 @@ if anti_refresh_region_names:
 def my_slave(input):
     msg_fd = sys.stderr if input['verbose'] else NullFD()
 
-    # reconnect to DB to avoid subprocesses sharing conenctions
+    # reconnect to DB to avoid subprocesses sharing connections
     db_client = connect_to_db()
 
     checks = [pol(db_client, dry_run = input['dry_run'], msg_fd = msg_fd, test = input['test'], verbose = input['verbose']) \

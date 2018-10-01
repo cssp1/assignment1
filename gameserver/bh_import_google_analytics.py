@@ -4,7 +4,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# import data from Google Analytics API into the SQL database for futher processing
+# import data from Google Analytics API into the SQL database for further processing
 
 # API docs: https://developers.google.com/analytics/devguides/reporting/core/v4/basics#dimensions
 

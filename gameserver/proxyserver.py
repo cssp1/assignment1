@@ -1608,6 +1608,8 @@ class GameProxy(proxy.ReverseProxyResource):
             # but don't reset oauth info
             pass
 
+        proposed_oauth_token = None
+
         if visitor.raw_signed_request:
 
             try:
@@ -1637,7 +1639,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 if 'user' in signed_request:
                     udata = signed_request['user']
                     if 'country' in udata:
-                        # note: allow this to override our geo-location. Facebok doesn't always provide it though!
+                        # note: allow this to override our geo-location. Facebook doesn't always provide it though!
                         visitor.demographics['country'] = udata['country']
                     if 'locale' in udata and ('locale' not in visitor.demographics):
                         visitor.demographics['locale'] = udata['locale']
@@ -1655,11 +1657,11 @@ class GameProxy(proxy.ReverseProxyResource):
                     visitor.set_facebook_id(None)
 
                 if 'oauth_token' in signed_request:
-                    visitor.oauth_token = signed_request['oauth_token']
+                    proposed_oauth_token = signed_request['oauth_token']
 
                 # accept raw oauth_token from client flow (?)
-                elif (not visitor.oauth_token) and ('spin_oauth_token' in request.args):
-                    visitor.oauth_token = request.args['spin_oauth_token'][-1]
+                elif (not proposed_oauth_token) and ('spin_oauth_token' in request.args):
+                    proposed_oauth_token = request.args['spin_oauth_token'][-1]
 
                 else:
                     # don't reset?
@@ -1720,14 +1722,16 @@ class GameProxy(proxy.ReverseProxyResource):
         # this MIGHT come together inside the signed_request, or we might have to retrieve them if we get a "code" argument (after an auth redirect)
 
         if SpinConfig.config['proxyserver'].get('log_auth_scope', 0) >= 2:
-            exception_log.event(proxy_time, 'index visitor: fbid "%s" oauth_token "%s" args: %s' % (repr(visitor.facebook_id), repr(visitor.oauth_token), repr(request.args)))
+            exception_log.event(proxy_time, 'index visitor: fbid "%s" proposed_oauth_token "%s" args: %s' % (repr(visitor.facebook_id), repr(proposed_oauth_token), repr(request.args)))
 
-        if visitor.facebook_id and visitor.oauth_token:
-            if SpinConfig.config.get('enable_facebook',0): # and SpinConfig.config['proxyserver'].get('check_auth_scope', True): this is mandatory now, to pass permissions proxy->client->server
-                # perform deferred /permissions check
-                return self.index_visit_check_scope(request, visitor)
+        if visitor.facebook_id and proposed_oauth_token:
+            if SpinConfig.config.get('enable_facebook',0):
+                # this is mandatory to check the token (it might have expired) and pass permissions proxy->client->server
+                return self.index_visit_verify_oauth_token(request, visitor, proposed_oauth_token)
+                #return self.index_visit_check_scope(request, visitor)
             else:
                 # immediate entry to game
+                visitor.oauth_token = proposed_oauth_token
                 return self.index_visit_authorized(request, visitor)
 
         if 'code' in request.args:
@@ -1802,7 +1806,8 @@ class GameProxy(proxy.ReverseProxyResource):
               urllib.urlencode({'input_token':token})
         if SpinConfig.config['proxyserver'].get('log_auth_scope', 0) >= 2:
             exception_log.event(proxy_time, 'verifying OAuth token: ' + url)
-        fb_queue_request('oauth/debug_token', proxy_time, url, sc.on_response, error_callback = sc.on_error)
+        fb_queue_request('oauth/debug_token', proxy_time, url, sc.on_response, error_callback = sc.on_error,
+                         callback_type = AsyncHTTP.AsyncHTTPRequester.CALLBACK_FULL)
         return twisted.web.server.NOT_DONE_YET
 
     class OAuthVerifier:
@@ -1812,12 +1817,12 @@ class GameProxy(proxy.ReverseProxyResource):
             self.visitor = visitor
             self.token = token
             self.d = d
-        def on_response(self, response):
-            self.d.callback(self.parent.index_visit_verify_oauth_token_response(self.request, self.visitor, self.token, response))
-        def on_error(self, reason):
-            self.d.callback(self.parent.index_visit_verify_oauth_token_response(self.request, self.visitor, self.token, 'false'))
+        def on_response(self, body = '', headers = {}, status = 500):
+            self.d.callback(self.parent.index_visit_verify_oauth_token_response(self.request, self.visitor, self.token, body))
+        def on_error(self, body = '', headers = {}, status = 500, ui_reason = None):
+            self.d.callback(self.parent.index_visit_verify_oauth_token_response(self.request, self.visitor, self.token, 'false', http_error_message = ui_reason))
 
-    def index_visit_verify_oauth_token_response(self, request, visitor, token, response):
+    def index_visit_verify_oauth_token_response(self, request, visitor, token, response, http_error_message = None):
         response = SpinJSON.loads(response)
         # carefully check for a valid token
 
@@ -1839,9 +1844,23 @@ class GameProxy(proxy.ReverseProxyResource):
                             scope_data['installed'] = 1
                             scope_data['public_profile'] = 1
                             return self.index_visit_check_scope_response(request, visitor, None, preload_data = scope_data)
+                    else:
+                        # NOT a valid oauth token
+                        # check for known harmless reasons here
+                        # any other case falls down to "some other failure" below
+                        if 'error' in data and data['error'].get('code') == 190 and data['error'].get('subcode') == 467:
+                            # "Error validating access token: The session is invalid because the user logged out." (of Facebook)
+                            return self.index_visit_do_fb_auth(request, visitor)
 
-        # fail, request auth again
-        exception_log.event(proxy_time, 'failed to verify oauth token: '+repr(request)+' args '+repr(request.args)+' signed_request '+repr(visitor.raw_signed_request)+' token '+repr(token)+' response '+repr(response))
+                else:
+                    # the oauth token has expired
+                    if verbose():
+                        raw_log.event(proxy_time, ('browser presented an expired Facebook OAuth token (expires at %d, current time %d): ' % (int(data['expires_at']), proxy_time))+log_request(request))
+                    # no problem, just redirect to auth
+                    return self.index_visit_do_fb_auth(request, visitor)
+
+        # some other failure - request auth again
+        exception_log.event(proxy_time, 'failed to verify oauth token: '+repr(request)+' args '+repr(request.args)+' signed_request '+repr(visitor.raw_signed_request)+' token '+repr(token)+' response '+repr(response)+' http_error_message '+repr(http_error_message))
         return self.index_visit_do_fb_auth(request, visitor)
 
     #

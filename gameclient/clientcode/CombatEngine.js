@@ -380,7 +380,7 @@ CombatEngine.ProjectileEffect.prototype.apply = function(world) {
 /** @constructor @struct
     @implements {GameTypes.ISerializable}
     @param {!GameTypes.TickCount} tick
-    @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for applicaiton
+    @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for application
     @param {GameObjectId|null} source_id
     @param {string|null} source_team
     @param {!GameTypes.Integer} amount

@@ -37,7 +37,7 @@ export CVSEDITOR="$HOME/bin/edit"
 # add my personal bin directory to the path
 export PATH="$HOME/bin:$PATH"
 
-# this is my home CVS respository (via the master NFS share)
+# this is my home CVS repository (via the master NFS share)
 if [ ! $CVSROOT ]; then
     export CVSROOT=/shared/cvs
 fi

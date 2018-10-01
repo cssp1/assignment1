@@ -2941,12 +2941,22 @@ class User:
 
         endpoint = str(self.facebook_id)
 
-        # XXXXXX now we always have to use using app_tok here because of appsecret_proof.
-        # This results in no birthday info and no is_eligible_promo data.
-        # We'll need to do client-side queries for those
+        # Facebook has been messing around with which of the app or user access tokens can be used to retrieve data.
+
+        # Note, if using a user access token, then it is not possible to apply appsecret_proof verification
+        # That option seems to be busted as of 2018.
+
+        # note: when using app access token, Facebook has stopped sending: birthday, is_eligible_promo
+        # and also the /friends endpoint returns nothing.
 
         profile_url = SpinFacebook.versioned_graph_endpoint_secure('user', endpoint)+'&fields=id,birthday,email,name,first_name,last_name,gender,locale,timezone,third_party_id,currency,is_eligible_promo,permissions'
-        friends_url = SpinFacebook.versioned_graph_endpoint_secure('friend', endpoint+'/friends')+'?limit=500&offset=0'
+
+        # as of 20180925, Facebook doesn't return any friends here if you use the app_tok instead of the user's fb_oauth_token
+        if 'facebook_api_token_choice' in SpinConfig.config and SpinConfig.config['facebook_api_token_choice'].get('friend') == 'user' and self.fb_oauth_token:
+            friends_url = SpinFacebook.versioned_graph_endpoint('friend', endpoint+'/friends')+'?limit=500&offset=0&' + urllib.urlencode({'access_token': self.fb_oauth_token})
+        else:
+            friends_url = SpinFacebook.versioned_graph_endpoint_secure('friend', endpoint+'/friends')+'?limit=500&offset=0'
+
         likes_url = SpinFacebook.versioned_graph_endpoint_secure('like', endpoint+'/likes')+'?limit=500&offset=0'
 
         # keep track of outstanding requests
@@ -4430,16 +4440,46 @@ class Session(object):
         return channel
 
     def do_chat_catchup(self, true_channel, retmsg):
+        num_received = 0
+        min_time = server_time
         for x in gamesite.nosql_client.chat_catchup(true_channel, limit = gamedata['server']['chat_memory'], reason='catchup'):
             self.chat_recv(true_channel, x.get('id',None), x['sender'], x.get('text',''), retmsg = retmsg)
+            num_received += 1
+            if 'time' in x['sender']:
+                min_time = min(min_time, x['sender']['time'])
+
+        no_more_messages = (num_received < gamedata['server']['chat_memory'])
+
+        # tell client whether we can get more
+        self.chat_recv(true_channel, None, {'chat_name':'System',
+                                            'type':'cannot_get_more' if no_more_messages else 'can_get_more',
+                                            'time': min_time, 'user_id':-1},
+                       'cannot_get_more' if no_more_messages else 'can_get_more',
+                       retmsg = retmsg, is_prepend = True)
+
     def do_chat_getmore(self, true_channel, end_time, end_msg_id, retmsg):
         msg_list = gamesite.nosql_client.chat_catchup(true_channel, end_time = end_time, end_msg_id = end_msg_id,
                                                       order = SpinNoSQL.NoSQLClient.CHAT_NEWEST_FIRST,
                                                       limit = gamedata['server']['chat_memory'],
                                                       reason = 'getmore')
+        min_time = server_time
         for x in msg_list:
             self.chat_recv(true_channel, x.get('id',None), x['sender'], x.get('text',''), retmsg = retmsg, is_prepend = True)
-        return len(msg_list) < gamedata['server']['chat_memory'] # is_final
+            if 'time' in x['sender']:
+                min_time = min(min_time, x['sender']['time'])
+
+        # if we got fewer messages than chat_memory, that means the next query won't return any at all
+        # so tell the client this is the final "getmore"
+        no_more_messages = len(msg_list) < gamedata['server']['chat_memory']
+
+        self.chat_recv(true_channel, None, {'chat_name':'System',
+                                            'type':'cannot_get_more' if no_more_messages else 'can_get_more',
+                                            'time': min_time, 'user_id':-1},
+                       'cannot_get_more' if no_more_messages else 'can_get_more',
+                       retmsg = retmsg, is_prepend = True)
+
+        return no_more_messages
+
 
     def init_alliance(self, retmsg, chat_catchup = True, reason = 'Session.init_alliance'):
         if self.alliance_chat_channel:
@@ -4903,9 +4943,15 @@ class Session(object):
         # set up environmental auras
         if obj.is_mobile():
             climate = gamedata['climates'].get(self.viewing_base.base_climate, None)
-            if climate and ('applies_aura' in climate):
-                if obj.auras is None: obj.auras = []
-                Aura.apply_aura(obj.auras, climate['applies_aura'], climate['aura_strength'], session_only = True)
+            if climate:
+                if ('applies_aura' in climate):
+                    if obj.auras is None: obj.auras = []
+                    Aura.apply_aura(obj.auras, climate['applies_aura'], climate['aura_strength'], session_only = True)
+                if obj.spec.climate_auras:
+                    for aura in obj.spec.climate_auras:
+                        if climate['name'] in aura['required_climates']:
+                            if obj.auras is None: obj.auras = []
+                            Aura.apply_aura(obj.auras, aura['aura_name'], aura['aura_strength'], session_only = True)
 
         return self.cur_objects.add_object(obj)
 
@@ -6749,6 +6795,7 @@ class GameObjectSpec(Spec):
         ["quarry_invul", False],
         ["equip_slots", None],
         ["permanent_auras", None],
+        ["climate_auras", None],
         ["permanent_modstats", None],
         ["auto_spawn", False],
         ["on_destroy", None],
@@ -21702,17 +21749,24 @@ class GAMEAPI(resource.Resource):
         d.addErrback(report_and_absorb_deferred_failure, session)
 
         # failure AND success path (failure indicated by buf being None or the 404 'NOTFOUND' value)
-        def cb(buf, session, tag):
+        def cb(buf, session, tag, battle_time, attacker_id, defender_id, base_id):
+            ret = None
+
             if buf and (buf != 'NOTFOUND'):
+                raw_ret = None
                 with admin_stats.latency_measurer('GET_BATTLE_REPLAY(gunzip)'):
-                    raw_ret = gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).read()
-                with admin_stats.latency_measurer('GET_BATTLE_REPLAY(compress)'):
-                    ret = compress_and_wrap_string(raw_ret)
-            else:
-                ret = None
+                    try:
+                        raw_ret = gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).read()
+                    except:
+                        gamesite.exception_log.event(server_time, 'player %d: error loading replay %d-%d-vs-%d at %s: %s' % (session.player.user_id, battle_time, attacker_id, defender_id, base_id, traceback.format_exc().strip()))
+
+                if raw_ret:
+                    with admin_stats.latency_measurer('GET_BATTLE_REPLAY(compress)'):
+                        ret = compress_and_wrap_string(raw_ret)
+
             session.send([["GET_BATTLE_REPLAY_RESULT", tag, ret]])
 
-        d.addCallback(cb, session, tag)
+        d.addCallback(cb, session, tag, battle_time, attacker, defender, base_id)
 
         return session.start_async_request(d) # go async
 
@@ -26502,7 +26556,7 @@ class GAMEAPI(resource.Resource):
                 if update_viewing_player and session.has_attacked:
                     retmsg.append(["ENEMY_STATE_UPDATE", session.viewing_player.resources.calc_snapshot().serialize(enemy = True)])
 
-    def fire_on_approach(self, session, retmsg, id, xy, trigger_obj_id):
+    def fire_on_approach(self, session, retmsg, id, xy, trigger_obj_id, client_time):
         if not session.has_object(id): return
         obj = session.get_object(id)
         if obj.on_approach_fired: return
@@ -26522,6 +26576,8 @@ class GAMEAPI(resource.Resource):
             obj.on_approach_fired = True
             for cons in cons_list:
                 session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y] if obj.is_building() else map(int, xy), 'trigger_obj': trigger_obj}, reason='on_approach(%s)' % obj.spec.name)
+
+        retmsg.append(["ON_APPROACH_RESULT", obj.owner.user_id, id, client_time, server_time])
 
     def recycle_unit(self, session, retmsg, id):
         obj = session.player.get_object_by_obj_id(id, fail_missing = False)
@@ -27528,6 +27584,8 @@ class GAMEAPI(resource.Resource):
 
         # update profile fields
         if frame_platform == 'fb':
+            # ideally we should extend this token, in case the gameplay session lasts longer than the normal 2-hour expiration
+            # https://developers.facebook.com/docs/facebook-login/access-tokens/refreshing/
             user.fb_oauth_token = auth_token
 
             user.facebook_id = social_id[2:]
@@ -29122,7 +29180,7 @@ class GAMEAPI(resource.Resource):
             self.object_combat_updates(session, retmsg, arg[1])
 
         elif arg[0] == "ON_APPROACH":
-            self.fire_on_approach(session, retmsg, arg[1], arg[2], arg[3])
+            self.fire_on_approach(session, retmsg, arg[1], arg[2], arg[3], arg[4])
 
         elif arg[0] == "AUTO_RESOLVE":
             self.auto_resolve(session, retmsg)
@@ -32230,12 +32288,10 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
                         success = False
 
-                if success:
-                    if gamedata.get('alliance_help_restrict_region', True) and (not session.player.home_region):
-                        retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
-                        success = False
+                # you may request alliance help even if you aren't on the map yet
 
                 if success:
+                    # note: region_id may be None if the player is not on the map
                     region_id = session.player.home_region if gamedata.get('alliance_help_restrict_region', True) else None
                     expire_time = server_time + gamedata['alliance_help_request_duration']
                     req_props = {'obj_id': object.obj_id, 'obj_spec': object.spec.name, 'obj_level': object.level,
@@ -32280,8 +32336,10 @@ class GAMEAPI(resource.Resource):
                                                            '%DESCR': '%s L%d' % (gamedata['buildings'][req_props['action_spec']]['ui_name'], req_props['action_level'])})
                             for member, pinfo in zip(member_list, pcache_data):
                                 if member['user_id'] != session.user.user_id:
-                                    if gamedata.get('alliance_help_restrict_region', True) and pinfo and pinfo.get('home_region',None) != region_id:
-                                        continue # different region - don't notify
+                                    # don't notify if the region restriction would prevent you from responding
+                                    if region_id and gamedata.get('alliance_help_restrict_region', True) and \
+                                       pinfo and pinfo.get('home_region',None) != region_id:
+                                        continue
                                     gamesite.do_CONTROLAPI(session.user.user_id, {'method': 'send_notification', # 'reliable': 1,
                                                                                   'ignore_if_online': 1, # only send to offline people
                                                                                   'user_id': member['user_id'],
@@ -32296,6 +32354,13 @@ class GAMEAPI(resource.Resource):
                 success = True
                 error_reason = None
 
+                spell = gamedata['spells'][spellname]
+
+                for PRED in ('show_if', 'requires'):
+                    if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
+                        error_reason = "REQUIREMENTS_NOT_SATISFIED"
+                        success = False
+
                 if success:
                     if session.has_attacked:
                         error_reason = "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"
@@ -32305,11 +32370,6 @@ class GAMEAPI(resource.Resource):
                     if (not session.player.alliance_help_enabled()) or \
                        (not gamesite.sql_client) or (not session.alliance_chat_channel):
                         retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])
-                        success = False
-
-                if success:
-                    if gamedata.get('alliance_help_restrict_region', True) and (not session.player.home_region):
-                        error_reason = "REQUIREMENTS_NOT_SATISFIED"
                         success = False
 
                 if success:
