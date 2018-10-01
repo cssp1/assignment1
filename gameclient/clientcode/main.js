@@ -21280,17 +21280,7 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
 
     if(player.tutorial_state == 'COMPLETE' && session.enable_progress_timers &&
        can_show_replay_for_battle_summary(battle_summary)) {
-        var link_qs = battle_replay_link_qs(battle_summary['time'], battle_summary['attacker_id'], battle_summary['defender_id'], battle_summary['base_id'], dialog.user_data['replay_signature']);
-        if(link_qs && FBShare.supported()) {
-            dialog.widgets['fb_share_button'].show =
-                dialog.widgets['fb_share_icon'].show = true;
-            var text = gamedata['virals']['replay']['ui_post_headline']
-                .replace('%ATTACKER', player.get_ui_name()) // battle_summary['attacker_name'])
-                .replace('%DEFENDER', battle_opponent_name); //  battle_summary['defender_name']);
-            dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
-                FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
-            }; })(link_qs, text);
-        }
+        set_up_replay_sharing_button(dialog, battle_summary, dialog.user_data['replay_signature'], player.get_ui_name(), battle_opponent_name);
     }
 
     dialog.widgets['winner_name'].str = player.get_ui_name();
@@ -28520,6 +28510,62 @@ function can_show_replay_for_battle_summary(summary) {
     return their_replay_version === cur_replay_version;
 }
 
+/** @param {!SPUI.Dialog} dialog
+    @param {Object<string,*>} battle_summary
+    @param {string} replay_signature
+    @param {string} attacker_name
+    @param {string} defender_name
+
+    Drives a "Share replay on Facebook" button on the UI.
+    Common code for both the battle_log and fancy_victory dialogs.
+*/
+function set_up_replay_sharing_button(dialog, battle_summary, replay_signature, attacker_name, defender_name) {
+    // initialize to blank state
+    dialog.widgets['fb_share_button'].show =
+        dialog.widgets['fb_share_icon'].show =
+        dialog.widgets['fb_share_incentive_icon'].show = false;
+
+    // get the URL link for sharing a battle replay
+    var link_qs = battle_replay_link_qs(
+        /** @type {number} */ (battle_summary['time']),
+        /** @type {number} */ (battle_summary['attacker_id']),
+        /** @type {number} */ (battle_summary['defender_id']),
+        /** @type {string|null} */ (battle_summary['base_id']),
+        replay_signature);
+
+    if(!link_qs || !FBShare.supported()) {
+        // no link or FB sharing is not available. Nothing to do.
+        return;
+    }
+
+    // show button and icon
+    dialog.widgets['fb_share_button'].show =
+        dialog.widgets['fb_share_icon'].show = true;
+
+    var text = gamedata['virals']['replay']['ui_post_headline'].replace('%ATTACKER', attacker_name).replace('%DEFENDER', defender_name);
+
+    dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
+        FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
+    }; })(link_qs, text);
+
+    if(!gamedata['show_fb_share_replay_incentive']) {
+        // checks for the fb_share_replay_incentive flag in main_options.json. If not there, the flashing icon is not needed.
+        // Nothing to do.
+        return;
+    }
+
+    // Check if a quest named "share_battle_replay" or "share_battle_replay_again" exists, is active, but is not complete yet.
+    // If so, show the incentive icon on top of the button.
+
+    goog.array.forEach(['share_battle_replay', 'share_battle_replay_again'], function(quest_name) {
+        if(quest_name in gamedata['quests'] &&
+           player.can_activate_quest(gamedata['quests'][quest_name]) &&
+           !player.can_complete_quest(gamedata['quests'][quest_name])) {
+            dialog.widgets['fb_share_incentive_icon'].show = true;
+        }
+    });
+}
+
 function receive_battle_log_result(dialog, ret) {
     var log, replay_exists;
     if(!ret) {
@@ -28564,17 +28610,7 @@ function receive_battle_log_result(dialog, ret) {
                                          dialog.user_data['signature'], fail_cb);
             };
 
-            var link_qs = battle_replay_link_qs(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'], dialog.user_data['signature']);
-            if(link_qs && FBShare.supported()) {
-                dialog.widgets['fb_share_button'].show =
-                    dialog.widgets['fb_share_icon'].show = true;
-                var text = gamedata['virals']['replay']['ui_post_headline']
-                    .replace('%ATTACKER', dialog.widgets['attacker_name'].str)
-                    .replace('%DEFENDER', dialog.widgets['defender_name'].str);
-                dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
-                    FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
-                }; })(link_qs, text);
-            }
+            set_up_replay_sharing_button(dialog, summary, dialog.user_data['signature'], dialog.widgets['attacker_name'].str, dialog.widgets['defender_name'].str);
         }
     }
     dialog.widgets['log'].scroll_to_top();
