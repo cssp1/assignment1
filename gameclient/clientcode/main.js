@@ -22605,10 +22605,6 @@ function invoke_building_context_menu(mouse_xy) {
         dialog.widgets['level'].str = session.minefield_tags_by_obj_id[obj.id];
 
         dialog.widgets['level'].str += ' ('+gamedata['strings'][obj.is_minefield_armed() ? 'minefield_armed' : 'minefield_not_armed']+')';
-    } else if(obj.is_building() && obj.is_ambush() && (obj.id in session.ambush_tags_by_obj_id)) {
-        dialog.widgets['level'].str = session.ambush_tags_by_obj_id[obj.id];
-
-        dialog.widgets['level'].str += ' ('+gamedata['strings'][obj.is_ambush_armed() ? 'ambush_armed' : 'ambush_not_armed']+')';
     } else if(obj.is_inert() && ('ui_description' in spec)) {
         // this used to be an amount specified in obj.metadata (iron_deposit contents), but we decided to hide it from players
         dialog.widgets['level'].str = obj.get_leveled_quantity(spec['ui_description']).replace('%d', '??');
@@ -51342,8 +51338,6 @@ function create_mouse_tooltip() {
             var nameline = obj.spec['ui_name'];
             if(obj.is_building() && obj.is_minefield() && (obj.id in session.minefield_tags_by_obj_id)) {
                 nameline += ' '+session.minefield_tags_by_obj_id[obj.id];
-            } else if(obj.is_building() && obj.is_ambush() && (obj.id in session.ambush_tags_by_obj_id)) {
-                nameline += ' '+session.ambush_tags_by_obj_id[obj.id];
             }
             str.push(nameline);
 

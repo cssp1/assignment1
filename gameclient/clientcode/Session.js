@@ -39,8 +39,6 @@ Session.Session = function() {
 
     this.minefield_tags_by_obj_id = {}; // mapping from obj_id to tag of player minefield buildings, used for GUI purposes only
     this.minefield_tags_by_tag = {}; // mapping from tag to obj_id
-    this.ambush_tags_by_obj_id = {}; // GUI purposes only - identify unique factories (same as minefield tags above)
-    this.ambush_tags_by_tag = {};
     this.factory_tags_by_obj_id = {}; // GUI purposes only - identify unique factories (same as minefield tags above)
     this.factory_tags_by_tag = {};
     this.viewing_user_id = null; // SpinPunch user ID of the person whose base we are looking at
@@ -129,8 +127,6 @@ Session.Session.prototype.set_viewing_base = function(new_base, enable_citizens)
 
     this.minefield_tags_by_obj_id = {};
     this.minefield_tags_by_tag = {};
-    this.ambush_tags_by_obj_id = {};
-    this.ambush_tags_by_tag = {};
     this.factory_tags_by_obj_id = {};
     this.factory_tags_by_tag = {};
 };
@@ -333,15 +329,6 @@ Session.Session.prototype.on_real_world_object_added = function(event) {
             var tag = String.fromCharCode('A'.charCodeAt(0) + collet)+(rownum+1).toString();
             this.minefield_tags_by_obj_id[obj.id] = tag;
             this.minefield_tags_by_tag[tag] = obj.id;
-        } else if(obj.is_ambush()) {
-            var count = goog.object.getCount(this.ambush_tags_by_obj_id[obj.spec['name']] || {});
-            var tag = String.fromCharCode('A'.charCodeAt(0) + count).toString();
-            if(!(obj.spec['name'] in this.ambush_tags_by_obj_id)) {
-                this.ambush_tags_by_obj_id[obj.spec['name']] = {};
-                this.ambush_tags_by_tag[obj.spec['name']] = {};
-            }
-            this.ambush_tags_by_obj_id[obj.spec['name']][obj.id] = tag;
-            this.ambush_tags_by_tag[obj.spec['name']][tag] = obj.id;
         } else if(obj.is_factory()) {
             var count = goog.object.getCount(this.factory_tags_by_obj_id[obj.spec['name']] || {});
             var tag = String.fromCharCode('A'.charCodeAt(0) + count).toString();
