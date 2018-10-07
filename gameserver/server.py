@@ -18457,7 +18457,7 @@ class Store(object):
         elif spellname.startswith("GROW_BASE_PERIMETER"):
             # accept any spellname of the form GROW_BASE_PERIMETERx_... where "x" is the new level to grow to
             new_level = int(spellname.split('_')[2][-1])
-            assert new_level >= 0 and new_level <= 1
+            assert new_level >= 0 and new_level <= 3
             assert new_level > session.viewing_base.base_size
             session.viewing_base.base_size = new_level
             retmsg.append(["BASE_SIZE_UPDATE", session.viewing_base.base_size])
