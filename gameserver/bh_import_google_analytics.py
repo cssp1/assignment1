@@ -279,7 +279,11 @@ if __name__ == '__main__':
 
     for table, affected, interval, dt in ((bh_summary_table, set(), 'day', 86400),
                                           (bh_detail_table, set(), 'day', 86400),
-                                          (bh_clicks_table, set(), 'day', 86400),
+
+                                          # outbound click tracking is now turned off, so this will
+                                          # uselessly look for missing data. Skip it.
+                                          # (bh_clicks_table, set(), 'day', 86400),
+
                                           (bh_login_summary_table, set(), 'day', 86400),
                                           (bh_login_campaign_summary_table, set(), 'day', 86400),
                                           ):
