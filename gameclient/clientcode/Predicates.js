@@ -1941,6 +1941,10 @@ BaseSizePredicate.prototype.is_satisfied = function(player, qdata) {
 };
 /** @override */
 BaseSizePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+/** @override */
+BaseSizePredicate.prototype.do_ui_describe = function(player) {
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name_'+this.method].replace('%d', this.value.toString()));
+};
 
 /** @constructor @struct
   * @extends Predicate */
