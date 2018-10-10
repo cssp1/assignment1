@@ -1939,6 +1939,8 @@ BaseSizePredicate.prototype.is_satisfied = function(player, qdata) {
         throw Error('unknown method '+this.method);
     }
 };
+/** @override */
+BaseSizePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor @struct
   * @extends Predicate */
