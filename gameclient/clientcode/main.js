@@ -9564,8 +9564,6 @@ function get_killer_info(killer) {
         if(killer.is_building()) {
             if(killer.is_minefield() && killer.is_minefield_armed()) {
                 ret['mine'] = killer.minefield_item();
-            } else if(killer.is_ambush() && killer.is_ambush_armed()) {
-                ret['ambush'] = killer.ambush_point_item();
             } else if(killer.is_emplacement() && killer.turret_head_item()) {
                 ret['turret_head'] = killer.turret_head_item()['spec'];
             }
@@ -15240,7 +15238,7 @@ BuildUICursor.prototype.draw = function(offset) {
         spell_range_aoe = get_weapon_range(null, 1, get_auto_spell_raw(gamedata['buildings'][selection.spellkind])); // assume level 1 spell for newly-constructed buildings
     }
     var spell = spell_range_aoe[0], range = (spell_range_aoe[3] > 0 ? spell_range_aoe[3] : spell_range_aoe[1]), aoe = spell_range_aoe[2], min_range = spell_range_aoe[4];
-    if(range > 0 || (this.obj && this.obj.is_building() && this.obj.is_minefield()) || (this.obj && this.obj.is_building() && this.obj.is_ambush())) {
+    if(range > 0 || (this.obj && this.obj.is_building() && (this.obj.is_minefield() || this.obj.is_ambush()))) {
         // manually draw prospective range at new location
         if(range > 0) {
             draw_weapon_range(xy, range, true, aoe, min_range);
@@ -34454,7 +34452,7 @@ function crafting_dialog_change_category(dialog, category, page) {
     dialog.user_data['scrolled'] = false;
     dialog.user_data['open_time'] = client_time;
     // special case for mines, there is only one column of recipes
-	dialog.user_data['recipe_columns'] = (category == 'mines' ? 1 : dialog.data['widgets']['recipe_icon']['array'][0]);
+    dialog.user_data['recipe_columns'] = (category == 'mines' ? 1 : dialog.data['widgets']['recipe_icon']['array'][0]);
 
     // center scroll arrows relative to recipe icons
     goog.array.forEach(['scroll_left', 'scroll_right'], function(wname) {
