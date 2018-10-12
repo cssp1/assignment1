@@ -5351,10 +5351,11 @@ Building.prototype.turret_head_inprogress_item = function() {
     }
     return null;
 };
-Building.prototype.is_minefield = function(){return this.spec['equip_slots'] && ('mine' in this.spec['equip_slots']);};
-Building.prototype.is_ambush = function(){return this.spec['equip_slots'] && ('ambush' in this.spec['equip_slots']);};
-Building.prototype.is_minefield_armed = function(){return (this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0);};
-Building.prototype.is_ambush_armed = function(){return (this.equipment && this.equipment['ambush'] && this.equipment['ambush'].length > 0);};
+Building.prototype.is_minefield = function() { return this.spec['equip_slots'] && ('mine' in this.spec['equip_slots']); };
+Building.prototype.is_ambush = function() { return this.spec['equip_slots'] && ('ambush' in this.spec['equip_slots']); };
+Building.prototype.is_minefield_armed = function() { return (this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0); };
+Building.prototype.is_ambush_armed = function() { return (this.equipment && this.equipment['ambush'] && this.equipment['ambush'].length > 0); };
+
 // returns the name of mine item associated with this minefield, if any, otherwise null
 Building.prototype.minefield_item = function() {
     if(this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0) {
@@ -5364,28 +5365,11 @@ Building.prototype.minefield_item = function() {
     }
     return null;
 };
-Building.prototype.ambush_point_item = function() {
-    if(this.equipment && this.equipment['ambush'] && this.equipment['ambush'].length > 0) {
-        return (this.equipment['ambush'][0] ? player.decode_equipped_item(this.equipment['ambush'][0])['spec'] : null);
-    } else if(this.config && this.config['ambush'] && this.config['ambush'].length > 0) {
-        return (typeof(this.config['ambush']) === 'string' ? this.config['ambush'] : player.decode_equipped_item(this.config['ambush'][0])['spec']);
-    }
-    return null;
-};
 
 // search session for any player-owned minefield building
 var find_any_player_minefield = function() {
     return session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.is_minefield() && obj.team === 'player') {
-            return obj;
-        }
-    });
-};
-
-// search session for any player-owned ambush building
-var find_any_player_ambush = function() {
-    return session.for_each_real_object(function(obj) {
-        if(obj.is_building() && obj.is_ambush() && obj.team === 'player') {
             return obj;
         }
     });
@@ -6929,14 +6913,6 @@ player.removers_in_use = function() { return player.remover_get_tasks().length; 
 player.all_minefields_armed = function() {
     return !session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.team == 'player' && obj.is_minefield() && !obj.is_minefield_armed()) {
-            return true;
-        }
-    });
-};
-
-player.all_ambushes_armed = function() {
-    return !session.for_each_real_object(function(obj) {
-        if(obj.is_building() && obj.team == 'player' && obj.is_ambush() && !obj.is_ambush_armed()) {
             return true;
         }
     });
@@ -22493,7 +22469,10 @@ function invoke_building_context_menu(mouse_xy) {
 
             if(obj.time_until_finish() > 0) {
                 // object is busy with something, cannot upgrade
-            } else if((session.home_base || quarry_upgradable || quarry_stats_viewable) && (obj.get_max_ui_level() > 1 || obj.is_storage() || (('equip_slots' in obj.spec) && !obj.is_minefield()) || (('equip_slots' in obj.spec) && !obj.is_ambush()))) {
+            } else if((session.home_base || quarry_upgradable || quarry_stats_viewable) &&
+                      (obj.get_max_ui_level() > 1 || obj.is_storage() ||
+                       (('equip_slots' in obj.spec) && !obj.is_minefield() && !obj.is_ambush()))
+                     ) {
                 var spell = gamedata['spells']['SHOW_UPGRADE'];
                 if(obj.level < obj.get_max_ui_level()) {
                     if(gamedata['store']['enable_upgrade_all_barriers'] && (obj.spec['name'] === 'barrier')) {
@@ -34616,11 +34595,6 @@ function crafting_dialog_init_status_mines(dialog) {
             dialog.widgets['mine_slot'+wname].show = ((y*dims[0]+x) < max_minefields);
         }
     }
-}
-function get_max_ambush_points() {
-    if(!('ambush_point' in gamedata['buildings'])) { return 0; }
-    var spec = gamedata['buildings']['ambush_point'];
-    return spec['limit_requires'].length;
 }
 
 function crafting_dialog_init_status_missiles(dialog) {
