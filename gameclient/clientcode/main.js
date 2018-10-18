@@ -22471,7 +22471,7 @@ function invoke_building_context_menu(mouse_xy) {
                 // object is busy with something, cannot upgrade
             } else if((session.home_base || quarry_upgradable || quarry_stats_viewable) &&
                       (obj.get_max_ui_level() > 1 || obj.is_storage() ||
-                       (('equip_slots' in obj.spec) && !obj.is_minefield() && !obj.is_ambush()))
+                       (('equip_slots' in obj.spec) && !obj.is_minefield()))
                      ) {
                 var spell = gamedata['spells']['SHOW_UPGRADE'];
                 if(obj.level < obj.get_max_ui_level()) {
