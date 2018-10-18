@@ -168,16 +168,19 @@ if __name__ == '__main__':
     game_id = SpinConfig.game()
     min_spend = 100
     churned_for_days = -1
+    played_within_days = -1
     country = None
     filename = '-'
     do_all = False
     parallel = 1
     verbose = True
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:q', ['min-spend=', 'churned-for=','all','quiet','parallel=','country=','filename='])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:q', ['min-spend=', 'churned-for=', 'played-within=',
+                                                         'all','quiet','parallel=','country=','filename='])
     for key, val in opts:
         if key == '--min-spend': min_spend = float(val)
         elif key == '--churned-for': churned_for_days = int(val)
+        elif key == '--played-within': played_within_days = int(val)
         elif key == '-g': game_id = val
         elif key == '--all': do_all = True
         elif key == '-q' or key == '--quiet': verbose = False
@@ -214,7 +217,7 @@ if __name__ == '__main__':
                  ]
 
     else:
-        auds = [{'game_id':game_id, 'filename':filename, 'min_spend':min_spend, 'churned_for_days':churned_for_days, 'country':country}]
+        auds = [{'game_id':game_id, 'filename':filename, 'min_spend':min_spend, 'churned_for_days':churned_for_days, 'country':country, 'played_within_days': played_within_days}]
 
     if verbose:
         for aud in auds: print aud
