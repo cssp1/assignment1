@@ -18333,14 +18333,14 @@ function do_post_screenshot(data, filename, player_caption, privacy, reason, lau
         return true;
     }
 
-    return call_with_facebook_permissions('publish_actions', (function (_data, _filename, _caption, _privacy, _reason, _launch_cb, _cb) { return function() {
-        if(_launch_cb) { _launch_cb(); }
-        var metric_props = {'sum': player.get_denormalized_summary_props('brief'),
-                            'facebook_id': spin_facebook_user,
-                            'privacy': _privacy,
-                            'reason': _reason};
-        FBUploadPhoto.upload(_data, _filename, _caption, _privacy, true, _cb, metric_props);
-    }; })(data, filename, caption, privacy, reason, launch_callback, cb));
+    // 2018 Oct 19: this used to require 'publish_actions' permission, but Facebook removed that.
+    if(launch_callback) { launch_callback(); }
+    var metric_props = {'sum': player.get_denormalized_summary_props('brief'),
+                        'facebook_id': spin_facebook_user,
+                        'privacy': privacy,
+                        'reason': reason};
+    FBUploadPhoto.upload(data, filename, caption, privacy, true, cb, metric_props);
+    return true;
 }
 
 // for analysis, take a screenshot of the entire game canvas, and upload it to our server

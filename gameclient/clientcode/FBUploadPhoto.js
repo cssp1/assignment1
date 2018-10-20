@@ -18,9 +18,14 @@ goog.require('goog.object');
 /** Check for browser support
     @return {boolean} */
 FBUploadPhoto.supported = function() {
+    // As of 2018 Oct 19, Facebook has disabled all the direct upload APIs.
+    // We can still upload photos, but need to do so by bouncing out to an external URL.
+    return false;
+    /*
     return (typeof('Blob') !== 'undefined') &&
         (typeof('FormData') !== 'undefined') &&
         (typeof('Uint8Array') !== 'undefined');
+    */
 };
 
 /** @enum {string} */
@@ -88,6 +93,9 @@ FBUploadPhoto.upload = function(dataURI, ui_filename, caption, privacy, post_sto
 
     var props = goog.object.clone(metric_props);
     metric_event('7272_photo_upload_attempted', props);
+
+    // As of 2018 October 19, BOTH of these upload methods are now broken.
+    // Facebook seems to want to use the 'share' dialog for all this now.
 
     // As of 2017 March 19, Facebook requires some kind of cookie on client-side
     // requests in order to avoid the AppSecret Proof requirement. This means
