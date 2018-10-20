@@ -91,7 +91,12 @@ FBShare.invoke_share = function(options) {
         var fb_ui_cb = /** @param {!FBShare.Options} _options */
             (function (_options) {
                 return /** @type {function(?Object.<string,string>)} */ (function(result) {
-                    if(result && ('post_id' in result)) {
+                    if(player.is_developer()) {
+                        console.log('(DEV) FB.ui(share) result is', result);
+                    }
+                    // if the post succeeeds, Facebook no longer returns any data,
+                    // just an empty {} as the result.
+                    if(result && !('error_code' in result)) {
                         metric_event('7271_feed_post_completed',
                                      {'method':_options.ref, 'api':'share',
                                       'facebook_post_id':result['post_id'],
@@ -100,10 +105,15 @@ FBShare.invoke_share = function(options) {
                     }
                 }); })(options);
 
-        // we need to have the publish_actions permission for this to work
+        // Previously, we needed to have the 'publish_actions' permission for this to work.
+        // 2018 Oct 20: I don't think this is the case anymore,
+        // and 'publish_actions' is no longer recognized by Facebook
+        /*
         call_with_facebook_permissions('publish_actions', (function (_fb_ui_param, _fb_ui_cb) { return function() {
             SPFB.ui(_fb_ui_param, _fb_ui_cb);
         }; })(fb_ui_param, fb_ui_cb));
+        */
+        SPFB.ui(fb_ui_param, fb_ui_cb);
 
     } else if(spin_frame_platform == 'bh' && spin_battlehouse_fb_app_id) {
             // if Facebook SDK is loaded, use that
