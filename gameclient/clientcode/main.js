@@ -9696,7 +9696,7 @@ function ortho_to_playfield(ji) {
     @return {!Array.<number>} */
 function playfield_to_screen(p) {
     // shift view so that view_pos puts center grid cell at middle of canvas
-    var ncells = (session.viewing_base ? session.viewing_base.ncells() : [0,0]);
+    var ncells = (session.has_world() ? session.get_draw_world().base.ncells() : [0,0]);
     return vec_add(vec_scale(view_zoom, vec_sub(p, view_pos)),
                    [canvas_width_half, canvas_height_half - view_zoom*cellsize[1]*ncells[1]/2]);
 }
@@ -9768,7 +9768,7 @@ function ortho_to_depth(ji) {
     @return {!Array.<number>} */
 function screen_to_playfield(xy) {
     // undo view window shift
-    var ncells = session.viewing_base.ncells(); // let's try to catch errors where base is null
+    var ncells = session.get_draw_world().base.ncells();
     return vec_add(view_pos, vec_scale(1/view_zoom, vec_sub(xy, [canvas_width_half, canvas_height_half - view_zoom*cellsize[1]*ncells[1]/2])));
 }
 /** @param {!Array.<number>} xy
@@ -52651,9 +52651,9 @@ function sort_scene_objects(a,b) {
 
 // apply the transformation matrix for drawing the playfield
 function set_playfield_draw_transform(context) {
-    if(view_is_zoomed()) {
+    if(view_is_zoomed() && session.has_world()) {
         // shift view so that view_pos puts center grid cell at middle of canvas
-        var ncells = session.viewing_base.ncells();
+        var ncells = session.get_draw_world().base.ncells();
         context.transform(view_zoom, 0, 0, view_zoom,
                           -view_pos[0]*view_zoom + canvas_width_half,
                           -view_pos[1]*view_zoom + canvas_height_half - view_zoom*cellsize[1]*ncells[1]/2);
