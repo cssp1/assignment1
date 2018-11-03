@@ -3342,6 +3342,15 @@ def check_store_sku(sku_name, sku, state):
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_unlocked')
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_available')
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_release')
+                expect_library_preds.add('elite_nimr_L6_available') # Special for Elite Nimr release
+                # these allow for various level unlocks on main release predicates
+                # necessary for special event limited-time unlocks introduced with elite nimr in TR/DV
+                if '_L' in sku['item']:
+                    expect_library_preds.add(sku['item'][:-len('_Lx_blueprint')]+'_release')
+                    expect_library_preds.add(sku['item'][:-len('_Lxx_blueprint')]+'_release')
+                    expect_library_preds.add(sku['item'][:-len('_Lx_blueprint')]+'_available')
+                    expect_library_preds.add(sku['item'][:-len('_Lxx_blueprint')]+'_available')
+
 
 
     for PRED in ('activation', 'requires', 'collected', 'show_if'):
