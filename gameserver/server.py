@@ -2946,18 +2946,24 @@ class User:
         # Note, if using a user access token, then it is not possible to apply appsecret_proof verification
         # That option seems to be busted as of 2018.
 
-        # note: when using app access token, Facebook has stopped sending: birthday, is_eligible_promo
+        # note: when using app access token, Facebook has stopped sending: birthday, is_eligible_promo, email
         # and also the /friends endpoint returns nothing.
 
-        profile_url = SpinFacebook.versioned_graph_endpoint_secure('user', endpoint)+'&fields=id,birthday,email,name,first_name,last_name,gender,locale,timezone,third_party_id,currency,is_eligible_promo,permissions'
+        PROFILE_FIELDS = 'id,birthday,email,name,first_name,last_name,gender,locale,timezone,third_party_id,currency,is_eligible_promo,permissions'
+
+        # as of 20181108, Facebook doesn't return email here if you use the app_tok instead of the user's fb_oath_token
+        if 'facebook_api_token_choice' in SpinConfig.config and SpinConfig.config['facebook_api_token_choice'].get('user') == 'user' and self.fb_oauth_token:
+            profile_url = SpinFacebook.versioned_graph_endpoint('user', endpoint)+'?fields='+PROFILE_FIELDS+'&'+urllib.urlencode({'access_token': self.fb_oauth_token})
+        else:
+            profile_url = SpinFacebook.versioned_graph_endpoint_secure('user', endpoint)+'&fields='+PROFILE_FIELDS
 
         # as of 20180925, Facebook doesn't return any friends here if you use the app_tok instead of the user's fb_oauth_token
         if 'facebook_api_token_choice' in SpinConfig.config and SpinConfig.config['facebook_api_token_choice'].get('friend') == 'user' and self.fb_oauth_token:
             friends_url = SpinFacebook.versioned_graph_endpoint('friend', endpoint+'/friends')+'?limit=500&offset=0&' + urllib.urlencode({'access_token': self.fb_oauth_token})
         else:
-            friends_url = SpinFacebook.versioned_graph_endpoint_secure('friend', endpoint+'/friends')+'?limit=500&offset=0'
+            friends_url = SpinFacebook.versioned_graph_endpoint_secure('friend', endpoint+'/friends')+'&limit=500&offset=0'
 
-        likes_url = SpinFacebook.versioned_graph_endpoint_secure('like', endpoint+'/likes')+'?limit=500&offset=0'
+        likes_url = SpinFacebook.versioned_graph_endpoint_secure('like', endpoint+'/likes')+'&limit=500&offset=0'
 
         # keep track of outstanding requests
         self.fb_retrieve_semaphore = set(['profile', 'friends', 'likes'])
