@@ -27,7 +27,7 @@ PyMySQL==0.9.2 # pure-Python implementation
 # MySQL-python==1.2.5 # note: will require a MySQL-devel package to build against
 
 Pillow==5.3.0
-psycopg2-binary==2.7.5
+psycopg2-binary==2.7.6
 py-vapid==1.4.0
 pyasn1>=0.4.2
 pyasn1-modules>=0.2.1
