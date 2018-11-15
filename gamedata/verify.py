@@ -313,7 +313,7 @@ def check_mandatory_fields(specname, spec, kind):
         for mlist in mlist_list:
             if mlist:
                 for m in mlist:
-                    error |= check_modstat(m, specname + ':permanent_modstats')
+                    error |= check_modstat(m, specname + ':permanent_modstats', expect_strength_array_length = max_level)
 
     for EFFECT in ('pre_deploy_effect','post_deploy_effect','explosion_effect','damaged_effect','movement_effect','permanent_effect','upgrade_finish_effect'):
         if EFFECT in spec:
@@ -440,7 +440,7 @@ def check_levels(specname, spec):
               'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories', 'enhancement_categories',
               'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras', 'climate_auras', 'permanent_modstats',
               'upgrade_ingredients', 'remove_ingredients', 'research_ingredients',
-              'quarry_control_auras')
+              'quarry_control_auras', 'name_color')
     error = 0
 
     histogram = {}
@@ -580,7 +580,7 @@ def check_tech(specname, keyname, spec, maxlevel):
             if effect['code'] != 'modstat':
                 error |= 1
                 print '%s: uses invalid effect code %s' % effect['code']
-            error |= check_modstat(effect, specname)
+            error |= check_modstat(effect, specname, expect_strength_array_length = maxlevel)
 
     if specname.endswith('_production'):
         if 'associated_unit' in spec:
@@ -661,7 +661,7 @@ def check_enhancement(specname, keyname, spec, maxlevel):
             if effect['code'] != 'modstat':
                 error |= 1
                 print '%s: uses invalid effect code %s' % effect['code']
-            error |= check_modstat(effect, specname, affects = effect.get('affects',None))
+            error |= check_modstat(effect, specname, affects = effect.get('affects',None), expect_strength_array_length = maxlevel)
 
     # check resource requirement vs CC level
     if verbose:
@@ -746,7 +746,7 @@ def check_aura(auraname, spec, maxlevel):
                 error |= 1; print '%s: uses invalid effect code %s' % (auraname, effect['code'])
 
             if effect['code'] == 'modstat':
-                error |= check_modstat(effect, auraname, effect.get('affects', None))
+                error |= check_modstat(effect, auraname, effect.get('affects', None), expect_strength_array_length = maxlevel)
 
             if 'apply_interval' in effect:
                 int_cd = int(effect['apply_interval']*100.0+0.5)
@@ -1244,7 +1244,7 @@ def check_item(itemname, spec):
                             elif ('affects_unit' in aura) or ('affects_manufacture_category' in aura) or ('affects_kind' in aura) or ('affects_building' in aura):
                                 affects = None
 
-                            error |= check_modstat(temp, itemname, affects = affects)
+                            error |= check_modstat(temp, itemname, affects = affects, expect_strength_array_length = max_level)
                 elif spellname == 'CLIENT_CONSEQUENT':
                     error |= check_consequent(use['spellarg'], reason = 'item %s: use' % itemname, context = 'item')
 
@@ -1289,7 +1289,8 @@ def check_item(itemname, spec):
             if effect['code'] == 'modstat':
                 error |= check_modstat(effect, reason = 'item %s: effects' % itemname,
                                        expect_level = spec.get('level', None),
-                                       expect_item_sets = set((spec['item_set'],)) if 'item_set' in spec else None)
+                                       expect_item_sets = set((spec['item_set'],)) if 'item_set' in spec else None,
+                                       expect_strength_array_length = max_level)
                 if effect['stat'] == 'permanent_auras' and not any(x['kind'] == 'building' for x in spec['equip'].get('compatible',[spec['equip']])):
                     error |= 1; print '%s: permanent_auras mods are not supported on mobile units (buildings only)' % itemname
                 if effect['stat'] in ('on_destroy','on_damage','on_approach') and ('strength' in effect):
@@ -1406,12 +1407,24 @@ def check_item_name(specname, context):
         error |= 1; print '%s refers to missing item "%s"' % (context, specname)
     return error
 
-def check_modstat(effect, reason, affects = None, expect_level = None, expect_item_sets = None):
+def check_modstat(effect, reason, affects = None,
+                  # expect to see the "level" specified by this modstat to be a certain (single) value
+                  # (corresponding to a parent object of a particular level)
+                  expect_level = None,
+                  expect_item_sets = None,
+                  # expect the "strength", if it's an array, to have exactly this many entires
+                  # (corresponding to a parent object that has multiple levels)
+                  expect_strength_array_length = 1
+                  ):
     error = 0
     if 'apply_if' in effect:
         error |= check_predicate(effect['apply_if'], reason = '%s:apply_if' % reason, expect_item_sets = expect_item_sets)
     if effect['method'] not in ('*=(1+strength)', '*=(1-strength)', '+=strength', '*=strength', 'max', 'min', 'replace', 'concat'):
         error |= 1; print '%s: bad method %s' % (reason, effect['method'])
+
+    if 'strength' in effect and isinstance(effect['strength'], list):
+        if len(effect['strength']) != expect_strength_array_length:
+            error |= 1; print '%s: strength array length is %d but should be %d' % (reason, len(effect['strength']), expect_strength_array_length)
 
     if not affects: affects = 'unit/building'
 
@@ -3714,7 +3727,10 @@ def main(args):
         error |= check_enhancement('enhancement:'+name, name, data, maxlevel)
 
     for name, data in gamedata['auras'].iteritems():
+        # this can return an incorrect maxlevel for auras with a manually specified "max_level", so override when present
         e, maxlevel = check_levels('aura:'+name, data)
+        if 'max_level' in data:
+            maxlevel = data['max_level']
         error |= e
         error |= check_aura('aura:'+name, data, maxlevel)
 
