@@ -39,7 +39,7 @@ pywebpush==1.7.0
 requests==2.20.1
 service-identity>=17.0.0
 six==1.11.0
-SQLAlchemy==1.2.13
+SQLAlchemy==1.2.14
 txpostgres==1.6.0
 
 # SpinPunch customized Python libraries
