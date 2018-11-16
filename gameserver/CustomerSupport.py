@@ -213,6 +213,16 @@ class HandleGetPersonalInfo(Handler):
             result = SpinJSON.dumps(result, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
         return ReturnValue(result = result)
 
+class HandleAddNote(Handler):
+    need_user = False
+    # the note text will be sent in as the ui_reason and recorded a
+    # player.history['customer_support'][..] = {'method': 'add_note', 'ui_reason': ...}
+    # so it's not necessary to have an extra "text" parameter.
+    def do_exec_online(self, session, retmsg):
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        return ReturnValue(result = 'ok')
+
 class HandleBan(Handler):
     need_user = False
     def do_exec_online(self, session, retmsg):
@@ -1992,6 +2002,7 @@ methods = {
     'get_raw_player': HandleGetRawPlayer,
     'get_raw_user': HandleGetRawUser,
     'get_personal_info': HandleGetPersonalInfo,
+    'add_note': HandleAddNote,
     'ban': HandleBan,
     'unban': HandleUnban,
     'mark_uninstalled': HandleMarkUninstalled,

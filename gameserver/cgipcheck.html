@@ -577,6 +577,17 @@ var method_clear_lockout = function() {
     }
 };
 
+var method_add_note = function() {
+    var ident = get_ident();
+    var body = $("#add_note_body")[0].value;
+    if(ident && body.length>0) {
+        send_request('player', 'add_note', $.extend(ident, {'ui_reason':body}), function(result) {
+            display_response("Success!");
+            $("#add_note_body").val('');
+        });
+    }
+};
+
 var method_send_message = function() {
     var ident = get_ident();
     var sender = $("#send_message_sender")[0].value;
@@ -1736,6 +1747,7 @@ $(function() {
 <hr>
 <div id="player_tools" style="display:none;">
   <ul>
+    <li><a href="#player_tools_add_note" id="player_tools_add_note_header">Add Note</a></li>
     <li><a href="#player_tools_give_item" id="player_tools_give_item_header">Give Item</a></li>
     <li><a href="#player_tools_give_gamebucks" id="player_tools_give_gamebucks_header">Give $GAMEBUCKS_NAME$</a></li>
     <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Tools</a></li>
@@ -1749,6 +1761,13 @@ $(function() {
     <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
     <li><a href="#player_tools_developer" id="player_tools_developer_header">Developer</a></li>
   </ul>
+    <div id="player_tools_add_note">
+      Add an internal note to this account:
+      <br>
+      <textarea id="add_note_body" name="add_note_body" value="" style="width:600px;height:100px"></textarea>
+      <p>
+      <button onclick="method_add_note()" class="spin_button" style="width:200px;">Add Note</button><p>
+    </div>
     <div id="player_tools_give_gamebucks">
       $GAMEBUCKS_NAME$ amount: <input type="text" id="gamebucks_amount" name="gamebucks_amount" value="100">
       <button onclick="method_give_gamebucks()" class="spin_button">Give</button>
