@@ -1151,6 +1151,21 @@ Aura.prototype.apply = function(world, obj) {
                 var o2 = obj_list[i].obj;
                 o2.create_aura(world, obj.id, obj.team, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
+        } else if(code === 'range_booster') {
+            // apply the range_boosted aura to this and nearby units
+
+            if(obj.is_destroyed()) {
+                // but don't apply if the booster is dead
+                return;
+            }
+
+            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
+                                                               gamedata['map']['range_conversion'] * this.range,
+                                                               { only_team: obj.team, mobile_only: true });
+            for(var i = 0; i < obj_list.length; i++) {
+                var o2 = obj_list[i].obj;
+                o2.create_aura(world, obj.id, obj.team, 'range_boosted', this.strength, new GameTypes.TickCount(1), 0);
+            }
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
         } else if(code === 'disarmed') {
@@ -1172,6 +1187,8 @@ Aura.prototype.apply = function(world, obj) {
                 var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
                 world.combat_engine.queue_damage_effect(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, this.source_team, obj.id, dmg, effect['damage_vs'] || this.vs_table));
             }
+        } else if(code === 'sprite_swapped') {
+            obj.combat_stats.art_asset = this.strength['sprite'];
         } else if(code === 'projectile_speed_reduced') {
             obj.combat_stats.projectile_speed *= (1 - this.strength);
         } else if(code === 'cast_spell_continuously') {
@@ -1675,6 +1692,7 @@ function CombatStats() {
     this.swamp_effects = 1;
     this.projectile_speed = 1;
     this.splash_range = 1;
+    this.art_asset = null;
 
     // Mobile only
 
@@ -1705,6 +1723,7 @@ CombatStats.prototype.clear = function() {
     this.splash_range = 1;
     this.maxvel = 1;
     this.erratic_flight = 0;
+    this.art_asset = null;
 };
 
 /** @override */
@@ -1735,6 +1754,7 @@ CombatStats.prototype.serialize = function() {
     if(this.splash_range != 1) { ret['splash_range'] = this.splash_range; }
     if(this.maxvel != 1) { ret['maxvel'] = this.maxvel; }
     if(this.erratic_flight) { ret['erratic_flight'] = this.erratic_flight; }
+    if(this.art_asset) { ret['art_asset'] = this.art_asset; }
     return ret;
 };
 
@@ -1762,6 +1782,7 @@ CombatStats.prototype.apply_snapshot = function(snap) {
     if('splash_range' in snap) { this.splash_range = snap['splash_range']; }
     if('maxvel' in snap) { this.maxvel = snap['maxvel']; }
     if('erratic_flight' in snap) { this.erratic_flight = snap['erratic_flight']; }
+    if('art_asset' in snap) { this.art_asset = snap['art_asset']; }
 };
 
 // "merge" together two damage_vs tables, returning a table that has
@@ -54452,7 +54473,7 @@ function draw_unit(world, unit) {
     // draw the sprite
     var sprite, alpha;
     if(unit.hp > 0 || unit.max_hp === 0) {
-        sprite = unit.get_leveled_quantity(unit.spec['art_asset']);
+        sprite = unit.combat_stats.art_asset || unit.get_leveled_quantity(unit.spec['art_asset']);
 
         // special movement states
         var sprite_data = gamedata['art'][sprite];
