@@ -1604,6 +1604,25 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             error |= 1; print '%s: %s predicate includes subconsequents: %s' % (reason, pred['predicate'], repr(pred))
 
         if 'subpredicates' in pred:
+
+            # ensure that NOT predicates have only one subpredicate
+            if pred['predicate'] == 'NOT' and len(pred['subpredicates']) != 1:
+                error |= 1; print '%s: %s predicate has more than one subpredicate' % (reason, pred['predicate'])
+
+            # find redundancy in AND/OR subpredicates.
+            # This often means there's a typo in one of the subpredicates.
+
+            # But, ignore these in ai_base-related predicates, since many of those are auto-generated, and it
+            # would unnecessarily complicate the generation scripts to optimize the subpredicates perfectly.
+
+            elif pred['predicate'] in ('AND', 'OR') and context != 'ai_base' and len(pred['subpredicates']) > 1:
+                # lazy N^2 version
+                for i in xrange(len(pred['subpredicates'])):
+                    for j in xrange(i+1, len(pred['subpredicates'])):
+                        if pred['subpredicates'][i] == pred['subpredicates'][j]:
+                            error |= 1; print '%s: %s %s predicate has redundant subpredicate: %s' % \
+                                     (reason, context, pred['predicate'], pred['subpredicates'][i])
+
             for subpred in pred['subpredicates']:
                 error |= check_predicate(subpred, reason = reason, context=context, context_data=context_data, expect_items=expect_items, expect_items_unique_equipped=expect_items_unique_equipped, expect_library_preds=expect_library_preds, expect_player_history_keys=expect_player_history_keys, expect_item_sets=expect_item_sets)
         else:
