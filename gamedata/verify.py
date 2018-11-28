@@ -1774,6 +1774,9 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             error |= 1; print '%s: %s predicate "level" %d is greater than the max level (%d)' % (reason, pred['predicate'], pred['level'],
                                                                                                   len(gamedata['player_xp']['level_xp'])-1)
     elif pred['predicate'] == 'ABSOLUTE_TIME':
+        if not ('range' in pred and isinstance(pred['range'], list) and len(pred['range']) == 2):
+            error |= 1; print '%s: %s predicate syntax error: bad or missing "range"' % (reason, pred['predicate'])
+
         if expect_absolute_time_end is not None:
             if ((pred['range'][1] - expect_absolute_time_end['origin']) % expect_absolute_time_end['interval']) != expect_absolute_time_end['offset']:
                 error |= 1; print '%s: %s predicate has incorrect end time (%d). Must agree with %r' % (reason, pred['predicate'], pred['range'][1], expect_absolute_time_end)
