@@ -19282,7 +19282,10 @@ class XSAPI(resource.Resource):
                                                    'time':server_time,
                                                    'expire_time': server_time + SpinConfig.config['proxyserver'].get('XSAPI_payment_msg_duration', 30*24*60*60),
                                                    'response': request_data}])
-                    pass # payment accepted from Xsolla now; will be handled when player logs in
+                    # payment accepted from Xsolla now; will be handled when player logs in
+                    request.setResponseCode(http.NO_CONTENT)
+                    return ''
+
                 else:
                     gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s), NOT queueing!' % xs_id)
                     request.setResponseCode(http.BAD_REQUEST)

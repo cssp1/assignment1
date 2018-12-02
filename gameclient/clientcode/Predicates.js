@@ -1943,6 +1943,12 @@ BaseSizePredicate.prototype.is_satisfied = function(player, qdata) {
 BaseSizePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 /** @override */
 BaseSizePredicate.prototype.do_ui_describe = function(player) {
+    // special case when player has already exceeded the required size
+    if((this.method == '==' || this.method == '<') &&
+       session.viewing_base.base_size > this.value) {
+        // tell the player they've already done this upgrade
+        return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name_already_upgraded']);
+    }
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name_'+this.method].replace('%d', this.value.toString()));
 };
 
