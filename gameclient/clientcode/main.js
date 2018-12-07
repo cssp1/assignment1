@@ -54473,7 +54473,18 @@ function draw_unit(world, unit) {
     // draw the sprite
     var sprite, alpha;
     if(unit.hp > 0 || unit.max_hp === 0) {
-        sprite = unit.combat_stats.art_asset || unit.get_leveled_quantity(unit.spec['art_asset']);
+
+        sprite = unit.get_leveled_quantity(unit.spec['art_asset']);
+
+        if(unit.combat_stats.art_asset) { // attempt to over-ride the art asset with one specified in combat stats
+            if(unit.combat_stats.art_asset in gamedata['art']) {
+                sprite = unit.combat_stats.art_asset;
+            } else {
+                // uh oh, the stat refers to a missing asset (maybe it's an out-of-date replay)
+                // fall back to the original art asset
+                console.log('warning: unit.combat_stats.art_asset refers to missing asset "' + unit.combat_stats.art_asset + '"');
+            }
+        }
 
         // special movement states
         var sprite_data = gamedata['art'][sprite];
