@@ -737,7 +737,7 @@ def check_aura(auraname, spec, maxlevel):
                                     'frozen', 'ice_shielded', 'ice_encrusted', 'moving_in_swamp', 'swamp_shielded',
                                     'rate_of_fire_boosted', 'damage_boosted', 'range_boosted',
                                     'armor_boosted', 'damage_booster', 'defense_booster', 'stunned', 'disarmed', 'hacked', 'range_reduction', 'weak_zombie',
-                                    'on_fire', 'projectile_speed_reduced', 'cast_spell_continuously'):
+                                    'on_fire', 'projectile_speed_reduced', 'range_booster', 'sprite_swapped', 'cast_spell_continuously'):
                 if not spec.get('client',False):
                     error |= 1; print '%s: uses a client-side effect code but client != 1' % auraname
                 if spec.get('server',False):
@@ -1298,6 +1298,12 @@ def check_item(itemname, spec):
                         if cons['consequent'] == 'SPAWN_SECURITY_TEAM':
                             if cons.get('persist') and not all('ersist' in ui_descr for ui_descr in ui_descr_list):
                                 error |= 1; print '%s\'s ui_description does not mention that its security team is persistent' % (itemname,)
+                            for unit, val in cons['units'].iteritems():
+                                if not isinstance(val, int):
+                                    if val['apply_auras']:
+                                        for aura in val['apply_auras']:
+                                            if aura['aura_name'] not in gamedata['auras']:
+                                                error |= 1; print '%s\'s apply_auras unit %s has an invalid aura, %s.' % (itemname,unit,aura['aura_name'])
 
             if 'consequent' in effect:
                 error |= check_consequent(effect['consequent'], reason = 'item %s: effects' % itemname)

@@ -7018,7 +7018,7 @@ for name, data in gamedata["tech"].iteritems():
 for name, data in gamedata["enhancements"].iteritems():
     EnhancementSpec(name, data)
 
-def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None, temporary = None):
+def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None, temporary = None, apply_auras = None):
     if observer:
         # create a fresh GameObject for this player, taking into account A/B tests and tech auras
         # subtle distinction: "observer" is the person playing the game, "owner" is the player/AI who owns it
@@ -7028,8 +7028,12 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
 
     auras = None
 
-    if spec.permanent_auras:
-        perm = spec.permanent_auras
+    if spec.permanent_auras or apply_auras:
+        perm = [] # list to hold auras
+        if spec.permanent_auras:
+            perm += spec.permanent_auras # adds any permanent auras into the list of auras
+        if apply_auras:
+            perm += apply_auras # adds any spawn code auras into the list of auras
         if len(perm) >= 1 and (isinstance(perm[0], list) or perm[0] is None): # could be a list of per-level lists, or a plain all-level list
             perm = spec.get_leveled_quantity(perm, level)
 
@@ -9156,6 +9160,7 @@ def spawn_units(owner, base, units, temporary = False,
             x, y = get_spawn_location_for_unit(name, base)
 
         force_level = None
+        apply_auras = None
         if type(data) is int:
             qty = data
             min_level = 1
@@ -9163,6 +9168,7 @@ def spawn_units(owner, base, units, temporary = False,
             qty = data.get('qty',1)
             min_level = data.get('min_level',1)
             force_level = data.get('force_level',None)
+            apply_auras = data.get('apply_auras',None)
 
         if force_level is not None:
             level = force_level
@@ -9219,7 +9225,7 @@ def spawn_units(owner, base, units, temporary = False,
                                                          (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.main_squad_space, repr(cur_space_usage)))
 
             newobj_id = gamesite.nosql_id_generator.generate()
-            newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id, temporary = temporary)
+            newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id, temporary = temporary, apply_auras = apply_auras)
             newobj.squad_id = destination_squad
             if temporary:
                 # put object into aggressive state by default
