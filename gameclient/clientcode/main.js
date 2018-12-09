@@ -6207,6 +6207,12 @@ player.donated_units_max_space = function() {
     return alliance_building.get_leveled_quantity(alliance_building.spec['provides_donated_space'] || 0);
 };
 
+player.alliance_help_daily_limit = function() {
+    var alliance_building = find_object_by_type(gamedata['alliance_building']);
+    if(!alliance_building) { return -1; }
+    return alliance_building.get_leveled_quantity(alliance_building.spec['alliance_help_daily_limit'] || 0);
+};
+
 // same as player.mailbox on the server
 player.mailbox = [];
 player.mailbox_sync_marker = Synchronizer.INIT; // for client-side prediction of the mailbox contents
@@ -20761,13 +20767,13 @@ function do_invoke_speedup_dialog(kind) {
         } else if(selection.unit.upgrade_help.help_requested && selection.unit.upgrade_help.help_request_expire_time < 0) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_requested'];
-        } else if(selection.unit.upgrade_help.help_requested && selection.unit.upgrade_help.help_request_expire_time > server_time && (selection.unit.upgrade_help.help_request_expire_time - server_time < selection.unit.upgrade_time_left())) {
+        } else if(selection.unit.upgrade_help.help_requested && selection.unit.upgrade_help.help_request_expire_time > server_time && (selection.unit.upgrade_help.help_request_expire_time - server_time >= selection.unit.upgrade_time_left())) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_requested_expires'].replace('%s', pretty_print_time(selection.unit.upgrade_help.help_request_expire_time - server_time));
         } else if(!session.is_in_alliance()) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_no_alliance'];
-        } else if(player.cooldown_active(spell['cooldown_name'])) {
+        } else if(player.cooldown_active(spell['cooldown_name']) >= player.alliance_help_daily_limit()) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_cooldown'].replace('%s', pretty_print_time(player.cooldown_togo(spell['cooldown_name'])));
         } else if('requires' in spell && !read_predicate(spell['requires']).is_satisfied(player)) {
@@ -20788,6 +20794,7 @@ function do_invoke_speedup_dialog(kind) {
                                             .replace('%duration', pretty_print_time(gamedata['alliance_help_request_duration']))
                                             .replace('%pct', (100.0*gamedata['alliance_help_speedup_fraction']).toFixed(0))
                                             .replace('%min_time', pretty_print_time(gamedata['alliance_help_speedup_min_time']))
+                                            .replace('%times', pretty_print_number(player.alliance_help_daily_limit()))
                                             .replace('%cooldown', pretty_print_time(spell['cooldown'])),
                                             {'dialog': 'message_dialog_big',
                                              'cancel_button': true,
@@ -44241,6 +44248,7 @@ function update_upgrade_dialog(dialog) {
 
         if('provides_donated_space' in unit.spec && player.unit_donation_enabled()) { feature_list.push('provides_donated_space'); }
         if('max_individual_donation_space' in unit.spec && player.unit_donation_enabled()) { feature_list.push('max_individual_donation_space'); }
+        if('alliance_help_daily_limit' in unit.spec && player.alliance_help_enabled()) { feature_list.push('alliance_help_daily_limit'); }
         if('provides_inventory' in unit.spec) { feature_list.push('provides_inventory'); }
 
         if(unit.spec['name'] === gamedata['townhall']) {

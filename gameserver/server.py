@@ -6810,6 +6810,7 @@ class GameObjectSpec(Spec):
         ["upgrade_completion", None],
         ["remove_completion", None],
         ["provides_foremen", 0],
+        ["alliance_help_daily_limit", 0]
         ]
 
     # * note: the worth_less_xp flag has the following consequences for a building:
@@ -12445,6 +12446,7 @@ class Player(AbstractPlayer):
             self.main_squad_space = 0 # max space for base_defenders
             self.total_space = 0 # max space for all of the player's units
             self.total_foremen = 0 # max number of foremen
+            self.alliance_help_daily_limit = 0 # max number of times player can request alliance/clan help per day
             use_squads = player.squads_enabled()
             self.vault_res = dict((res, 0) for res in gamedata['resources']) # resname -> vault amount
 
@@ -12462,6 +12464,7 @@ class Player(AbstractPlayer):
                         self.total_space += obj.get_leveled_quantity(obj.spec.provides_total_space)
 
                     self.main_squad_space += obj.get_leveled_quantity(obj.spec.provides_space)
+                    self.alliance_help_daily_limit += obj.get_leveled_quantity(obj.spec.alliance_help_daily_limit)
                     if obj.spec.manufacture_category:
                         if obj.spec.unit_repair_speed:
                             self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, 'repair_speed', '*=(1+strength)',
@@ -32278,7 +32281,7 @@ class GAMEAPI(resource.Resource):
                         success = False
                         break
 
-                if session.player.cooldown_active(spell['cooldown_name']):
+                if session.player.cooldown_active(spell['cooldown_name']) >= session.player.stattab.alliance_help_daily_limit:
                     retmsg.append(["ERROR", "ON_COOLDOWN"])
                     success = False
 
@@ -32324,7 +32327,7 @@ class GAMEAPI(resource.Resource):
                     object.upgrade_help.help_requested = True
                     object.upgrade_help.help_request_expire_time = expire_time
                     session.deferred_object_state_updates.add(object)
-                    session.player.cooldown_trigger(gamedata['spells'][spellname]['cooldown_name'], gamedata['spells'][spellname]['cooldown'])
+                    session.player.cooldown_trigger(gamedata['spells'][spellname]['cooldown_name'], gamedata['spells'][spellname]['cooldown'], add_stack = 1)
                     if session.increment_player_metric('alliance_help_requested', 1, time_series = False):
                         session.deferred_history_update = True
                     metric_event_coded(session.player.user_id, '4180_alliance_help_requested',
