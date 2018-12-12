@@ -12446,7 +12446,7 @@ class Player(AbstractPlayer):
             self.main_squad_space = 0 # max space for base_defenders
             self.total_space = 0 # max space for all of the player's units
             self.total_foremen = 0 # max number of foremen
-            self.alliance_help_daily_limit = 0 # max number of times player can request alliance/clan help per day
+            self.alliance_help_daily_limit = 1 # max number of times player can request alliance/clan help per day
             use_squads = player.squads_enabled()
             self.vault_res = dict((res, 0) for res in gamedata['resources']) # resname -> vault amount
 
