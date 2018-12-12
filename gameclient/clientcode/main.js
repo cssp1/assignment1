@@ -6209,8 +6209,8 @@ player.donated_units_max_space = function() {
 
 player.alliance_help_daily_limit = function() {
     var alliance_building = find_object_by_type(gamedata['alliance_building']);
-    if(!alliance_building) { return -1; }
-    return alliance_building.get_leveled_quantity(alliance_building.spec['alliance_help_daily_limit'] || 0);
+    if(!alliance_building) { return 1; }
+    return alliance_building.get_leveled_quantity(alliance_building.spec['alliance_help_daily_limit'] || 1);
 };
 
 // same as player.mailbox on the server
