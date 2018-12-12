@@ -20786,7 +20786,9 @@ function do_invoke_speedup_dialog(kind) {
             var estimated_speedup = Math.min(selection.unit.upgrade_time_left(),
                                              Math.max(gamedata['alliance_help_speedup_min_time'],
                                                       Math.floor(gamedata['alliance_help_speedup_fraction'] * selection.unit.upgrade_total_time)));
-            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip'].replace('%est', pretty_print_time(estimated_speedup));
+            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip']
+                                                                .replace('%est', pretty_print_time(estimated_speedup))
+                                                                .replace('%d', pretty_print_number(player.alliance_help_daily_limit() - player.cooldown_active(spell['cooldown_name'])));
             dialog.widgets['help_request_button'].onclick = function(w) {
                 var s = gamedata['strings']['help_request_confirm'];
                 invoke_child_message_dialog(s['ui_title'], s['ui_description']
