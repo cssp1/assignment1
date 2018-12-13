@@ -20765,9 +20765,15 @@ function do_invoke_speedup_dialog(kind) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_completed'].replace('%time', pretty_print_time(selection.unit.upgrade_help.time_saved));
         } else if(selection.unit.upgrade_help.help_requested && selection.unit.upgrade_help.help_request_expire_time < 0) {
+            // help request is in progress, with unknown expire time
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_requested'];
         } else if(selection.unit.upgrade_help.help_requested && selection.unit.upgrade_help.help_request_expire_time > server_time && (selection.unit.upgrade_help.help_request_expire_time - server_time >= selection.unit.upgrade_time_left())) {
+            // help request is in progress, and won't expire until after the upgrade finishes naturally
+            dialog.widgets['help_request_button'].state = 'disabled';
+            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_requested'];
+        } else if(selection.unit.upgrade_help.help_requested && selection.unit.upgrade_help.help_request_expire_time > server_time && (selection.unit.upgrade_help.help_request_expire_time - server_time < selection.unit.upgrade_time_left())) {
+            // help request is in progress, and will expire before the upgrade finishes naturally
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_requested_expires'].replace('%s', pretty_print_time(selection.unit.upgrade_help.help_request_expire_time - server_time));
         } else if(!session.is_in_alliance()) {
