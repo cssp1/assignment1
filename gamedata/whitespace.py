@@ -14,7 +14,7 @@ import sys, os, stat, re, getopt, cStringIO, traceback
 IGNORE_DIRS = set(['.svn','.git', # SCM data
                    'userdb','playerdb','basedb','aistate','db','art','built', # server state
                    'logs','ujson','pysvg','dowser','google', # third-party
-                   'puppet', # don't even try
+                   'puppet', '.terraform', # don't even try
                    'localize',
                    ])
 
@@ -29,7 +29,7 @@ def is_ai_base_dir(name):
 
 # only process files named with these endings
 FILE_EXTENSIONS = set(['html','js','json','php','pl','po','pot','py','sh','skel','sql','txt'])
-IGNORE_FILES = set(['config.json', 'ses-send-email.pl', 'email_notification_html.html'])
+IGNORE_FILES = set(['config.json', 'ses-send-email.pl', 'email_notification_html.html', 'asn-data-raw-table.txt', 'asn-data-used-autnums.txt'])
 
 def file_filter(name):
     return ('.' in name) and \

@@ -29,7 +29,7 @@ if [ -e "../gameclient/art.tar.gz" ]; then
     # check for incomplete (<10MB) art pack downloads, and delete the corrupted file if found
     SIZE=$(wc -c "../gameclient/art.tar.gz" | awk '{print $1}')
     if [ $SIZE -ge 10000000 ]; then
-	# it's a big file. Assume that it's not corrupted. Tell curl not to re-download if it's up to date.
+    # it's a big file. Assume that it's not corrupted. Tell curl not to re-download if it's up to date.
         CURL_OPTIONS="${CURL_OPTIONS} -z art.tar.gz"
     else
         echo "art.tar.gz appears to be incomplete or corrupted, deleting..."

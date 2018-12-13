@@ -120,6 +120,6 @@ fi
 if [[ $DO_COMPARE == 1 ]]; then
     echo "Comparing against snapshot:"
     if ! (cd ${SPIN_GAMEDATA} && diff -sq $SNAPSRC $SNAPREF); then
-	(cd ${SPIN_GAMEDATA} && ./diff.py $SNAPSRC $SNAPREF)
+    (cd ${SPIN_GAMEDATA} && ./diff.py $SNAPSRC $SNAPREF)
     fi
 fi
