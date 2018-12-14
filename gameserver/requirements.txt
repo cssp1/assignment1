@@ -36,7 +36,7 @@ pymongo>=3.6.0
 pyOpenSSL>=17.5.0
 pywebpush==1.7.0
 # pyxDamerauLevenshtein==1.4.1 # note: this is optional, and pulls in numpy (large)
-requests==2.20.1
+requests==2.21.0
 service-identity>=17.0.0
 six==1.11.0
 SQLAlchemy==1.2.15
