@@ -914,8 +914,9 @@ def check_region(name, data):
     if 'on_enter' in data: error |= check_consequent(data['on_enter'], reason = 'region %s: on_enter' % name)
     for COND in ('ladder_point_minloss_scale',
                  'loot_attacker_gains_scale_if_defender', 'loot_attacker_gains_scale_if_attacker',
-                 'loot_defender_loses_scale_if_defender', 'loot_defender_loses_scale_if_attacker'):
-        if COND in data and type(COND) is list:
+                 'loot_defender_loses_scale_if_defender', 'loot_defender_loses_scale_if_attacker',
+                 'ui_priority', 'ui_description_short', 'ui_description_long', 'text_color', 'info_color'):
+        if COND in data and isinstance(COND, list) and len(COND) >= 1 and isinstance(COND[0], list) and len(COND[0]) == 2 and isinstance(COND[0][0], dict):
             error |= check_cond_chain(data[COND], reason = 'region %s: %s' % (name, COND))
     return error
 

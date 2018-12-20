@@ -23964,7 +23964,7 @@ function change_region_dialog_pop_results(dialog, populations) {
     dialog.user_data['rowdata'].sort(function (a,b) {
         // sort by ui_priority, then predicate, then fullness (low to high), then name
         var ra = gamedata['regions'][a], rb = gamedata['regions'][b];
-        var pa = ra['ui_priority'] || 0, pb = rb['ui_priority'] || 0;
+        var pa = eval_cond_or_literal(ra['ui_priority'] || 0, player, null), pb = eval_cond_or_literal(rb['ui_priority'] || 0, player, null);
         var pred_oka = ignore_pred || (!('requires' in ra) || read_predicate(ra['requires']).is_satisfied(player, null));
         var pred_okb = ignore_pred || (!('requires' in rb) || read_predicate(rb['requires']).is_satisfied(player, null));
         var popa = (ra['open_join'] && pred_oka && populations[a] ? populations[a] : {'state':'full','rank':99999});
@@ -24050,13 +24050,13 @@ function change_region_dialog_setup_row(dialog, row, rowdata) {
         var pred_ok = ignore_pred || (pred ? pred.is_satisfied(player, null) : true);
 
         dialog.widgets['region_name'+row].str = data['ui_name'].toUpperCase();
-        dialog.widgets['region_name'+row].text_color = (!pred_ok ? SPUI.warning_text_color : (('text_color' in data) ? SPUI.make_colorv(data['text_color']) : SPUI.default_text_color));
+        dialog.widgets['region_name'+row].text_color = (!pred_ok ? SPUI.warning_text_color : (('text_color' in data) ? SPUI.make_colorv(eval_cond_or_literal(data['text_color'], player, null)) : SPUI.default_text_color));
 
         dialog.widgets['region_status'+row].str = dialog.data['widgets']['region_status']['ui_name_'+(already_here ? 'here' : (!open ? 'full' : (!pred_ok ? 'locked' : 'open')))];
-        dialog.widgets['region_status'+row].text_color = (already_here ? dialog.widgets['region_name'+row].text_color : ((open && pred_ok) ? (('text_color' in data) ? SPUI.make_colorv(data['text_color']) : SPUI.good_text_color) : SPUI.error_text_color));
-        dialog.widgets['region_info'+row].str = data['ui_description_short'];
-        dialog.widgets['region_info'+row].text_color = SPUI.make_colorv(('info_color' in data) ? data['info_color'] : dialog.data['widgets']['region_info']['text_color']);
-        dialog.widgets['region_info'+row].tooltip.str = SPText.bbcode_strip(data['ui_description_long']);
+        dialog.widgets['region_status'+row].text_color = (already_here ? dialog.widgets['region_name'+row].text_color : ((open && pred_ok) ? (('text_color' in data) ? SPUI.make_colorv(eval_cond_or_literal(data['text_color'], player, null)) : SPUI.good_text_color) : SPUI.error_text_color));
+        dialog.widgets['region_info'+row].str = eval_cond_or_literal(data['ui_description_short'], player, null);
+        dialog.widgets['region_info'+row].text_color = SPUI.make_colorv(('info_color' in data) ? eval_cond_or_literal(data['info_color'], player, null) : dialog.data['widgets']['region_info']['text_color']);
+        dialog.widgets['region_info'+row].tooltip.str = SPText.bbcode_strip(eval_cond_or_literal(data['ui_description_long'], player, null));
 
 
         // remember state/str since update_change_region_dialog may want to override it
@@ -24111,7 +24111,7 @@ function change_region_dialog_setup_row(dialog, row, rowdata) {
 
                 var msg = gamedata['strings']['change_region_confirm' + (within_region ? '_within_region' : (ladder_reset ? '_ladder_reset': '' ))];
                 invoke_child_message_dialog(msg['ui_title'].replace('%s', gamedata['regions'][_id]['ui_name']),
-                                            msg['ui_description'].replace('%s', gamedata['regions'][_id]['ui_name'])+'\n\n'+gamedata['strings']['regional_map']['change_region_feature_info'].replace('%NAME',gamedata['regions'][_id]['ui_name']).replace('%DESCR',gamedata['regions'][_id]['ui_description_long']),
+                                            msg['ui_description'].replace('%s', gamedata['regions'][_id]['ui_name'])+'\n\n'+gamedata['strings']['regional_map']['change_region_feature_info'].replace('%NAME',gamedata['regions'][_id]['ui_name']).replace('%DESCR',eval_cond_or_literal(gamedata['regions'][_id]['ui_description_long'], player, null)),
                                             {'use_bbcode': true,
                                              'cancel_button': true,
                                              'ok_button_ui_name': msg['ui_button'],
@@ -48197,7 +48197,7 @@ function handle_server_message(data) {
                 if(!session.region.data) { return; }
                 var msg = gamedata['strings']['change_region_finish'];
                 invoke_child_message_dialog(msg['ui_title'].replace('%s', session.region.data['ui_name']),
-                                            msg['ui_description'].replace('%s', session.region.data['ui_name']).replace('%loc', player.home_base_loc[0].toString()+','+player.home_base_loc[1].toString())+session.region.data['ui_description_long'],
+                                            msg['ui_description'].replace('%s', session.region.data['ui_name']).replace('%loc', player.home_base_loc[0].toString()+','+player.home_base_loc[1].toString())+eval_cond_or_literal(session.region.data['ui_description_long'], player, null),
                                             {'dialog': 'message_dialog_big', 'use_bbcode': true});
                 GameArt.play_canned_sound('success_playful_22');
             }, -2);
