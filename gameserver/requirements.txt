@@ -23,7 +23,7 @@ lz4==0.18.1
 maxminddb==1.4.1
 
 # MySQL library
-PyMySQL==0.9.2 # pure-Python implementation
+PyMySQL==0.9.3 # pure-Python implementation
 # MySQL-python==1.2.5 # note: will require a MySQL-devel package to build against
 
 Pillow==5.3.0
