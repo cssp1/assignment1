@@ -1116,6 +1116,12 @@ def check_item(itemname, spec):
         error |= 1
         print '%s:name mismatch' % itemname
 
+    if "leader" in spec['name']:
+        if 'ui_precious' not in spec:
+            error |=1; print '%s: is a leader but does not have ui_precious flag' % (itemname)
+        if 'ui_precious' in spec and spec['ui_precious'] != 1:
+            error |=1; print '%s: should have a ui_precious value of 1, but it is %s' % (itemname, str(spec['ui_precious']))
+
     max_level = spec.get('max_level', 1)
 
     if 'associated_crafting_recipes' in spec:
