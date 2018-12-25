@@ -1116,7 +1116,7 @@ def check_item(itemname, spec):
         error |= 1
         print '%s:name mismatch' % itemname
 
-    if "leader" in spec['name']:
+    if 'leader' in spec['name'] and (gamedata['game_id'] in ('tr','dv')):
         if 'ui_precious' not in spec:
             error |=1; print '%s: is a leader but does not have ui_precious flag' % (itemname)
         if 'ui_precious' in spec and spec['ui_precious'] != 1:
