@@ -68,10 +68,18 @@ class JQueryUI (PageContent):
                 }]
         fd.write('var spin_abtests = '+json.dumps(abt)+';\n')
 
+        def get_region_ui_priority(data):
+            if 'ui_priority' in data:
+                if isinstance(data['ui_priority'], list): # cond chain
+                    return data['ui_priority'][-1][1]
+                else:
+                    return data['ui_priority']
+            return 0
+
         reg = [{'xtype':'checkboxgroup', 'name': 'home_region',
                 'labelWidth': 30, 'width': 225, 'columns': 1,
                 'items':[{'boxLabel':'Not on map', 'name':'home_region', 'inputValue':'MISSING', 'checked':True}] + \
-                [{'boxLabel':data['ui_name'], 'name':'home_region', 'inputValue':data['id'], 'checked':True} for id, data in sorted(self.gamedata['regions'].items(), key = lambda id_data: '%09d%s' % (id_data[1].get('ui_priority',0), id_data[1]['ui_name']))]
+                [{'boxLabel':data['ui_name'], 'name':'home_region', 'inputValue':data['id'], 'checked':True} for id, data in sorted(self.gamedata['regions'].items(), key = lambda id_data: '%09d%s' % (get_region_ui_priority(id_data[1]), id_data[1]['ui_name']))]
                 }]
         fd.write('var spin_regions = '+json.dumps(reg)+';\n')
 
