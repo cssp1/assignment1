@@ -1326,24 +1326,31 @@ def do_upload_ad_csv(data):
     print SpinJSON.dumps(retmsg)
 
 def do_ui(args):
-    page = SpinWebUI.Page()
+    buf = cStringIO.StringIO()
 
-    campaign_list = ['ALL']
+    try:
+        page = SpinWebUI.Page()
 
-    page.add(SpinWebUI.JQueryUI(args=args,
-                                campaign_list=campaign_list,
-                                gamedata=gamedata
-                                ))
+        campaign_list = ['ALL']
 
-    print '<!DOCTYPE html><html><head><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>%s Analytics</title>' % gamedata['strings']['game_name'].upper()
+        page.add(SpinWebUI.JQueryUI(args=args,
+                                    campaign_list=campaign_list,
+                                    gamedata=gamedata
+                                    ))
 
-    page.write_head(sys.stdout)
+        buf.write('<!DOCTYPE html><html><head><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>%s Analytics</title>\n' % gamedata['strings']['game_name'].upper())
 
-    print '</head><body>'
+        page.write_head(buf)
 
-    page.write_body(sys.stdout)
+        buf.write('</head><body>\n')
 
-    print '</body></html>'
+        page.write_body(buf)
+
+        buf.write('</body></html>\n')
+        return 200, buf.getvalue()
+
+    except:
+        return 500, 'Error rendering this page:<br><tt>%s</tt>' % traceback.format_exc()
 
 def do_csv(qlist, csv_format, zip = True, sample_interval = 'day'):
     if 0: # Debugging
@@ -3492,16 +3499,25 @@ if __name__ == "__main__":
 
     output_mode = args.get('output_mode', ['ui'])[0]
     if output_mode == 'ui':
+        status = 200
+
+        if auth_info['ok']:
+            status, html = do_ui(args)
+        elif 'redirect' in auth_info:
+            html = auth_info['redirect']
+        else:
+            html = auth_info['error']
+
+        if status != 200:
+            print 'Status: %d' % status
+
         print 'Content-Type: text/html'
         print 'Pragma: no-cache'
         print 'Cache-Control: no-cache'
         print ''
-        if auth_info['ok']:
-            do_ui(args)
-        elif 'redirect' in auth_info:
-            print auth_info['redirect']
-        else:
-            print auth_info['error']
+
+        print html
+
         sys.exit(0)
     else:
         if not auth_info['ok']:
