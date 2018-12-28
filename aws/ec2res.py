@@ -1,10 +1,18 @@
 #!/usr/bin/python
 
+# Report coverage of reserved instances in Amazon EC2 and RDS.
+
+# This script checks for running instances that are not covered by reservations,
+# as well as any reservations that aren't being used by a running instance.
+# It also reports any upcoming service events that will affect EC2 instances.
+
+# This is a stand-alone script with no dependencies other than Amazon's "boto" library.
+
 # Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# this is a raw standalone script that does not depend on a game checkout
+# Updated for public release by Dan Maas.
 
 import sys, time, datetime, calendar, getopt
 import boto.ec2, boto.rds2
@@ -13,6 +21,7 @@ import boto3
 time_now = int(time.time())
 
 class ANSIColor:
+    """ For colorizing the terminal output """
     BOLD = '\033[1m'
     YELLOW = '\033[93m'
     GREEN = '\033[92m'
@@ -27,32 +36,39 @@ class ANSIColor:
     @classmethod
     def yellow(self, x): return self.YELLOW+x+self.ENDC
 
-# Amazon API string time to UTC timestamp
 def decode_time_string(amztime):
+    """ Translate Amazon API time string to a UNIX timestamp """
     return calendar.timegm(time.strptime(amztime.split('.')[0], '%Y-%m-%dT%H:%M:%S'))
 
-# datetime to UTC timestamp
+# Utility to convert a Python datetime to UNIX timestamp
 
-# come on Python, really?
 ZERO = datetime.timedelta(0)
-class StupidPythonUTC(datetime.tzinfo):
+class DummyPythonUTC(datetime.tzinfo):
     def utcoffset(self, dt): return ZERO
     def tzname(self, dt): return "UTC"
     def dst(self, dt): return ZERO
-stupid_python_utc = StupidPythonUTC()
+dummy_python_utc = DummyPythonUTC()
 
 def decode_time_datetime(dt):
-    ret = dt - datetime.datetime(1970, 1, 1, tzinfo=stupid_python_utc)
+    """ Translate Python datetime to UNIX timestamp """
+    ret = dt - datetime.datetime(1970, 1, 1, tzinfo=dummy_python_utc)
     if hasattr(ret, 'total_seconds'):
         return ret.total_seconds()
     # Python 2.6 compatibility
     return (ret.microseconds + (ret.seconds + ret.days * 24 * 3600) * 10**6) / 10**6
 
-def ec2_inst_is_vpc(inst): return (inst.vpc_id is not None)
-def ec2_res_is_vpc(res): return ('VPC' in res['ProductDescription'])
+# Utilities that operate on objects returned from the AWS API queries
 
-# return true if this reservation can cover this instance
+def ec2_inst_is_vpc(inst):
+    """ Is this EC2 instance a VPC instance? """
+    return (inst.vpc_id is not None)
+
+def ec2_res_is_vpc(res):
+    """ Is this EC2 reservation for a VPC instance? """
+    return ('VPC' in res['ProductDescription'])
+
 def ec2_res_match(res, inst):
+    """ Return true if this EC2 reservation can cover this EC2 instance. """
     if res['Scope'] == 'Availability Zone':
         if res['AvailabilityZone'] != inst.placement:
             return False
@@ -66,12 +82,14 @@ def ec2_res_match(res, inst):
            res['State'] == 'active'
 
 def rds_product_engine_match(product, engine):
+    """ Check whether an RDS reservation 'product' matches a running instance 'engine' """
     return (product, engine) in (('postgresql','postgres'),
-                                 ('mysql','mysql'), # not sure if this is correct
+                                 ('mysql','mysql'), # note: not sure if this is correct
                                  )
 
 def rds_res_match(res, inst, rds_offerings):
-    # note: RDS uses slightly different terminology for the reservation "product" and the instance "engine"
+    """ Return true if this RDS reservation can cover this RDS instance. """
+    # note: RDS uses slightly different terminology for the reservation "product" vs. the instance "engine"
     if 'ProductDescription' in res:
         product = res['ProductDescription']
     elif res['ReservedDBInstancesOfferingId'] in rds_offerings:
@@ -85,7 +103,10 @@ def rds_res_match(res, inst, rds_offerings):
            rds_product_engine_match(product, engine) and \
            res['MultiAZ'] == inst['MultiAZ']
 
+# Pretty-printing utilities for objects returned from the AWS API
+
 def pretty_print_ec2_res_price(res):
+    """ Pretty-print price of an EC2 reservation """
     yearly = float(res['FixedPrice']) * (365*86400)/float(res['Duration'])
     for charge in res['RecurringCharges']:
         assert charge['Frequency'] == 'Hourly'
@@ -94,6 +115,7 @@ def pretty_print_ec2_res_price(res):
     return '$%.0f/yr' % yearly
 
 def pretty_print_ec2_res_where(res):
+    """ Pretty-print zonal placement of an EC2 reservation """
     if res['Scope'] == 'Region':
         return '(region)'
     elif res['Scope'] == 'Availability Zone':
@@ -102,6 +124,7 @@ def pretty_print_ec2_res_where(res):
         raise Exception('unknown where %r' % res)
 
 def pretty_print_ec2_res(res, override_count = None, my_index = None):
+    """ Pretty-print an entire EC2 reservation """
     assert res['State'] == 'active'
     lifetime = decode_time_datetime(res['Start']) + res['Duration'] - time_now
     days = lifetime//86400
@@ -114,13 +137,16 @@ def pretty_print_ec2_res(res, override_count = None, my_index = None):
     return '%-10s %-7s %-22s %10s  %3d days left' % (pretty_print_ec2_res_where(res), is_vpc, res['InstanceType']+count, pretty_print_ec2_res_price(res), days)
 
 def pretty_print_ec2_res_id(res):
+    """ Pretty-print the EC2 reservation ID """
     return res['ReservedInstancesId'].split('-')[0]+'...'
 
 def pretty_print_ec2_instance(inst):
+    """ Pretty-print a running EC2 instance """
     is_vpc = '--VPC--' if ec2_inst_is_vpc(inst) else 'Classic'
     return '%-24s %-10s %-7s %-11s' % (inst.tags['Name'], inst.placement, is_vpc, inst.instance_type)
 
 def pretty_print_rds_offering_price(offer):
+    """ Pretty-print the price of an RDS reserved offering """
     yearly = float(offer['FixedPrice']) * (365*86400)/float(offer['Duration'])
     for charge in offer['RecurringCharges']:
         assert charge['RecurringChargeFrequency'] == 'Hourly'
@@ -132,6 +158,7 @@ def pretty_print_multiaz(flag):
     return 'MultiAZ' if flag else 'NoMulti'
 
 def pretty_print_rds_res(res, rds_offerings, override_count = None, my_index = None):
+    """ Pretty-print an RDS reservation """
     lifetime = res['StartTime'] + res['Duration'] - time_now
     days = lifetime//86400
     if my_index is not None and res['DBInstanceCount'] > 1:
@@ -146,9 +173,11 @@ def pretty_print_rds_res(res, rds_offerings, override_count = None, my_index = N
                                                    days)
 
 def pretty_print_rds_instance(inst):
+    """ Pretty-print a running RDS instance """
     return '%-16s %-10s %s %-13s %-8s' % (inst['DBInstanceIdentifier'], inst['AvailabilityZone'], pretty_print_multiaz(inst['MultiAZ']), inst['DBInstanceClass'], inst['Engine'])
 
 def get_rds_res_offerings(rds):
+    """ Query RDS API for the reserved offerings """
     ret = {}
     marker = None
     while True:
@@ -169,13 +198,15 @@ if __name__ == '__main__':
         elif key == '--region': region = val
 
     conn = boto.ec2.connect_to_region(region)
-    conn3 = boto3.client('ec2')
+    conn3 = boto3.client('ec2', region_name = region)
     rds = boto.rds2.connect_to_region(region)
 
+    # query EC2 instances and reservations
     ec2_instance_list = conn.get_only_instances()
     ec2_res_list = conn3.describe_reserved_instances(Filters = [{'Name':'state','Values':['active']}])['ReservedInstances']
     ec2_status_list = conn.get_all_instance_status()
 
+    # query RDS instances and reservations
     rds_instance_list = rds.describe_db_instances()['DescribeDBInstancesResponse']['DescribeDBInstancesResult']['DBInstances']
     rds_res_list = rds.describe_reserved_db_instances()['DescribeReservedDBInstancesResponse']['DescribeReservedDBInstancesResult']['ReservedDBInstances']
 
@@ -190,15 +221,15 @@ if __name__ == '__main__':
     ec2_res_list = filter(lambda x: x['State']=='active', ec2_res_list)
     rds_res_list = filter(lambda x: x['State']=='active', rds_res_list)
 
-    # maps instance ID -> reservation
+    # maps instance ID -> reservation that covers it
     ec2_res_coverage = dict((inst.id, None) for inst in ec2_instance_list)
     rds_res_coverage = dict((inst['DBInstanceIdentifier'], None) for inst in rds_instance_list)
 
-    # maps reservation ID -> instances
+    # maps reservation ID -> list of instances that it covers
     ec2_res_usage = dict((res['ReservedInstancesId'], []) for res in ec2_res_list)
     rds_res_usage = dict((res['ReservedDBInstanceId'], []) for res in rds_res_list)
 
-    # figure out which instances are covered
+    # figure out which instances are currently covered by reservations
     for res in ec2_res_list:
         for i in xrange(res['InstanceCount']):
             for inst in ec2_instance_list:
@@ -217,7 +248,7 @@ if __name__ == '__main__':
                     rds_res_usage[res['ReservedDBInstanceId']].append(inst)
                     break
 
-    # map instance ID -> events
+    # map instance ID -> upcoming service events
     ec2_instance_status = {}
     for stat in ec2_status_list:
         if stat.events:
@@ -231,6 +262,8 @@ if __name__ == '__main__':
                     st = time.gmtime(ts)
                     msg += ' in %d days (%s/%d)' % (days_until, st.tm_mon, st.tm_mday)
                 ec2_instance_status[stat.id].append(msg)
+
+    # print console output
 
     print 'EC2 INSTANCES:'
     for inst in ec2_instance_list:
