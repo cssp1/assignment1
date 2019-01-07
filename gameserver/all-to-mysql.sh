@@ -91,6 +91,7 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./privacy_to_sql.py -q --prune
   run_it ./activity_to_sql.py -q --prune
   run_it ./alliance_events_to_sql.py -q --prune
+  run_it ./alliance_help_to_sql.py -q --prune
   run_it ./alliance_state_to_sql.py -q
   run_it ./skynet_conversion_pixels_to_sql.py -q
 
