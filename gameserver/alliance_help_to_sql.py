@@ -17,20 +17,25 @@ time_now = int(time.time())
 def alliance_help_schema(sql_util): return {
     'fields': [('time', 'INT8 NOT NULL'),
                ('user_id', 'INT4 NOT NULL'),
-               ('aliance_id', 'INT4 NOT NULL'),
                ('event_name', 'VARCHAR(128) NOT NULL')] + \
               sql_util.summary_in_dimensions() + \
-              [('total_time', 'VARCHAR(128)'),
-               ('kind', 'VARCHAR(128)'),
-               ('obj_id', 'VARCHAR(128)'),
+              [('alliance_id', 'INT4 NOT NULL'),
+               ('region_id', 'VARCHAR(16)'),
+               ('req_id', 'VARCHAR(32)'),
+               ('recipient_id', 'INT4'),
+               ('cur_helpers', 'INT4'),
+               ('max_helpers', 'INT4'),
+               ('time_saved', 'INT4'),
+
                ('start_time', 'INT8'),
-               ('obj_spec', 'VARCHAR(32)'),
-               ('done_time', 'INT8'),
-               ('action_spec', 'VARCHAR(32)'),
-               ('action', 'VARCHAR(32)'),
+               ('done_time', 'INT4'),
+               ('total_time', 'INT4'),
+               ('kind', 'VARCHAR(128)'),
+               ('obj_spec', 'VARCHAR(128)'),
+               ('action_spec', 'VARCHAR(128)'),
+               ('action', 'VARCHAR(128)'),
                ('action_level', 'INT4'),
                ('obj_level', 'INT4'),
-               ('cur_helpers', 'INT4'),
                ],
     'indices': {'by_time': {'keys': [('time','ASC')]}}
     }
@@ -87,18 +92,23 @@ if __name__ == '__main__':
 
                 if row['sum'].get('developer',False): continue # skip events by developers
 
-                if 'reason' in row: # JS code calls this "reason" but it should be "method" for consistency with other analytics
-                    row['method'] = row['reason']
-
+                # mandatory properties
                 keyvals = [('time',row['time']),
                            ('user_id',row['user_id']),
                            ('alliance_id',row['alliance_id']),
                            ('event_name',row['event_name'])] + \
                            sql_util.parse_brief_summary(row['sum'])
-                for FIELD in ('total_time','kind','obj_id','start_time','obj_spec','done_time',
-                              'action_spec','action','action_level','obj_level','cur_helpers'):
+
+                # top-level optional properties
+                for FIELD in ('region_id', 'req_id', 'recipient_id', 'cur_helpers', 'max_helpers', 'time_saved'):
                     if FIELD in row:
                         keyvals.append((FIELD, row[FIELD]))
+
+                # row['req_props'] optional properties
+                if 'req_props' in row:
+                    for FIELD in ('start_time', 'done_time', 'total_time', 'kind', 'obj_spec', 'action_spec', 'action', 'action_level', 'obj_level'):
+                        if FIELD in row['req_props']:
+                            keyvals.append((FIELD, row['req_props'][FIELD]))
 
                 sql_util.do_insert(cur, alliance_help_table, keyvals)
 
@@ -113,13 +123,6 @@ if __name__ == '__main__':
 
         con.commit()
         if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)'
-
-        cur.execute("SELECT MIN(time) AS min_time, MAX(time) AS max_time FROM "+sql_util.sym(alliance_help_table))
-        rows = cur.fetchall()
-        if rows and rows[0] and rows[0]['min_time'] and rows[0]['max_time']:
-            event_range = (rows[0]['min_time'], rows[0]['max_time'])
-        else:
-            event_range = None
 
         if do_prune:
             # drop old data
