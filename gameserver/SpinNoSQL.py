@@ -2996,18 +2996,28 @@ if __name__ == '__main__':
                   (ui_score_time_scope, tournament_stat, 'SEASON %d ' % (season+gamedata['matchmaking']['season_ui_offset']) if season >= 0 else '', week,
                    (' IN '+gamedata['continents'][score_space_loc]['ui_name']) if score_space_scope == Scores2.SPACE_CONTINENT else '')
 
-            data = client.get_alliance_info([x['alliance_id'] for x in top_alliances])
+            # (ranking data, alliance info, list of member IDs) for each ranked alliance
+            data = zip(top_alliances,
+                       client.get_alliance_info([x['alliance_id'] for x in top_alliances]),
+                       [client.get_alliance_member_ids(x['alliance_id']) for x in top_alliances])
+
+            # remove alliances that have been disbanded and therefore are not present in the alliance info database
+            data = filter(lambda item: item[1] is not None, data)
+
+            # remove alliances that have no members
+            data = filter(lambda item: bool(item[2]), data)
 
             commands = []
 
-            for i in xrange(len(top_alliances)):
-                rank = top_alliances[i]
-                info = data[i]
+            for i in xrange(len(data)):
+                rank, info, members = data[i]
 
-                if not info: continue
+                # sanity checks
+                assert info
+                assert members
 
-                members = client.get_alliance_member_ids(rank['alliance_id'])
-                if not members: continue
+                # re-number the 'rank' to skip any alliances removed in the above filtering steps
+                rank['rank'] = i
 
                 print ''
                 print '%d) [COLOR="#FFD700"]%s[/COLOR] with %d points (id %5d)' % (rank['rank']+1, info['ui_name'], rank['absolute'], rank['alliance_id'])
