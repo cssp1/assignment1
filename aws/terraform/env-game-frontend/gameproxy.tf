@@ -66,7 +66,6 @@ module "game_haproxy" {
   aws_cloud_config_tail = "${module.aws_cloud_init.cloud_config_tail}"
   aws_ec2_iam_role_fragment = "${module.aws_cloud_init.ec2_iam_role_fragment}"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
-  instance_type = "t2.micro"
   n_instances = "${var.game_haproxy_n_instances}"
   security_group_id_list = "${concat(list(data.terraform_remote_state.corp.spinpunch_prod_game_haproxy_security_group_id),
 module.ipranges.cloudfront_ingress_security_group_id_list,

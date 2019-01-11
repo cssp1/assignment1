@@ -63,6 +63,9 @@ resource "aws_instance" "game_haproxy" {
   count = "${var.n_instances}"
   ami = "${var.ami}"
   instance_type = "${var.instance_type}"
+  credit_specification {
+    cpu_credits = "unlimited"
+  }
   associate_public_ip_address = true
   iam_instance_profile = "${aws_iam_instance_profile.game_haproxy.name}"
   subnet_id = "${element(split(",", var.subnet_ids), count.index)}"
@@ -78,7 +81,7 @@ resource "aws_instance" "game_haproxy" {
 
   lifecycle = {
     create_before_destroy = true
-    ignore_changes = ["ami", "user_data", "tags", "key_name"] # must manually taint for these changes
+    ignore_changes = ["instance_type", "ami", "user_data", "tags", "key_name"] # must manually taint for these changes
   }
 
   user_data = "${data.template_cloudinit_config.conf.*.rendered[count.index]}"

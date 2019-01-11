@@ -16,7 +16,7 @@ variable "availability_zones" {
 }
 variable "instance_type" {
   description = "AWS EC2 instance type for HAproxy"
-  default = "t2.micro"
+  default = "t3.micro"
 }
 variable "n_instances" {
   description = "Number of HAproxy server instances"
