@@ -1868,6 +1868,18 @@ HostileUnitNearPredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function ObjectOwnershipPredicate(data) {
+    goog.base(this, data);
+}
+goog.inherits(ObjectOwnershipPredicate, Predicate);
+ObjectOwnershipPredicate.prototype.is_satisfied = function(player, qdata) {
+    if(!qdata || !('source_obj' in qdata)) { throw Error('no source_obj provided'); }
+    var obj = qdata['source_obj'];
+    return obj.team === this.data['team'];
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function ForemanIsBusyPredicate(data) {
     goog.base(this, data);
 }
@@ -2397,6 +2409,8 @@ function read_predicate(data) {
         return new HostileUnitExistsPredicate(data);
     } else if(kind === 'HOSTILE_UNIT_NEAR') {
         return new HostileUnitNearPredicate(data);
+    } else if(kind === 'OBJECT_OWNERSHIP') {
+        return new ObjectOwnershipPredicate(data);
     } else if(kind === 'DIALOG_OPEN') {
         return new DialogOpenPredicate(data);
     } else if(kind === 'PLAYER_PREFERENCE') {
