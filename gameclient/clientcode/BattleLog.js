@@ -458,6 +458,7 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
                 line.push(new SPText.ABlock(poss[met['attacker_user_id']]+' ', pr.normal));
 
                 if(met['obj_id'] && met['obj_id'] == met['attacker_obj_id']) {
+                    // the object killed itself - could be a landmine or something with a security team on_destroy consequent
                     if(met['attacker_mine']) {
                         var mine_spec = gamedata['items'][met['attacker_mine']];
                         var mine_name = (mine_spec ? mine_spec['ui_name'] : BattleLog.attacker(met, met['attacker_user_id'] === my_id));
@@ -465,7 +466,15 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
                     } else {
                         line.push(new SPText.ABlock(BattleLog.attacker(met, met['attacker_user_id'] === my_id), pr.hi));
                     }
-                    line.push(new SPText.ABlock((met['attacker_mine'] ? ' detonates' : ' explodes'), pr.normal));
+                    var verb;
+                    if(met['method'] === 'retreat') {
+                        verb = 'retreats'; // a unit voluntarily retreats from battle
+                    } else if(met['attacker_mine']) {
+                        verb = 'detonates'; // a mine is killing itself as it blows up
+                    } else {
+                        verb = 'explodes'; // suicide explosion, or unknown cause of death
+                    }
+                    line.push(new SPText.ABlock(' ' + verb, pr.normal));
                     show_items_destroyed = false;
                 } else {
                     line.push(new SPText.ABlock(BattleLog.attacker(met, met['attacker_user_id'] === my_id), pr.hi));

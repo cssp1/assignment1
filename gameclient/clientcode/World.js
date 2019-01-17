@@ -518,13 +518,20 @@ World.World.prototype.send_and_remove_object = function(obj) {
     }
 };
 /** @param {!GameObject} victim
-    @param {GameObject|null} killer */
-World.World.prototype.send_and_destroy_object = function(victim, killer) {
+    @param {GameObject|null} killer
+    @param {string|undefined} method - can be "hostile" for hostile fire, or "retreat" for voluntary retreat
+*/
+World.World.prototype.send_and_destroy_object = function(victim, killer, method) {
+    if(!method) {
+        method = 'hostile';
+    }
+
     if(this === session.get_real_world()) { // XXXXXX ugly
         send_to_server.func(["DSTROY_OBJECT",
                              victim.id,
                              victim.raw_pos(),
-                             get_killer_info(killer)
+                             get_killer_info(killer),
+                             method
                             ]);
         if(victim.id in player.my_army) {
             player.army_unit_cancel_repair(victim.id);
@@ -570,7 +577,7 @@ World.World.prototype.destroy_all_enemies = function() {
     this.objects.for_each(function(obj) {
         if(obj.team === 'enemy' && !obj.is_destroyed()) {
             if(obj.is_mobile()) {
-                this.send_and_destroy_object(obj, null);
+                this.send_and_destroy_object(obj, null, 'hostile');
             } else if(obj.is_building()) {
                 obj.hp = 0;
                 obj.state_dirty |= obj_state_flags.HP;
@@ -813,7 +820,7 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source) {
                 var death_spell_name = target.spec['on_death_spell'];
                 target.cast_client_spell(this, death_spell_name, gamedata['spells'][death_spell_name], target, null);
             } else {
-                this.send_and_destroy_object(target, source);
+                this.send_and_destroy_object(target, source, 'hostile');
             }
         } else if(target.is_building() || target.is_inert()) {
             target.state_dirty |= obj_state_flags.URGENT;

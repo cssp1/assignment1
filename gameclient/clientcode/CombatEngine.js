@@ -509,7 +509,7 @@ CombatEngine.KillDamageEffect.prototype.apply = function(world) {
         } else {
             world.create_debris(target, target.raw_pos());
         }
-        world.send_and_destroy_object(target, world.objects._get_object(this.source_id));
+        world.send_and_destroy_object(target, world.objects._get_object(this.source_id), 'hostile');
     } else if(target.is_building()) {
         target.hp = 1;
         world.hurt_object(target, 999, {}, world.objects._get_object(this.source_id));

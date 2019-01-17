@@ -5006,7 +5006,7 @@ class Session(object):
         for obj in sorted(obj_list, key = lambda obj: (obj.spec.kind, obj.spec.name)):
             if obj.is_mobile() or obj.spec.history_category in ('turrets','turret_emplacements'):
                 self.log_attack_unit(owner_id, obj, event_name, props = props)
-    def _log_attack_unit_props(self, obj, props = None, fake_xy = None, killer_info = None):
+    def _log_attack_unit_props(self, obj, props = None, fake_xy = None, killer_info = None, method = None):
         if props is None:
             props = {}
         if fake_xy:
@@ -5058,10 +5058,14 @@ class Session(object):
             if 'id' in killer_info: props['attacker_obj_id'] = killer_info['id']
             for EXTRA in ('spellname','mine','turret_head'): # extra metadata on the killer
                 if EXTRA in killer_info: props['attacker_'+EXTRA] = killer_info[EXTRA]
+
+        if method:
+            props['method'] = method
+
         return props
 
-    def log_attack_unit(self, owner_id, obj, event_name, props = None, fake_xy = None, killer_info = None):
-        self.attack_event(owner_id, event_name, self._log_attack_unit_props(obj, props = props, fake_xy = fake_xy, killer_info = killer_info))
+    def log_attack_unit(self, owner_id, obj, event_name, props = None, fake_xy = None, killer_info = None, method = None):
+        self.attack_event(owner_id, event_name, self._log_attack_unit_props(obj, props = props, fake_xy = fake_xy, killer_info = killer_info, method = method))
 
     def attack_event(self, user_id, event_name, props = None):
         if self.attack_log is None:
@@ -26629,7 +26633,7 @@ class GAMEAPI(resource.Resource):
         # client initiated the removal - do not send OBJECT_REMOVED or PLAYER_ARMY_UPDATE
         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
-    def destroy_object(self, session, retmsg, id, death_location, killer_info):
+    def destroy_object(self, session, retmsg, id, death_location, killer_info, method = 'hostile'):
 
         if (not session.has_object(id)):
             if gamedata['server'].get('log_combat_race_conditions', False):
@@ -26696,7 +26700,9 @@ class GAMEAPI(resource.Resource):
                     dict_increment(session.loot, loot_stat+'_'+res, cost[res])
 
         # must come before rem_object() since it needs obj.team
-        session.log_attack_unit(owning_user_id, obj, '3930_unit_destroyed', fake_xy = death_location, killer_info = killer_info)
+        session.log_attack_unit(owning_user_id, obj, '3930_unit_destroyed',
+                                fake_xy = death_location, killer_info = killer_info,
+                                method = method)
 
         on_destroy_enabled = obj.is_on_destroy_enabled()
 
@@ -26767,7 +26773,7 @@ class GAMEAPI(resource.Resource):
             on_destroy_cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
             if on_destroy_cons_list:
                 for cons in on_destroy_cons_list:
-                    session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj':obj, 'xy':death_location}, reason='on_destroy(%s)' % obj.spec.name)
+                    session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj':obj, 'xy':death_location, 'method': method}, reason='on_destroy(%s)' % obj.spec.name)
 
     def do_harvest_all(self, session, retmsg, base_type, region_id, base_id, object_list, power_factor, base_info):
         base_loot = {} if base_id != session.viewing_base.base_id else None
@@ -29172,7 +29178,12 @@ class GAMEAPI(resource.Resource):
             id = arg[1]
             death_location = arg[2]
             killer_info = arg[3]
-            self.destroy_object(session, retmsg, id, death_location, killer_info)
+            if len(arg) >= 5:
+                method = arg[4]
+            else:
+                method = 'hostile'
+
+            self.destroy_object(session, retmsg, id, death_location, killer_info, method = method)
 
         elif arg[0] == "REMOVE_OBJECT":
             # only for debugging/level-editing
