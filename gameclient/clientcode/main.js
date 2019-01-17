@@ -2386,7 +2386,14 @@ GameObject.prototype.cast_client_spell_checked = function(world, spell_name, spe
     @param {GameObject|null} target
     @param {Array.<number>|null} location */
 GameObject.prototype.cast_client_spell = function(world, spell_name, spell, target, location) {
+    // check for cooldowns
     if(!this.get_cooldown(spell_name)) {
+        // can't fire yet - on cooldown
+        return false;
+    }
+
+    if(spell['deployment_arming_delay'] && this.combat_stats.disarmed) {
+        // can't fire yet - still arming
         return false;
     }
 
@@ -48779,9 +48786,26 @@ function handle_server_message(data) {
             // check for arming delay when in hostile territory
             if((obj.team == 'player' && session.viewing_base.base_landlord_id !== session.user_id) ||
                (obj.team == 'enemy' && session.viewing_base.base_landlord_id === session.user_id)) {
+                // find the MAX arming delay among all relevant spells
+                var arming_delay = -1;
+                var spell_list = [];
+                // check the auto spell
                 var auto_spell = obj.get_auto_spell();
-                if(auto_spell && auto_spell['deployment_arming_delay']) {
-                    obj.create_aura(world, obj.id, obj.team, 'arming', 1, relative_time_to_tick(auto_spell['deployment_arming_delay']), -1, null);
+                if(auto_spell) {
+                    spell_list.push(auto_spell);
+                }
+                // check special ability spells
+                var special_ability = obj.get_special_ability_spell();
+                if(special_ability) {
+                    spell_list.push(special_ability[1]);
+                }
+                goog.array.forEach(spell_list, function(spell) {
+                    if(spell['deployment_arming_delay']) {
+                        arming_delay = Math.max(arming_delay, spell['deployment_arming_delay']);
+                    }
+                });
+                if(arming_delay > 0) {
+                    obj.create_aura(world, obj.id, obj.team, 'arming', 1, relative_time_to_tick(arming_delay), -1, null);
                 }
             }
 
