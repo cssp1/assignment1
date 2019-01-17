@@ -230,7 +230,7 @@ goog.inherits(CastClientSpellConsequent, Consequent);
 CastClientSpellConsequent.prototype.execute = function(state) {
     if(!state || !state['source_obj']) { throw Error('no source_obj provided'); }
     var spell = gamedata['spells'][this.spellname];
-    state['source_obj'].cast_client_spell(this.spellname, spell, state['source_obj'], state['xy'] || null);
+    state['source_obj'].cast_client_spell(session.get_real_world(), this.spellname, spell, state['source_obj'], state['xy'] || null);
 };
 
 /** Client-side only - set all mobile objects on same team to aggressive
