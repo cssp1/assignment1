@@ -202,6 +202,9 @@ class SpawnSecurityTeamConsequent(Consequent):
         self.behaviors = data.get('behaviors',None)
 
     def execute(self, session, player, retmsg, context=None):
+        if not (context and 'source_obj' in context and 'xy' in context):
+            raise Exception('invalid context: must include "source_obj" and "xy"')
+
         ai_target = None
         if self.aggro_trigger_obj:
             ai_target = context['trigger_obj']
