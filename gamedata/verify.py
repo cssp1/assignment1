@@ -257,6 +257,22 @@ def check_mandatory_fields(specname, spec, kind):
     if 'activation' in spec:
         error |= 1; print '%s "activation" is deprecated, change to "show_if"' % specname
 
+    # check consequent fields
+    for FIELD in ('on_destroy', 'on_retreat', 'special_ai'):
+        if FIELD in spec:
+            # these can be raw consequents, or a per-level list of consequents, or a per-level list of lists of consequents !()
+            if isinstance(spec[FIELD], dict):
+                cons_list = [spec[FIELD],]
+            elif isinstance(spec[FIELD], list) and isinstance(spec[FIELD][0], dict):
+                cons_list = spec[FIELD]
+            elif isinstance(spec[FIELD], list) and isinstance(spec[FIELD][0][0], dict):
+                cons_list = [cons for conslist in spec[FIELD] for cons in conslist]
+            else:
+                error |= 1; print '%s cannot parse consequent field "%s"' % (specname, FIELD)
+                continue
+            for cons in cons_list:
+                error |= check_consequent(cons, reason = specname+':'+FIELD)
+
     if 'research_categories' in spec:
         for cat in spec['research_categories']:
             found = False
@@ -1826,7 +1842,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_PROGRESS_TIMERS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'BH_BOOKMARK_PROMPT', 'BH_WEB_PUSH_INIT', 'HELP_REQUEST_REMINDER', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER', 'UI_NOTIFY',
                         'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE', 'INVOKE_LOGIN_INCENTIVE_DIALOG', 'INVOKE_PRIVACY_DIALOG', 'INVOKE_INGAME_TIP', 'INVOKE_VIDEO_WIDGET',
-                        'ALL_AGGRESSIVE', 'INVOKE_FULLSCREEN_PROMPT',
+                        'ALL_AGGRESSIVE', 'INVOKE_FULLSCREEN_PROMPT', 'CAST_CLIENT_SPELL',
                    ])
 
 def check_consequent(cons, reason = '', context = None, context_data = None):
@@ -1943,6 +1959,9 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
     elif cons['consequent'] == "SPAWN_SECURITY_TEAM":
         for name, qty in cons['units'].iteritems():
             error |= check_unit_name(name, reason)
+    elif cons['consequent'] == "CAST_CLIENT_SPELL":
+        if cons['spellname'] not in gamedata['spells']:
+            error |= 1; print '%s: invalid spellname "%s"' % (reason, cons['spellname'])
     elif cons['consequent'] == "START_AI_ATTACK":
         if str(cons['attack_id'])[0] == '$':
             pass # context variable
