@@ -2482,6 +2482,22 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
             } else {
                 throw Error('projectile_attack with no location from '+this.spec['name']);
             }
+        } else if(code === 'retreat_unit') {
+            // remove the unit peacefully from the world.
+            // no debris is spawned. But the unit does go down to 0 HP and counts as "destroyed" in the battle.
+            world.send_and_destroy_object(this, this, 'retreat');
+
+            if('muzzle_flash_effect' in spell) {
+                // instance properties passed to vfx system
+                var vfx_props = {'heading': this.cur_facing,
+                                 'tick_offset': 0,
+                                 'my_next_pos': this.next_pos};
+                var muzzle_vfx = spell['muzzle_flash_effect'];
+                world.fxworld.add_visual_effect_at_tick(this.interpolate_pos(world), (this.is_flying() ? this.altitude : 0),
+                                                        [Math.cos(this.cur_facing), 0, Math.sin(this.cur_facing)],
+                                                        world.combat_engine.cur_tick, 0,
+                                                        muzzle_vfx, true, vfx_props);
+            }
         }
     }
 
