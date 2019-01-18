@@ -6,7 +6,7 @@
 # with updates pushed by Amazon Linux and other external tools.
 
 awscli>=1.16.9
-bcrypt==3.1.5
+bcrypt==3.1.6
 botocore>=1.11.9
 boto3>=1.8.9
 Brotli==1.0.7
