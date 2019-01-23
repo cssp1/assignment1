@@ -33300,7 +33300,7 @@ var ARMY_DIALOG_BUTTONS = {
                                              // check if we should go to table-of-contents dialog instead of directly to crafting dialog
                                              if(category) {
                                                  var catdata = gamedata['crafting']['categories'][category];
-                                                 if(catdata['table_of_contents']) {
+                                                 if(catdata && catdata['table_of_contents']) {
                                                      change_selection_ui(null);
                                                      invoke_crafting_table_of_contents_dialog(category);
                                                      return;
@@ -34417,7 +34417,7 @@ function crafting_subcategory_setup_row(dialog, row_col, rowdata) {
     @param {string|null=} newsubcategory
     @param {number=} newpage */
 function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
-    if(!newcategory || newcategory == 'turret_heads') { // pick a reasonable default
+    if(!newcategory || newcategory == 'turret_heads' || newcategory == 'ambushes') { // pick a reasonable default
         goog.object.forEach(gamedata['crafting']['categories'], function(entry, name) {
             if('dialog' in entry && entry['dialog'] != 'crafting_dialog') { return; } // do not display
             if(entry['table_of_contents']) { return; } // too complex to handle
