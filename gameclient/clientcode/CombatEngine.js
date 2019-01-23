@@ -221,7 +221,12 @@ CombatEngine.CombatEngine.unserialize_projectile_effect = function(snap) {
     @return {!CombatEngine.DamageEffect} */
 CombatEngine.CombatEngine.unserialize_damage_effect = function(snap) {
     if(snap['kind'] === 'KillDamageEffect') {
-        return new CombatEngine.KillDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_id']);
+        /** @type {string} */
+        var death_method = 'hostile';
+        if('death_method' in snap) {
+            death_method = /** @type {string} */ (snap['death_method']);
+        }
+        return new CombatEngine.KillDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_id'], death_method);
     } else if(snap['kind'] === 'TargetedDamageEffect') {
         return new CombatEngine.TargetedDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_id'], snap['amount'], snap['vs_table']);
     } else if(snap['kind'] === 'TargetedAuraEffect') {
@@ -483,10 +488,12 @@ CombatEngine.CombatEngine.prototype.has_queued_effects = function() {
     @param {GameObjectId|null} source_id
     @param {string|null} source_team
     @param {!GameObjectId} target_id
+    @param {string} death_method
 */
-CombatEngine.KillDamageEffect = function(tick, client_time_hack, source_id, source_team, target_id) {
+CombatEngine.KillDamageEffect = function(tick, client_time_hack, source_id, source_team, target_id, death_method) {
     goog.base(this, tick, client_time_hack, source_id, source_team, 0, null);
     this.target_id = target_id;
+    this.death_method = death_method;
 }
 goog.inherits(CombatEngine.KillDamageEffect, CombatEngine.DamageEffect);
 /** @override */
@@ -494,6 +501,7 @@ CombatEngine.KillDamageEffect.prototype.serialize = function() {
     var ret = goog.base(this, 'serialize');
     ret['kind'] = 'KillDamageEffect';
     ret['target_id'] = this.target_id;
+    ret['death_method'] = this.death_method;
     return ret;
 };
 
@@ -509,10 +517,10 @@ CombatEngine.KillDamageEffect.prototype.apply = function(world) {
         } else {
             world.create_debris(target, target.raw_pos());
         }
-        world.send_and_destroy_object(target, world.objects._get_object(this.source_id), 'hostile');
+        world.send_and_destroy_object(target, world.objects._get_object(this.source_id), this.death_method);
     } else if(target.is_building()) {
         target.hp = 1;
-        world.hurt_object(target, 999, {}, world.objects._get_object(this.source_id));
+        world.hurt_object(target, 999, {}, world.objects._get_object(this.source_id), this.death_method);
     }
 };
 
@@ -546,7 +554,7 @@ CombatEngine.TargetedDamageEffect.prototype.apply = function(world) {
         // target is already dead
         return;
     }
-    world.hurt_object(target, this.amount, this.vs_table, world.objects._get_object(this.source_id));
+    world.hurt_object(target, this.amount, this.vs_table, world.objects._get_object(this.source_id), 'hostile');
 };
 
 /** @constructor @struct
@@ -667,7 +675,7 @@ CombatEngine.AreaDamageEffect.prototype.apply = function(world) {
 
         var amt = this.amount * falloff;
         if(amt != 0) {
-            world.hurt_object(obj, amt, this.vs_table, source);
+            world.hurt_object(obj, amt, this.vs_table, source, 'hostile');
         }
     }, this);
 };

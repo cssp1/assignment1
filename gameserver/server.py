@@ -5056,7 +5056,7 @@ class Session(object):
             props['attacker_type'] = killer_info['spec']
             props['attacker_level'] = killer_info['level']
             if 'id' in killer_info: props['attacker_obj_id'] = killer_info['id']
-            for EXTRA in ('spellname','mine','turret_head'): # extra metadata on the killer
+            for EXTRA in ('spellname','mine','turret_head','ambush'): # extra metadata on the killer
                 if EXTRA in killer_info: props['attacker_'+EXTRA] = killer_info[EXTRA]
 
         if method:

@@ -2429,7 +2429,8 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                 var death_client_time = client_time + (spell['kills_self_delay']||0);
                 var death_tick = GameTypes.TickCount.add(world.combat_engine.cur_tick,
                                                          relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
-                world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, null, this.id));
+                var death_method = ('kills_self_method' in spell ? spell['kills_self_method'] : 'hostile');
+                world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, null, this.id, death_method));
             }
 
             if(spell['impact_auras']) {
@@ -3782,8 +3783,9 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
             death_tick = GameTypes.TickCount.add(death_tick, relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay'])));
             death_client_time += spell['kills_self_delay'];
         }
+        var death_method = ('kills_self_method' in spell ? spell['kills_self_method'] : 'hostile');
 
-        world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, null, this.id));
+        world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, null, this.id, death_method));
     }
 
     if(COMBAT_ENGINE_USE_TICKS) {
@@ -4560,7 +4562,7 @@ GameObject.prototype.run_behaviors = function(world) {
             var state = this.behavior_state['self_destruct'];
             if(this.hp < 0.9*this.max_hp && !state['triggered']) {
                 state['triggered'] = 1;
-                world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(world.combat_engine.cur_tick, client_time, this.id, null, this.id));
+                world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(world.combat_engine.cur_tick, client_time, this.id, null, this.id, 'hostile'));
             }
         }
     }, this);
@@ -5400,15 +5402,22 @@ Building.prototype.is_ambush = function() { return this.spec['equip_slots'] && (
 Building.prototype.is_minefield_armed = function() { return (this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0); };
 Building.prototype.is_ambush_armed = function() { return (this.equipment && this.equipment['ambush'] && this.equipment['ambush'].length > 0); };
 
-// returns the name of mine item associated with this minefield, if any, otherwise null
-Building.prototype.minefield_item = function() {
-    if(this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0) {
-        return (this.equipment['mine'][0] ? player.decode_equipped_item(this.equipment['mine'][0])['spec'] : null);
-    } else if(this.config && this.config['mine'] && this.config['mine'].length > 0) {
-        return (typeof(this.config['mine']) === 'string' ? this.config['mine'] : player.decode_equipped_item(this.config['mine'][0])['spec']);
+/** @param {string} slot_name
+    @return {string|null}
+    returns the spec name of any item found in the named slot type on this building, null if none found */
+Building.prototype.equipped_item_name_by_slot = function(slot_name) {
+    if(this.equipment && this.equipment[slot_name] && this.equipment[slot_name].length > 0) {
+        return (this.equipment[slot_name][0] ? player.decode_equipped_item(this.equipment[slot_name][0])['spec'] : null);
+    } else if(this.config && this.config[slot_name] && this.config[slot_name].length > 0) {
+        return (typeof(this.config[slot_name]) === 'string' ? this.config[slot_name] : player.decode_equipped_item(this.config[slot_name][0])['spec']);
     }
     return null;
 };
+
+// returns the name of mine item associated with this minefield, if any, otherwise null
+Building.prototype.minefield_item = function() { return this.equipped_item_name_by_slot('mine'); };
+// same, but for ambush-point items
+Building.prototype.ambush_item = function() { return this.equipped_item_name_by_slot('ambush'); };
 
 // search session for any player-owned minefield building
 var find_any_player_minefield = function() {
@@ -9590,6 +9599,8 @@ function get_killer_info(killer) {
         if(killer.is_building()) {
             if(killer.is_minefield() && killer.is_minefield_armed()) {
                 ret['mine'] = killer.minefield_item();
+            } else if(killer.is_ambush() && killer.is_ambush_armed()) {
+                ret['ambush'] = killer.ambush_item();
             } else if(killer.is_emplacement() && killer.turret_head_item()) {
                 ret['turret_head'] = killer.turret_head_item()['spec'];
             }

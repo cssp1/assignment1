@@ -90,12 +90,14 @@ BattleLog.unit = function(met, is_mine) {
 };
 
 BattleLog.attacker = function(met, is_mine) { // is_mine here means "is friendly" not "is a landmine"
-    if(met['attacker_mine']) {
-        // mine detonation
-        if(met['attacker_mine'] in gamedata['items']) {
-            return gamedata['items'][met['attacker_mine']]['ui_name'];
+    var ret = null;
+    goog.array.forEach(['attacker_mine', 'attacker_ambush'], function(slot_name) {
+        if(!ret && met[slot_name] && met[slot_name] in gamedata['items']) {
+            // mine detonation or ambush trigger
+            ret = gamedata['items'][met[slot_name]]['ui_name'];
         }
-    }
+    });
+    if(ret) { return ret; }
 
     var kind = met['attacker_type'];
     var dat = gamedata['units'][kind] || gamedata['buildings'][kind];
@@ -447,7 +449,7 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
                   met['event_name'] == '3930_unit_destroyed') {
             var show_items_destroyed = true;
 
-            if(met['obj_id'] && met['obj_id'] == met['attacker_obj_id'] && met['attacker_mine']) {
+            if(met['obj_id'] && met['obj_id'] == met['attacker_obj_id'] && (met['attacker_mine'] || met['attacker_ambush'])) {
                 // invert the usual sense of "pr" - your own mine exploding is good, enemy's mine exploding is bad
                 pr = (met['user_id'] == my_id) ? props.good : props.bad;
             } else {
@@ -463,12 +465,20 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
                         var mine_spec = gamedata['items'][met['attacker_mine']];
                         var mine_name = (mine_spec ? mine_spec['ui_name'] : BattleLog.attacker(met, met['attacker_user_id'] === my_id));
                         line.push(new SPText.ABlock(mine_name, pr.hi));
+                    } else if(met['attacker_ambush']) {
+                        var ambush_spec = gamedata['items'][met['attacker_ambush']];
+                        var ambush_name = (ambush_spec ? ambush_spec['ui_name'] : BattleLog.attacker(met, met['attacker_user_id'] === my_id));
+                        line.push(new SPText.ABlock(ambush_name, pr.hi));
                     } else {
                         line.push(new SPText.ABlock(BattleLog.attacker(met, met['attacker_user_id'] === my_id), pr.hi));
                     }
                     var verb;
+                    // note: the 'method' here comes from the parameter given in send_and_destroy()
+                    // which may come from a spell's kills_self_method
                     if(met['method'] === 'retreat') {
                         verb = 'retreats'; // a unit voluntarily retreats from battle
+                    } else if(met['method'] === 'ambush' || met['attacker_ambush']) {
+                        verb = 'was triggered'; // an ambush point triggers itself
                     } else if(met['attacker_mine']) {
                         verb = 'detonates'; // a mine is killing itself as it blows up
                     } else {

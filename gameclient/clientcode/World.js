@@ -629,8 +629,10 @@ World.World.prototype.create_debris = function(target, pos) {
 /** @param {!GameObject} target
     @param {number} damage
     @param {Object<string,number>|null} vs_table
-    @param {GameObject|null} source */
-World.World.prototype.hurt_object = function(target, damage, vs_table, source) {
+    @param {GameObject|null} source
+    @param {string|null} death_method - analogous to the send_and_destroy() parameter, but for buildings instead of mobile units
+*/
+World.World.prototype.hurt_object = function(target, damage, vs_table, source, death_method) {
     if(target.id === GameObject.DEAD_ID) {
         throw Error('hurt_object called on dead object');
     }
