@@ -54251,7 +54251,7 @@ function draw_building_or_inert(world, obj, powerfac) {
     }
 
     // draw equip icons
-    if(obj.is_building() && obj.equipment) {
+    if(obj.is_building() && obj.equipment && !obj.is_ambush()) {
         var ecount = 0, elevel = 0;
         for(var slot_type in obj.equipment) {
             if(slot_type == "mine" || // maybe set "show":0 on mine slots?
