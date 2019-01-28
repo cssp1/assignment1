@@ -5137,9 +5137,9 @@ class Session(object):
                                    limit_reduce_qty = False,
                                    xyloc = None, xyscatter = None, persist = False,
                                    ai_state = None, ai_target = None, ai_aggressive = None,
-                                   pack_id = None, behaviors = None):
+                                   pack_id = None, behaviors = None, unit_health_modifier = 1.0):
         new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player, persist = persist,
-                                  ai_state = ai_state, ai_target = ai_target, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors)
+                                  ai_state = ai_state, ai_target = ai_target, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors, unit_health_modifier = unit_health_modifier)
         for obj in new_objects:
             if (not temporary) and (player is self.player):
                 player.send_army_update_one(obj, retmsg)
@@ -9146,7 +9146,7 @@ def spawn_units(owner, base, units, temporary = False,
                 limit_reduce_qty = False, # if true, reduce quantity of units to fit in unit space
                 xyloc = None, xyscatter = None, observer = None, persist = False,
                 ai_state = None, ai_target = None, ai_aggressive = None,
-                pack_id = None, behaviors = None):
+                pack_id = None, behaviors = None, unit_health_modifier = 1.0):
     if not observer: observer = owner
     if temporary: assert xyloc
 
@@ -9232,6 +9232,9 @@ def spawn_units(owner, base, units, temporary = False,
             newobj_id = gamesite.nosql_id_generator.generate()
             newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id, temporary = temporary, apply_auras = apply_auras)
             newobj.squad_id = destination_squad
+
+            newobj.hp = newobj.max_hp * unit_health_modifier
+
             if temporary:
                 # put object into aggressive state by default
                 if ai_aggressive is None:

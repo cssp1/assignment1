@@ -200,6 +200,8 @@ class SpawnSecurityTeamConsequent(Consequent):
         self.pack_aggro = data.get('pack_aggro',False)
         self.aggro_trigger_obj = data.get('aggro_trigger_obj',False)
         self.behaviors = data.get('behaviors',None)
+        self.parent_health_modifier = data.get('parent_health_modifier',None)
+        self.unit_health_modifier = 1.0
 
     def execute(self, session, player, retmsg, context=None):
         if not (context and 'source_obj' in context and 'xy' in context):
@@ -209,9 +211,13 @@ class SpawnSecurityTeamConsequent(Consequent):
         if self.aggro_trigger_obj:
             ai_target = context['trigger_obj']
 
+        if self.parent_health_modifier:
+            self.unit_health_modifier = (1 - float(source_obj.hp / source_obj.max_hp)) * self.parent_health_modifier
+            if self.unit_health_modifier > 1.0 or self.unit_health_modifier < 0.0: self.unit_health_modifier = 1.0
+
         session.spawn_security_team(player, retmsg, context['source_obj'], context['xy'], self.units, self.spread, self.persist,
                                     ai_state = self.ai_state, ai_target = ai_target, ai_aggressive = self.ai_aggressive,
-                                    pack_aggro = self.pack_aggro, behaviors = self.behaviors)
+                                    pack_aggro = self.pack_aggro, behaviors = self.behaviors, unit_health_modifier = self.unit_health_modifier)
 
 class DisplayMessageConsequent(Consequent):
     def __init__(self, data):
