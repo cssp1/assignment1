@@ -2486,6 +2486,9 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
         } else if(code === 'retreat_unit') {
             // remove the unit peacefully from the world.
             // no debris is spawned. But the unit does go down to 0 HP and counts as "destroyed" in the battle.
+
+            flush_dirty_objects({}); // ensure latest damage HP values are sent to the server, for determining post-retreat secteam health
+
             world.send_and_destroy_object(this, this, 'retreat');
 
             if('muzzle_flash_effect' in spell) {

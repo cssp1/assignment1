@@ -200,8 +200,14 @@ class SpawnSecurityTeamConsequent(Consequent):
         self.pack_aggro = data.get('pack_aggro',False)
         self.aggro_trigger_obj = data.get('aggro_trigger_obj',False)
         self.behaviors = data.get('behaviors',None)
-        self.health_on_parent_death = data.get('health_on_parent_death',None)
-        self.unit_health_modifier = 1.0
+
+        # this parameter makes child secteam units inherit some of the damage their parent took before spawning.
+        # set to 1.0 to inherit all of the damage, or between 0.0 and 1.0 to inherit some of the damage
+        self.inherit_parent_damage = data.get('inherit_parent_damage', 0)
+
+        # the above parameter will only apply if the parent object's health is below this proportion of full health.
+        # set to 0.0 to make inherit_parent_health only apply when the parent unit is totally dead.
+        self.inherit_parent_damage_threshold = data.get('inherit_parent_damage_threshold', 0)
 
     def execute(self, session, player, retmsg, context=None):
         if not (context and 'source_obj' in context and 'xy' in context):
@@ -211,12 +217,12 @@ class SpawnSecurityTeamConsequent(Consequent):
         if self.aggro_trigger_obj:
             ai_target = context['trigger_obj']
 
-        if self.health_on_parent_death and str(context['method']) != 'retreat':
-            self.unit_health_modifier = self.health_on_parent_death
-
         session.spawn_security_team(player, retmsg, context['source_obj'], context['xy'], self.units, self.spread, self.persist,
                                     ai_state = self.ai_state, ai_target = ai_target, ai_aggressive = self.ai_aggressive,
-                                    pack_aggro = self.pack_aggro, behaviors = self.behaviors, unit_health_modifier = self.unit_health_modifier)
+                                    pack_aggro = self.pack_aggro, behaviors = self.behaviors,
+                                    parent_last_hp = context['last_hp'],
+                                    inherit_parent_damage = self.inherit_parent_damage,
+                                    inherit_parent_damage_threshold = self.inherit_parent_damage_threshold)
 
 class DisplayMessageConsequent(Consequent):
     def __init__(self, data):
