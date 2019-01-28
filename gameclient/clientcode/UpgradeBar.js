@@ -121,6 +121,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         throw Error('unknown kind '+kind);
     }
     if(new_level > get_max_level(spec)) { dialog.user_data['is_applicable'] = false; return; } // maxed out
+    if(new_level > get_max_ui_level(spec)) { dialog.user_data['is_applicable'] = false; return; } // maxed out
 
     dialog.widgets['upgrade_button'].show = dialog.user_data['show_button'];
 
