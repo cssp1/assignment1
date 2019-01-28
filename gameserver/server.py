@@ -7023,7 +7023,7 @@ for name, data in gamedata["tech"].iteritems():
 for name, data in gamedata["enhancements"].iteritems():
     EnhancementSpec(name, data)
 
-def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None, temporary = None, apply_auras = None):
+def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None, temporary = None, apply_auras = None, unit_health_modifier = 1.0):
     if observer:
         # create a fresh GameObject for this player, taking into account A/B tests and tech auras
         # subtle distinction: "observer" is the person playing the game, "owner" is the player/AI who owns it
@@ -7053,6 +7053,8 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
         obj = Building(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras)
     elif spec.kind == 'mobile':
         obj = Mobile(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras, temporary = temporary)
+        obj.hp = obj.spec['max_hp'] * unit_health_modifier
+        obj.hp = obj.spec['max_hp'] * 0.5
     elif spec.kind == 'inert':
         obj = Inert(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras, metadata = metadata)
     return obj
@@ -9230,10 +9232,8 @@ def spawn_units(owner, base, units, temporary = False,
                                                          (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.main_squad_space, repr(cur_space_usage)))
 
             newobj_id = gamesite.nosql_id_generator.generate()
-            newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id, temporary = temporary, apply_auras = apply_auras)
+            newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id, temporary = temporary, apply_auras = apply_auras, unit_health_modifier = unit_health_modifier)
             newobj.squad_id = destination_squad
-
-            newobj.hp = newobj.max_hp * unit_health_modifier
 
             if temporary:
                 # put object into aggressive state by default
