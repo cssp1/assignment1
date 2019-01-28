@@ -5183,7 +5183,7 @@ class Session(object):
 
     def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread, persist,
                             ai_state = None, ai_target = None, ai_aggressive = None,
-                            pack_aggro = False, behaviors = None):
+                            pack_aggro = False, behaviors = None, unit_health_modifier = 1.0):
         if source_obj.is_mobile():
             event_name = '3971_security_team_spawned_from_unit'
             if spread < 0: spread = 0
@@ -5205,7 +5205,7 @@ class Session(object):
         else:
             pack_id = None
 
-        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist, ai_state = ai_state, ai_target = ai_target, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors)
+        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist, ai_state = ai_state, ai_target = ai_target, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors, unit_health_modifier = unit_health_modifier)
         self.log_attack_units(player.user_id, units, event_name,
                               props = {'source_obj_specname': source_obj.spec.name,
                                        'source_obj_level': source_obj.level})
@@ -7053,8 +7053,7 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
         obj = Building(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras)
     elif spec.kind == 'mobile':
         obj = Mobile(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras, temporary = temporary)
-        obj.hp = obj.spec['max_hp'] * unit_health_modifier
-        obj.hp = obj.spec['max_hp'] * 0.5
+        obj.hp = int(spec.max_hp[level - 1] * unit_health_modifier)
     elif spec.kind == 'inert':
         obj = Inert(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras, metadata = metadata)
     return obj
