@@ -5137,9 +5137,9 @@ class Session(object):
                                    limit_reduce_qty = False,
                                    xyloc = None, xyscatter = None, persist = False,
                                    ai_state = None, ai_target = None, ai_aggressive = None,
-                                   pack_id = None, behaviors = None):
+                                   pack_id = None, behaviors = None, unit_health_modifier = 1.0):
         new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player, persist = persist,
-                                  ai_state = ai_state, ai_target = ai_target, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors)
+                                  ai_state = ai_state, ai_target = ai_target, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors, unit_health_modifier = unit_health_modifier)
         for obj in new_objects:
             if (not temporary) and (player is self.player):
                 player.send_army_update_one(obj, retmsg)
@@ -5183,7 +5183,9 @@ class Session(object):
 
     def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread, persist,
                             ai_state = None, ai_target = None, ai_aggressive = None,
-                            pack_aggro = False, behaviors = None):
+                            pack_aggro = False, behaviors = None,
+                            parent_last_hp = 0,
+                            inherit_parent_damage = 0, inherit_parent_damage_threshold = 0):
         if source_obj.is_mobile():
             event_name = '3971_security_team_spawned_from_unit'
             if spread < 0: spread = 0
@@ -5193,6 +5195,18 @@ class Session(object):
             if spread < 0: spread = 1
             scatter = [spread*gamedata['guard_deploy_spread']*source_obj.spec.unit_collision_gridsize[0]//2,
                        spread*gamedata['guard_deploy_spread']*source_obj.spec.unit_collision_gridsize[1]//2]
+
+        # determine how much health the secteam units should have
+        # see Consequents.py for the meaning of these parameters
+
+        unit_health_modifier = 1.0
+        if inherit_parent_damage > 0:
+            # note: use parent_last_hp instead of source_obj.hp here
+            # for peaceful retreats, we want to use the parent's original HP before the retreat code set it to zero
+            parent_health = float(parent_last_hp)/source_obj.max_hp
+            if parent_health <= inherit_parent_damage_threshold:
+                # reduce secteam unit health by inherit_parent_damage as a proportion of the parent's health loss
+                unit_health_modifier = 1.0 + inherit_parent_damage * (parent_health - 1.0)
 
         if pack_aggro:
             # set up pack aggro for the whole team
@@ -5205,7 +5219,7 @@ class Session(object):
         else:
             pack_id = None
 
-        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist, ai_state = ai_state, ai_target = ai_target, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors)
+        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist, ai_state = ai_state, ai_target = ai_target, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors, unit_health_modifier = unit_health_modifier)
         self.log_attack_units(player.user_id, units, event_name,
                               props = {'source_obj_specname': source_obj.spec.name,
                                        'source_obj_level': source_obj.level})
@@ -7023,7 +7037,7 @@ for name, data in gamedata["tech"].iteritems():
 for name, data in gamedata["enhancements"].iteritems():
     EnhancementSpec(name, data)
 
-def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None, temporary = None, apply_auras = None):
+def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None, temporary = None, apply_auras = None, unit_health_modifier = 1.0):
     if observer:
         # create a fresh GameObject for this player, taking into account A/B tests and tech auras
         # subtle distinction: "observer" is the person playing the game, "owner" is the player/AI who owns it
@@ -7053,6 +7067,9 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
         obj = Building(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras)
     elif spec.kind == 'mobile':
         obj = Mobile(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras, temporary = temporary)
+        if unit_health_modifier < 1:
+            # reduce unit's health to this fraction of its full health
+            obj.hp = max(1, int(obj.max_hp * unit_health_modifier))
     elif spec.kind == 'inert':
         obj = Inert(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras, metadata = metadata)
     return obj
@@ -9146,7 +9163,7 @@ def spawn_units(owner, base, units, temporary = False,
                 limit_reduce_qty = False, # if true, reduce quantity of units to fit in unit space
                 xyloc = None, xyscatter = None, observer = None, persist = False,
                 ai_state = None, ai_target = None, ai_aggressive = None,
-                pack_id = None, behaviors = None):
+                pack_id = None, behaviors = None, unit_health_modifier = 1.0):
     if not observer: observer = owner
     if temporary: assert xyloc
 
@@ -9230,8 +9247,9 @@ def spawn_units(owner, base, units, temporary = False,
                                                          (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.main_squad_space, repr(cur_space_usage)))
 
             newobj_id = gamesite.nosql_id_generator.generate()
-            newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id, temporary = temporary, apply_auras = apply_auras)
+            newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id, temporary = temporary, apply_auras = apply_auras, unit_health_modifier = unit_health_modifier)
             newobj.squad_id = destination_squad
+
             if temporary:
                 # put object into aggressive state by default
                 if ai_aggressive is None:
@@ -26498,7 +26516,10 @@ class GAMEAPI(resource.Resource):
                             on_destroy_cons_list = obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
                             if on_destroy_cons_list:
                                 for cons in on_destroy_cons_list:
-                                    session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y]}, reason='on_destroy(%s)' % obj.spec.name)
+                                    session.execute_consequent_safe(cons, obj.owner, retmsg,
+                                                                    # for buildings last_hp is always the POST-damage HP value
+                                                                    context = {'source_obj': obj, 'xy': [obj.x,obj.y], 'last_hp': newhp},
+                                                                    reason='on_destroy(%s)' % obj.spec.name)
 
                         # check for fragile equipment
                         items_destroyed = obj.destroy_fragile_equipment_items()
@@ -26773,7 +26794,11 @@ class GAMEAPI(resource.Resource):
             on_destroy_cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
             if on_destroy_cons_list:
                 for cons in on_destroy_cons_list:
-                    session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj':obj, 'xy':death_location, 'method': method}, reason='on_destroy(%s)' % obj.spec.name)
+                    session.execute_consequent_safe(cons, obj.owner, retmsg,
+                                                    # for mobile units, last_hp is the HP it has AFTER damage but BEFORE retreating
+                                                    context = {'source_obj':obj, 'last_hp': original_hp if method == 'retreat' else 0,
+                                                               'xy':death_location, 'method': method},
+                                                    reason='on_destroy(%s)' % obj.spec.name)
 
     def do_harvest_all(self, session, retmsg, base_type, region_id, base_id, object_list, power_factor, base_info):
         base_loot = {} if base_id != session.viewing_base.base_id else None
