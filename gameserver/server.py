@@ -5204,7 +5204,7 @@ class Session(object):
             # note: use parent_last_hp instead of source_obj.hp here
             # for peaceful retreats, we want to use the parent's original HP before the retreat code set it to zero
             parent_health = float(parent_last_hp)/source_obj.max_hp
-            if parent_health < inherit_parent_damage_threshold:
+            if parent_health <= inherit_parent_damage_threshold:
                 # reduce secteam unit health by inherit_parent_damage as a proportion of the parent's health loss
                 unit_health_modifier = 1.0 + inherit_parent_damage * (parent_health - 1.0)
 
