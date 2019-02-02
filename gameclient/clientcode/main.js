@@ -35798,6 +35798,7 @@ function update_notification_choice_button(w, pref_key, config_name) {
         w.text_color = SPUI.make_colorv(w.data['text_color_hidden']);
         w.tooltip.str = w.data['ui_tooltip_hidden'];
         w.onclick = (function (_pref_key) { return function(w) {
+            player.quest_tracked_dirty = true;
             var s = gamedata['errors']['NOTIFICATIONS_DISABLED'];
             invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog': s['dialog'],
                                                                       'on_ok': (function (__pref_key) { return function() {
@@ -35813,6 +35814,7 @@ function update_notification_choice_button(w, pref_key, config_name) {
         w.text_color = SPUI.make_colorv(w.data['text_color']);
         w.tooltip.str = null;
         w.onclick = (function (_pref_key, _config_name) { return function(w) {
+            player.quest_tracked_dirty = true;
             player.preferences[_pref_key] = (w.state == 'active' ? 0 : 1);
             send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
             if(player.preferences[_pref_key] &&
