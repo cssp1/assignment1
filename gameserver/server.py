@@ -26620,7 +26620,7 @@ class GAMEAPI(resource.Resource):
         if cons_list:
             obj.on_approach_fired = True
             for cons in cons_list:
-                session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y] if obj.is_building() else map(int, xy), 'trigger_obj': trigger_obj}, reason='on_approach(%s)' % obj.spec.name)
+                session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y] if obj.is_building() else map(int, xy), 'last_hp': obj.hp, 'trigger_obj': trigger_obj}, reason='on_approach(%s)' % obj.spec.name)
 
         retmsg.append(["ON_APPROACH_RESULT", obj.owner.user_id, id, client_time, server_time])
 
