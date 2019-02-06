@@ -164,7 +164,17 @@ var spin_on_login_status = function(response) {
         // already logged in - redirect to game
         spin_redirect_to_game_with_credentials(response.authResponse);
     } else {
-        spin_try_to_log_in();
+        // trigger automatic login attempt
+        // since this happens automatically after page load, it isn't allowed
+        // to launch a pop-up window. On desktop, this is fine, because the FB SDK
+        // opens the login prompt in a div on the parent page. But on mobile, it
+        // does try to open a popup. So for the mobile case, we cannot trigger the
+        // login attempt here. We have to
+        var facebook_uses_popup = (spin_demographics['browser_OS'] == 'iOS' ||
+                                   spin_demographics['browser_OS'] == 'Android');
+        if(!facebook_uses_popup) {
+            spin_try_to_log_in();
+        }
     }
 };
 
