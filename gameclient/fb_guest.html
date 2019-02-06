@@ -169,7 +169,7 @@ var spin_on_login_status = function(response) {
         // to launch a pop-up window. On desktop, this is fine, because the FB SDK
         // opens the login prompt in a div on the parent page. But on mobile, it
         // does try to open a popup. So for the mobile case, we cannot trigger the
-        // login attempt here. We have to
+        // login attempt here. We have to wait for a click.
         var facebook_uses_popup = (spin_demographics['browser_OS'] == 'iOS' ||
                                    spin_demographics['browser_OS'] == 'Android');
         if(!facebook_uses_popup) {
