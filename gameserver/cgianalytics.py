@@ -1786,8 +1786,13 @@ CUSTOM_STAGES = {
     {'name': 'E132M Crafted 100x Anti-Air Mine', 'func': lambda user: user.get('achievement:anti_air_minecraft_100',0) >= 1 },
     {'name': 'E132N Crafted 500x Anti-Air Mine', 'func': lambda user: user.get('achievement:anti_air_minecraft_500',0) >= 1 },
     {'name': 'E136G Completed FASCAM Shield Set', 'func': lambda user: user.get('achievement:aoefire_shield_infantry_complete',0) >= 1 },
+    {'name': 'E200 Quest: Complete 16h Dispatch', 'func': lambda user: user.get('quest:complete_16h_dispatch:completed',0) > 0,},
+    {'name': 'E201 Quest: Attack Event Base', 'func': lambda user: user.get('quest:tutorial_attack_event_base:completed',0) > 0,},
     ],
-    'dv': [],
+    'dv': [
+    {'name': 'E200 Quest: Complete 16h Dispatch', 'func': lambda user: user.get('quest:complete_16h_dispatch:completed',0) > 0,},
+    {'name': 'E201 Quest: Attack Event Base', 'func': lambda user: user.get('quest:tutorial_attack_event_base:completed',0) > 0,},
+    ],
     'bfm': [],
     'sg': [
         {'name': 'E02 Maker House L2+', 'func': lambda user: user.get('extra_foreman_level',1) >= 2 },
