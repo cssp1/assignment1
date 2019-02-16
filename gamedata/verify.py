@@ -3412,7 +3412,11 @@ def check_store_sku(sku_name, sku, state):
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_unlocked')
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_available')
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_release')
-                expect_library_preds.add('elite_nimr_L6_available') # Special for Elite Nimr release
+                for i in range(100): # allows L1 through L100 suffix for level upgrades later
+                    str_lx_bp = "_L" + str(i)
+                    expect_library_preds.add(sku['item'][:-len('_blueprint')]+str_lx_bp+'_unlocked')
+                    expect_library_preds.add(sku['item'][:-len('_blueprint')]+str_lx_bp+'_available')
+                    expect_library_preds.add(sku['item'][:-len('_blueprint')]+str_lx_bp+'_release')
                 # these allow for various level unlocks on main release predicates
                 # necessary for special event limited-time unlocks introduced with elite nimr in TR/DV
                 if '_L' in sku['item']:
