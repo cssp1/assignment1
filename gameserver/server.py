@@ -4566,8 +4566,14 @@ class Session(object):
 
         assert self.user.active_session is self
         self.user.active_session = None
-        assert self.viewing_base_lock is None
-        assert self.viewing_squad_locks is None
+
+        if (self.viewing_base_lock is not None) or (self.viewing_squad_locks is not None):
+            # shouldn't get here - this violates an invariant
+            gamesite.exception_log.event(server_time, 'shutdown() with invalid session state: %s\nviewing_base_lock %r viewing_squad_locks %r pre_locks %r' % (self.dump_exception_state(), self.viewing_base_lock, self.viewing_squad_locks, self.pre_locks))
+
+            # try to clean up - but we might have broken something. Better to release the locks though.
+            self.release_base()
+
         self.release_pre_locks()
 
         if self.async_ds_watchdog:
@@ -4598,8 +4604,15 @@ class Session(object):
     # acquire locks on the viewed base and all defending and deployable squads.
     # "errors" is an optional list to append any locking errors to (strings in gamedata['errors'])
     def do_acquire_base(self, viewing_player, viewing_base, deployable_squads, defending_squads, errors = None):
-        assert self.viewing_base_lock is None
-        assert self.viewing_squad_locks is None
+
+        if (self.viewing_base_lock is not None) or (self.viewing_squad_locks is not None):
+            # shouldn't get here - this violates an invariant
+            gamesite.exception_log.event(server_time, 'do_acquire_base() with invalid session state: %s\nviewing_base_lock %r viewing_squad_locks %r pre_locks %r' % (self.dump_exception_state(), self.viewing_base_lock, self.viewing_squad_locks, self.pre_locks))
+
+            if errors is not None:
+                errors.append('CANNOT_ATTACK_YOUR_SQUAD_LOCKING_ISSUE')
+            return Player.LockState.open # unsuccessful
+
         if (viewing_base and viewing_base.base_region) or deployable_squads: assert gamesite.nosql_client
 
         state = Player.LockState.being_attacked

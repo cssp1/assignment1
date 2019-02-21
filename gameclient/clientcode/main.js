@@ -50512,6 +50512,7 @@ function handle_server_message(data) {
                   name == "CANNOT_ATTACK_THEIR_SQUAD_OFFENSE" ||
                   name == "CANNOT_ATTACK_THEIR_SQUAD_DEFENSE" ||
                   name == "CANNOT_ATTACK_YOUR_SQUAD_RACE" ||
+                  name == "CANNOT_ATTACK_YOUR_SQUAD_LOCKING_ISSUE" ||
                   name == "LADDER_MATCH_FAILED") {
 
             cancel_loading_base_timer();
