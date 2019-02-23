@@ -3412,7 +3412,7 @@ def check_store_sku(sku_name, sku, state):
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_unlocked')
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_available')
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_release')
-                for i in range(100): # allows L1 through L100 suffix for level upgrades later
+                for i in range(26): # allows L1 through L100 suffix for level upgrades later
                     str_lx_bp = "_L" + str(i)
                     expect_library_preds.add(sku['item'][:-len('_blueprint')]+str_lx_bp+'_unlocked')
                     expect_library_preds.add(sku['item'][:-len('_blueprint')]+str_lx_bp+'_available')
