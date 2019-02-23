@@ -14399,6 +14399,7 @@ class LivePlayer(Player):
 
     def is_alt_account_unattackable(self, other_id):
         if (not spin_secure_mode): return False
+        if self.is_developer(): return False
         limit = gamedata['server']['alt_no_attack_after']
         if limit < 0: return False
         alt_data = self.get_alt_data(other_id)
