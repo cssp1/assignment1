@@ -43810,7 +43810,11 @@ function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
     @return {Array.<string>} */
 function get_weapon_spell_features2(spec, spell) {
     var ret = [];
-    if(!('damage_ui_bypass' in spell)){
+    var ui_show_weapon_features = 1;
+    if ('ui_show_weapon_features' in spell && !spell['ui_show_weapon_features']){
+        ui_show_weapon_features = 0;
+    }
+    if(ui_show_weapon_features == 1){
         ret.push('weapon_damage');
     }
     if('effective_range' in spell) {
@@ -44913,7 +44917,8 @@ function update_upgrade_dialog(dialog) {
     // set up damage_vs icons
     if(!tech) {
         var spell = get_auto_spell_raw(unit.spec);
-        init_damage_vs_icons(dialog, unit.spec, spell); // note: not unit.get_auto_spell(), since that includes equipped item mods
+        // note: not unit.get_auto_spell(), since that includes equipped item mods
+        init_damage_vs_icons(dialog, unit.spec, spell);
     } else if(tech['associated_unit']) {
         init_damage_vs_icons(dialog, gamedata['units'][tech['associated_unit']], get_auto_spell_for_unit(player, gamedata['units'][tech['associated_unit']]));
     } else if(tech['associated_item']) {
@@ -45503,7 +45508,9 @@ function update_upgrade_dialog_equipment(dialog) {
 
 function init_damage_vs_icons(dialog, spec, weapon_spell) {
     var show = (weapon_spell && (('ui_damage_vs' in weapon_spell) || ('ui_damage_vs' in spec)));
-    var ui_name_bypass = ((spec || weapon_spell) && (('damage_ui_bypass' in weapon_spell) || ('damage_ui_bypass' in spec)));
+    if ((spec && 'ui_show_weapon_features' in spec && !spec['ui_show_weapon_features']) || (weapon_spell && 'ui_show_weapon_features' in weapon_spell && !weapon_spell['ui_show_weapon_features'])){
+        show = false;
+    }
 
     if('damage_vs_label' in dialog.widgets) { dialog.widgets['damage_vs_label'].show = show; }
 
@@ -45543,8 +45550,6 @@ function init_damage_vs_icons(dialog, spec, weapon_spell) {
                 ui_name = gamedata['strings']['manufacture_categories'][CATS[i][1]]['plural'];
             } else if(CATS[i][1] in gamedata['strings']['object_kinds']) {
                 ui_name = gamedata['strings']['object_kinds'][CATS[i][1]]['plural'];
-            } else if(ui_name_bypass) {
-                ui_name = "";
             } else {
                 throw Error('unknown manuf category or object kind '+CATS[i][1]);
             }
