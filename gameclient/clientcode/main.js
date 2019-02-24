@@ -1108,7 +1108,9 @@ Aura.prototype.apply = function(world, obj) {
                 obj.combat_stats.turn_rate *= (1 - obj.combat_stats.ice_effects*this.strength);
                 obj.combat_stats.erratic_flight = Math.max(obj.combat_stats.erratic_flight, obj.combat_stats.ice_effects*this.strength);
             }
-        } else if(code === 'swamp_shielded') {
+        } else if(code === 'on_island') {
+            obj.combat_stats.damage_taken_from['drowning'] = 0;
+        }  else if(code === 'swamp_shielded') {
             obj.combat_stats.swamp_effects *= this.strength;
         } else if(code === 'moving_in_swamp') {
             if(obj.is_mobile()) {
