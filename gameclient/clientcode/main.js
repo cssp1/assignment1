@@ -31169,6 +31169,7 @@ function update_alliance_info_tab(dialog) {
                         __dialog.widgets['join_button'].tooltip.str = _dialog.data['widgets']['join_button']['ui_tooltip_on_cooldown'].replace('%s', pretty_print_time(player.cooldown_togo(gamedata['spells']['ALLIANCE_LEAVE']['cooldown_name'])));
                     } else if(__dialog.user_data['join_type'] == 'anyone' || info['invite_status']) {
                         join_cb = (function (w, _alliance_id, _ui_name) { return function() {
+                            player.quest_tracked_dirty = true;
                             var s = gamedata['strings']['join_alliance_confirm'];
                             invoke_child_message_dialog(s['ui_title'], s['ui_description'].replace('%s', _ui_name),
                                                         {'cancel_button': true,
@@ -31186,6 +31187,7 @@ function update_alliance_info_tab(dialog) {
                         __dialog.widgets['join_button'].tooltip.str = __dialog.data['widgets']['join_button']['ui_tooltip_request_sent'];
                     } else if(__dialog.user_data['join_type'] == 'invite_only') {
                         join_cb = (function (w, _alliance_id, _ui_name) { return function() {
+                            player.quest_tracked_dirty = true;
                             var s = gamedata['strings']['send_alliance_join_request_confirm'];
                             invoke_child_message_dialog(s['ui_title'], s['ui_description'].replace('%s', _ui_name),
                                                         {'cancel_button': true,
@@ -50510,6 +50512,7 @@ function handle_server_message(data) {
                   name == "CANNOT_ATTACK_THEIR_SQUAD_OFFENSE" ||
                   name == "CANNOT_ATTACK_THEIR_SQUAD_DEFENSE" ||
                   name == "CANNOT_ATTACK_YOUR_SQUAD_RACE" ||
+                  name == "CANNOT_ATTACK_YOUR_SQUAD_LOCKING_ISSUE" ||
                   name == "LADDER_MATCH_FAILED") {
 
             cancel_loading_base_timer();
