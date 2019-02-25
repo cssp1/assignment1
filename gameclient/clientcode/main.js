@@ -1110,7 +1110,7 @@ Aura.prototype.apply = function(world, obj) {
             }
         } else if(code === 'on_island') {
             obj.combat_stats.damage_taken_from['drowning'] = 0;
-        }  else if(code === 'swamp_shielded') {
+        } else if(code === 'swamp_shielded') {
             obj.combat_stats.swamp_effects *= this.strength;
         } else if(code === 'moving_in_swamp') {
             if(obj.is_mobile()) {
