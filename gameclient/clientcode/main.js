@@ -43814,11 +43814,11 @@ function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
     @return {Array.<string>} */
 function get_weapon_spell_features2(spec, spell) {
     var ret = [];
-    var ui_show_weapon_features = 1;
-    if ('ui_show_weapon_features' in spell && !spell['ui_show_weapon_features']){
-        ui_show_weapon_features = 0;
+    var ui_show_weapon_features = true;
+    if('ui_show_weapon_features' in spell && !spell['ui_show_weapon_features']) {
+        ui_show_weapon_features = false;
     }
-    if(ui_show_weapon_features == 1){
+    if(ui_show_weapon_features) {
         ret.push('weapon_damage');
     }
     if('effective_range' in spell) {
@@ -44920,15 +44920,15 @@ function update_upgrade_dialog(dialog) {
 
     // set up damage_vs icons
     if(!tech) {
-        var spell = get_auto_spell_raw(unit.spec);
         // note: not unit.get_auto_spell(), since that includes equipped item mods
+        var spell = get_auto_spell_raw(unit.spec);
         init_damage_vs_icons(dialog, unit.spec, spell);
     } else if(tech['associated_unit']) {
         init_damage_vs_icons(dialog, gamedata['units'][tech['associated_unit']], get_auto_spell_for_unit(player, gamedata['units'][tech['associated_unit']]));
     } else if(tech['associated_item']) {
         var spell = get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'],Math.min(new_level, max_level))));
         init_damage_vs_icons(dialog, {'name': tech['name'], 'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
-                            spell); // spell's ui_damage_vs will take precedence
+                             spell); // spell's ui_damage_vs will take precedence
     } else {
         init_damage_vs_icons(dialog, null, null);
     }
@@ -45512,7 +45512,8 @@ function update_upgrade_dialog_equipment(dialog) {
 
 function init_damage_vs_icons(dialog, spec, weapon_spell) {
     var show = (weapon_spell && (('ui_damage_vs' in weapon_spell) || ('ui_damage_vs' in spec)));
-    if ((spec && 'ui_show_weapon_features' in spec && !spec['ui_show_weapon_features']) || (weapon_spell && 'ui_show_weapon_features' in weapon_spell && !weapon_spell['ui_show_weapon_features'])){
+
+    if((spec && 'ui_show_weapon_features' in spec && !spec['ui_show_weapon_features']) || (weapon_spell && 'ui_show_weapon_features' in weapon_spell && !weapon_spell['ui_show_weapon_features'])) {
         show = false;
     }
 
