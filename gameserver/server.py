@@ -20738,7 +20738,7 @@ class GAMEAPI(resource.Resource):
                 cannot_spy = True
 
         # in NoSQL-land when spying on a friendly squad or quarry, grab the lock immediately so that we can mutate objects we own
-        if dest_base and (dest_base.base_type in ('squad','quarry')) and (dest_base.base_landlord_id == session.player.user_id) \
+        if (not cannot_spy) and dest_base and (dest_base.base_type in ('squad','quarry')) and (dest_base.base_landlord_id == session.player.user_id) \
            and (gamesite.nosql_client and session.player.home_region):
             # XXXXXX hack - this is to fix squads in defending_squads dying since the order is query->complete_attack->session_change
             # the real solution is to move query AFTER complete_attack
