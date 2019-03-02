@@ -43827,13 +43827,13 @@ function get_weapon_spell_features2(spec, spell) {
     if(!is_melee_spell(spell) && ('range' in spell)) {
         ret.push('weapon_range');
     }
-    if('min_range' in spell) {
+    if('min_range' in spell && ui_show_weapon_features) {
         ret.push('min_range');
     }
-    if('splash_range' in spell) {
+    if('splash_range' in spell && ui_show_weapon_features) {
         ret.push('splash_range');
     }
-    if('accuracy' in spell) {
+    if('accuracy' in spell && ui_show_weapon_features) {
         ret.push('accuracy');
     }
     if('ui_priority_vs' in spell || 'ui_priority_vs' in spec) {
