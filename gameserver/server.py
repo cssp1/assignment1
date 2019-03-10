@@ -33662,7 +33662,7 @@ class AdminResource(resource.Resource):
 
     def revenue_image(self):
         rev = admin_stats.revenue
-        src = 'http://s3.amazonaws.com/'+SpinConfig.config['public_s3_bucket']+'/'
+        src = 'https://spinpunch-public.spinpunch.com/'
         if rev >= 1000.0:
             src += 'revenue5.jpg'
         elif rev >= 500.0:
