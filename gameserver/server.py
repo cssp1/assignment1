@@ -16074,7 +16074,7 @@ class OGPAPI(resource.Resource):
                                               SpinConfig.config['proxyserver']['external_http_port'])
                 image_url = 'http://%s%s' % (art_server, art_asset_file)
             elif art_asset_s3:
-                image_url = 'http://s3.amazonaws.com/'+gamedata['public_s3_bucket']+'/facebook_assets/%s' % art_asset_s3
+                image_url = 'https://spinpunch-public.spinpunch.com/facebook_assets/%s' % art_asset_s3
             else:
                 image_url = SpinConfig.config['proxyserver'].get('fbexternalhit_image', '')
                 if not video_url:

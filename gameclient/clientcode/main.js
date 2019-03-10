@@ -9701,6 +9701,8 @@ function ogpapi_url(props) {
         url += (i == 0 ? '?' : '&') + k + '=' + encodeURIComponent(props[k]);
         i += 1;
     }
+    // force flush of bad cached entries at Facebook
+    url += (i == 0 ? '?' : '&') + 'sp_ogpapi_ver=2';
     return url;
 }
 
