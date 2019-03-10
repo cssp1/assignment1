@@ -15837,9 +15837,22 @@ class OGPAPI(resource.Resource):
             check_parts = urlparse.urlparse(str(check))
             if check_parts.netloc == url_parts.netloc and \
                check_parts.path == url_parts.path and \
-               check_parts.query == url_parts.query:
+               (self.strip_object_endpoint_query(check_parts.query) == \
+                self.strip_object_endpoint_query(url_parts.query)):
                 return True
         return False
+
+    @staticmethod
+    def strip_object_endpoint_query(query):
+        # Simplify an OGPAPI query string by stripping out keys/values that
+        # should not affect equality matches.
+        qs = urlparse.parse_qs(query)
+
+        if 'sp_ogpapi_ver' in qs:
+            del qs['sp_ogpapi_ver']
+
+        # note: use stable ordering of key/value pairs for the query string
+        return urllib.urlencode(sorted(qs.items()))
 
     def render_GET(self, request):
         SpinHTTP.set_access_control_headers(request)
