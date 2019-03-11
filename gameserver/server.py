@@ -15837,9 +15837,22 @@ class OGPAPI(resource.Resource):
             check_parts = urlparse.urlparse(str(check))
             if check_parts.netloc == url_parts.netloc and \
                check_parts.path == url_parts.path and \
-               check_parts.query == url_parts.query:
+               (self.strip_object_endpoint_query(check_parts.query) == \
+                self.strip_object_endpoint_query(url_parts.query)):
                 return True
         return False
+
+    @staticmethod
+    def strip_object_endpoint_query(query):
+        # Simplify an OGPAPI query string by stripping out keys/values that
+        # should not affect equality matches.
+        qs = urlparse.parse_qs(query)
+
+        if 'sp_ogpapi_ver' in qs:
+            del qs['sp_ogpapi_ver']
+
+        # note: use stable ordering of key/value pairs for the query string
+        return urllib.urlencode(sorted(qs.items()))
 
     def render_GET(self, request):
         SpinHTTP.set_access_control_headers(request)
@@ -16074,7 +16087,7 @@ class OGPAPI(resource.Resource):
                                               SpinConfig.config['proxyserver']['external_http_port'])
                 image_url = 'http://%s%s' % (art_server, art_asset_file)
             elif art_asset_s3:
-                image_url = 'http://s3.amazonaws.com/'+gamedata['public_s3_bucket']+'/facebook_assets/%s' % art_asset_s3
+                image_url = 'https://spinpunch-public.spinpunch.com/facebook_assets/%s' % art_asset_s3
             else:
                 image_url = SpinConfig.config['proxyserver'].get('fbexternalhit_image', '')
                 if not video_url:
@@ -33649,7 +33662,7 @@ class AdminResource(resource.Resource):
 
     def revenue_image(self):
         rev = admin_stats.revenue
-        src = 'http://s3.amazonaws.com/'+SpinConfig.config['public_s3_bucket']+'/'
+        src = 'https://spinpunch-public.spinpunch.com/'
         if rev >= 1000.0:
             src += 'revenue5.jpg'
         elif rev >= 500.0:

@@ -98,7 +98,7 @@ def make_virtual_currency_settings_update(config, gamedata):
                       'sku': spellname,
                       'amount': data['quantity'],
                       'price': data['price'],
-                      'image_url': '//s3.amazonaws.com/'+config['public_s3_bucket']+'/facebook_assets/'+gamedata['store']['fb_open_graph_gamebucks_icon'],
+                      'image_url': '//spinpunch-public.spinpunch.com/facebook_assets/'+gamedata['store']['fb_open_graph_gamebucks_icon'],
                       'description': { 'en': data['ui_name'].replace('%GAMEBUCKS_QUANTITY', '%d' % data['quantity']).replace('%GAME_NAME', gamedata['strings']['game_name']).replace('%GAMEBUCKS_NAME', gamedata['store']['gamebucks_ui_name']).replace('%ITEM_BUNDLE', '') },
                       }
             by_currency_and_price_and_quantity[key3] = packet

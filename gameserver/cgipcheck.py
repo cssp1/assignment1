@@ -116,7 +116,7 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_h
         '$SPIN_AI_BASE_IDS$': SpinJSON.dumps(sorted([int(strid) for strid in gamedata['ai_bases_server']['bases'].iterkeys()])),
         '$SPIN_SSL_AVAILABLE$': 'true' if ssl_available else 'false',
         '$SPIN_WSS_AVAILABLE$': 'true' if ssl_available else 'false',
-        '$SPIN_PUBLIC_S3_BUCKET$': SpinConfig.config['public_s3_bucket'],
+        '$SPIN_PUBLIC_S3_URL$': 'https://spinpunch-public.spinpunch.com',
         }
     expr = re.compile('|'.join([key.replace('$','\$') for key in replacements]))
     template = open('cgipcheck.html').read()

@@ -36,8 +36,8 @@ class JQueryUI (PageContent):
 #        fd.write('<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>\n')
 #        fd.write('<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.18/jquery-ui.min.js"></script>\n')
         EXT_JS_VERSION = '4.2.1' # 4.0.7
-        fd.write('<script type="text/javascript" src="https://'+SpinConfig.config['public_s3_bucket']+'.s3.amazonaws.com/ext-'+EXT_JS_VERSION+'/ext-all.js"></script>\n')
-        fd.write('<link rel="stylesheet" type="text/css" href="https://'+SpinConfig.config['public_s3_bucket']+'.s3.amazonaws.com/ext-'+EXT_JS_VERSION+'/resources/css/ext-all.css" />\n')
+        fd.write('<script type="text/javascript" src="https://spinpunch-public.spinpunch.com/ext-'+EXT_JS_VERSION+'/ext-all.js"></script>\n')
+        fd.write('<link rel="stylesheet" type="text/css" href="https://spinpunch-public.spinpunch.com/ext-'+EXT_JS_VERSION+'/resources/css/ext-all.css" />\n')
 
         # manually override a little CSS bug in Ext.js that causes scrollbars to appear on the little tab headers in Chrome
         fd.write('''<style type="text/css">
@@ -93,7 +93,6 @@ class JQueryUI (PageContent):
 
         fd.write('var townhall = "'+self.gamedata['townhall']+'";\n')
         fd.write('var spin_game_id_long = "'+self.gamedata['strings']['game_name']+'";\n')
-        fd.write('var public_s3_bucket = "'+SpinConfig.config['public_s3_bucket']+'";\n')
 
         #for line in open('ext-Line-patch.js').xreadlines():
         #    fd.write(line)

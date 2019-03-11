@@ -1592,7 +1592,8 @@ def adimage_get_s3_url(db, image):
         con = SpinS3.S3(os.getenv('HOME')+'/.ssh/'+socket.gethostname().split('.')[0]+'-awssecret')
         basename = os.path.basename(filename)
         assert con.put_file(s3_image_bucket, s3_image_path+basename, filename, acl='public-read')
-        entry = {'_id':image, 'url': 'https://s3.amazonaws.com/'+s3_image_bucket+'/'+s3_image_path+basename}
+        # note: assumes bucket is aliased to BUCKET-NAME.spinpunch.com
+        entry = {'_id':image, 'url': 'https://'+s3_image_bucket+'.spinpunch.com/'+s3_image_path+basename}
         db.s3_adimages.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).replace_one({'_id':entry['_id']}, entry, upsert=True)
         print 'done'
     return entry['url']

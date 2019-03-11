@@ -33,9 +33,9 @@ class PlayerPortraits(object):
             if not social_id.startswith('fb'): return None
             fb_id = social_id[2:]
             if fb_id.startswith('example1'): # for sandbox testing
-                return 'https://s3.amazonaws.com/spinpunch-public/anon_portrait.jpg'
+                return 'https://spinpunch-public.spinpunch.com/anon_portrait.jpg'
             elif fb_id.startswith('example2'):
-                return 'https://s3.amazonaws.com/spinpunch-public/anon_portrait2.jpg'
+                return 'https://spinpunch-public.spinpunch.com/anon_portrait2.jpg'
 
             # since enabling appsecret_proof requirement, we can no longer use client-side access tokens here
             return SpinFacebook.versioned_graph_endpoint_secure('user/picture', '%s/picture' % fb_id)
