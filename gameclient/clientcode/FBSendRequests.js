@@ -143,12 +143,11 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
             var viral = gamedata['virals']['send_gifts'];
             var params = {'method':'apprequests',
                           'message': viral['ui_post_message'],
-                          'action_type': viral['og_action_type'], 'object_id': viral['og_object_id'],
                           'data': 'gift',
                           'title': viral['ui_title'],
                           'frictionlessRequests': true,
                           'to': to_string,
-                          'show_error': !spin_secure_mode
+                          'show_error': (player.is_developer() || !spin_secure_mode)
                          };
 
             SPFB.ui(params, (function (__is_instant, __attempt_id, __reason, __batches, _batch_num, __do_send) { return function(response) {
@@ -365,12 +364,11 @@ FBSendRequests.invoke_send_single_dialog = function(viral_name, viral_replace_s,
 
     var params = {'method':'apprequests',
                   'message': viral['ui_post_message'].replace('%s', viral_replace_s),
-                  'action_type': viral['og_action_type'], 'object_id': viral['og_object_id'],
                   'data': 'gift',
                   'title': viral['ui_title'],
                   'frictionlessRequests': true,
                   'to': to_string,
-                  'show_error': !spin_secure_mode
+                  'show_error': (player.is_developer() || !spin_secure_mode)
                  };
 
     SPFB.ui(params, (function (_to_user_id, _attempt_id, _viral_name, _cb) { return function(response) {
