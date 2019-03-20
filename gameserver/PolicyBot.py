@@ -401,9 +401,15 @@ class AntiAltPolicy(Policy):
 
             # last-chance check for any IGNORE_ALT instructions that were dumped out of alt_account_data
             # but still logged in customer support history
-            if any(x['method'] == 'ignore_alt' and \
-                   int(x['args']['other_id']) == int(salt_id) \
-                   for x in player['history'].get('customer_support',[])): continue
+            ignored = False
+            for x in player['history'].get('customer_support',[]):
+                if x['method'] in ('ignore_alt', 'unignore_alt') and \
+                   int(x['args']['other_id']) == int(salt_id):
+                    if x['method'] == 'ignore_alt':
+                        ignored = True
+                    elif x['method'] == 'unignore_alt':
+                        ignored = False
+            if ignored: continue
 
             alt_ids.append(int(salt_id))
 
