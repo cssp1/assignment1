@@ -37,7 +37,7 @@ pyOpenSSL>=17.5.0
 pywebpush==1.9.2
 # pyxDamerauLevenshtein==1.4.1 # note: this is optional, and pulls in numpy (large)
 requests==2.21.0
-service-identity>=17.0.0
+service-identity>=18.1.0
 six==1.12.0
 SQLAlchemy==1.3.2
 txpostgres==1.6.0
@@ -52,7 +52,7 @@ git+git://github.com/spinpunch/spin-py-libs.git@v0.1.0#egg=spinlibs==0.1.0
 # note: the version string on the end only tells pip to skip this
 # intall if the currently installed version matches that version. It
 # does NOT enforce which version is pulled from Git.
-git+git://github.com/spinpunch/twisted.git@spinpunch#egg=Twisted==18.7.0.dev0
+git+git://github.com/spinpunch/twisted.git@spinpunch-19.2.0dev0#egg=Twisted==19.2.0.dev0
 
 # ujson MUST be this customized version, which adds extra options like
 # buffer size hints and adjusts whitespace handling
