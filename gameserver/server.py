@@ -15135,20 +15135,17 @@ class LivePlayer(Player):
         if self.history.get('map_placement_gen', 0) < gamedata['territory']['map_placement_gen'] and \
            (self.eligible_for_quarries() or (force_region is not None)):
             success = self.change_region(force_region if (force_region is not None) else None, None, None, session, retmsg, reason='update_map_placement')
-            if success and retmsg:
-                self.send_history_update(retmsg)
+            if success:
+                if retmsg:
+                    self.send_history_update(retmsg)
 
-        # update nosql state of home base
-#        if 0:
-#            if (self.history.get('nosql_test_gen',0) < NOSQL_GEN or self.history.get('nosql_region',None) != self.home_region):
-#                reason = 'update_map_placement'
-#                old_nosql_region = self.history.get('nosql_region', None)
-#                if old_nosql_region:
-#                    self.my_home.nosql_pluck(reason)
-#                self.history['nosql_region'] = self.home_region
-#                self.history['nosql_test_gen'] = NOSQL_GEN
-#                if self.history['nosql_region']:
-#                    self.my_home.nosql_plant(reason)
+                if session and self.history.get('logged_in_times', 0) < 5:
+                    # for early accounts, who get on the map during the
+                    # first play session, we need to ensure playerdb and
+                    # userdb entries are created so that would-be attackers
+                    # aren't blocked from attacking their squads.
+                    user_table.store_async(session.user, lambda: None, False, 'update_map_placement')
+                    player_table.store_async(session.player, lambda: None, False, 'update_map_placement')
 
         return True
 
