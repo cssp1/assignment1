@@ -12530,7 +12530,7 @@ class Player(AbstractPlayer):
                     if permanent_auras:
                         if obj.auras is None: obj.auras = []
                         for data in permanent_auras:
-                            Aura.apply_aura(obj.auras, data['aura_name'], data.get('aura_strength',1), from_stattab = True)
+                            Aura.apply_aura(obj.auras, data['aura_name'], data.get('aura_strength',1), range = data.get('aura_range',-1), from_stattab = True)
 
             # even when squads are off, make sure total_space is enough for the whole of base defenders
             self.total_space = max(self.total_space, self.main_squad_space)
