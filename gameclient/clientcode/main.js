@@ -33369,7 +33369,7 @@ function init_army_dialog_buttons(dialog, mode, my_dialog_name) {
 
         if(data['require_generic_crafting_category']) {
             if(!goog.object.some(gamedata['crafting']['categories'], function(cat) {
-                return !('dialog' in cat);
+                return !('dialog' in cat) && (!('show_if' in cat) || read_predicate(cat['show_if']).is_satisfied(player, null));
             })) {
                 // don't show the "Produce" buttona
                 dialog.widgets[btn].show = false;
