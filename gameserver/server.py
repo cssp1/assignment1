@@ -2970,26 +2970,36 @@ class User:
 
         if not SpinConfig.config['enable_facebook']: # mock path
             reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive, session, 'profile', open("test-facebook-profile.txt").read())) # delay to expose timing bugs
-            reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'friends', [], open("test-facebook-friends.txt").read())) # delay to expose timing bugs
-            reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'likes', [], open("test-facebook-likes.txt").read())) # delay to expose timing bugs
+            reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'friends', [], set(), open("test-facebook-friends.txt").read())) # delay to expose timing bugs
+            reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'likes', [], set(), open("test-facebook-likes.txt").read())) # delay to expose timing bugs
         else:
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, profile_url, functools.partial(self.retrieve_facebook_info_receive, session, 'profile'))
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, friends_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'friends', []))
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, likes_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'likes', []))
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, friends_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'friends', [], set(friends_url)))
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, likes_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'likes', [], set(likes_url)))
 
             # update portrait
             portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {}, 'fb', 'fb'+str(self.facebook_id), self.fb_oauth_token)
             session.portrait_update_launched(portrait_d)
 
-    def retrieve_facebook_info_receive_paged(self, session, dest, buffer, raw_result):
+    def retrieve_facebook_info_receive_paged(self, session, dest, buffer, seen_set, raw_result):
+        # note: On 2019 Apr 18, Facebook started sending us in infinite loops, by having the
+        # result['paging']['next'] URL point back to a page we'd already seen.
+        # Detect and break the cycle by tracking all URLs we've seen.
+
         result = SpinJSON.loads(raw_result)
 
         buffer += result['data']
 
         if ('paging' in result) and ('next' in result['paging']) and \
-           (('count' not in result) or (len(buffer) < int(result['count']))):
+           (('count' not in result) or (len(buffer) < int(result['count']))) and \
+           (result['paging']['next'] not in seen_set): # avoid infinite loop
+
+            next_url = result['paging']['next']
+            seen_set.add(next_url)
+
             # fetch next page
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, result['paging']['next'], functools.partial(self.retrieve_facebook_info_receive_paged, session, dest, buffer))
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, next_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, dest, buffer, seen_set))
+
         else:
             # it's complete now
             self.retrieve_facebook_info_receive(session, dest, None, result = buffer)
