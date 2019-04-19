@@ -1056,7 +1056,7 @@
     "facebook_icon": { "states": { "normal": { "images": ["art/ui/menu_buttons17.png"], "dimensions": [32,32], "origins": [251,790] } } },
 
     // XXX borrowed from MF2/BFM for now
-    "facebook_incentive_icon": { "states": { "normal": { "images": ["art/ui/mf2_inventory_elements27b.png"], "origins": [150,1250], "dimensions": [50,50] } } },
+    "facebook_incentive_icon": { "states": { "normal": { "images": ["art/ui/mf2_inventory_elements28.png"], "origins": [150,1250], "dimensions": [50,50] } } },
 
     // pile o' gamebucks for purchase dialog
     "gold_pile": { "states": { "size0": { "images": ["art/ui/gamebucks_gold2.png"], "origins": [0, 50], "dimensions": [90,90] },
