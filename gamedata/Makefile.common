@@ -37,6 +37,7 @@ dep:
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_tech.json --get-deps-as ${BUILT}/${GAME_ID}_tech_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_enhancements.json --get-deps-as ${BUILT}/${GAME_ID}_enhancements_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_buildings.json --get-deps-as ${BUILT}/${GAME_ID}_buildings_compiled.json >> ${BUILT}/deps
+	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_map.json --get-deps-as ${BUILT}/${GAME_ID}_map_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_units.json --get-deps-as ${BUILT}/${GAME_ID}_units_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_crafting.json --get-deps-as ${BUILT}/${GAME_ID}_crafting_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_item_sets.json --get-deps-as ${BUILT}/${GAME_ID}_item_sets_compiled.json >> ${BUILT}/deps
@@ -72,6 +73,8 @@ ${BUILT}/${GAME_ID}_raids_server.json: ${GAMEDATA}/make_raids.py ${BUILT}/${GAME
 	@echo "    ${GAME_ID}_raids_server.json..." && ${GAMEDATA}/make_raids.py --server ${BUILT}/${GAME_ID}_raids_compiled.json $@
 ${BUILT}/${GAME_ID}_buildings_compiled.json: ${GAME_ID}/${GAME_ID}_buildings.json # just for invert_requirements.py and other scripts, NOT actually incorprated into gamedata
 	@echo "    ${GAME_ID}_buildings_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
+${BUILT}/${GAME_ID}_map_compiled.json: ${GAME_ID}/${GAME_ID}_map.json # just for invert_requirements.py and other scripts, NOT actually incorprated into gamedata
+	@echo "    ${GAME_ID}_map_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_units_compiled.json: ${GAME_ID}/${GAME_ID}_units.json # just for invert_requirements.py and other scripts, NOT actually incorprated into gamedata
 	@echo "    ${GAME_ID}_units_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_tech_compiled.json: ${GAME_ID}/${GAME_ID}_tech.json # just for invert_requirements.py and other scripts, NOT actually incorprated into gamedata
