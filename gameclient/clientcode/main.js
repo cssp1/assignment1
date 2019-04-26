@@ -38604,7 +38604,7 @@ function apply_dialog_hacks(dialog, _tip, consequent_context) {
                 dialog.modal = true;
                 change_selection_ui(dialog);
                 var close_cb = (function (_dialog) { return function() { change_selection_ui(null); }; })(dialog);
-                SPVideoWidget.init(SPVideoWidget.make_youtube_url(_hack['youtube_id']), close_cb);
+                SPVideoWidget.init_youtube(SPVideoWidget.make_youtube_url(_hack['youtube_id']), close_cb);
             }; })(old_cb, hack);
             var wname = hack['widget'] || 'ok_button';
             dialog.widgets[wname].onclick = new_cb;

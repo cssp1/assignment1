@@ -12,15 +12,15 @@ goog.require('GameArt');
 
 /** @type {HTMLDivElement|null} */
 SPVideoWidget.div = null;
-/** @type {HTMLIFrameElement|null} */
-SPVideoWidget.iframe = null;
 /** @type {HTMLImageElement|null} */
 SPVideoWidget.close_button = null;
 /** @type {function()|null} */
 SPVideoWidget.onclose = null;
 
 /** @param {string} key
-    @return {string} */
+    @return {string}
+    Given a YouTube video key name like "34gGxdfsdf", construct the URL string to bring up that video in an embedded player.
+*/
 SPVideoWidget.make_youtube_url = function(key) {
     var ret = 'http://www.youtube.com/embed/'+key+'?html5=1&autoplay=1&enablejsapi=1&hd=1&modestbranding=1&rel=0&theme=dark';
     if(spin_server_host != 'localhost') {
@@ -29,9 +29,10 @@ SPVideoWidget.make_youtube_url = function(key) {
     return ret;
 };
 
-/** @param {string} video_url
-    @param {function()} onclose */
-SPVideoWidget.init = function(video_url, onclose) {
+/** @param {function()} onclose
+    Internal function - this sets up an HTML div to hold a video player on top of the game window.
+ */
+SPVideoWidget._init_div = function(onclose) {
     SPVideoWidget.onclose = onclose;
 
     SPVideoWidget.div = /** @type {HTMLDivElement} */ (document.createElement('div'));
@@ -56,21 +57,10 @@ SPVideoWidget.init = function(video_url, onclose) {
 
     //SPVideoWidget.div.style.align = 'center';
     //SPVideoWidget.div.style.textAlign = 'center';
+};
 
-    if(1) {
-        SPVideoWidget.iframe = /** @type {HTMLIFrameElement} */ (document.createElement('iframe'));
-        SPVideoWidget.iframe.allowfullscreen = true;
-        SPVideoWidget.iframe.allowscriptaccess = true;
-        SPVideoWidget.iframe.frameborder = '0';
-        SPVideoWidget.iframe.style.position = 'relative';
-        SPVideoWidget.iframe.style.top = '30px';
-        SPVideoWidget.iframe.style.left = '48px';
-        SPVideoWidget.iframe.style.width = '640px';
-        SPVideoWidget.iframe.style.height = '360px';
-        SPVideoWidget.iframe.src = video_url;
-        SPVideoWidget.div.appendChild(SPVideoWidget.iframe);
-    }
-
+/** Internal function - add close button and finalize the video player div for display. */
+SPVideoWidget._init_finish = function() {
     SPVideoWidget.close_button = /** @type {HTMLImageElement} */ (document.createElement('img'));
     SPVideoWidget.close_button.crossOrigin = 'Anonymous';
     SPVideoWidget.close_button.src = GameArt.art_url(gamedata['art']['close_button']['states']['normal']['images'][0], false);
@@ -90,4 +80,49 @@ SPVideoWidget.init = function(video_url, onclose) {
     SPVideoWidget.div.appendChild(SPVideoWidget.close_button);
 
     document.body.appendChild(SPVideoWidget.div);
+};
+
+/** @param {string} video_url
+    @param {function()} onclose
+
+    Start up a video player div featuring an embedded YouTube player.
+*/
+SPVideoWidget.init_youtube = function(video_url, onclose) {
+
+    SPVideoWidget._init_div(onclose);
+
+    var iframe = /** @type {HTMLIFrameElement} */ (document.createElement('iframe'));
+    iframe.allowfullscreen = true;
+    iframe.allowscriptaccess = true;
+    iframe.frameborder = '0';
+    iframe.style.position = 'relative';
+    iframe.style.top = '30px';
+    iframe.style.left = '48px';
+    iframe.style.width = '640px';
+    iframe.style.height = '360px';
+    iframe.src = video_url;
+    SPVideoWidget.div.appendChild(iframe);
+
+    SPVideoWidget._init_finish();
+};
+
+/** @param {string} gif_url
+    @param {number} gif_width
+    @param {number} gif_height
+    @param {function()} onclose
+
+    Start up a video player div featuring an animated GIF.
+*/
+SPVideoWidget.init_gif = function(gif_url, gif_width, gif_height, onclose) {
+
+    SPVideoWidget._init_div(onclose);
+
+    var image = /** @type {HTMLImageElement} */ (document.createElement('img'));
+    // XXXXXX add CSS style as necessary to center the GIF image
+    //image.style.width = '640px';
+    //image.style.height = '360px';
+    image.src = gif_url;
+    SPVideoWidget.div.appendChild(image);
+
+    SPVideoWidget._init_finish();
 };
