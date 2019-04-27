@@ -1596,7 +1596,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'FACEBOOK_LIKES_CLIENT', 'PRICE_REGION', 'COUNTRY', 'COUNTRY_TIER', 'PRIVACY_CONSENT', 'LOCALE', 'EVENT_TIME', 'ABSOLUTE_TIME', 'TIME_OF_DAY', 'BROWSER_HARDWARE', 'BROWSER_STANDALONE_MODE',
                    'BROWSER_OS', 'BROWSER_NAME', 'BROWSER_VERSION', 'SELECTED', 'REGION_MAP_SELECTED', 'SQUAD_IS_MOVING', 'SQUAD_IS_DEPLOYED', 'SQUAD_LOCATION', 'UI_CLEAR', 'QUEST_CLAIMABLE', 'HOME_BASE', 'HAS_ATTACKED', 'HAS_DEPLOYED',
                    'PRE_DEPLOY_UNITS', 'DIALOG_OPEN', 'FOREMAN_IS_BUSY', 'GAMEBUCKS_BALANCE', 'INVENTORY', 'HAS_ITEM', 'HAS_ITEM_SET', 'HOME_REGION', 'REGION_PROPERTY', 'LADDER_PLAYER',
-                   'HOSTILE_UNIT_NEAR', 'HOSTILE_UNIT_EXISTS',
+                   'HOSTILE_UNIT_NEAR', 'HOSTILE_UNIT_EXISTS', 'DAY_OF_WEEK',
                    'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AURA_INACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE', 'USING_TITLE', 'PLAYER_LEVEL',
                    'PURCHASED_RECENTLY', 'SESSION_LENGTH_TREND', 'ARMY_SIZE',
                    'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE', 'BASE_TYPE', 'BASE_RICHNESS', 'QUERY_STRING',
@@ -1661,6 +1661,10 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
 #            if 'trophy_pvp' in pred['event_kind']:
 #                error |= 1
 #                print '%s: EVENT_TIME predicate uses incorrect kind "%s" - it should be pvp not pve' % (reason, pred['event_kind'])
+    elif pred['predicate'] == 'DAY_OF_WEEK':
+        if pred.get('day',None) not in ['1','2','3','4','5','6','7']:
+            error |= 1
+            print '%s: %s predicate refers to invalid day %s. Must be a number from 1 to 7, (1=Monday, 7=Sunday)' % (reason, pred['predicate'], pred.get('day','MISSING'))
     elif pred['predicate'] == 'TECH_LEVEL':
         if pred.get('tech',None) not in gamedata['tech']:
             error |= 1

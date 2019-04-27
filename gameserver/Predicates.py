@@ -779,6 +779,18 @@ class TimeOfDayPredicate(Predicate):
         if self.hour_range[1] >= 0 and gmt.tm_hour > self.hour_range[1]: return False
         return True
 
+class DayOfWeekPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.day = data['day']
+    def is_satisfied(self, player, qdata):
+        et = player.get_absolute_time()
+        if et is None: return False
+        gmt = time.gmtime(et)
+        today = time.strftime("%u", gmt)
+        if self.day != today: return False
+        return True
+
 class HasAttackedPredicate(Predicate):
     def is_satisfied2(self, session, player, qdata, override_time = None):
         return session.has_attacked
@@ -1103,6 +1115,8 @@ def read_predicate(data):
         return AbsoluteTimePredicate(data)
     elif kind == 'TIME_OF_DAY':
         return TimeOfDayPredicate(data)
+    elif kind == 'DAY_OF_WEEK':
+        return DayOfWeekPredicate(data)
     elif kind == 'HAS_ATTACKED':
         return HasAttackedPredicate(data)
     elif kind == 'HAS_DEPLOYED':
