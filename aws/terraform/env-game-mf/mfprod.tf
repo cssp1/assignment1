@@ -94,7 +94,7 @@ data.terraform_remote_state.game_frontend.cloudfront_ingress_security_group_id_l
   game_mail_from = "Valentina"
   tournament_continents = "fb"
   zone_index = 2 # us-east-1d
-  instance_type = "m5.xlarge"
+  instance_type = "m5a.large"
   game_server_snam = "srv0"
 
   # to test alongside legacy server, set snam to "srv2" and make CloudFlare DNS entry "mfprod-srv2.spinpunch.com"
