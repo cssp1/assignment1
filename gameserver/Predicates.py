@@ -787,7 +787,7 @@ class DayOfWeekPredicate(Predicate):
         et = player.get_absolute_time()
         if et is None: return False
         gmt = time.gmtime(et)
-        today = time.strftime("%u", gmt)
+        today = gmt[6] # index 6 of struct_time is the day of the week as an integer. Monday = 0, Tuesday = 1, etc.
         if self.day != today: return False
         return True
 

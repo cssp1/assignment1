@@ -1662,7 +1662,7 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
 #                error |= 1
 #                print '%s: EVENT_TIME predicate uses incorrect kind "%s" - it should be pvp not pve' % (reason, pred['event_kind'])
     elif pred['predicate'] == 'DAY_OF_WEEK':
-        if pred.get('day',None) not in ['1','2','3','4','5','6','7']:
+        if pred.get('day',None) not in [0, 1, 2, 3, 4, 5, 6]:
             error |= 1
             print '%s: %s predicate refers to invalid day %s. Must be a number from 1 to 7, (1=Monday, 7=Sunday)' % (reason, pred['predicate'], pred.get('day','MISSING'))
     elif pred['predicate'] == 'TECH_LEVEL':
