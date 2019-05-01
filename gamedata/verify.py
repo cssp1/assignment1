@@ -3179,7 +3179,7 @@ def check_events(events):
                                               'current_trophy_pve_challenge', # (obsolete) PvE trophy tournament
                                               'current_trophy_pvp_challenge', # PvP point tournament
                                               'current_stat_tournament', # Scores2 stat tournament
-                                              'facebook_sale', 'bargain_sale'
+                                              'facebook_sale', 'bargain_sale', 'weekend_warrior'
                                               ):
             error |= 1; print 'event %s has invalid kind "%s"' % (key, data.get('kind','MISSING'))
         for ASSET in ('console_portrait', 'logo', 'icon'):
