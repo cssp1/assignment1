@@ -138,7 +138,7 @@ resource "aws_instance" "game_server" {
 
   lifecycle = {
     create_before_destroy = true
-    ignore_changes = ["ami", "user_data", "tags", "key_name"] # must manually taint for these changes
+    ignore_changes = ["ami", "user_data", "tags", "key_name", "ebs_optimized"] # must manually taint for these changes
   }
 
   user_data = "${data.template_cloudinit_config.conf.*.rendered[count.index]}"
