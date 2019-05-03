@@ -1123,8 +1123,8 @@ Aura.prototype.apply = function(world, obj) {
             obj.combat_stats.weapon_damage *= (1 + this.strength);
         } else if(code === 'armor_boosted') {
             obj.combat_stats.extra_armor = Math.max(obj.combat_stats.extra_armor, this.strength);
-        } else if(code === 'defense_booster') {
-            // apply the defense_boosted aura to this and nearby units
+        } else if(code.indexOf('defense_booster') === 0) { // this handles both defense_booster and defense_booster_invisible
+            // apply the defense_boosted or defense_boosted_invisible aura to this and nearby units
 
             if(obj.is_destroyed()) {
                 // but don't apply if the booster is dead
@@ -1136,25 +1136,10 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o = obj_list[i].obj;
-                o.create_aura(world, obj.id, obj.team, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
+                o.create_aura(world, obj.id, obj.team, code.replace('booster', 'boosted'), this.strength, new GameTypes.TickCount(1), 0);
             }
-        } else if(code === 'defense_booster_invisible') {
-            // apply the defense_boosted aura to this and nearby units
-
-            if(obj.is_destroyed()) {
-                // but don't apply if the booster is dead
-                return;
-            }
-
-            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
-                                                               gamedata['map']['range_conversion'] * this.range,
-                                                               { only_team: obj.team, mobile_only: true });
-            for(var i = 0; i < obj_list.length; i++) {
-                var o = obj_list[i].obj;
-                o.create_aura(world, obj.id, obj.team, 'defense_boosted_invisible', this.strength, new GameTypes.TickCount(1), 0);
-            }
-        } else if(code === 'damage_booster') {
-            // apply the damage_boosted aura to this and nearby units
+        } else if(code.indexOf('damage_booster') === 0) { // this handles both damage_booster and damage_booster_invisible
+            // apply the damage_boosted or damage_boosted_invisible aura to this and nearby units
 
             if(obj.is_destroyed()) {
                 // but don't apply if the booster is dead
@@ -1166,10 +1151,10 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                o2.create_aura(world, obj.id, obj.team, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
+                o2.create_aura(world, obj.id, obj.team, code.replace('booster', 'boosted'), this.strength, new GameTypes.TickCount(1), 0);
             }
-        }  else if(code === 'damage_booster_invisible') {
-            // apply the damage_boosted aura to this and nearby units
+        } else if(code.indexOf('range_booster') === 0) { // this handles both range_booster and range_booster_invisible
+            // apply the range_boosted or range_boosted_invisible aura to this and nearby units
 
             if(obj.is_destroyed()) {
                 // but don't apply if the booster is dead
@@ -1181,37 +1166,7 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                o2.create_aura(world, obj.id, obj.team, 'damage_boosted_invisible', this.strength, new GameTypes.TickCount(1), 0);
-            }
-        } else if(code === 'range_booster') {
-            // apply the range_boosted aura to this and nearby units
-
-            if(obj.is_destroyed()) {
-                // but don't apply if the booster is dead
-                return;
-            }
-
-            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
-                                                               gamedata['map']['range_conversion'] * this.range,
-                                                               { only_team: obj.team, mobile_only: true });
-            for(var i = 0; i < obj_list.length; i++) {
-                var o2 = obj_list[i].obj;
-                o2.create_aura(world, obj.id, obj.team, 'range_boosted', this.strength, new GameTypes.TickCount(1), 0);
-            }
-        } else if(code === 'range_booster_invisible') {
-            // apply the range_boosted aura to this and nearby units
-
-            if(obj.is_destroyed()) {
-                // but don't apply if the booster is dead
-                return;
-            }
-
-            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
-                                                               gamedata['map']['range_conversion'] * this.range,
-                                                               { only_team: obj.team, mobile_only: true });
-            for(var i = 0; i < obj_list.length; i++) {
-                var o2 = obj_list[i].obj;
-                o2.create_aura(world, obj.id, obj.team, 'range_boosted_invisible', this.strength, new GameTypes.TickCount(1), 0);
+                o2.create_aura(world, obj.id, obj.team, code.replace('booster', 'boosted'), this.strength, new GameTypes.TickCount(1), 0);
             }
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
