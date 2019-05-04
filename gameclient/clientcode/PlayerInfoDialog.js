@@ -495,7 +495,10 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
     dialog.widgets['id_number'].str = user_id.toString();
 
     dialog.widgets['name'].str = PlayerCache.get_ui_name(knowledge);
-    if('real_name' in knowledge && knowledge['real_name'] != dialog.widgets['name'].str) {
+    // note: we're hiding the real name even though the client knows it.
+    // This is for player "comfort" - since the Facebook ID/profile is also known,
+    // players can find the real name that way.
+    if(gamedata['client']['show_player_info_real_name'] && 'real_name' in knowledge && knowledge['real_name'] != dialog.widgets['name'].str) {
         dialog.widgets['name'].str += ' ('+knowledge['real_name']+')';
         dialog.widgets['name_label'].str = dialog.data['widgets']['name_label']['ui_name_alias'];
     } else {
