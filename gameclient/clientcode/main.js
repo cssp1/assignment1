@@ -1086,6 +1086,10 @@ Aura.prototype.apply = function(world, obj) {
         var code = effect['code'];
         if(code === 'speed_boosted') {
             obj.combat_stats.maxvel *= (1 + this.strength);
+        } else if(code === 'speed_weakened') {
+            if(obj.is_mobile()) {
+                obj.combat_stats.maxvel *= Math.max(1 - this.strength, 0);
+            }
         } else if(code === 'defense_boosted') {
             obj.combat_stats.damage_taken *= (1-this.strength);
         } else if(code === 'defense_weakened') {
@@ -2400,11 +2404,28 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
     }
 
     if('applies_aura' in spell) {
-        var aura_name = spell['applies_aura'];
-        var strength = this.get_leveled_quantity(spell['aura_strength'] || 1);
-        var duration = this.get_leveled_quantity(spell['aura_duration'] || -1);
-        var range = this.get_leveled_quantity(spell['aura_range'] || 0);
-        this.create_aura(world, null, null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
+        if(Array.isArray(spell['applies_aura'])) {
+            for (i = 0; i < spell['applies_aura'].length; i++) {
+                if(!(typeof spell['applies_aura'][i]['aura_name'] === 'undefined' || spell['applies_aura'][i]['aura_name'] === null)) {
+                    var aura_name = spell['applies_aura'][i]['aura_name']
+                    var strength = this.get_leveled_quantity(spell['applies_aura'][i]['aura_strength'] || 1);
+                    var duration = this.get_leveled_quantity(spell['applies_aura'][i]['aura_duration'] || -1);
+                    var range = this.get_leveled_quantity(spell['applies_aura'][i]['aura_range'] || 0);
+                } else {
+                    var aura_name = spell['applies_aura'][i]
+                    var strength = this.get_leveled_quantity(spell['aura_strength'] || 1);
+                    var duration = this.get_leveled_quantity(spell['aura_duration'] || -1);
+                    var range = this.get_leveled_quantity(spell['aura_range'] || 0);
+                }
+                this.create_aura(world, null, null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
+            }
+        } else {
+            var aura_name = spell['applies_aura'];
+            var strength = this.get_leveled_quantity(spell['aura_strength'] || 1);
+            var duration = this.get_leveled_quantity(spell['aura_duration'] || -1);
+            var range = this.get_leveled_quantity(spell['aura_range'] || 0);
+            this.create_aura(world, null, null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
+        }
     }
 
     if('code' in spell) {
