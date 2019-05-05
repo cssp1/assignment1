@@ -1207,6 +1207,43 @@ def check_item(itemname, spec):
         if 'store_icon' not in spec:
             error |= 1; print '%s: token-like items should have a "store_icon" (for Region Map display)' % (itemname,)
 
+    if spec.get('category') == 'blueprint' and '_tech_L' not in spec['name']:
+        # the script does not validate turret head blueprints or the stinger gunner or elite stinger gunner
+        # the script also completely skips over _tech_Lxx blueprint items
+        skip_name_check = 0
+        if spec['name'][-3:-1] == '_L' or spec['name'][-4:-2] == '_L':
+            skip_name_check = 1
+        if spec['name'] == 'elite_stinger_gunner_blueprint' or spec['name'] == 'stinger_gunner_blueprint':
+            skip_name_check = 1
+        if 'use' not in spec:
+            error |= 1; print '%s: blueprint items should have a "use" key for player history updates' % (itemname,)
+        if 'subconsequents' not in spec['use']:
+            error |= 1; print '%s: blueprint item "use" keys should be an "AND" consequent' % (itemname,)
+        if 'consequent' not in spec['use'] and spec['use']['consequent'] != 'AND':
+            error |= 1; print '%s: blueprint item "use" keys should be an "AND" consequent' % (itemname,)
+        expect_history = spec['name'] + "_unlocked"
+        consequent_errors = 0
+        consequent_error_messages = ""
+        player_history_found = 0
+        blueprint_congrats_found = 0
+        for consequent in spec['use']['subconsequents']:
+            if consequent['consequent'] == 'PLAYER_HISTORY':
+                player_history_found += 1
+                if consequent['key'] != expect_history and not skip_name_check:
+                    consequent_errors += 1
+                    consequent_error_messages += ' PLAYER_HISTORY key for %s blueprint item can only be %s ' % (itemname, expect_history)
+            if consequent['consequent'] == 'INVOKE_BLUEPRINT_CONGRATS':
+                blueprint_congrats_found += 1
+                if consequent['item'] != spec['name'] and not skip_name_check:
+                    consequent_errors += 1
+                    consequent_error_messages += ' INVOKE_BLUEPRINT_CONGRATS item for %s blueprint item can only be %s ' % (itemname, itemname)
+        if consequent_errors > 0:
+            error |= 1; print '%s' % (consequent_error_messages,)
+        if player_history_found == 0:
+            error |= 1; print '%s: blueprint item "use" keys should contain a PLAYER_HISTORY consequent' % (itemname,)
+        if blueprint_congrats_found == 0:
+            error |= 1; print '%s: blueprint item "use" keys should contain a INVOKE_BLUEPRINT_CONGRATS consequent' % (itemname,)
+
     if 'requires' in spec:
         error |= check_predicate(spec['requires'], reason = 'item %s: requires' % itemname)
 
