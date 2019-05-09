@@ -110,17 +110,19 @@ SPVideoWidget.init_youtube = function(video_url, onclose) {
     @param {number} gif_width
     @param {number} gif_height
     @param {function()} onclose
+    @param {number} gif_margin
 
     Start up a video player div featuring an animated GIF.
 */
-SPVideoWidget.init_gif = function(gif_url, gif_width, gif_height, onclose) {
+SPVideoWidget.init_gif = function(gif_url, gif_width, gif_height, gif_margin, onclose) {
 
     SPVideoWidget._init_div(onclose);
 
     var image = /** @type {HTMLImageElement} */ (document.createElement('img'));
     // XXXXXX add CSS style as necessary to center the GIF image
-    //image.style.width = '640px';
-    //image.style.height = '360px';
+    image.style.width = '620px';
+    image.style.height = '373px';
+    image.style.margin = '25px 52px 52px 52px';
     image.src = gif_url;
     SPVideoWidget.div.appendChild(image);
 
