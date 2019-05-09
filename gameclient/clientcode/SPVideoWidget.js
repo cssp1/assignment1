@@ -119,7 +119,6 @@ SPVideoWidget.init_gif = function(gif_url, gif_width, gif_height, gif_margin, on
     SPVideoWidget._init_div(onclose);
 
     var image = /** @type {HTMLImageElement} */ (document.createElement('img'));
-    // XXXXXX add CSS style as necessary to center the GIF image
     image.style.width = '620px';
     image.style.height = '373px';
     image.style.margin = '25px 52px 52px 52px';
