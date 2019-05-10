@@ -594,6 +594,17 @@ if __name__ == '__main__':
         if player.get('facebook_permissions',None):
             print fmt % ('Facebook perms:', string.join(player['facebook_permissions'],','))
 
+        if user.get('last_login_time', -1) > 0:
+            if time_now - user['last_login_time'] < 3600:
+                ago_str = '%.1f minutes ago' % ((time_now - user['last_login_time'])/60.0)
+            elif time_now - user['last_login_time'] < 86400:
+                ago_str = '%.1f hours ago' % ((time_now - user['last_login_time'])/3600.0)
+            else:
+                ago_str = '%.1f days ago' % ((time_now - user['last_login_time'])/86400.0)
+            ago_str = pretty_print_time(time_now - user['last_login_time'])
+            last_login_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(user['last_login_time']))
+            print fmt % ('Last Login Time:', '%s (%s ago)' % (last_login_str, ago_str))
+
         if 'last_login_ip' in user:
             print fmt % ('Last IP:', user['last_login_ip'])
 
