@@ -6840,9 +6840,16 @@ player.squads_enabled = function() { return read_predicate({'predicate':'LIBRARY
 
 /** Get an over-rideable setting from territory.json
     @param {string} name
+    @param {?=} default_value
     @return {?} */
-player.get_territory_setting = function(name) {
-    var ret = gamedata['territory'][name] || false;
+player.get_territory_setting = function(name, default_value) {
+    if(typeof default_value === 'undefined') {
+        default_value = false;
+    }
+    var ret = default_value;
+    if(name in gamedata['territory']) {
+        ret = gamedata['territory'][name];
+    }
     if(session.region && session.region.data && (name in session.region.data)) {
         ret = session.region.data[name];
     }

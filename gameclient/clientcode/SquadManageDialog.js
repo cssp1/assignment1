@@ -30,6 +30,7 @@ SquadManageDialog.invoke_squad_manage = function(squad_id) {
     dialog.user_data['squad_scroll_goal'] = 0;
     dialog.user_data['squad_scroll_limits'] = [0,0];
     dialog.user_data['last_unit_specname'] = null; // for dripper speedup/slowdown, keep track of last unit manipulated
+    dialog.user_data['open_time'] = client_time;
 
     install_child_dialog(dialog);
     dialog.auto_center();
@@ -101,6 +102,13 @@ SquadManageDialog.invoke_squad_manage = function(squad_id) {
     };
 
     dialog.widgets['recall_button'].onclick = function(w) {
+        // auto-clicker detection
+        if(client_time - w.parent.user_data['open_time'] < gamedata['client']['ui_latency_threshold']) {
+            metric_event('3974_ui_latency',
+                         {'latency': client_time - w.parent.user_data['open_time'],
+                          'method': 'SquadManageDialog:recall_button'});
+        }
+
         var squad_data = w.parent.user_data['squad'];
         player.squad_recall(squad_data['id']);
     };
@@ -707,7 +715,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     var is_nosql_region = (session.region.data && session.region.data['storage'] == 'nosql') && session.region.map_enabled();
 
     dialog.widgets['find_on_map_button'].show = squad_is_deployed;
-    dialog.widgets['recall_button'].show = (squad_is_deployed); // && !squad_is_moving);
+    dialog.widgets['recall_button'].show = squad_is_deployed && player.get_territory_setting('enable_recall_button', true);
     dialog.widgets['halt_button'].show = false; // (squad_is_deployed && squad_is_moving);
     dialog.widgets['disband_button'].show = !squad_is_deployed && SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']);
     dialog.widgets['deploy_button'].show = !squad_is_deployed && (squad_units.length > 0) && SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']);
