@@ -29,7 +29,8 @@ def metrics_schema(sql_util): return {
               [('code', 'INT4 NOT NULL'),
                ('event_name', 'VARCHAR(128)'),
                ('spec', 'VARCHAR(128)'),
-               ('stack', 'INT4')
+               ('stack', 'INT4'),
+               ('method', 'VARCHAR(128)'),
                ],
     'indices': {'by_time': {'keys': [('time','ASC')]}}
     }
@@ -97,7 +98,9 @@ if __name__ == '__main__':
                        ('time',row['time']),
                        ('user_id',row['user_id']),
                        ('code',row['code']),
-                       ('event_name',row['event_name'])]
+                       ('event_name',row['event_name']),
+                       ('method',row.get('method', None)),
+                       ]
 
             if 'sum' in row:
                 if row['sum'].get('developer', False): continue
@@ -168,6 +171,9 @@ if __name__ == '__main__':
                 # "stack" = the defending player ID
                 keyvals.append(('spec', '%.2f' % row.get('latency',-1.0)))
                 keyvals.append(('stack', row.get('defender_id')))
+
+            elif row['event_name'] == '3974_ui_latency':
+                keyvals.append(('spec', '%.4f' % row.get('latency',-1.0)))
 
             elif row['event_name'] in ('0113_account_deauthorized',
                                        '0140_tutorial_oneway_ticket',
