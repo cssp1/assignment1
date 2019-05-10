@@ -1124,6 +1124,7 @@ def check_item_set(setname, spec):
     return error
 
 level_re = re.compile(r'(?P<root>.+)_L(?P<level>[0-9]+)(_SHOOT)?$')
+simple_level_re = re.compile(r'(?P<root>.+)_L(?P<level>[0-9]+)$')
 pct_equip_re = re.compile(r'_(?P<pct>[0-9]+)pct_equip')
 
 def check_item(itemname, spec):
@@ -1206,6 +1207,45 @@ def check_item(itemname, spec):
     if spec.get('category') == 'token':
         if 'store_icon' not in spec:
             error |= 1; print '%s: token-like items should have a "store_icon" (for Region Map display)' % (itemname,)
+
+    elif spec.get('category') == 'blueprint' and '_tech_L' not in spec['name']:
+        # Check blueprints that unlock access to tech levels.
+        # the script does not validate turret head blueprints or the stinger gunner or elite stinger gunner
+        # the script also completely skips over _tech_Lxx blueprint items
+        # "name_check" means we will be looking for a particular PLAYER_HISTORY key to be set
+        enable_name_check = True
+        if simple_level_re.match(spec['name']):
+            # this blueprint is for a "main" tech and won't have an associated history key, so don't bother looking for one
+            enable_name_check = False
+        elif spec['name'] in ('elite_stinger_gunner_blueprint', 'stinger_gunner_blueprint'):
+            # special-case some legacy items that have inconsistent names
+            enable_name_check = False
+        if spec['use'].get('consequent') != 'AND':
+            error |= 1; print '%s: blueprint items should have a "use" key for player history updates' % (itemname,)
+        error |= check_consequent(spec['use'])
+        expect_history = spec['name'] + "_unlocked"
+        consequent_error_messages = []
+        player_history_found = False
+        blueprint_congrats_found = False
+        for consequent in spec['use']['subconsequents']:
+            # check that the item will set the expected player history key and invoke the appropriate "blueprint congrats" screen upon usage
+            if consequent['consequent'] == 'PLAYER_HISTORY':
+                player_history_found = True
+                if consequent['key'] != expect_history and enable_name_check:
+                    consequent_error_messages.append('PLAYER_HISTORY key for %s blueprint item can only be %s' % (itemname, expect_history))
+            elif consequent['consequent'] == 'INVOKE_BLUEPRINT_CONGRATS':
+                blueprint_congrats_found = True
+                if consequent['item'] != spec['name'] and enable_name_check:
+                    consequent_error_messages.append('INVOKE_BLUEPRINT_CONGRATS item for %s blueprint item can only be %s' % (itemname, itemname))
+        if consequent_error_messages:
+            error |= 1; print ', '.join(consequent_error_messages)
+        if gamedata['game_id'] in ('bfm',):
+            # BFM still uses buildings, not techs, for turrets, but has blueprints
+            blueprint_congrats_found = True
+        if not player_history_found:
+            error |= 1; print '%s: blueprint item "use" keys must contain a PLAYER_HISTORY consequent, the key for which must be %s' % (itemname,expect_history)
+        if not blueprint_congrats_found:
+            error |= 1; print '%s: blueprint item "use" keys should contain an INVOKE_BLUEPRINT_CONGRATS consequent' % (itemname,)
 
     if 'requires' in spec:
         error |= check_predicate(spec['requires'], reason = 'item %s: requires' % itemname)
