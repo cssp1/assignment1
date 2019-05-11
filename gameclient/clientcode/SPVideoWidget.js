@@ -115,12 +115,14 @@ SPVideoWidget.init_youtube = function(video_url, onclose) {
     Start up a video player div featuring an animated GIF.
 */
 SPVideoWidget.init_gif = function(gif_url, gif_width, gif_height, gif_margin, onclose) {
+    gif_width += "px"
+    gif_height += "px"
 
     SPVideoWidget._init_div(onclose);
 
     var image = /** @type {HTMLImageElement} */ (document.createElement('img'));
-    image.style.width = '620px';
-    image.style.height = '373px';
+    image.style.width = gif_width;
+    image.style.height = gif_height;
     image.style.margin = '25px 52px 52px 52px';
     image.src = gif_url;
     SPVideoWidget.div.appendChild(image);
