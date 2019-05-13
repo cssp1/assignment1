@@ -2086,6 +2086,14 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
                 error |= 1; print '%s: INVOKE_VIDEO_WIDGET using parameter "gif_url" requires parameter "gif_width"' % (reason,)
             elif 'gif_height' not in cons:
                 error |= 1; print '%s: INVOKE_VIDEO_WIDGET using parameter "gif_url" requires parameter "gif_height"' % (reason,)
+            if cons['gif_width'] > 736:
+                error |= 1; print '%s: INVOKE_VIDEO_WIDGET parameter "gif_width" cannot be higher than 736, currently set to %s' % (reason,str(cons['gif_width']))
+            elif cons['gif_width'] < 1:
+                error |= 1; print '%s: INVOKE_VIDEO_WIDGET parameter "gif_width" cannot be lower than 1, currently set to %s' % (reason,str(cons['gif_width']))
+            if cons['gif_height'] > 423:
+                error |= 1; print '%s: INVOKE_VIDEO_WIDGET parameter "gif_height" cannot be higher than 423, currently set to %s' % (reason,str(cons['gif_height']))
+            elif cons['gif_height'] < 1:
+                error |= 1; print '%s: INVOKE_VIDEO_WIDGET parameter "gif_height" cannot be lower than 1, currently set to %s' % (reason,str(cons['gif_height']))
 
     elif cons['consequent'] == 'INVOKE_MISSIONS_DIALOG':
         if ('select_mission' in cons) and (cons['select_mission'] not in gamedata['quests']):
