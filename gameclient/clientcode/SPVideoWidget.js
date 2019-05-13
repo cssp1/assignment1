@@ -117,31 +117,31 @@ SPVideoWidget.init_youtube = function(video_url, onclose) {
 SPVideoWidget.init_gif = function(gif_url, gif_width, gif_height, gif_margin, onclose) {
     // window width and height are hard-coded due to the background image used in _init_div
     // they are included here for computing the margins
-    window_width = 736
-    window_height = 423
+    var window_width = 736;
+    var window_height = 423;
     // left and right margins together are the difference between the window width and the gif width
     // the value is halved to keep the gif centered
-    left_margin = (window_width - gif_width) / 2
+    var left_margin = (window_width - gif_width) / 2;
     // concatonate the value into a string with 'px' after the integer for css compliance
-    left_margin += "px"
-    right_margin = left_margin
+    var left_margin_str = left_margin.toString() + "px";
+    var right_margin_str = left_margin_str;
     // top and bottom margins together are the difference between the window height and the gif height
     // the value is halved to keep the gif centered
-    top_margin = (window_height - gif_height) / 2
+    var top_margin = (window_height - gif_height) / 2;
     // concatonate the value into a string with 'px' after the integer for css compliance
-    top_margin += "px"
-    bottom_margin = top_margin
+    var top_margin_str = top_margin.toString() + "px";
+    var bottom_margin_str = top_margin_str
     // concatonate margin values with spaces between each in the order specified by css specs
-    gif_margin = top_margin + " " + right_margin + " " + bottom_margin + " " + left_margin
+    var gif_margin_str = top_margin_str + " " + right_margin_str + " " + bottom_margin_str + " " + left_margin_str
     // concatonate gif width and height with 'px' for css compliance
-    gif_width += "px"
-    gif_height += "px"
+    var gif_width_str = gif_width.toString() + "px";
+    var gif_height_str = gif_height.toString() + "px";
     SPVideoWidget._init_div(onclose);
 
     var image = /** @type {HTMLImageElement} */ (document.createElement('img'));
-    image.style.width = gif_width;
-    image.style.height = gif_height;
-    image.style.margin = gif_margin;
+    image.style.width = gif_width_str;
+    image.style.height = gif_height_Str;
+    image.style.margin = gif_margin_str;
     image.src = gif_url;
     SPVideoWidget.div.appendChild(image);
 
