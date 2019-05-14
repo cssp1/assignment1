@@ -114,7 +114,7 @@ SPVideoWidget.init_youtube = function(video_url, onclose) {
 
     Start up a video player div featuring an animated GIF.
 */
-SPVideoWidget.init_gif = function(gif_url, gif_width, gif_height, gif_margin, onclose) {
+SPVideoWidget.init_gif = function(gif_url, gif_width, gif_height, onclose) {
     // window width and height are hard-coded due to the background image used in _init_div
     // they are included here for computing the margins
     var window_width = 736;
@@ -140,7 +140,7 @@ SPVideoWidget.init_gif = function(gif_url, gif_width, gif_height, gif_margin, on
 
     var image = /** @type {HTMLImageElement} */ (document.createElement('img'));
     image.style.width = gif_width_str;
-    image.style.height = gif_height_Str;
+    image.style.height = gif_height_str;
     image.style.margin = gif_margin_str;
     image.src = gif_url;
     SPVideoWidget.div.appendChild(image);
