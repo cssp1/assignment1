@@ -71,7 +71,7 @@ jobs:
           command: |
             docker build -t make-gameclient -f Dockerfile-make-gameclient .
       - run:
-          name: Run make-gamedata
+          name: Run make-gameclient
           command:
             docker run --rm make-gameclient:latest
 
