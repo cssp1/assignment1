@@ -110,7 +110,6 @@ SPVideoWidget.init_youtube = function(video_url, onclose) {
     @param {number} gif_width
     @param {number} gif_height
     @param {function()} onclose
-    @param {number} gif_margin
 
     Start up a video player div featuring an animated GIF.
 */
