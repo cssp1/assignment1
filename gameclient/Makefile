@@ -96,7 +96,7 @@ CLOSURE_LIB_FILES:= --js='google/third_party/closure/goog/mochikit/async/*.js' \
  --js='!google/closure/goog/ui/**'
 
 compiled-client.js: clientcode/*.js
-	@java -client -jar google/compiler.jar \
+	@(java -client -jar google/compiler.jar \
 		--language_in=ECMASCRIPT6_STRICT \
 		--language_out=ECMASCRIPT5 \
 		--dependency_mode=STRICT \
@@ -113,9 +113,15 @@ compiled-client.js: clientcode/*.js
 		--create_renaming_reports \
 		${CHECK_FLAGS} ${OPT_FLAGS} \
 		--output_manifest=%outname%_manifest.out \
-		--js_output_file=$@ || (rm -f $@ *.out *.date; false) # clean up on failure
+		--js_output_file=$@ 2>&1 \
+		| tee /dev/tty | grep -q '0 error(s), 0 warning(s)') \
+		|| (rm -f $@ *.out *.date; false) # clean up on failure
 	@echo "var gameclient_build_date = \"${BUILD_DATE}\";" >> $@
 	@echo "${BUILD_DATE}" > $@.date
+
+# note: the tee | grep pattern above causes the java command to emit a nonzero exit code
+# when its output does NOT include "0 error(s), 0 warning(s)". tee is used to send stdout+stderr
+# to the console output while also sending it along the pipe to grep.
 
 # variant of the build with experimental Closure compiler checks
 check: clientcode/*.js

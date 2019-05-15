@@ -211,6 +211,9 @@
         "predict_squad_assign": 1, // enable client-side prediction for SQUAD_ASSIGN/UNASSIGN_UNIT
         "squad_manage_dripper": 1, // enable click-and-hold for SQUAD_ASSIGN/UNASSIGN_UNIT
 
+        // UI click latency monitoring - only record successive events closer than this many seconds
+        "ui_latency_threshold": 2.5,
+
         // if true, ALWAYS shove the Missions dialog in the player's face and "click here" on the "Claim" button
         // as soon as any quest is completable, even the one that is not tracked!
         "always_auto_complete_quests": 0,

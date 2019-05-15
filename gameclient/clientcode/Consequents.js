@@ -843,13 +843,20 @@ OpenURLConsequent.prototype.execute = function(state) {
   * @extends Consequent */
 function InvokeVideoWidgetConsequent(data) {
     goog.base(this, data);
-    this.youtube_id = data['youtube_id'];
+    this.youtube_id = data['youtube_id'] || null;
+    this.gif_url = data['gif_url'] || null;
+    this.gif_width = data['gif_width'] || 0;
+    this.gif_height = data['gif_height'] || 0;
     this.notification_params = data['notification_params'] || null;
 }
 goog.inherits(InvokeVideoWidgetConsequent, Consequent);
 InvokeVideoWidgetConsequent.prototype.execute = function(state) {
     var cb = (function(_this) { return function() {
-        SPVideoWidget.init(SPVideoWidget.make_youtube_url(_this.youtube_id), function() {});
+        if(_this.youtube_id) {
+            SPVideoWidget.init_youtube(SPVideoWidget.make_youtube_url(_this.youtube_id), function() {});
+        } else if(_this.gif_url) {
+            SPVideoWidget.init_gif(_this.gif_url, _this.gif_width, _this.gif_height, function() {});
+        }
     }; })(this);
     if(this.notification_params !== null) {
         notification_queue.push(cb, this.notification_params);

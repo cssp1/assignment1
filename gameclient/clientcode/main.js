@@ -6861,9 +6861,16 @@ player.squads_enabled = function() { return read_predicate({'predicate':'LIBRARY
 
 /** Get an over-rideable setting from territory.json
     @param {string} name
+    @param {?=} default_value
     @return {?} */
-player.get_territory_setting = function(name) {
-    var ret = gamedata['territory'][name] || false;
+player.get_territory_setting = function(name, default_value) {
+    if(typeof default_value === 'undefined') {
+        default_value = false;
+    }
+    var ret = default_value;
+    if(name in gamedata['territory']) {
+        ret = gamedata['territory'][name];
+    }
     if(session.region && session.region.data && (name in session.region.data)) {
         ret = session.region.data[name];
     }
@@ -38625,7 +38632,7 @@ function apply_dialog_hacks(dialog, _tip, consequent_context) {
                 dialog.modal = true;
                 change_selection_ui(dialog);
                 var close_cb = (function (_dialog) { return function() { change_selection_ui(null); }; })(dialog);
-                SPVideoWidget.init(SPVideoWidget.make_youtube_url(_hack['youtube_id']), close_cb);
+                SPVideoWidget.init_youtube(SPVideoWidget.make_youtube_url(_hack['youtube_id']), close_cb);
             }; })(old_cb, hack);
             var wname = hack['widget'] || 'ok_button';
             dialog.widgets[wname].onclick = new_cb;
