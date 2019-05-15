@@ -136,11 +136,11 @@ check: clientcode/*.js
 		--warning_level=VERBOSE \
 		${CHECK_FLAGS} ${OPT_FLAGS} \
 		--js_output_file=/dev/null 2>&1 \
-		| tee /dev/tty | grep -q '0 error(s), 0 warning(s)'
+		| tee /dev/stderr | grep -q '0 error(s), 0 warning(s)'
 
 # note: the tee | grep pattern above causes the java command to emit a nonzero exit code
-# when its output does NOT include "0 error(s), 0 warning(s)". tee is used to send stdout+stderr
-# to the console output while also sending it along the pipe to grep.
+# when its output does NOT include "0 error(s), 0 warning(s)". tee is used to echo the
+# compiler's stdout+stderr to the console-visible output while also sending it along the pipe to grep.
 
 # To find SpinPunch code that is not type-safe yet:
 # grep reportUnknownTypes.*XXX clientcode/*.js
