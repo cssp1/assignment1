@@ -96,7 +96,7 @@ CLOSURE_LIB_FILES:= --js='google/third_party/closure/goog/mochikit/async/*.js' \
  --js='!google/closure/goog/ui/**'
 
 compiled-client.js: clientcode/*.js
-	@(java -client -jar google/compiler.jar \
+	@java -client -jar google/compiler.jar \
 		--language_in=ECMASCRIPT6_STRICT \
 		--language_out=ECMASCRIPT5 \
 		--dependency_mode=STRICT \
@@ -113,20 +113,14 @@ compiled-client.js: clientcode/*.js
 		--create_renaming_reports \
 		${CHECK_FLAGS} ${OPT_FLAGS} \
 		--output_manifest=%outname%_manifest.out \
-		--js_output_file=$@ 2>&1 \
-		| tee /dev/tty | grep -q '0 error(s), 0 warning(s)') \
+		--js_output_file=$@ \
 		|| (rm -f $@ *.out *.date; false) # clean up on failure
 	@echo "var gameclient_build_date = \"${BUILD_DATE}\";" >> $@
 	@echo "${BUILD_DATE}" > $@.date
 
-# note: the tee | grep pattern above causes the java command to emit a nonzero exit code
-# when its output does NOT include "0 error(s), 0 warning(s)". tee is used to send stdout+stderr
-# to the console output while also sending it along the pipe to grep.
-
 # variant of the build with experimental Closure compiler checks
 check: clientcode/*.js
 	@java -client -jar google/compiler.jar \
-		--new_type_inf \
 		--language_in=ECMASCRIPT6_STRICT \
 		--language_out=ECMASCRIPT5 \
 		--dependency_mode=STRICT \
@@ -140,7 +134,13 @@ check: clientcode/*.js
 		--compilation_level=ADVANCED \
 		--summary_detail_level=2 \
 		--warning_level=VERBOSE \
-		--js_output_file=/dev/null 2>&1 | ./filter_closure_warnings.py
+		${CHECK_FLAGS} ${OPT_FLAGS} \
+		--js_output_file=/dev/null 2>&1 \
+		| tee /dev/stderr | grep -q '0 error(s), 0 warning(s)'
+
+# note: the tee | grep pattern above causes the java command to emit a nonzero exit code
+# when its output does NOT include "0 error(s), 0 warning(s)". tee is used to echo the
+# compiler's stdout+stderr to the console-visible output while also sending it along the pipe to grep.
 
 # To find SpinPunch code that is not type-safe yet:
 # grep reportUnknownTypes.*XXX clientcode/*.js

@@ -92,27 +92,32 @@ class AntiRefreshPolicy(Policy):
         elif repeat_offender_level >= 2:
             # full punishment - removal from region and banishment
 
-            cur_region = gamedata['regions'][cur_region_name]
-            cur_continent_id = cur_region.get('continent_id',None)
+            if cur_region_name:
+                cur_region = gamedata['regions'][cur_region_name]
+                cur_continent_id = cur_region.get('continent_id',None)
 
-            # find pro-refresh regions in the same continent
-            pro_refresh_regions = filter(lambda x: not is_anti_refresh_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
+                # find pro-refresh regions in the same continent
+                pro_refresh_regions = filter(lambda x: not is_anti_refresh_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
 
-            assert len(pro_refresh_regions) >= 1
+                assert len(pro_refresh_regions) >= 1
 
-            # pick any pro-refresh region (which will usually be prison)
-            candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
-                                       x.get('open_join',1) and x.get('enable_map',1) and \
-                                       not x.get('developer_only',0),
-                                       pro_refresh_regions)
-            assert len(candidate_regions) >= 1
-            new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
+                # pick any pro-refresh region (which will usually be prison)
+                candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
+                                           x.get('open_join',1) and x.get('enable_map',1) and \
+                                           not x.get('developer_only',0),
+                                           pro_refresh_regions)
+                assert len(candidate_regions) >= 1
+                new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
 
-            if not self.test:
-                assert new_region['id'] != cur_region_name
+                if not self.test:
+                    assert new_region['id'] != cur_region_name
+
+                message_body = 'Our systems have again detected that you are using a browser plugin or script to manipulate the game, and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our Terms of Service. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (new_region['ui_name'])
+
+            else: # player was not on the map currently
+                message_body = 'Our systems have again detected that you are using a browser plugin or script to manipulate the game, and therefore locked you out of the main map regions due to repeated violations of our Terms of Service. If you would like to appeal your case, please contact support and our team will be able to assist you.'
 
             clear_repeat_stacks = True
-            message_body = 'Our systems have again detected that you are using a browser plugin or script to manipulate the game, and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our Terms of Service. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (new_region['ui_name'])
             do_banish = True
             event_name = '7301_policy_bot_punished'
 
@@ -339,7 +344,7 @@ class IdleCheckAntiRefreshPolicy(AntiRefreshPolicy):
             return # not enough failures to worry about
 
         try:
-            new_region_name = self.punish_player(user_id, player['home_region'])
+            new_region_name = self.punish_player(user_id, player.get('home_region'))
             if self.verbose >= 2:
                 print >> self.msg_fd, 'moved to region %s' % (new_region_name)
 

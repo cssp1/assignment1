@@ -71,9 +71,11 @@ jobs:
           command: |
             docker build -t make-gameclient -f Dockerfile-make-gameclient .
       - run:
-          name: Run make-gameclient
+          # note: the "check" make target returns an error on any
+          # compiler warnings
+          name: Run make-gameclient in "check" mode
           command:
-            docker run --rm make-gameclient:latest
+            docker run --rm make-gameclient:latest make -f Makefile check
 
 workflows:
   version: 2
