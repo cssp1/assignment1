@@ -1302,7 +1302,7 @@ if __name__ == '__main__':
                 slate_match_predicate = {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_kind', 'value': slate_kind or 'UNUSED'}
 
                 # allow enabling individual FLASH SKUs by predicate, outside of normal FLASH whole-slate sale
-                if slate_kind == 'FLASH25' and loot_level in (500,1000,5000,10000,20000) and game_id in ('tr','dv'):
+                if slate_kind in ('FLASH25','FLASH50') and loot_level in (500,1000,5000,10000,20000) and game_id in ('tr','dv'):
 
                     sku_match_predname = 'buy_gamebucks_%s_%d_available' % (slate_kind, loot_level)
                     #print sku_name, sku_match_predname
@@ -1315,7 +1315,7 @@ if __name__ == '__main__':
                     # special on_purchase consequent that fires only when this SKU is selected by predicate
                     sku['on_purchase'] = {'consequent':'IF',
                                           'if': {'predicate': 'LIBRARY', 'name': sku_match_predname},
-                                          'then': {'consequent': 'LIBRARY', 'name': 'buy_gamebucks_%s_%d_on_purchase' % (slate_kind, loot_level)}}
+                                          'then': {'consequent': 'LIBRARY', 'name': 'buy_gamebucks_FLASH_%d_on_purchase' % (loot_level,)}}
 
                     # XXX temporary hack for testing - special version of ui_bonus that adds "Limit 1 per player"
                     if 'ui_bonus' in sku:
