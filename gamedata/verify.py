@@ -861,6 +861,28 @@ def check_spell(spellname, spec):
                 error |= 1
                 print '%s:impact_aura refers to missing aura %s' % (spellname, aura['spec'])
 
+    if 'applies_aura' in spec:
+        if spec.get('activation',None) != 'instant':
+            error |= 1; print '%s: has "applies_aura" in spec but is activated by %s. Only "instant" spells should use "applies_aura"' % (spellname, str(spec.get('activation',None)))
+        if isinstance(spec['applies_aura'], list):
+            # check if working with list parameters properly
+            for aura in spec['applies_aura']:
+                if 'aura_name' not in aura:
+                    error |= 1
+                    print '%s:applies_aura entry does not have "aura_name" value' % (spellname)
+                if aura['aura_name'] not in gamedata['auras']:
+                    error |= 1
+                    print '%s:applies_aura refers to missing aura %s' % (spellname, aura['aura_name'])
+                aura['name'] = aura['aura_name']
+                error |= check_aura('aura:'+aura['aura_name'], aura, 1) # validate the aura entry. Assume maxlevel value of 1
+        elif isinstance(spec['applies_aura'], str):
+            # check if working with string parameters properly
+            if spec['applies_aura'] not in gamedata['auras']:
+                error |= 1
+                print '%s:applies_aura refers to missing aura %s' % (spellname, spec['applies_aura'])
+            this_aura_spec = {'name': spec['applies_aura'], 'aura_strength': spec.get('aura_strength', None), 'aura_duration': spec.get('aura_duration', None)}
+            error |= check_aura('aura:'+spec['applies_aura'], this_aura_spec, 1) # validate the aura data. Assume maxlevel value of 1
+
     if spellname.endswith('_SHOOT') and ('cooldown' not in spec):
         error |= 1
         print '%s is missing a "cooldown"' % (spellname)
