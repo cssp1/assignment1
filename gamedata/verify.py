@@ -862,11 +862,15 @@ def check_spell(spellname, spec):
                 print '%s:impact_aura refers to missing aura %s' % (spellname, aura['spec'])
 
     if 'applies_aura' in spec:
+        # 'auto' and 'targeted' spells may apply auras in the future, but that isn't presently an ideal setup
         if spec.get('activation',None) != 'instant':
             error |= 1; print '%s: has "applies_aura" in spec but is activated by %s. Only "instant" spells should use "applies_aura"' % (spellname, str(spec.get('activation',None)))
+        # spells with an 'applies_aura' can list a signle aura as a string, or be a list of dictionaries
         if isinstance(spec['applies_aura'], list):
-            # check if working with list parameters properly
             for aura in spec['applies_aura']:
+                if not isinstance(aura, dict):
+                    error |= 1
+                    print '%s:applies_aura entry has a list value that is not a dictionary' % (spellname)
                 if 'aura_name' not in aura:
                     error |= 1
                     print '%s:applies_aura entry does not have "aura_name" value' % (spellname)
@@ -876,10 +880,11 @@ def check_spell(spellname, spec):
                 aura['name'] = aura['aura_name']
                 error |= check_aura('aura:'+aura['aura_name'], aura, 1) # validate the aura entry. Assume maxlevel value of 1
         elif isinstance(spec['applies_aura'], str):
-            # check if working with string parameters properly
             if spec['applies_aura'] not in gamedata['auras']:
                 error |= 1
                 print '%s:applies_aura refers to missing aura %s' % (spellname, spec['applies_aura'])
+            # applies_aura string entries get the aura parameters within the spell
+            # this assembles those values into a single spec dictionary for validating the aura 
             this_aura_spec = {'name': spec['applies_aura'], 'aura_strength': spec.get('aura_strength', None), 'aura_duration': spec.get('aura_duration', None)}
             error |= check_aura('aura:'+spec['applies_aura'], this_aura_spec, 1) # validate the aura data. Assume maxlevel value of 1
 
