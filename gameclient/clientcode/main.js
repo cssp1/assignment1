@@ -2405,13 +2405,13 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
 
     if('applies_aura' in spell) {
         if(Array.isArray(spell['applies_aura'])) {
-            for (i = 0; i < spell['applies_aura'].length; i++) {
-                var aura_name = spell['applies_aura'][i]['aura_name']
-                var strength = this.get_leveled_quantity(spell['applies_aura'][i]['aura_strength'] || 1);
-                var duration = this.get_leveled_quantity(spell['applies_aura'][i]['aura_duration'] || -1);
-                var range = this.get_leveled_quantity(spell['applies_aura'][i]['aura_range'] || 0);
+            goog.array.forEach(spell['applies_aura'], function(aura) {
+                var aura_name = aura['aura_name'];
+                var strength = this.get_leveled_quantity(aura['aura_strength'] || 1);
+                var duration = this.get_leveled_quantity(aura['aura_duration'] || -1);
+                var range = this.get_leveled_quantity(aura['aura_range'] || 0);
                 this.create_aura(world, null, null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
-            }
+            }, this);
         } else {
             var aura_name = spell['applies_aura'];
             var strength = this.get_leveled_quantity(spell['aura_strength'] || 1);

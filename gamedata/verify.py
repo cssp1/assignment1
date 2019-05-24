@@ -865,7 +865,7 @@ def check_spell(spellname, spec):
         # 'auto' and 'targeted' spells may apply auras in the future, but that isn't presently an ideal setup
         if spec.get('activation',None) != 'instant':
             error |= 1; print '%s: has "applies_aura" in spec but is activated by %s. Only "instant" spells should use "applies_aura"' % (spellname, str(spec.get('activation',None)))
-        # spells with an 'applies_aura' can list a signle aura as a string, or be a list of dictionaries
+        # spells with an 'applies_aura' can list a single aura as a string, or be a list of dictionaries
         if isinstance(spec['applies_aura'], list):
             for aura in spec['applies_aura']:
                 if not isinstance(aura, dict):
