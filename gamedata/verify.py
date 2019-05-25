@@ -749,7 +749,7 @@ def check_aura(auraname, spec, maxlevel):
                     error |= 1; print '%s: uses a server-side effect code but client != 0' % auraname
 
             # client-side codes (implemented in main.js)
-            elif effect['code'] in ('speed_boosted', 'defense_boosted', 'defense_weakened', 'radiation_hardened',
+            elif effect['code'] in ('speed_boosted', 'speed_weakened', 'defense_boosted', 'defense_weakened', 'radiation_hardened',
                                     'frozen', 'ice_shielded', 'ice_encrusted', 'moving_in_swamp', 'swamp_shielded', 'range_booster_invisible',
                                     'rate_of_fire_boosted', 'damage_boosted', 'range_boosted', 'on_island', 'damage_booster_invisible', 'defense_booster_invisible',
                                     'armor_boosted', 'damage_booster', 'defense_booster', 'stunned', 'disarmed', 'hacked', 'range_reduction', 'weak_zombie',
@@ -860,6 +860,35 @@ def check_spell(spellname, spec):
             if aura['spec'] not in gamedata['auras']:
                 error |= 1
                 print '%s:impact_aura refers to missing aura %s' % (spellname, aura['spec'])
+
+    if 'applies_aura' in spec:
+        # 'auto' and 'targeted' spells may apply auras in the future, but that isn't presently an ideal setup
+        if spec.get('activation',None) != 'instant':
+            error |= 1; print '%s: has "applies_aura" in spec but is activated by %s. Only "instant" spells should use "applies_aura"' % (spellname, str(spec.get('activation',None)))
+        # spells with an 'applies_aura' can list a single aura as a string, or be a list of dictionaries
+        if isinstance(spec['applies_aura'], list):
+            for aura in spec['applies_aura']:
+                if not isinstance(aura, dict):
+                    error |= 1
+                    print '%s:applies_aura entry has a list value that is not a dictionary' % (spellname)
+                if 'aura_name' not in aura:
+                    error |= 1
+                    print '%s:applies_aura entry does not have "aura_name" value' % (spellname)
+                if aura['aura_name'] not in gamedata['auras']:
+                    error |= 1
+                    print '%s:applies_aura refers to missing aura %s' % (spellname, aura['aura_name'])
+                # applies_aura list entries get the aura parameters within the dictionary value of the applies_aura list
+                # this adds defaults to any missing values for validating the aura
+                this_aura_spec = {'name': aura['aura_name'], 'aura_strength': aura.get('aura_strength', 1), 'aura_duration': aura.get('aura_duration', -1), 'aura_range': aura.get('aura_range', 0) }
+                error |= check_aura('aura:'+aura['aura_name'], this_aura_spec, 1) # validate the aura entry. Assume maxlevel value of 1
+        elif isinstance(spec['applies_aura'], str):
+            if spec['applies_aura'] not in gamedata['auras']:
+                error |= 1
+                print '%s:applies_aura refers to missing aura %s' % (spellname, spec['applies_aura'])
+            # applies_aura string entries get the aura parameters within the spell
+            # this assembles those values into a single spec dictionary for validating the aura
+            this_aura_spec = {'name': spec['applies_aura'], 'aura_strength': spec.get('aura_strength', 1), 'aura_duration': spec.get('aura_duration', -1)}
+            error |= check_aura('aura:'+spec['applies_aura'], this_aura_spec, 1) # validate the aura data. Assume maxlevel value of 1
 
     if spellname.endswith('_SHOOT') and ('cooldown' not in spec):
         error |= 1
