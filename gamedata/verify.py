@@ -1545,6 +1545,17 @@ def check_modstat(effect, reason, affects = None,
             for element in entry:
                 error |= check_consequent(element, reason = '%s:strength' % reason)
 
+    # make sure that we don't give unreasonable speed bonuses on permanent (non-boost) items
+    if effect['stat'].endswith('_speed') and effect['method'] == '*=(1+strength)' and \
+       ('strength' in effect) and ('_boost' not in reason):
+        if isinstance(effect['strength'], list):
+            per_level_list = effect['strength']
+        else:
+            per_level_list = [effect['strength']]
+        for entry in per_level_list:
+            if entry > 0.5:
+                error |= 1; print '%s: effect gives an abnormally high bonus (%r) to %s' % (reason, entry, effect['stat'])
+
     if effect['stat'] == 'weapon':
         if effect['strength'] not in gamedata['spells']:
             error |= 1; print '%s: weapon spell "%s" not found' % (reason, effect['strength'])
