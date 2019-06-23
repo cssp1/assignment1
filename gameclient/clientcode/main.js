@@ -25393,8 +25393,6 @@ function update_loot_dialog(dialog) {
 /** @type {!Array.<function()>} list of callbacks listening for INVENTORY_UPDATE */
 var inventory_update_receivers = [];
 
-/** begin inventory system */
-
 /** @param {boolean=} force it to open even away from home */
 function invoke_inventory_dialog(force) {
     if(!player.get_any_abtest_value('enable_inventory', gamedata['enable_inventory'])) { return null; }
@@ -26387,8 +26385,6 @@ function inventory_send_request(item, slot, action, spellargs, options) {
         goog.array.remove(session.home_equip_items, slot);
     }
 }
-
-/** end inventory system */
 
 /** @param {string} item_ui_name
     @param {function(number)} callback */
