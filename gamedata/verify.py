@@ -3902,10 +3902,11 @@ def main(args):
 
     for name, entry in gamedata['strings']['manufacture_categories'].iteritems():
         error |= check_manufacture_category('strings:manufacture_categories:'+name, entry)
-    for name in gamedata['strings']['inventory_categories']:
-        error |= check_inventory_category('strings:inventory_categories:'+name['name'],name)
-    if len(gamedata['strings']['inventory_categories']) > 7:
-        error |= 1; print 'more than 7 inventory_categories entries in strings.json'
+    if 'inventory_categories' in gamedata['strings']:
+        for name in gamedata['strings']['inventory_categories']:
+            error |= check_inventory_category('strings:inventory_categories:'+name['name'],name)
+        if len(gamedata['strings']['inventory_categories']) > 7:
+            error |= 1; print 'more than 7 inventory_categories entries in strings.json'
     for parent_name, parent_cat in gamedata['strings']['research_categories'].iteritems():
         for entry in parent_cat:
             error |= check_research_category('strings:research_categories:'+parent_name+':'+entry['name'], entry)
