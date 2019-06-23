@@ -1022,6 +1022,12 @@ def check_manufacture_category(path, spec):
         error |= check_predicate(spec['show_if'], reason=path+':show_if')
     return error
 
+def check_inventory_category(path, spec):
+    error = 0
+    if 'show_if' in spec:
+        error |= check_predicate(spec['show_if'], reason=path+':show_if')
+    return error
+
 def check_research_category(path, spec):
     error = 0
     if 'show_if' in spec:
@@ -3896,6 +3902,10 @@ def main(args):
 
     for name, entry in gamedata['strings']['manufacture_categories'].iteritems():
         error |= check_manufacture_category('strings:manufacture_categories:'+name, entry)
+    for name in gamedata['strings']['inventory_categories']:
+        error |= check_inventory_category('strings:inventory_categories:'+name['name'],name)
+    if len(gamedata['strings']['inventory_categories']) > 7:
+        error |= 1; print 'more than 7 inventory_categories entries in strings.json'
     for parent_name, parent_cat in gamedata['strings']['research_categories'].iteritems():
         for entry in parent_cat:
             error |= check_research_category('strings:research_categories:'+parent_name+':'+entry['name'], entry)
