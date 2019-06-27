@@ -478,6 +478,17 @@ ItemDisplay.inventory_item_is_refundable = function(item) {
     return (refund !== null);
 };
 
+/** return category for item of given spec
+    @param {Object} spec
+    @returns {string} */
+ItemDisplay.get_inventory_item_category = function(spec) {
+    if('category' in spec) {
+        return spec['category']
+    } else {
+        return 'ALL';
+    };
+};
+
 /** return SPUI.Color corresponding to item rarity
     @param {Object} spec
     @returns {SPUI.Color} */

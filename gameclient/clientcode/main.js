@@ -25063,8 +25063,8 @@ function invoke_loot_dialog(msg) {
     // loot and inventory share init_inventory_grid
     // this adds the 'category' field used for inventory
     // tabs so loot will show all items in inventory
-    dialog.user_data['category'] = 'all';
-    dialog.user_data['category_inventory'] = player.inventory;
+    dialog.user_data['category'] = 'ALL';
+    dialog.user_data['category_inventory'] = Array.from(player.inventory);
     install_child_dialog(dialog);
     global_loot_dialog = dialog;
     dialog.on_destroy = function(dialog) { global_loot_dialog = null; };
@@ -25397,32 +25397,30 @@ var inventory_update_receivers = [];
 function invoke_inventory_dialog(force) {
     if(!player.get_any_abtest_value('enable_inventory', gamedata['enable_inventory'])) { return null; }
     if(!session.home_base && !force) { return null; }
-    // inventory category tabs are disabled by default
-    var show_categories = false;
     // note: assumes the warehouse is already selected
 
-	// checks if inventory categories exist in gamedata, and if so enables/populates them
+    var cat_list = null; // null when in 'ALL' mode, otherwise list of visible entries in gamedata['strings']['inventory_categories']
+    // checks if inventory categories exist in gamedata, and if so enables/populates them
 	if(gamedata['strings']['inventory_categories']) {
 		var entry = gamedata['strings']['inventory_categories'];
-		var cat_list = goog.array.filter(gamedata['strings']['inventory_categories'], function(entry) {
+		cat_list = goog.array.filter(gamedata['strings']['inventory_categories'], function(entry) {
 			if('show_if' in entry && !read_predicate(entry['show_if']).is_satisfied(player, null)) { return false; }
 			return true;
 		});
-        show_categories = true;
     }
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['inventory_dialog']);
     dialog.user_data['dialog'] = 'inventory_dialog';
-    dialog.user_data['category'] = 'all'; // set default category to show all items even if category tabs are disabled
-    dialog.user_data['category_inventory'] = player.inventory;
+    dialog.user_data['category'] = 'ALL'; // set default category to show all items even if category tabs are disabled
+    dialog.user_data['category_inventory'] = Array.from(player.inventory);
     change_selection_ui(dialog);
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
     // turns off the static "Items" label if categories are enabled
-    dialog.widgets['section'].show = !show_categories
+    dialog.widgets['section'].show = (cat_list === null);
 
-    if (show_categories) {
+    if (cat_list) {
         var used = cat_list.length;
     	var i = 0;
         goog.array.forEach(cat_list, function(entry) {
@@ -25431,7 +25429,7 @@ function invoke_inventory_dialog(force) {
             dialog.widgets['category_button'+i.toString()].xy = [x, dialog.data['widgets']['category_button']['xy'][1]];
 
             dialog.widgets['category_button'+i.toString()].str = entry['ui_name'];
-            dialog.widgets['category_button'+i.toString()].onclick = function(w) { inventory_dialog_change_category(dialog, entry['name']); };
+            dialog.widgets['category_button'+i.toString()].onclick = (function (_catname) { return function(w) { inventory_dialog_change_category(dialog, _catname); }; })(entry['name']);
             i++;
             if(i >= dialog.data['widgets']['category_button']['array'][0]) { throw Error('not enough category_button array entries!'); }
         });
@@ -25457,32 +25455,30 @@ function inventory_dialog_change_category(dialog, category) {
         w.text_color = (category === entry['name'] ? SPUI.default_text_color : SPUI.disabled_text_color);
         w.state = (category === entry['name'] ? 'active' : 'normal');
     });
-        // if the category is all, the category_inventory is the player's whole inventory
-    if (category === 'all') {
-        dialog.user_data['category_inventory'] = player.inventory;
+    // if the category is all, the category_inventory is the player's whole inventory
+    if (category === 'ALL') {
+        dialog.user_data['category_inventory'] = Array.from(player.inventory);
     } else {
-        var subcategories = []; // process subcategories as list
+        var show_categories = []; // process subcategories as list
         // checks if category allows subcategories and adds those
-        goog.array.forEach(dialog.user_data['category_list'], function(list, cat) {
-            var check_category = dialog.user_data['category_list'][cat];
-            if (check_category['name'] === category) {
-                if ('subcategories' in check_category) {
-                    subcategories = check_category['subcategories'];
-                }
-            }
+        var check_category = goog.array.find(dialog.user_data['category_list'], function(entry){
+            return entry['name'] == category;
         });
-        subcategories.push(category); // the category is always added into the subcategories list
+        if ('show_categories' in check_category) {
+            show_categories = check_category['show_categories'];
+        };
+        show_categories.push(category); // the category is always added into the subcategories list as a redundancy
         var category_inventory = [];
         goog.array.forEach(player.inventory, function(inventory, slot) {
-            var item = player.inventory[slot];
-            var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
-            if(subcategories.includes(spec['category'])){
-                // subcategories is always checked as a list
-                // all items in the player's inventory matching the subcategories are sent back to the dialog
+            var item = player.inventory[slot]
+            var spec = gamedata['items'][item['spec']]
+            var item_category = ItemDisplay.get_inventory_item_category(spec);
+            if(show_categories.includes(item_category)){
+                // subcategories is always checked as a list even if it's only one category
                 category_inventory.push(item);
             }
         });
-        dialog.user_data['category_inventory'] = category_inventory;
+        dialog.user_data['category_inventory'] = category_inventory; // all items in the player's inventory matching the subcategories are sent back to the dialog
     }
 }
 
@@ -25508,7 +25504,7 @@ function update_inventory_grid(dialog) {
     var category_inventory = dialog.user_data['category_inventory'];
 
     var provides = gamedata['buildings'][gamedata['inventory_building']]['provides_inventory'];
-    var max_possible_slots = Math.max((typeof(provides) === 'number' ? provides : provides[provides.length-1]), category_inventory.length); // allow for over-stuffed inventory
+    var max_possible_slots = Math.max((typeof(provides) === 'number' ? provides : provides[provides.length-1]), player.inventory.length); // allow for over-stuffed inventory
     var warehouse_busy = player.warehouse_is_busy();
     var max_usable_inventory = Math.max(player.max_usable_inventory(), category_inventory.length); // allow for over-stuffed inventory
     var craft_products = [], craft_product_i = 0;
@@ -25762,11 +25758,11 @@ function update_inventory_grid(dialog) {
     }
 
     if('overstuffed_warning' in dialog.widgets) {
-        dialog.widgets['overstuffed_warning'].show = (category_inventory.length > player.max_usable_inventory());
+        dialog.widgets['overstuffed_warning'].show = (player.inventory.length > player.max_usable_inventory());
         dialog.widgets['overstuffed_warning'].str = dialog.data['widgets']['overstuffed_warning'][(warehouse && warehouse.level < warehouse.get_max_ui_level() ? 'ui_name': 'ui_name_maxlevel')].replace('%s', warehouse.spec['ui_name']);
     }
 
-    dialog.widgets['restack_button'].show = (dialog.user_data['category'] === 'all') && !warehouse_busy && eval_cond_or_literal(gamedata['client']['enable_inventory_restack'] || 0, player, null);
+    dialog.widgets['restack_button'].show = (dialog.user_data['category'] === 'ALL') && !warehouse_busy && eval_cond_or_literal(gamedata['client']['enable_inventory_restack'] || 0, player, null);
     dialog.widgets['restack_button'].onclick = function(w) {
         var dialog = w.parent;
         if(dialog.user_data['context']) {

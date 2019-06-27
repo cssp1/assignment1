@@ -1174,6 +1174,16 @@ def check_item(itemname, spec):
         if 'ui_precious' in spec and spec['ui_precious'] != 1:
             error |=1; print '%s: should have a ui_precious value of 1, but it is %s' % (itemname, str(spec['ui_precious']))
 
+    if 'category' in spec and spec['category'] not in ('unit', 'token') and 'inventory_categories' in gamedata['strings']:
+        match = 0
+        for category in gamedata['strings']['inventory_categories']:
+            if spec['category'] == category['name']:
+                match += 1
+            elif 'show_categories' in category and spec['category'] in category['show_categories']:
+                match += 1
+        if match == 0:
+            error |= 1; print '%s has category %s, which does not have a listing in strings.json inventory_categories.' % (itemname, spec['category'])
+
     max_level = spec.get('max_level', 1)
 
     if 'associated_crafting_recipes' in spec:
@@ -3905,8 +3915,8 @@ def main(args):
     if 'inventory_categories' in gamedata['strings']:
         for name in gamedata['strings']['inventory_categories']:
             error |= check_inventory_category('strings:inventory_categories:'+name['name'],name)
-        if len(gamedata['strings']['inventory_categories']) > 7:
-            error |= 1; print 'more than 7 inventory_categories entries in strings.json'
+        if len(gamedata['strings']['inventory_categories']) > 8:
+            error |= 1; print 'more than 8 inventory_categories entries in strings.json'
     for parent_name, parent_cat in gamedata['strings']['research_categories'].iteritems():
         for entry in parent_cat:
             error |= check_research_category('strings:research_categories:'+parent_name+':'+entry['name'], entry)
