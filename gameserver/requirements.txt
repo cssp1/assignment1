@@ -6,7 +6,7 @@
 # with updates pushed by Amazon Linux and other external tools.
 
 awscli>=1.16.9
-bcrypt==3.1.6
+bcrypt==3.1.7
 botocore>=1.11.9
 boto3>=1.8.9
 Brotli==1.0.7
@@ -28,7 +28,7 @@ PyMySQL==0.9.3 # pure-Python implementation
 
 Pillow>=6.0.0,<7.0.0
 psycopg2-binary==2.8.3
-py-vapid==1.6.0
+py-vapid==1.7.0
 pyasn1>=0.4.2
 pyasn1-modules>=0.2.1
 pyflakes==2.1.1
@@ -39,7 +39,7 @@ pywebpush==1.9.4
 requests==2.22.0
 service-identity>=18.1.0
 six==1.12.0
-SQLAlchemy==1.3.4
+SQLAlchemy==1.3.5
 txpostgres==1.6.0
 
 # SpinPunch customized Python libraries
