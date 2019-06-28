@@ -1179,7 +1179,7 @@ def check_item(itemname, spec):
         for category in gamedata['strings']['inventory_categories']:
             if spec['category'] == category['name']:
                 match += 1
-            elif 'show_categories' in category and spec['category'] in category['show_categories']:
+            elif 'categories' in category and spec['category'] in category['categories']:
                 match += 1
         if match == 0:
             error |= 1; print '%s has category %s, which does not have a listing in strings.json inventory_categories.' % (itemname, spec['category'])

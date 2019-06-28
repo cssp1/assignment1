@@ -25459,22 +25459,16 @@ function inventory_dialog_change_category(dialog, category) {
     if (category === 'ALL') {
         dialog.user_data['category_inventory'] = Array.from(player.inventory);
     } else {
-        var show_categories = []; // process subcategories as list
-        // checks if category allows subcategories and adds those
         var check_category = goog.array.find(dialog.user_data['category_list'], function(entry){
             return entry['name'] == category;
         });
-        if ('show_categories' in check_category) {
-            show_categories = check_category['show_categories'];
-        };
-        show_categories.push(category); // the category is always added into the subcategories list as a redundancy
+        var show_categories = check_category['categories'];
         var category_inventory = [];
         goog.array.forEach(player.inventory, function(inventory, slot) {
             var item = player.inventory[slot]
             var spec = gamedata['items'][item['spec']]
             var item_category = ItemDisplay.get_inventory_item_category(spec);
             if(show_categories.includes(item_category)){
-                // subcategories is always checked as a list even if it's only one category
                 category_inventory.push(item);
             }
         });
