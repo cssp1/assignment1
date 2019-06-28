@@ -199,7 +199,10 @@ class ChatFilter(object):
                 return True
 
             if codepoint < 0x10000:
-                if unicodedata.category(unichr(codepoint)) == 'Po': # punctuation, other
+                category = unicodedata.category(unichr(codepoint))
+                if category in ('Po', # punctuation, other
+                                'Sc', # symbol, currency
+                                ):
                     return True
 
             if codepoint in (0x5e, # CIRCUMFLEX ACCENT
@@ -354,6 +357,7 @@ if __name__ == '__main__':
 
     assert cf.is_ugly(u'\u200e\u200f\u200e\u200f\u200e\u200f')
     assert cf.is_ugly(u'\u200e\u200fabc\u200e\u200f')
+    assert cf.is_graphical(u"₯test₯")
 
     assert cf.is_graphical(u'🖕🖕🖕')
     assert cf.is_graphical(u"\u2508\u256d\u256e\u2508\u2508\u2508\u2508\u2508\u2508\u2508\u2508\u2508\u2508\u2508\u2508 \u2508\u2503\u2503\u2508\u256d\u256e\u2508\u250f\u256e\u256d\u256e\u256d\u256e\u2503\u256d \u2508\u2503\u2503\u2508\u2503\u2503\u2508\u2523\u252b\u2503\u2503\u2503\u2508\u2523\u252b \u2508\u2503\u2523\u2533\u252b\u2503\u2508\u2503\u2570\u2570\u256f\u2570\u256f\u2503\u2570 \u256d\u253b\u253b\u253b\u252b\u2503\u2508\u2508\u256d\u256e\u2503\u2503\u2501\u2533\u2501 \u2503\u2571\u256d\u2501\u256f\u2503\u2508\u2508\u2503\u2503\u2503\u2503\u2508\u2503\u2508 \u2570\u256e\u2571\u2571\u2571\u2503\u2508\u2508\u2570\u256f\u2570\u256f\u2508\u2503\u2508")
