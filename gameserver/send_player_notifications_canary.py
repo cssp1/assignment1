@@ -14,7 +14,7 @@ import Mailgun
 import Notification2
 import requests
 
-opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run', 'key', 'email='])
+opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run', 'key', 'email=', 'domain='])
 
 email = None
 notif_key = 'retain_23h_incentive' # which FB notification to send
@@ -22,6 +22,7 @@ dry_run = False
 verbose = True
 n2_class = Notification2.USER_ENGAGED
 ref_suffix = ''
+domain_override = None
 
 for key, val in opts:
     if key == '-q':
@@ -31,7 +32,9 @@ for key, val in opts:
     elif key == '--email':
         email = val
     elif key == '--key':
-        notif_key = key
+        notif_key = val
+    elif key == '--domain':
+        domain_override = val
 
 if not email:
     raise Exception('must specify --email')
@@ -94,7 +97,9 @@ req = mailgun.send(email,
                    config['email']['ui_subject'],
                    ui_body_plaintext,
                    ui_body_html = ui_body_html,
-                   tags = ['%s_%s_%s%s' % (SpinConfig.game().upper(), config['ref'], n2_class, ref_suffix)])
+                   tags = ['%s_%s_%s%s' % (SpinConfig.game().upper(), config['ref'], n2_class, ref_suffix)],
+                   domain_override = domain_override
+                   )
 
 if dry_run:
     print req

@@ -15,21 +15,25 @@ class Mailgun(object):
         self.domain_by_provider = config.get('domain_by_provider', {})
 
     def send(self, email, ui_subject, ui_body_plaintext, ui_body_html = None, tags = [],
-             ui_sender_name = None, ui_sender_email = None, campaign = None):
+             ui_sender_name = None, ui_sender_email = None, campaign = None,
+             domain_override = None):
         assert isinstance(ui_subject, unicode)
         assert isinstance(ui_body_plaintext, unicode)
         assert ui_body_html is None or isinstance(ui_body_html, unicode)
         assert ui_sender_name is None or isinstance(ui_sender_name, unicode)
 
-        domain = self.domain
+        if domain_override:
+            domain = domain_override
+        else:
+            domain = self.domain
 
-        # Ooverride sender domain depending on the email provider.
-        # This allows us to work around spam blacklists.
-        if not ('@' in email and len(email.split('@')) >= 2):
-            raise Exception('invalid email address: %r' % email)
+            # Ooverride sender domain depending on the email provider.
+            # This allows us to work around spam blacklists.
+            if not ('@' in email and len(email.split('@')) >= 2):
+                raise Exception('invalid email address: %r' % email)
 
-        provider = email.split('@')[1].lower()
-        domain = self.domain_by_provider.get(provider, domain)
+            provider = email.split('@')[1].lower()
+            domain = self.domain_by_provider.get(provider, domain)
 
         sender_email = self.sender_email.replace('${DOMAIN}', domain)
 
