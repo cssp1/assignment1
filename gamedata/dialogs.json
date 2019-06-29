@@ -9601,7 +9601,7 @@
                          "text_color": [0.66,0.66,0.66,1], "text_hjustify": "center", "text_vjustify": "center" },
             // these button are centered by the Javascript code because the number of visible ones is dynamic
             "category_button": { "kind": "ActionButton", "xy": [-10,72], "dimensions": [100,33], "text_size": 13, "text_hjustify": "center",
-                                 "highlight_text_color": [0.75,0.75,0.75,1], "mouseover_sound": 1,
+                                 "highlight_text_color": [0.75,0.75,0.75,1], "mouseover_sound": 1, "resize_to_fit_text": 1,
                                  "array": [9,1], "array_offset": [80,0] },
 
             "restack_spinner": { "kind": "StaticImage", "xy":[642,76], "dimensions":[16,16], "asset":"loading_spinner"},

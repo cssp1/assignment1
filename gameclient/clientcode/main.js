@@ -25399,14 +25399,13 @@ function invoke_inventory_dialog(force) {
     if(!session.home_base && !force) { return null; }
     // note: assumes the warehouse is already selected
 
-    var cat_list = null; // null when in 'ALL' mode, otherwise list of visible entries in gamedata['strings']['inventory_categories']
+    var cat_list = null; // null when in 'ALL' mode, otherwise list of visible entries in gamedata['strings']['inventory_tabs']
     // checks if inventory categories exist in gamedata, and if so enables/populates them
-	if(gamedata['strings']['inventory_categories']) {
-		var entry = gamedata['strings']['inventory_categories'];
-		cat_list = goog.array.filter(gamedata['strings']['inventory_categories'], function(entry) {
-			if('show_if' in entry && !read_predicate(entry['show_if']).is_satisfied(player, null)) { return false; }
-			return true;
-		});
+    if(gamedata['strings']['inventory_tabs']) {
+        var entry = gamedata['strings']['inventory_tabs'];
+        cat_list = goog.array.filter(gamedata['strings']['inventory_tabs'], function(entry) {
+            return !('show_if' in entry) || read_predicate(entry['show_if']).is_satisfied(player, null);
+        });
     }
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['inventory_dialog']);
@@ -25462,13 +25461,14 @@ function inventory_dialog_change_category(dialog, category) {
         var check_category = goog.array.find(dialog.user_data['category_list'], function(entry){
             return entry['name'] == category;
         });
+        if(!check_category) { throw Error('unknown category '+category); }
         var show_categories = check_category['categories'];
         var category_inventory = [];
         goog.array.forEach(player.inventory, function(inventory, slot) {
-            var item = player.inventory[slot]
-            var spec = gamedata['items'][item['spec']]
+            var item = player.inventory[slot];
+            var spec = gamedata['items'][item['spec']];
             var item_category = ItemDisplay.get_inventory_item_category(spec);
-            if(show_categories.includes(item_category)){
+            if(goog.array.contains(show_categories, item_category)){
                 category_inventory.push(item);
             }
         });
@@ -25500,7 +25500,7 @@ function update_inventory_grid(dialog) {
     var provides = gamedata['buildings'][gamedata['inventory_building']]['provides_inventory'];
     var max_possible_slots = Math.max((typeof(provides) === 'number' ? provides : provides[provides.length-1]), player.inventory.length); // allow for over-stuffed inventory
     var warehouse_busy = player.warehouse_is_busy();
-    var max_usable_inventory = Math.max(player.max_usable_inventory(), category_inventory.length); // allow for over-stuffed inventory
+    var max_usable_inventory = Math.max(player.max_usable_inventory(), player.inventory.length); // allow for over-stuffed inventory
     var craft_products = [], craft_product_i = 0;
 
     // need to update scrolling per-frame as category_inventory changes

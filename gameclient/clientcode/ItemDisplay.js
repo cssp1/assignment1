@@ -256,6 +256,7 @@ ItemDisplay.get_inventory_item_ui_name_long = function(spec, level, stack) {
     @returns {string} */
 ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
     var subtitle_list = []; // space-separated phrases
+    var category = ItemDisplay.get_inventory_item_category(spec);
 
     if('ui_subtitle' in spec) {
         subtitle_list.push(spec['ui_subtitle']);
@@ -265,8 +266,8 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
         }
         if('ui_category' in spec) {
             subtitle_list.push(spec['ui_category']);
-        } else if('category' in spec) {
-            subtitle_list.push(gamedata['strings']['item_types'][spec['category']]);
+        } else if(category) {
+            subtitle_list.push(gamedata['strings']['item_types'][category]);
         } else if(('use' in spec) && ('spellname' in spec['use'])) { // assumes spells with list use[]s specify category!
             var spellname = ('spellname' in spec['use'] ? spec['use']['spellname'] : null);
             var spell = ('spellname' in spec['use'] ? gamedata['spells'][spec['use']['spellname']] : null);
@@ -480,12 +481,12 @@ ItemDisplay.inventory_item_is_refundable = function(item) {
 
 /** return category for item of given spec
     @param {Object} spec
-    @returns {string} */
+    @returns {string|null} */
 ItemDisplay.get_inventory_item_category = function(spec) {
     if('category' in spec) {
-        return spec['category']
+        return spec['category'];
     } else {
-        return 'ALL';
+        return null;
     };
 };
 

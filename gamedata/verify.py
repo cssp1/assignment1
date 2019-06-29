@@ -1022,7 +1022,7 @@ def check_manufacture_category(path, spec):
         error |= check_predicate(spec['show_if'], reason=path+':show_if')
     return error
 
-def check_inventory_category(path, spec):
+def check_inventory_tab(path, spec):
     error = 0
     if 'show_if' in spec:
         error |= check_predicate(spec['show_if'], reason=path+':show_if')
@@ -1174,15 +1174,14 @@ def check_item(itemname, spec):
         if 'ui_precious' in spec and spec['ui_precious'] != 1:
             error |=1; print '%s: should have a ui_precious value of 1, but it is %s' % (itemname, str(spec['ui_precious']))
 
-    if 'category' in spec and spec['category'] not in ('unit', 'token') and 'inventory_categories' in gamedata['strings']:
+    if 'category' in spec and spec['category'] not in ('unit', 'token') and 'inventory_tabs' in gamedata['strings']:
         match = 0
-        for category in gamedata['strings']['inventory_categories']:
-            if spec['category'] == category['name']:
-                match += 1
-            elif 'categories' in category and spec['category'] in category['categories']:
-                match += 1
+        for tab in gamedata['strings']['inventory_tabs']:
+            if tab['name'] != 'ALL' and spec['category'] in tab['categories']: match += 1
         if match == 0:
-            error |= 1; print '%s has category %s, which does not have a listing in strings.json inventory_categories.' % (itemname, spec['category'])
+            error |= 1; print '%s has category %s, which does not have a listing in strings.json inventory_tabs.' % (itemname, spec['category'])
+        if spec['category'] not in gamedata['strings']['item_types']:
+            error |= 1; print '%s has category %s, which does not have a listing in strings.json item_types.' % (itemname, spec['category'])
 
     max_level = spec.get('max_level', 1)
 
@@ -3912,11 +3911,13 @@ def main(args):
 
     for name, entry in gamedata['strings']['manufacture_categories'].iteritems():
         error |= check_manufacture_category('strings:manufacture_categories:'+name, entry)
-    if 'inventory_categories' in gamedata['strings']:
-        for name in gamedata['strings']['inventory_categories']:
-            error |= check_inventory_category('strings:inventory_categories:'+name['name'],name)
-        if len(gamedata['strings']['inventory_categories']) > 8:
-            error |= 1; print 'more than 8 inventory_categories entries in strings.json'
+    if 'inventory_tabs' in gamedata['strings']:
+        for name in gamedata['strings']['inventory_tabs']:
+            if name['name'] != 'ALL' and 'categories' not in name:
+                error |= 1; print 'inventory_tabs entry %s is not ALL and does not have a categories entry.'
+            error |= check_inventory_tab('strings:inventory_categories:'+name['name'],name)
+        if len(gamedata['strings']['inventory_tabs']) > 8:
+            error |= 1; print 'more than 8 inventory_tabs entries in strings.json (overflows the space available for GUI buttons)'
     for parent_name, parent_cat in gamedata['strings']['research_categories'].iteritems():
         for entry in parent_cat:
             error |= check_research_category('strings:research_categories:'+parent_name+':'+entry['name'], entry)
