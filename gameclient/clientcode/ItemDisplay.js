@@ -266,21 +266,8 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
         }
         if('ui_category' in spec) {
             subtitle_list.push(spec['ui_category']);
-        } else if(category) {
+        } else if(category && !('equip' in spec)) {
             subtitle_list.push(gamedata['strings']['item_types'][category]);
-        } else if(('use' in spec) && ('spellname' in spec['use'])) { // assumes spells with list use[]s specify category!
-            var spellname = ('spellname' in spec['use'] ? spec['use']['spellname'] : null);
-            var spell = ('spellname' in spec['use'] ? gamedata['spells'][spec['use']['spellname']] : null);
-
-            if(spellname == 'GIVE_UNITS' || spellname == 'GIVE_UNITS_LIMIT_BREAK') {
-                subtitle_list.push(gamedata['strings']['item_types']['packaged_unit']);
-            } else if(spell && (spell['code'] == 'projectile_attack' || spell['code'] == 'instant_repair' || spell['code'] == 'instant_combat_repair')) {
-                subtitle_list.push(gamedata['strings']['item_types']['battle_consumable']);
-            } else if(spellname.indexOf("BUY_RANDOM_") == 0 || spellname.indexOf("FREE_RANDOM_") == 0) {
-                subtitle_list.push(gamedata['strings']['item_types']['expedition']);
-            } else {
-                subtitle_list.push(gamedata['strings']['item_types']['consumable']);
-            }
         } else if('equip' in spec) {
             var equip_type;
             var name = '';
@@ -486,7 +473,22 @@ ItemDisplay.get_inventory_item_category = function(spec) {
     if('category' in spec) {
         return spec['category'];
     } else {
+        if(('use' in spec) && ('spellname' in spec['use'])) { // assumes spells with list use[]s specify category!
+            var spellname = ('spellname' in spec['use'] ? spec['use']['spellname'] : null);
+            var spell = ('spellname' in spec['use'] ? gamedata['spells'][spec['use']['spellname']] : null);
+
+            if(spellname == 'GIVE_UNITS' || spellname == 'GIVE_UNITS_LIMIT_BREAK') {
+                return 'packaged_unit';
+            } else if(spell && (spell['code'] == 'projectile_attack' || spell['code'] == 'instant_repair' || spell['code'] == 'instant_combat_repair')) {
+                return 'battle_consumable';
+            } else if(spellname.indexOf("BUY_RANDOM_") == 0 || spellname.indexOf("FREE_RANDOM_") == 0) {
+                return 'expedition';
+            } else {
+                return 'consumable';
+            }
+        } else {
         return null;
+        };
     };
 };
 

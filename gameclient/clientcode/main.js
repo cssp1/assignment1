@@ -25463,14 +25463,10 @@ function inventory_dialog_change_category(dialog, category) {
         });
         if(!check_category) { throw Error('unknown category '+category); }
         var show_categories = check_category['categories'];
-        var category_inventory = [];
-        goog.array.forEach(player.inventory, function(inventory, slot) {
-            var item = player.inventory[slot];
-            var spec = gamedata['items'][item['spec']];
+        var category_inventory = goog.array.filter(player.inventory, function(item) {
+            var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
             var item_category = ItemDisplay.get_inventory_item_category(spec);
-            if(goog.array.contains(show_categories, item_category)){
-                category_inventory.push(item);
-            }
+            return goog.array.contains(show_categories, item_category);
         });
         dialog.user_data['category_inventory'] = category_inventory; // all items in the player's inventory matching the subcategories are sent back to the dialog
     }
