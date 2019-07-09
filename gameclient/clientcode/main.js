@@ -25399,32 +25399,36 @@ function invoke_inventory_dialog(force) {
     if(!session.home_base && !force) { return null; }
     // note: assumes the warehouse is already selected
 
-    var cat_list = null; // null when in 'ALL' mode, otherwise list of visible entries in gamedata['strings']['inventory_tabs']
-    // checks if inventory categories exist in gamedata, and if so enables/populates them
-    if(gamedata['strings']['inventory_tabs']) {
-        var entry = gamedata['strings']['inventory_tabs'];
-        cat_list = goog.array.filter(gamedata['strings']['inventory_tabs'], function(entry) {
-            return !('show_if' in entry) || read_predicate(entry['show_if']).is_satisfied(player, null);
-        });
-    }
-
     var dialog = new SPUI.Dialog(gamedata['dialogs']['inventory_dialog']);
     dialog.user_data['dialog'] = 'inventory_dialog';
-    dialog.user_data['category'] = 'ALL'; // set default category to show all items even if category tabs are disabled
-    dialog.user_data['category_inventory'] = Array.from(player.inventory);
     change_selection_ui(dialog);
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
-    // turns off the static "Items" label if categories are enabled
-    dialog.widgets['section'].show = (cat_list === null);
 
-    if (cat_list) {
-        var used = cat_list.length;
+    // dialog.user_data['category_list'] is null when in 'ALL' mode,
+    // otherwise list of visible entries in gamedata['strings']['inventory_tabs']
+    if(gamedata['strings']['inventory_tabs']) {
+        dialog.user_data['category_list'] = goog.array.filter(gamedata['strings']['inventory_tabs'], function(entry) {
+            return !('show_if' in entry) || read_predicate(entry['show_if']).is_satisfied(player, null);
+        });
+    } else {
+        dialog.user_data['category_list'] = null;
+    }
+
+    // turns off the static "Items" label if categories are enabled
+    dialog.widgets['section'].show = !dialog.user_data['category_list'];
+
+    if(dialog.user_data['category_list']) {
+        var used = dialog.user_data['category_list'].length;
     	var i = 0;
-        goog.array.forEach(cat_list, function(entry) {
+
+        var x_spacing = dialog.data['widgets']['category_button']['array_offset'][0];
+        var x_start = dialog.data['widgets']['category_button']['topbar_width'] / 2 - ((used-1)/2) * x_spacing;
+
+        goog.array.forEach(dialog.user_data['category_list'], function(entry) {
             // manually compute X coordinate to center all the visible buttons
-            var x = Math.floor(dialog.wh[0]/2 + (i - used/2) * dialog.data['widgets']['category_button']['array_offset'][0] + dialog.data['widgets']['category_button']['xy'][0]);
+            var x = Math.floor(x_start + i * x_spacing + dialog.data['widgets']['category_button']['xy'][0] - dialog.data['widgets']['category_button']['dimensions'][0]/2);
             dialog.widgets['category_button'+i.toString()].xy = [x, dialog.data['widgets']['category_button']['xy'][1]];
 
             dialog.widgets['category_button'+i.toString()].str = entry['ui_name'];
@@ -25436,8 +25440,10 @@ function invoke_inventory_dialog(force) {
             dialog.widgets['category_button'+i.toString()].show = false;
             i++;
         }
-        dialog.user_data['category_list'] = cat_list;
     }
+
+    // set default category to show all items even if category tabs are disabled
+    inventory_dialog_change_category(dialog, 'ALL');
 
     init_inventory_grid(dialog);
     dialog.ondraw = update_inventory_grid;
@@ -25449,11 +25455,13 @@ function invoke_inventory_dialog(force) {
     @param {string} category*/
 function inventory_dialog_change_category(dialog, category) {
     dialog.user_data['category'] = category;
-    goog.array.forEach(dialog.user_data['category_list'], function(entry, i) {
-        var w = dialog.widgets['category_button'+i.toString()];
-        w.text_color = (category === entry['name'] ? SPUI.default_text_color : SPUI.disabled_text_color);
-        w.state = (category === entry['name'] ? 'active' : 'normal');
-    });
+    if(dialog.user_data['category_list']) {
+        goog.array.forEach(dialog.user_data['category_list'], function(entry, i) {
+            var w = dialog.widgets['category_button'+i.toString()];
+            w.text_color = (category === entry['name'] ? SPUI.default_text_color : SPUI.disabled_text_color);
+            w.state = (category === entry['name'] ? 'active' : 'normal');
+        });
+    }
     // if the category is all, the category_inventory is the player's whole inventory
     if (category === 'ALL') {
         dialog.user_data['category_inventory'] = Array.from(player.inventory);
