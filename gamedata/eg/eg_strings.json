@@ -568,7 +568,9 @@
         "building_leader": "%NAME Leader",
         "unit_equip": "Unit %SLOT Equipment",
         "unit_leader": "%NAME Leader",
-        "equip": "%SLOT Equipment"
+        "equip": "%SLOT Equipment",
+        "gift": "Gift",
+        "boost": "Boost"
     },
 
     "predicates": {
