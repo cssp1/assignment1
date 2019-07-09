@@ -23,5 +23,8 @@ variable "n_instances" {
   default = 1
 }
 variable "ami" {}
-variable "security_group_id_list" { type = "list" }
+
+variable "security_group_id_list" {
+  type = list(string)
+}
 
