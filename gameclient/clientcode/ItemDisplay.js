@@ -259,18 +259,22 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
     var category = ItemDisplay.get_inventory_item_category(spec);
 
     if('ui_subtitle' in spec) {
+        // manual override of the subtitle. Stop here.
         subtitle_list.push(spec['ui_subtitle']);
     } else {
         if('rarity' in spec) {
             subtitle_list.push(gamedata['strings']['rarities'][spec['rarity']+1]);
         }
+
+        // add the item-category part of the subtitle
         if('ui_category' in spec) {
+            // manual override
             subtitle_list.push(spec['ui_category']);
-        } else if(category && !('equip' in spec)) {
-            subtitle_list.push(gamedata['strings']['item_types'][category]);
-        } else if('equip' in spec) {
-            var equip_type;
-            var name = '';
+
+        } else if(goog.array.contains(['building_leader', 'building_equip',
+                                       'unit_leader', 'unit_equip'], category)) {
+            // special case handling for building/unit equipment, to add
+            // some text about what building/unit it goes on and the slot type.
             var crit_list;
             if('compatible' in spec['equip']) {
                 crit_list = spec['equip']['compatible'];
@@ -278,10 +282,12 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
                 crit_list = [spec['equip']]; // legacy raw outer JSON
             }
 
-            // try to find an applicable criterion for the item subtitle
+            // check the equip criteria to find what building/unit it goes on and the slot type
 
             for(var i = 0; i < crit_list.length; i++) {
                 var crit = crit_list[i];
+
+                var name = '';
 
                 if(crit['kind'] == 'building') {
                     if(crit['slot_type'] == 'leader' && ('name' in crit)) {
@@ -290,9 +296,6 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
                             continue; // reject invisible buildings
                         }
                         name = bspec['ui_name'];
-                        equip_type = 'building_leader';
-                    } else {
-                        equip_type = 'building_equip';
                     }
                 } else if(crit['kind'] == 'mobile') {
                     if(crit['slot_type'] == 'leader' && ('name' in crit)) {
@@ -301,17 +304,17 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
                             continue; // reject invisible units
                         }
                         name = uspec['ui_name'];
-                        equip_type = 'unit_leader';
-                    } else {
-                        equip_type = 'unit_equip';
                     }
-                } else {
-                    equip_type = 'equip';
                 }
+
                 var slot_type = gamedata['strings']['equip_slots'][crit['slot_type']]['ui_name'];
-                subtitle_list.push(gamedata['strings']['item_types'][equip_type].replace('%SLOT', slot_type).replace('%NAME', name));
+                subtitle_list.push(gamedata['strings']['item_types'][category].replace('%SLOT', slot_type).replace('%NAME', name));
                 break;
             }
+
+        } else if(category) {
+            // generic item_types category
+            subtitle_list.push(gamedata['strings']['item_types'][category]);
         }
     }
 
@@ -466,30 +469,69 @@ ItemDisplay.inventory_item_is_refundable = function(item) {
     return (refund !== null);
 };
 
-/** return category for item of given spec
+/** Return category for item of given spec. This could be specified manually as "category" in the item spec JSON.
+    Otherwise, we look inside the item spec to guess what the right category would be.
     @param {Object} spec
-    @returns {string|null} */
+    @returns {string|null}
+*/
 ItemDisplay.get_inventory_item_category = function(spec) {
     if('category' in spec) {
+        // manual setting
         return spec['category'];
-    } else {
-        if(('use' in spec) && ('spellname' in spec['use'])) { // assumes spells with list use[]s specify category!
-            var spellname = ('spellname' in spec['use'] ? spec['use']['spellname'] : null);
-            var spell = ('spellname' in spec['use'] ? gamedata['spells'][spec['use']['spellname']] : null);
+    } else if(('use' in spec) && ('spellname' in spec['use'])) { // assumes spells with list use[]s specify category!
+        // it's a triggerable spell
+        var spellname = ('spellname' in spec['use'] ? spec['use']['spellname'] : null);
+        var spell = (spellname ? gamedata['spells'][spellname] : null);
 
-            if(spellname == 'GIVE_UNITS' || spellname == 'GIVE_UNITS_LIMIT_BREAK') {
-                return 'packaged_unit';
-            } else if(spell && (spell['code'] == 'projectile_attack' || spell['code'] == 'instant_repair' || spell['code'] == 'instant_combat_repair')) {
-                return 'battle_consumable';
-            } else if(spellname.indexOf("BUY_RANDOM_") == 0 || spellname.indexOf("FREE_RANDOM_") == 0) {
-                return 'expedition';
-            } else {
-                return 'consumable';
-            }
+        if(spellname == 'GIVE_UNITS' || spellname == 'GIVE_UNITS_LIMIT_BREAK') {
+            return 'packaged_unit';
+        } else if(spellname == 'APPLY_AURA') {
+            return 'boost';
+        } else if(spellname == 'ALLIANCE_GIFT_LOOT') {
+            return 'gift';
+        } else if(spell && (spell['code'] == 'projectile_attack' || spell['code'] == 'instant_repair' || spell['code'] == 'instant_combat_repair')) {
+            return 'battle_consumable';
+        } else if(spellname.indexOf("BUY_RANDOM_") == 0 || spellname.indexOf("FREE_RANDOM_") == 0) {
+            return 'expedition';
         } else {
+            return 'consumable';
+        }
+    } else if('equip' in spec) {
+        // it's some kind of equippable item
+
+        // get the criteria for what unit/building this can be equipped on
+        var crit_list;
+        if('compatible' in spec['equip']) {
+            crit_list = spec['equip']['compatible'];
+        } else {
+            crit_list = [spec['equip']]; // legacy raw outer JSON
+        }
+
+        // try to find a specific category based on what we see in the criteria list
+        for(var i = 0; i < crit_list.length; i++) {
+            var crit = crit_list[i];
+            if(crit['kind'] == 'building') {
+                if(crit['slot_type'] == 'leader' && ('name' in crit)) {
+                    return 'building_leader';
+                } else {
+                    return 'building_equip';
+                }
+            } else if(crit['kind'] == 'mobile') {
+                if(crit['slot_type'] == 'leader' && ('name' in crit)) {
+                    return 'unit_leader';
+                } else {
+                    return 'unit_equip';
+                }
+            }
+        }
+
+        // fall back to this generic category
+        return 'equip';
+
+    } else {
+        // unknown. Give up.
         return null;
-        };
-    };
+    }
 };
 
 /** return SPUI.Color corresponding to item rarity
