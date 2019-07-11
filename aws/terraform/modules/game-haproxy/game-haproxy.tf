@@ -69,7 +69,7 @@ resource "aws_instance" "game_haproxy" {
   associate_public_ip_address = true
   iam_instance_profile = "${aws_iam_instance_profile.game_haproxy.name}"
   subnet_id = "${element(split(",", var.subnet_ids), count.index)}"
-  vpc_security_group_ids = ["${var.security_group_id_list}"]
+  vpc_security_group_ids = var.security_group_id_list
   key_name = "${var.key_pair_name}"
   depends_on = ["aws_iam_role_policy.game_haproxy"]
   tags = { 
@@ -79,7 +79,7 @@ resource "aws_instance" "game_haproxy" {
     game_id = "ALL"
   }
 
-  lifecycle = {
+  lifecycle {
     create_before_destroy = true
     ignore_changes = ["instance_type", "ami", "user_data", "tags", "key_name"] # must manually taint for these changes
   }

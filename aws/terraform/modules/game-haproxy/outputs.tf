@@ -1,15 +1,20 @@
 output "sitename" {
-  value = "${var.sitename}"
+  value = var.sitename
 }
+
 output "raw_public_dns_list" {
-  value = ["${aws_instance.game_haproxy.*.public_dns}"]
+  value = aws_instance.game_haproxy[*].public_dns
 }
+
 output "raw_private_dns_list" {
-  value = ["${aws_instance.game_haproxy.*.private_dns}"]
+  value = aws_instance.game_haproxy[*].private_dns
 }
+
 output "instance_id_list" {
-  value = ["${aws_instance.game_haproxy.*.id}"]
+  value = aws_instance.game_haproxy[*].id
 }
+
 output "n_instances" {
-  value = "${var.n_instances}"
+  value = var.n_instances
 }
+
