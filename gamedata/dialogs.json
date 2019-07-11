@@ -9600,9 +9600,12 @@
             "section": { "kind": "TextField", "xy": [37,68], "dimensions": [663,32], "text_size": 13, "ui_name": "Items",
                          "text_color": [0.66,0.66,0.66,1], "text_hjustify": "center", "text_vjustify": "center" },
             // these button are centered by the Javascript code because the number of visible ones is dynamic
-            "category_button": { "kind": "ActionButton", "xy": [-10,72], "dimensions": [100,33], "text_size": 13, "text_hjustify": "center",
+            "category_button": { "kind": "ActionButton", "xy": [37,70], "dimensions": [74,33], "text_size": 13, "text_hjustify": "center",
                                  "highlight_text_color": [0.75,0.75,0.75,1], "mouseover_sound": 1, "resize_to_fit_text": 1,
-                                 "array": [9,1], "array_offset": [80,0] },
+                                 "array": [9,1], "array_offset": [74,0], "drop_shadow": 1,
+                                 "topbar_width": 640 // shift slightly left rather than centering in the middle of topbar,
+                                 // to avoid clash with the restack button
+                               },
 
             "restack_spinner": { "kind": "StaticImage", "xy":[642,76], "dimensions":[16,16], "asset":"loading_spinner"},
             "restack_button": {"kind": "ActionButton", "xy":[664,74], "dimensions":[22,20], "bg_image": "refresh_button", "push_bg_image": 1,
