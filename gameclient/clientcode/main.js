@@ -25521,7 +25521,10 @@ function update_inventory_grid(dialog) {
     scrollable_dialog_change_page(dialog, dialog.user_data['page']);
     dialog.widgets['custom_scroll_text'].str = dialog.data['widgets']['custom_scroll_text']['ui_name'].replace('%d1', pretty_print_number((slots_per_page * dialog.user_data['page'])+1)).replace('%d2', pretty_print_number(Math.min(slots_per_page * (dialog.user_data['page']+1), max_usable_inventory))).replace('%d3', pretty_print_number(player.max_usable_inventory()));
     // hide scroll text if beyond end of usable slots
-    dialog.widgets['custom_scroll_text'].show = (slots_per_page * dialog.user_data['page'])+1 <= max_usable_inventory;
+    dialog.widgets['custom_scroll_text'].show = (dialog.user_data['category'] === 'ALL') &&
+        ((slots_per_page * dialog.user_data['page'])+1 <= max_usable_inventory);
+
+    dialog.widgets['no_items_this_category'].show = (dialog.user_data['category'] !== 'ALL') && (category_inventory.length == 0);
 
     var cols = dialog.data['widgets']['slot']['array'][0];
     for(var y = 0; y < dialog.data['widgets']['slot']['array'][1]; y++) {
@@ -25537,12 +25540,13 @@ function update_inventory_grid(dialog) {
                 dialog.widgets['frame'+wname].show = false;
 
             if(slot < max_usable_inventory) {
-                dialog.widgets['slot'+wname].show = true;
-                dialog.widgets['slot'+wname].state = 'normal';
                 if(slot < category_inventory.length) {
+                    // there's an item here
                     var item = category_inventory[slot];
                     var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
 
+                    dialog.widgets['slot'+wname].show = true;
+                    dialog.widgets['slot'+wname].state = 'normal';
                     dialog.widgets['item'+wname].show = true;
                     ItemDisplay.set_inventory_item_asset(dialog.widgets['item'+wname], spec);
                     ItemDisplay.set_inventory_item_stack(dialog.widgets['stack'+wname], spec, item);
@@ -25693,6 +25697,16 @@ function update_inventory_grid(dialog) {
                     dialog.widgets['item'+wname].bg_image_offset = stickout;
                     dialog.widgets['stack'+wname].text_offset = stickout;
                     dialog.widgets['frame'+wname].bg_image_offset = stickout;
+                } else {
+                    // it's an open slot
+                    if(dialog.user_data['category'] === 'ALL') {
+                        // show as empty
+                        dialog.widgets['slot'+wname].show = true;
+                        dialog.widgets['slot'+wname].state = 'normal';
+                    } else {
+                        // in filtered view, hide empty slots
+                        dialog.widgets['slot'+wname].show = false;
+                    }
                 }
             } else if(slot < player.max_inventory) {
                 // it's a reserved slot for crafting
@@ -25710,7 +25724,7 @@ function update_inventory_grid(dialog) {
                 } else {
                     // unknown
                 }
-            } else if(slot < max_possible_slots) {
+            } else if(slot < max_possible_slots && dialog.user_data['category'] === 'ALL') {
                 dialog.widgets['slot'+wname].show = true;
                 dialog.widgets['slot'+wname].state = 'locked';
                 dialog.widgets['slot'+wname].onclick = function(w) {
