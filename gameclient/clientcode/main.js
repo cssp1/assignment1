@@ -25524,7 +25524,10 @@ function update_inventory_grid(dialog) {
     dialog.widgets['custom_scroll_text'].show = (dialog.user_data['category'] === 'ALL') &&
         ((slots_per_page * dialog.user_data['page'])+1 <= max_usable_inventory);
 
-    dialog.widgets['no_items_this_category'].show = (dialog.user_data['category'] !== 'ALL') && (category_inventory.length == 0);
+    if('no_items_this_category' in dialog.widgets) {
+        dialog.widgets['no_items_this_category'].show =
+            (dialog.user_data['category'] !== 'ALL') && (category_inventory.length == 0);
+    }
 
     var cols = dialog.data['widgets']['slot']['array'][0];
     for(var y = 0; y < dialog.data['widgets']['slot']['array'][1]; y++) {
