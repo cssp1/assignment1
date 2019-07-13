@@ -25447,6 +25447,15 @@ function invoke_inventory_dialog(force) {
 
     init_inventory_grid(dialog);
     dialog.ondraw = update_inventory_grid;
+
+    // listen for inventory updates, because they affect category grid listings
+    dialog.user_data['inventory_update_receiver'] = (function (_dialog) { return function() {
+        // run inventory_dialog_change_category() to update the inventory grid, but pass the current category so the category doesn't change
+        inventory_dialog_change_category(dialog, dialog.user_data['category']);
+    }; })(dialog);
+    inventory_update_receivers.push(dialog.user_data['inventory_update_receiver']);
+    dialog.on_destroy = function(dialog) { goog.array.remove(inventory_update_receivers, dialog.user_data['inventory_update_receiver']); };
+
     update_inventory_header_buttons(dialog, find_object_by_type(gamedata['inventory_building']), 'inventory');
     return dialog;
 }
@@ -25462,9 +25471,15 @@ function inventory_dialog_change_category(dialog, category) {
             w.state = (category === entry['name'] ? 'active' : 'normal');
         });
     }
-    // if the category is all, the category_inventory is the player's whole inventory
+    // reset the category index
+    dialog.user_data['category_index'] = [];
+    // if the category is 'ALL', the category_inventory is the player's whole inventory
     if (category === 'ALL') {
         dialog.user_data['category_inventory'] = Array.from(player.inventory);
+        // if the category is 'ALL', the category_index will just match the index of player.inventory
+        goog.array.forEach(player.inventory, function(ply_inv, i) {
+            dialog.user_data['category_index'].push(i);
+        });
     } else {
         var check_category = goog.array.find(dialog.user_data['category_list'], function(entry){
             return entry['name'] == category;
@@ -25475,6 +25490,15 @@ function inventory_dialog_change_category(dialog, category) {
             var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
             var item_category = ItemDisplay.get_inventory_item_category(spec);
             return goog.array.contains(show_categories, item_category);
+        });
+        // when a category other than 'ALL' is selected, a category index has to list each item's corresponding index in player.inventory
+        // otherwise server messages will not work properly
+        goog.array.forEach(category_inventory, function(cat_inv, i) {
+            goog.array.forEach(player.inventory, function(ply_inv, j) {
+                if(cat_inv === ply_inv) {
+                    dialog.user_data['category_index'].push(j);
+                }
+            });
         });
         dialog.user_data['category_inventory'] = category_inventory; // all items in the player's inventory matching the subcategories are sent back to the dialog
     }
@@ -25630,7 +25654,7 @@ function update_inventory_grid(dialog) {
                                 }
                             }
                         }
-                        invoke_inventory_context(w.parent, w, _slot, _item, false);
+                        invoke_inventory_context(w.parent, w, dialog.user_data['category_index'][_slot], _item, false);
                     }; })(slot, item);
                     dialog.widgets['frame'+wname].onclick = (function (_slot, _item) { return function(w) {
                         var inv_dialog = w.parent;
@@ -25680,7 +25704,7 @@ function update_inventory_grid(dialog) {
                             }
 
                         } else {
-                            invoke_inventory_context(w.parent, w, _slot, _item, true);
+                            invoke_inventory_context(w.parent, w, dialog.user_data['category_index'][_slot], _item, true);
                         }
                     }; })(slot, item);
                     dialog.widgets['frame'+wname].onleave_cb = (function (_slot, _item) { return function(w) {
