@@ -308,10 +308,10 @@
         "cannot_get_more": "[color=#808080]--- No More Messages ---[/color]",
 
         // system-wide announcements
-        "system": "\n[color=#fff000]*** %sender_name: %body ***[/color]\n\n",
+        "system": "\n[color=#fff000]*** %sender_name: %unsafe_body ***[/color]\n\n",
 
         // used for specially-marked developer accounts in public channels
-        "official": "[color=#ffffff]%sender_name: [/color][color=#00ffff]%body[/color]",
+        "official": "[color=#ffffff]%sender_name: [/color][color=#00ffff]%unsafe_body[/color]",
 
         // notice that YOU are gagged
         "you_are_gagged": "[color=#ffff00]System:[/color] Message not sent - you are muted.",
