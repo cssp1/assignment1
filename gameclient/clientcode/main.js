@@ -25118,6 +25118,14 @@ function invoke_loot_dialog(msg) {
         dialog.widgets['coverup_button'].onclick(dialog.widgets['coverup_button']);
     }
 
+    // listen for inventory updates, because they affect inventory grid listings
+    dialog.user_data['inventory_update_receiver'] = (function (_dialog) { return function() {
+        // run inventory_dialog_change_category() to update the inventory grid, but pass 'ALL' because loot only shows 'ALL'
+        inventory_dialog_change_category(dialog, 'ALL');
+    }; })(dialog);
+    inventory_update_receivers.push(dialog.user_data['inventory_update_receiver']);
+    dialog.on_destroy = function(dialog) { goog.array.remove(inventory_update_receivers, dialog.user_data['inventory_update_receiver']); };
+
     return dialog;
 }
 
@@ -25486,19 +25494,14 @@ function inventory_dialog_change_category(dialog, category) {
         });
         if(!check_category) { throw Error('unknown category '+category); }
         var show_categories = check_category['categories'];
-        var category_inventory = goog.array.filter(player.inventory, function(item) {
+        var category_inventory = []
+        goog.array.forEach(player.inventory, function(item, i) {
             var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
             var item_category = ItemDisplay.get_inventory_item_category(spec);
-            return goog.array.contains(show_categories, item_category);
-        });
-        // when a category other than 'ALL' is selected, a category index has to list each item's corresponding index in player.inventory
-        // otherwise server messages will not work properly
-        goog.array.forEach(category_inventory, function(cat_inv, i) {
-            goog.array.forEach(player.inventory, function(ply_inv, j) {
-                if(cat_inv === ply_inv) {
-                    dialog.user_data['category_index'].push(j);
-                }
-            });
+            if (goog.array.contains(show_categories, item_category)) {
+                category_inventory.push(item);
+                dialog.user_data['category_index'].push(i); // category_index is populated with the player.inventory index entry for each item added to the category_inventory
+            };
         });
         dialog.user_data['category_inventory'] = category_inventory; // all items in the player's inventory matching the subcategories are sent back to the dialog
     }
