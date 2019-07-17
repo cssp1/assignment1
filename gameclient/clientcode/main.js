@@ -16395,6 +16395,13 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
                 bb_text = bb_text.replace('%chat_message_id', chat_msg_id);
         }
 
+        // inject raw body text into the BBCode string, INCLUDING LIVE BBCODE.
+        // this is ONLY for system-generated chat messages. NOT safe to allow
+        // regular users to inject arbitrary BBCode.
+        if(bb_text.indexOf('%unsafe_body') != -1 && body) {
+            bb_text = bb_text.replace('%unsafe_body', body);
+        }
+
         // replace alliance chat tag
         if(bb_text.indexOf('%tag') != -1) {
             if((channel_name != 'ALLIANCE') && ('alliance_tag' in sender_info) && ('alliance_id' in sender_info) && (sender_info['alliance_id'] >= 0) &&
