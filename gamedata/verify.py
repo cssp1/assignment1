@@ -1041,7 +1041,7 @@ def check_item_type(name, spec):
     # ensure some inventory tab displays this item type
     if 'inventory_tabs' in gamedata['strings']:
         if not any(tab['name'] != 'ALL' and name in tab['categories'] \
-                   for tab in gamedata['strings']['inventory_tabs']):
+                   for tab in gamedata['strings']['inventory_tabs']['tabs']):
             error |= 1; print 'item type %s is not included in any inventory_tabs category' % name
 
     return error
@@ -3928,11 +3928,13 @@ def main(args):
         error |= check_manufacture_category('strings:manufacture_categories:'+name, entry)
 
     if 'inventory_tabs' in gamedata['strings']:
-        for tab in gamedata['strings']['inventory_tabs']:
+        if 'show_if' in gamedata['strings']['inventory_tabs']:
+            error |= check_predicate(gamedata['strings']['inventory_tabs']['show_if'], reason='inventory_tabs:show_if')
+        for tab in gamedata['strings']['inventory_tabs']['tabs']:
             if tab['name'] != 'ALL' and 'categories' not in tab:
                 error |= 1; print 'inventory_tabs entry %s is not ALL and does not have a categories entry.' % tab['name']
             error |= check_inventory_tab('strings:inventory_categories:'+tab['name'],tab)
-        if len(gamedata['strings']['inventory_tabs']) > 8:
+        if len(gamedata['strings']['inventory_tabs']['tabs']) > 8:
             error |= 1; print 'more than 8 inventory_tabs entries in strings.json (overflows the space available for GUI buttons)'
 
     for name, data in gamedata['strings']['item_types'].iteritems():

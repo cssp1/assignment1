@@ -25423,8 +25423,8 @@ function invoke_inventory_dialog(force) {
 
     // dialog.user_data['category_list'] is null when in 'ALL' mode,
     // otherwise list of visible entries in gamedata['strings']['inventory_tabs'], unless the inventory show_if predicate is not met
-    if(gamedata['strings']['inventory_tabs'] && (!('show_if' in gamedata['strings']['inventory_tabs'] || read_predicate(gamedata['strings']['inventory_tabs']['show_if']).is_satisfied(player, null)))) {
-        dialog.user_data['category_list'] = goog.array.filter(gamedata['strings']['inventory_tabs']['categories'], function(entry) {
+    if(gamedata['strings']['inventory_tabs'] && (!('show_if' in gamedata['strings']['inventory_tabs']) || read_predicate(gamedata['strings']['inventory_tabs']['show_if']).is_satisfied(player, null))) {
+        dialog.user_data['category_list'] = goog.array.filter(gamedata['strings']['inventory_tabs']['tabs'], function(entry) {
             return !('show_if' in entry) || read_predicate(entry['show_if']).is_satisfied(player, null);
         });
     } else {
@@ -25479,6 +25479,10 @@ function invoke_inventory_dialog(force) {
     @param {string} category*/
 function inventory_dialog_change_category(dialog, category) {
     dialog.user_data['category'] = category;
+    // check if an inventory item is open and close if it is
+    if(dialog.user_data['context']) {
+        close_dialog(dialog.user_data['context']);
+    }
     if(dialog.user_data['category_list']) {
         goog.array.forEach(dialog.user_data['category_list'], function(entry, i) {
             var w = dialog.widgets['category_button'+i.toString()];
@@ -26255,6 +26259,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_inventory_context(dialog) {
     var props = dialog.user_data['props'];
     var parent_dialog = dialog.user_data['parent_dialog'];
