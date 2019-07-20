@@ -25422,9 +25422,9 @@ function invoke_inventory_dialog(force) {
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
     // dialog.user_data['category_list'] is null when in 'ALL' mode,
-    // otherwise list of visible entries in gamedata['strings']['inventory_tabs']
-    if(gamedata['strings']['inventory_tabs']) {
-        dialog.user_data['category_list'] = goog.array.filter(gamedata['strings']['inventory_tabs'], function(entry) {
+    // otherwise list of visible entries in gamedata['strings']['inventory_tabs'], unless the inventory show_if predicate is not met
+    if(gamedata['strings']['inventory_tabs'] && (!('show_if' in gamedata['strings']['inventory_tabs'] || read_predicate(gamedata['strings']['inventory_tabs']['show_if']).is_satisfied(player, null)))) {
+        dialog.user_data['category_list'] = goog.array.filter(gamedata['strings']['inventory_tabs']['categories'], function(entry) {
             return !('show_if' in entry) || read_predicate(entry['show_if']).is_satisfied(player, null);
         });
     } else {
