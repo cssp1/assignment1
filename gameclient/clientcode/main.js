@@ -25071,8 +25071,6 @@ function invoke_loot_dialog(msg) {
     // this adds the 'category' field used for inventory
     // tabs so loot will show all items in inventory
     dialog.user_data['category'] = 'ALL';
-    // set the dialog's user data to reflect that 'loot_mode' is on so it won't attempt to close any context dialogs
-    dialog.user_data['loot_mode'] = true;
     // run inventory_dialog_change_category() to update the inventory grid, but pass 'ALL' because loot only shows 'ALL'
     inventory_dialog_change_category(dialog, 'ALL');
     install_child_dialog(dialog);
@@ -25130,8 +25128,6 @@ function invoke_loot_dialog(msg) {
 
     // listen for inventory updates, because they affect inventory grid listings
     dialog.user_data['inventory_update_receiver'] = (function (_dialog) { return function() {
-        // set the dialog's user data to reflect that 'loot_mode' is on so it won't attempt to close any context dialogs
-        dialog.user_data['loot_mode'] = true;
         // run inventory_dialog_change_category() to update the inventory grid, but pass 'ALL' because loot only shows 'ALL'
         inventory_dialog_change_category(dialog, 'ALL');
     }; })(dialog);
@@ -25485,7 +25481,7 @@ function invoke_inventory_dialog(force) {
 function inventory_dialog_change_category(dialog, category) {
     dialog.user_data['category'] = category;
     // check if an inventory item is open and close if it is
-    if(dialog.user_data['context'] && !dialog.user_data['loot_mode']) {
+    if(dialog.user_data['context']) {
         close_dialog(dialog.user_data['context']);
     }
     if(dialog.user_data['category_list']) {
