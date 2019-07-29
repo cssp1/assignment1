@@ -25075,7 +25075,6 @@ function invoke_loot_dialog(msg) {
     inventory_dialog_change_category(dialog, 'ALL');
     install_child_dialog(dialog);
     global_loot_dialog = dialog;
-    dialog.on_destroy = function(dialog) { global_loot_dialog = null; };
     dialog.auto_center();
     dialog.modal = true;
 
@@ -25129,10 +25128,13 @@ function invoke_loot_dialog(msg) {
     // listen for inventory updates, because they affect inventory grid listings
     dialog.user_data['inventory_update_receiver'] = (function (_dialog) { return function() {
         // run inventory_dialog_change_category() to update the inventory grid, but pass 'ALL' because loot only shows 'ALL'
-        inventory_dialog_change_category(dialog, 'ALL');
+        inventory_dialog_change_category(_dialog, 'ALL');
     }; })(dialog);
     inventory_update_receivers.push(dialog.user_data['inventory_update_receiver']);
-    dialog.on_destroy = function(dialog) { goog.array.remove(inventory_update_receivers, dialog.user_data['inventory_update_receiver']); };
+    dialog.on_destroy = function(dialog) {
+        goog.array.remove(inventory_update_receivers, dialog.user_data['inventory_update_receiver']);
+        global_loot_dialog = null;
+    };
 
     return dialog;
 }
@@ -25572,7 +25574,12 @@ function update_inventory_grid(dialog) {
     for(var y = 0; y < dialog.data['widgets']['slot']['array'][1]; y++) {
         for(var x = 0; x < cols; x++) {
             var wname = x.toString()+','+y.toString();
-            var slot = y*cols + x + dialog.user_data['page'] * slots_per_page;
+
+            // index of slot in the visible GUI
+            var ui_slot = y*cols + x + dialog.user_data['page'] * slots_per_page;
+            // index of slot in player.inventory
+            var inv_slot = dialog.user_data['category_index'][ui_slot];
+
             dialog.widgets['item'+wname].show =
                 dialog.widgets['slot'+wname].show =
                 dialog.widgets['stack'+wname].show =
@@ -25581,10 +25588,10 @@ function update_inventory_grid(dialog) {
                 dialog.widgets['pending'+wname].show =
                 dialog.widgets['frame'+wname].show = false;
 
-            if(slot < max_usable_inventory) {
-                if(slot < category_inventory.length) {
+            if(ui_slot < max_usable_inventory) {
+                if(ui_slot < category_inventory.length) {
                     // there's an item here
-                    var item = category_inventory[slot];
+                    var item = category_inventory[ui_slot];
                     var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
 
                     dialog.widgets['slot'+wname].show = true;
@@ -25643,9 +25650,9 @@ function update_inventory_grid(dialog) {
                     if(warehouse_busy) { can_activate = false; }
                     if(!synchronizer.is_in_sync(inventory_restack_sync_marker)) { can_activate = false; }
 
-                    dialog.widgets['frame'+wname].state = (!can_activate ? 'cooldown' : (dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] === slot ? 'active' : 'normal'));
+                    dialog.widgets['frame'+wname].state = (!can_activate ? 'cooldown' : (dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] === inv_slot ? 'active' : 'normal'));
 
-                    dialog.widgets['frame'+wname].onenter = (function (_slot, _item) { return function(w) {
+                    dialog.widgets['frame'+wname].onenter = (function (_inv_slot, _item) { return function(w) {
                         var inv_dialog = w.parent;
                         // XXX awkward hack to do nothing if another dialog is obscuring this one
                         if(inv_dialog.children[inv_dialog.children.length-1] instanceof SPUI.Dialog &&
@@ -25655,7 +25662,7 @@ function update_inventory_grid(dialog) {
 
                         if(inv_dialog.user_data['context']) {
                             // do not switch if context for this item is already up
-                            if(inv_dialog.user_data['context'].user_data['slot'] === _slot &&
+                            if(inv_dialog.user_data['context'].user_data['slot'] === _inv_slot &&
                                inv_dialog.user_data['context'].user_data['item'] === _item) {
                                 return;
                             }
@@ -25669,12 +25676,13 @@ function update_inventory_grid(dialog) {
                                 }
                             }
                         }
-                        invoke_inventory_context(w.parent, w, dialog.user_data['category_index'][_slot], _item, false);
-                    }; })(slot, item);
-                    dialog.widgets['frame'+wname].onclick = (function (_slot, _item) { return function(w) {
+                        invoke_inventory_context(w.parent, w, _inv_slot, _item, false);
+                    }; })(inv_slot, item);
+                    dialog.widgets['frame'+wname].onclick = (function (_inv_slot, _item) { return function(w) {
                         var inv_dialog = w.parent;
+
                         if(inv_dialog.user_data['context'] &&
-                           inv_dialog.user_data['context'].user_data['slot'] === _slot &&
+                           inv_dialog.user_data['context'].user_data['slot'] === _inv_slot &&
                            inv_dialog.user_data['context'].user_data['item'] === _item &&
                            inv_dialog.user_data['context'].user_data['show_dropdown']) {
                             // if context menu is already up for this item, simulate a click on "Activate"
@@ -25713,27 +25721,26 @@ function update_inventory_grid(dialog) {
                                     }
                                 }
                             }
-
                             if(inv_dialog.user_data['context'].widgets['button0'].state != 'disabled') {
                                 inv_dialog.user_data['context'].widgets['button0'].onclick(inv_dialog.user_data['context'].widgets['button0']);
                             }
 
                         } else {
-                            invoke_inventory_context(w.parent, w, dialog.user_data['category_index'][_slot], _item, true);
+                            invoke_inventory_context(w.parent, w, _inv_slot, _item, true);
                         }
-                    }; })(slot, item);
-                    dialog.widgets['frame'+wname].onleave_cb = (function (_slot, _item) { return function(w) {
+                    }; })(inv_slot, item);
+                    dialog.widgets['frame'+wname].onleave_cb = (function (_inv_slot, _item) { return function(w) {
                         var inv_dialog = w.parent;
                         if(inv_dialog.user_data['context'] &&
-                           inv_dialog.user_data['context'].user_data['slot'] === _slot &&
+                           inv_dialog.user_data['context'].user_data['slot'] === _inv_slot &&
                            inv_dialog.user_data['context'].user_data['item'] === _item &&
                            !inv_dialog.user_data['context'].user_data['show_dropdown']) {
                             invoke_inventory_context(w.parent, w, -1, null, false);
                         }
-                    }; })(slot, item);
+                    }; })(inv_slot, item);
                     // make item/frame stick out a little bit on mouseover to look more "clickable"
                     var stickout = [0,0];
-                    if(dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] == slot && dialog.user_data['context'].user_data['item'] == item) {
+                    if(dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] == inv_slot && dialog.user_data['context'].user_data['item'] == item) {
                         if(!dialog.widgets['frame'+wname].pushed) { stickout = [0,-1]; }
                     }
                     dialog.widgets['item'+wname].bg_image_offset = stickout;
@@ -25750,7 +25757,7 @@ function update_inventory_grid(dialog) {
                         dialog.widgets['slot'+wname].show = false;
                     }
                 }
-            } else if(slot < player.max_inventory) {
+            } else if(ui_slot < player.max_inventory) {
                 // it's a reserved slot for crafting
                 dialog.widgets['slot'+wname].show = true;
                 dialog.widgets['frame'+wname].show = true;
@@ -25766,7 +25773,7 @@ function update_inventory_grid(dialog) {
                 } else {
                     // unknown
                 }
-            } else if(slot < max_possible_slots && dialog.user_data['category'] === 'ALL') {
+            } else if(ui_slot < max_possible_slots && dialog.user_data['category'] === 'ALL') {
                 dialog.widgets['slot'+wname].show = true;
                 dialog.widgets['slot'+wname].state = 'locked';
                 dialog.widgets['slot'+wname].onclick = function(w) {
