@@ -502,8 +502,9 @@ reload_gamedata()
 
 try:
     SERVER_VERSION = subprocess.Popen('../scmtool.sh version', shell=True, stdout=subprocess.PIPE).stdout.readlines()[0].strip()
+    SERVER_BRANCH = subprocess.Popen('../scmtool.sh git-branch', shell=True, stdout=subprocess.PIPE).stdout.readlines()[0].strip()
 except:
-    SERVER_VERSION = 'unknown'
+    SERVER_VERSION = SERVER_BRANCH = 'unknown'
 
 
 # global time value (in integer seconds since UNIX epoch)
@@ -659,6 +660,7 @@ class AdminStats:
                 'game_wss_port': gamesite.config.game_wss_port,
                 'affinities': gamesite.config.affinities,
                 'scm_version': SERVER_VERSION,
+                'scm_branch': SERVER_BRANCH,
                 'gamedata_build': gamedata['gamedata_build_info']['date'],
                 'gameclient_build': gameclient_build_date,
                 'uptime': server_time - self.start_time,
