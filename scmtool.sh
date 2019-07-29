@@ -23,6 +23,7 @@ function usage {
     echo "  site-patch - apply all patches in the *-private/ directory"
     echo "  version - get current version, in active SCM system"
     echo "  git-version - get current Git version (from active Git, or from git-sync.txt if SVN slave)"
+    echo "  git-branch - get current Git branch (from active Git only)"
     echo "  stat - show modified file list"
     echo "  diff - show differences"
     echo "  commit [MESSAGE] - make a commit"
@@ -158,6 +159,10 @@ function do_version_git {
     SUBPATH="$2" # optional - path underneath the root to query the version for
     (cd "${ROOT}/${SUBPATH}" && git rev-parse HEAD)
 }
+function do_branch_git {
+    SUBPATH="$2" # optional - path underneath the root to query the version for
+    (cd "${ROOT}/${SUBPATH}" && git rev-parse --abbrev-ref HEAD)
+}
 function do_last_commit_message_git {
     SUBPATH="$2" # optional - path underneath the root to query the version for
     if [ "$SUBPATH" != "" ]; then
@@ -229,6 +234,9 @@ else
                 ;;
             git-version)
                 do_version_git $@
+                ;;
+            git-branch)
+                do_branch_git $@
                 ;;
             stat)
                 do_stat_git $@
