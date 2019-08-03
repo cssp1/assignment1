@@ -1022,6 +1022,30 @@ def check_manufacture_category(path, spec):
         error |= check_predicate(spec['show_if'], reason=path+':show_if')
     return error
 
+def check_inventory_tab(path, spec):
+    error = 0
+    if 'show_if' in spec:
+        error |= check_predicate(spec['show_if'], reason=path+':show_if')
+
+    # ensure all categories in this tab are represented in item_types
+    if spec['name'] != 'ALL':
+        for category in spec['categories']:
+            if category not in gamedata['strings']['item_types']:
+                error |= 1; print 'inventory tab %s has category %s, which does not have a listing in strings.json item_types.' % (path, category)
+
+    return error
+
+def check_item_type(name, spec):
+    error = 0
+
+    # ensure some inventory tab displays this item type
+    if 'inventory_tabs' in gamedata['strings']:
+        if not any(tab['name'] != 'ALL' and name in tab['categories'] \
+                   for tab in gamedata['strings']['inventory_tabs']['tabs']):
+            error |= 1; print 'item type %s is not included in any inventory_tabs category' % name
+
+    return error
+
 def check_research_category(path, spec):
     error = 0
     if 'show_if' in spec:
@@ -1167,6 +1191,12 @@ def check_item(itemname, spec):
             error |=1; print '%s: is a leader but does not have ui_precious flag' % (itemname)
         if 'ui_precious' in spec and spec['ui_precious'] != 1:
             error |=1; print '%s: should have a ui_precious value of 1, but it is %s' % (itemname, str(spec['ui_precious']))
+
+    if 'category' in spec:
+        if spec['category'] not in gamedata['strings']['item_types']:
+            error |= 1; print '%s has category %s, which does not have a listing in strings.json item_types.' % (itemname, spec['category'])
+        if spec['category'] in ('equip', 'leader'):
+            error |= 1; print '%s has category %s, which should be removed since ItemDisplay can figure out a more accurate category' % (itemname, spec['category'])
 
     max_level = spec.get('max_level', 1)
 
@@ -3896,6 +3926,26 @@ def main(args):
 
     for name, entry in gamedata['strings']['manufacture_categories'].iteritems():
         error |= check_manufacture_category('strings:manufacture_categories:'+name, entry)
+
+    if 'inventory_tabs' in gamedata['strings']:
+        if 'show_if' in gamedata['strings']['inventory_tabs']:
+            error |= check_predicate(gamedata['strings']['inventory_tabs']['show_if'], reason='inventory_tabs:show_if')
+        for tab in gamedata['strings']['inventory_tabs']['tabs']:
+            if tab['name'] != 'ALL' and 'categories' not in tab:
+                error |= 1; print 'inventory_tabs entry %s is not ALL and does not have a categories entry.' % tab['name']
+            error |= check_inventory_tab('strings:inventory_categories:'+tab['name'],tab)
+        if len(gamedata['strings']['inventory_tabs']['tabs']) > 8:
+            error |= 1; print 'more than 8 inventory_tabs entries in strings.json (overflows the space available for GUI buttons)'
+
+    for name, data in gamedata['strings']['item_types'].iteritems():
+        error |= check_item_type(name, data)
+
+    # ensure the hard-coded item types in gameclient/ItemDisplay.js are present in gamedata['strings']['item_types']
+    for name in ('packaged_unit', 'battle_consumable', 'expedition', 'consumable',
+                 'building_leader', 'building_equip', 'unit_leader', 'unit_equip', 'equip', 'boost', 'gift'):
+        if name not in gamedata['strings']['item_types']:
+            error |= 1; print 'strings.json item_types is missing hard-coded type %s' % name
+
     for parent_name, parent_cat in gamedata['strings']['research_categories'].iteritems():
         for entry in parent_cat:
             error |= check_research_category('strings:research_categories:'+parent_name+':'+entry['name'], entry)

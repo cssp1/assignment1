@@ -25067,9 +25067,14 @@ function invoke_loot_dialog(msg) {
     dialog.user_data['dialog'] = 'loot_dialog';
     dialog.user_data['pending'] = 0;
     dialog.user_data['anim_data'] = {};
+    // loot and inventory share init_inventory_grid
+    // this adds the 'category' field used for inventory
+    // tabs so loot will show all items in inventory
+    dialog.user_data['category'] = 'ALL';
+    // run inventory_dialog_change_category() to update the inventory grid, but pass 'ALL' because loot only shows 'ALL'
+    inventory_dialog_change_category(dialog, 'ALL');
     install_child_dialog(dialog);
     global_loot_dialog = dialog;
-    dialog.on_destroy = function(dialog) { global_loot_dialog = null; };
     dialog.auto_center();
     dialog.modal = true;
 
@@ -25119,6 +25124,17 @@ function invoke_loot_dialog(msg) {
     if(dialog.widgets['coverup_button'].show) {
         dialog.widgets['coverup_button'].onclick(dialog.widgets['coverup_button']);
     }
+
+    // listen for inventory updates, because they affect inventory grid listings
+    dialog.user_data['inventory_update_receiver'] = (function (_dialog) { return function() {
+        // run inventory_dialog_change_category() to update the inventory grid, but pass 'ALL' because loot only shows 'ALL'
+        inventory_dialog_change_category(_dialog, 'ALL');
+    }; })(dialog);
+    inventory_update_receivers.push(dialog.user_data['inventory_update_receiver']);
+    dialog.on_destroy = function(dialog) {
+        goog.array.remove(inventory_update_receivers, dialog.user_data['inventory_update_receiver']);
+        global_loot_dialog = null;
+    };
 
     return dialog;
 }
@@ -25399,6 +25415,7 @@ var inventory_update_receivers = [];
 function invoke_inventory_dialog(force) {
     if(!player.get_any_abtest_value('enable_inventory', gamedata['enable_inventory'])) { return null; }
     if(!session.home_base && !force) { return null; }
+    // note: assumes the warehouse is already selected
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['inventory_dialog']);
     dialog.user_data['dialog'] = 'inventory_dialog';
@@ -25406,14 +25423,107 @@ function invoke_inventory_dialog(force) {
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
+
+    // dialog.user_data['category_list'] is null when in 'ALL' mode,
+    // otherwise list of visible entries in gamedata['strings']['inventory_tabs'], unless the inventory show_if predicate is not met
+    if(gamedata['strings']['inventory_tabs'] && (!('show_if' in gamedata['strings']['inventory_tabs']) || read_predicate(gamedata['strings']['inventory_tabs']['show_if']).is_satisfied(player, null))) {
+        dialog.user_data['category_list'] = goog.array.filter(gamedata['strings']['inventory_tabs']['tabs'], function(entry) {
+            return !('show_if' in entry) || read_predicate(entry['show_if']).is_satisfied(player, null);
+        });
+    } else {
+        dialog.user_data['category_list'] = null;
+    }
+
+    // turns off the static "Items" label if categories are enabled
+    dialog.widgets['section'].show = !dialog.user_data['category_list'];
+
+    if(dialog.user_data['category_list']) {
+        var used = dialog.user_data['category_list'].length;
+    	var i = 0;
+
+        var x_spacing = dialog.data['widgets']['category_button']['array_offset'][0];
+        var x_start = dialog.data['widgets']['category_button']['topbar_width'] / 2 - ((used-1)/2) * x_spacing;
+
+        goog.array.forEach(dialog.user_data['category_list'], function(entry) {
+            // manually compute X coordinate to center all the visible buttons
+            var x = Math.floor(x_start + i * x_spacing + dialog.data['widgets']['category_button']['xy'][0] - dialog.data['widgets']['category_button']['dimensions'][0]/2);
+            dialog.widgets['category_button'+i.toString()].xy = [x, dialog.data['widgets']['category_button']['xy'][1]];
+
+            dialog.widgets['category_button'+i.toString()].str = entry['ui_name'];
+            dialog.widgets['category_button'+i.toString()].onclick = (function (_catname) { return function(w) { inventory_dialog_change_category(dialog, _catname); }; })(entry['name']);
+            i++;
+            if(i >= dialog.data['widgets']['category_button']['array'][0]) { throw Error('not enough category_button array entries!'); }
+        });
+        while(i < dialog.data['widgets']['category_button']['array'][0]) {
+            dialog.widgets['category_button'+i.toString()].show = false;
+            i++;
+        }
+    }
+
+    // set default category to show all items even if category tabs are disabled
+    inventory_dialog_change_category(dialog, 'ALL');
+
     init_inventory_grid(dialog);
     dialog.ondraw = update_inventory_grid;
+
+    // listen for inventory updates, because they affect category grid listings
+    dialog.user_data['inventory_update_receiver'] = (function (_dialog) { return function() {
+        // run inventory_dialog_change_category() to update the inventory grid, but pass the current category so the category doesn't change
+        inventory_dialog_change_category(dialog, dialog.user_data['category']);
+    }; })(dialog);
+    inventory_update_receivers.push(dialog.user_data['inventory_update_receiver']);
+    dialog.on_destroy = function(dialog) { goog.array.remove(inventory_update_receivers, dialog.user_data['inventory_update_receiver']); };
+
     update_inventory_header_buttons(dialog, find_object_by_type(gamedata['inventory_building']), 'inventory');
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog
+    @param {string} category*/
+function inventory_dialog_change_category(dialog, category) {
+    dialog.user_data['category'] = category;
+    // check if an inventory item is open and close if it is
+    if(dialog.user_data['context']) {
+        close_dialog(dialog.user_data['context']);
+    }
+    if(dialog.user_data['category_list']) {
+        goog.array.forEach(dialog.user_data['category_list'], function(entry, i) {
+            var w = dialog.widgets['category_button'+i.toString()];
+            w.text_color = (category === entry['name'] ? SPUI.default_text_color : SPUI.disabled_text_color);
+            w.state = (category === entry['name'] ? 'active' : 'normal');
+        });
+    }
+    // reset the category index
+    dialog.user_data['category_index'] = [];
+    // if the category is 'ALL', the category_inventory is the player's whole inventory
+    if (category === 'ALL') {
+        dialog.user_data['category_inventory'] = Array.from(player.inventory);
+        // if the category is 'ALL', the category_index will just match the index of player.inventory
+        goog.array.forEach(player.inventory, function(ply_inv, i) {
+            dialog.user_data['category_index'].push(i);
+        });
+    } else {
+        var check_category = goog.array.find(dialog.user_data['category_list'], function(entry){
+            return entry['name'] == category;
+        });
+        if(!check_category) { throw Error('unknown category '+category); }
+        var show_categories = check_category['categories'];
+        var category_inventory = []
+        goog.array.forEach(player.inventory, function(item, i) {
+            var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+            var item_category = ItemDisplay.get_inventory_item_category(spec);
+            if (goog.array.contains(show_categories, item_category)) {
+                category_inventory.push(item);
+                dialog.user_data['category_index'].push(i); // category_index is populated with the player.inventory index entry for each item added to the category_inventory
+            };
+        });
+        dialog.user_data['category_inventory'] = category_inventory; // all items in the player's inventory matching the subcategories are sent back to the dialog
+    }
+}
+
 var inventory_restack_sync_marker = Synchronizer.INIT;
 // the "inventory grid" functions are used by both inventory_dialog and loot_dialog
+/** @param {SPUI.Dialog} dialog */
 function init_inventory_grid(dialog) {
     dialog.user_data['restack_sort_order'] = 1;
     dialog.user_data['context'] = null;
@@ -25427,8 +25537,10 @@ function init_inventory_grid(dialog) {
     scrollable_dialog_change_page(dialog, dialog.user_data['page']);
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_inventory_grid(dialog) {
     var any_expiring = false;
+    var category_inventory = dialog.user_data['category_inventory'];
 
     var provides = gamedata['buildings'][gamedata['inventory_building']]['provides_inventory'];
     var max_possible_slots = Math.max((typeof(provides) === 'number' ? provides : provides[provides.length-1]), player.inventory.length); // allow for over-stuffed inventory
@@ -25436,13 +25548,13 @@ function update_inventory_grid(dialog) {
     var max_usable_inventory = Math.max(player.max_usable_inventory(), player.inventory.length); // allow for over-stuffed inventory
     var craft_products = [], craft_product_i = 0;
 
-    // need to update scrolling per-frame as player.inventory changes
+    // need to update scrolling per-frame as category_inventory changes
     var slots_per_page = dialog.user_data['rows_per_page'] * dialog.user_data['cols_per_page'];
     // add as many rowdata entries as necessary to fill the final page, but not beyond that
     var shown_slots = Math.min(max_possible_slots, slots_per_page * Math.floor((max_usable_inventory-1)/slots_per_page)+ slots_per_page - max_usable_inventory % slots_per_page);
 
     // note: rowdata here is just a placeholder null (so that scrollable_dialog_change_page() works)
-    // the actual data is in player.inventory
+    // the actual data is in category_inventory
     if(dialog.user_data['rowdata'].length != shown_slots) {
         dialog.user_data['rowdata'] = [];
         for(var s = 0; s < shown_slots; s++) { dialog.user_data['rowdata'].push(null); }
@@ -25450,13 +25562,24 @@ function update_inventory_grid(dialog) {
     scrollable_dialog_change_page(dialog, dialog.user_data['page']);
     dialog.widgets['custom_scroll_text'].str = dialog.data['widgets']['custom_scroll_text']['ui_name'].replace('%d1', pretty_print_number((slots_per_page * dialog.user_data['page'])+1)).replace('%d2', pretty_print_number(Math.min(slots_per_page * (dialog.user_data['page']+1), max_usable_inventory))).replace('%d3', pretty_print_number(player.max_usable_inventory()));
     // hide scroll text if beyond end of usable slots
-    dialog.widgets['custom_scroll_text'].show = (slots_per_page * dialog.user_data['page'])+1 <= max_usable_inventory;
+    dialog.widgets['custom_scroll_text'].show = (dialog.user_data['category'] === 'ALL') &&
+        ((slots_per_page * dialog.user_data['page'])+1 <= max_usable_inventory);
+
+    if('no_items_this_category' in dialog.widgets) {
+        dialog.widgets['no_items_this_category'].show =
+            (dialog.user_data['category'] !== 'ALL') && (category_inventory.length == 0);
+    }
 
     var cols = dialog.data['widgets']['slot']['array'][0];
     for(var y = 0; y < dialog.data['widgets']['slot']['array'][1]; y++) {
         for(var x = 0; x < cols; x++) {
             var wname = x.toString()+','+y.toString();
-            var slot = y*cols + x + dialog.user_data['page'] * slots_per_page;
+
+            // index of slot in the visible GUI
+            var ui_slot = y*cols + x + dialog.user_data['page'] * slots_per_page;
+            // index of slot in player.inventory
+            var inv_slot = dialog.user_data['category_index'][ui_slot];
+
             dialog.widgets['item'+wname].show =
                 dialog.widgets['slot'+wname].show =
                 dialog.widgets['stack'+wname].show =
@@ -25465,13 +25588,14 @@ function update_inventory_grid(dialog) {
                 dialog.widgets['pending'+wname].show =
                 dialog.widgets['frame'+wname].show = false;
 
-            if(slot < max_usable_inventory) {
-                dialog.widgets['slot'+wname].show = true;
-                dialog.widgets['slot'+wname].state = 'normal';
-                if(slot < player.inventory.length) {
-                    var item = player.inventory[slot];
+            if(ui_slot < max_usable_inventory) {
+                if(ui_slot < category_inventory.length) {
+                    // there's an item here
+                    var item = category_inventory[ui_slot];
                     var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
 
+                    dialog.widgets['slot'+wname].show = true;
+                    dialog.widgets['slot'+wname].state = 'normal';
                     dialog.widgets['item'+wname].show = true;
                     ItemDisplay.set_inventory_item_asset(dialog.widgets['item'+wname], spec);
                     ItemDisplay.set_inventory_item_stack(dialog.widgets['stack'+wname], spec, item);
@@ -25526,9 +25650,9 @@ function update_inventory_grid(dialog) {
                     if(warehouse_busy) { can_activate = false; }
                     if(!synchronizer.is_in_sync(inventory_restack_sync_marker)) { can_activate = false; }
 
-                    dialog.widgets['frame'+wname].state = (!can_activate ? 'cooldown' : (dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] === slot ? 'active' : 'normal'));
+                    dialog.widgets['frame'+wname].state = (!can_activate ? 'cooldown' : (dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] === inv_slot ? 'active' : 'normal'));
 
-                    dialog.widgets['frame'+wname].onenter = (function (_slot, _item) { return function(w) {
+                    dialog.widgets['frame'+wname].onenter = (function (_inv_slot, _item) { return function(w) {
                         var inv_dialog = w.parent;
                         // XXX awkward hack to do nothing if another dialog is obscuring this one
                         if(inv_dialog.children[inv_dialog.children.length-1] instanceof SPUI.Dialog &&
@@ -25538,7 +25662,7 @@ function update_inventory_grid(dialog) {
 
                         if(inv_dialog.user_data['context']) {
                             // do not switch if context for this item is already up
-                            if(inv_dialog.user_data['context'].user_data['slot'] === _slot &&
+                            if(inv_dialog.user_data['context'].user_data['slot'] === _inv_slot &&
                                inv_dialog.user_data['context'].user_data['item'] === _item) {
                                 return;
                             }
@@ -25552,12 +25676,13 @@ function update_inventory_grid(dialog) {
                                 }
                             }
                         }
-                        invoke_inventory_context(w.parent, w, _slot, _item, false);
-                    }; })(slot, item);
-                    dialog.widgets['frame'+wname].onclick = (function (_slot, _item) { return function(w) {
+                        invoke_inventory_context(w.parent, w, _inv_slot, _item, false);
+                    }; })(inv_slot, item);
+                    dialog.widgets['frame'+wname].onclick = (function (_inv_slot, _item) { return function(w) {
                         var inv_dialog = w.parent;
+
                         if(inv_dialog.user_data['context'] &&
-                           inv_dialog.user_data['context'].user_data['slot'] === _slot &&
+                           inv_dialog.user_data['context'].user_data['slot'] === _inv_slot &&
                            inv_dialog.user_data['context'].user_data['item'] === _item &&
                            inv_dialog.user_data['context'].user_data['show_dropdown']) {
                             // if context menu is already up for this item, simulate a click on "Activate"
@@ -25596,34 +25721,43 @@ function update_inventory_grid(dialog) {
                                     }
                                 }
                             }
-
                             if(inv_dialog.user_data['context'].widgets['button0'].state != 'disabled') {
                                 inv_dialog.user_data['context'].widgets['button0'].onclick(inv_dialog.user_data['context'].widgets['button0']);
                             }
 
                         } else {
-                            invoke_inventory_context(w.parent, w, _slot, _item, true);
+                            invoke_inventory_context(w.parent, w, _inv_slot, _item, true);
                         }
-                    }; })(slot, item);
-                    dialog.widgets['frame'+wname].onleave_cb = (function (_slot, _item) { return function(w) {
+                    }; })(inv_slot, item);
+                    dialog.widgets['frame'+wname].onleave_cb = (function (_inv_slot, _item) { return function(w) {
                         var inv_dialog = w.parent;
                         if(inv_dialog.user_data['context'] &&
-                           inv_dialog.user_data['context'].user_data['slot'] === _slot &&
+                           inv_dialog.user_data['context'].user_data['slot'] === _inv_slot &&
                            inv_dialog.user_data['context'].user_data['item'] === _item &&
                            !inv_dialog.user_data['context'].user_data['show_dropdown']) {
                             invoke_inventory_context(w.parent, w, -1, null, false);
                         }
-                    }; })(slot, item);
+                    }; })(inv_slot, item);
                     // make item/frame stick out a little bit on mouseover to look more "clickable"
                     var stickout = [0,0];
-                    if(dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] == slot && dialog.user_data['context'].user_data['item'] == item) {
+                    if(dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] == inv_slot && dialog.user_data['context'].user_data['item'] == item) {
                         if(!dialog.widgets['frame'+wname].pushed) { stickout = [0,-1]; }
                     }
                     dialog.widgets['item'+wname].bg_image_offset = stickout;
                     dialog.widgets['stack'+wname].text_offset = stickout;
                     dialog.widgets['frame'+wname].bg_image_offset = stickout;
+                } else {
+                    // it's an open slot
+                    if(dialog.user_data['category'] === 'ALL') {
+                        // show as empty
+                        dialog.widgets['slot'+wname].show = true;
+                        dialog.widgets['slot'+wname].state = 'normal';
+                    } else {
+                        // in filtered view, hide empty slots
+                        dialog.widgets['slot'+wname].show = false;
+                    }
                 }
-            } else if(slot < player.max_inventory) {
+            } else if(ui_slot < player.max_inventory) {
                 // it's a reserved slot for crafting
                 dialog.widgets['slot'+wname].show = true;
                 dialog.widgets['frame'+wname].show = true;
@@ -25639,7 +25773,7 @@ function update_inventory_grid(dialog) {
                 } else {
                     // unknown
                 }
-            } else if(slot < max_possible_slots) {
+            } else if(ui_slot < max_possible_slots && dialog.user_data['category'] === 'ALL') {
                 dialog.widgets['slot'+wname].show = true;
                 dialog.widgets['slot'+wname].state = 'locked';
                 dialog.widgets['slot'+wname].onclick = function(w) {
@@ -25689,7 +25823,7 @@ function update_inventory_grid(dialog) {
         dialog.widgets['overstuffed_warning'].str = dialog.data['widgets']['overstuffed_warning'][(warehouse && warehouse.level < warehouse.get_max_ui_level() ? 'ui_name': 'ui_name_maxlevel')].replace('%s', warehouse.spec['ui_name']);
     }
 
-    dialog.widgets['restack_button'].show = !warehouse_busy && eval_cond_or_literal(gamedata['client']['enable_inventory_restack'] || 0, player, null);
+    dialog.widgets['restack_button'].show = (dialog.user_data['category'] === 'ALL') && !warehouse_busy && eval_cond_or_literal(gamedata['client']['enable_inventory_restack'] || 0, player, null);
     dialog.widgets['restack_button'].onclick = function(w) {
         var dialog = w.parent;
         if(dialog.user_data['context']) {
@@ -26133,6 +26267,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_inventory_context(dialog) {
     var props = dialog.user_data['props'];
     var parent_dialog = dialog.user_data['parent_dialog'];
