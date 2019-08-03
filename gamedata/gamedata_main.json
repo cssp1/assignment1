@@ -777,7 +777,11 @@
     "gamebucks_in_deposits": 1, // whether iron_deposits can contain gamebucks
 
     // see https://developers.facebook.com/docs/payments/payer_promotion/
-    "enable_payer_promo": true, // whether or not to enable the Facebook Payer Promotion system by default
+    "enable_payer_promo": false, // whether or not to enable the Facebook Payer Promotion system by default
+    // 20190802 - turned off pending the resolution of these Facebook bugs, which seem to break the UI:
+    // https://developers.facebook.com/support/bugs/774878736264728/
+    // https://developers.facebook.com/support/bugs/780169055713475/
+
     "payer_promo_interval": 1814400, // minimum interval (sec) between Facebook Payer Promotion offer prompts
     "payer_promo_min_logins": 110, // minimum number of logins before promo can be shown
 
