@@ -218,7 +218,7 @@
     "suspicious_user_id_list": [],
     "banned_ips": [],
 
-    "default_ban_time": 31536000, // default ban is for 1 year
+    "default_ban_time": 3122064000, // default ban is for 99 years
 
     "log_fbpayments": 1, // log intensity for FB Payments API
     "log_fb_open_graph": false, // write FB open graph HTTP interaction to exceptions.txt
