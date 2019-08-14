@@ -97,8 +97,10 @@ if __name__ == '__main__':
             if ('country_tier' not in row) and ('country' in row):
                 row['country_tier'] = SpinConfig.country_tier_map.get(row['country'], 4)
 
-            if ('splash_image' in row) and (not (row['splash_image'].startswith('#'))):
-                row['splash_image'] = os.path.basename(row['splash_image'])
+            if ('splash_image' in row):
+                splash_image = str(row['splash_image'])
+                if not splash_image.startswith('#'):
+                    row['splash_image'] = os.path.basename(splash_image)
 
             for FIELD in ('user_id','social_id','country','country_tier','ip',
                           'browser_name','browser_os','browser_version','method',
