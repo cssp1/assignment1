@@ -147,6 +147,9 @@
         // South America
         [{"predicate": "COUNTRY", "countries": ["br"]}, "BRL"],
 
+        // Indonesia
+        [{"predicate": "COUNTRY", "countries": ["id"]}, "IDR"],
+
         [{"predicate": "ALWAYS_TRUE"}, "USD"]
     ],
 
