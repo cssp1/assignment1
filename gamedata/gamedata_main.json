@@ -1041,6 +1041,7 @@
         "KRW": { "suffix": " KRW", "decimals": 0 },
         "QAR": { "suffix": " QR", "decimals": 2 },
         "ZAR": { "suffix": " R", "decimals": 2 },
+        "IDR": { "prefix": "", "suffix": "", "decimals": 0 },
         "JPY": { "prefix": "\u00a5", "suffix": "", "decimals": 0 }
     },
 
