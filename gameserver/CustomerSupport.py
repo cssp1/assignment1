@@ -145,6 +145,25 @@ class Handler(object):
             ret['developer'] = 1
         return ret
 
+    def get_player_ui_name_offline(self, user, player):
+        if player.get('alias'):
+            return player['alias']
+        # needs to match User.get_real_name()
+        if user.get('bh_username'):
+            return user['bh_username']
+        elif user.get('mm_username'):
+            return user['mm_username']
+        elif user.get('ag_username'):
+            return user['ag_username']
+        elif user.get('kg_username'):
+            return user['kg_username']
+        elif user.get('facebook_first_name'):
+            return user['facebook_first_name']
+        elif user.get('facebook_name'):
+            return user['facebook_name'].split(' ')[0]
+        else:
+            return 'Unknown(user)'
+
 class HandleGetRaw(Handler):
     read_only = True
     def __init__(self, *args, **kwargs):
@@ -224,13 +243,52 @@ class HandleAddNote(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleBan(Handler):
-    need_user = False
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.enable_public_announce = bool(int(self.args.get('public_announce', '0')))
+        self.ui_public_message = self.args.get('ui_public_message', None)
+
+    def do_public_announce(self, ui_player_name, region_id):
+        if not self.enable_public_announce:
+            return
+
+        # send to regional chat channel
+        if (not region_id) or (region_id not in self.gamedata['regions']):
+            return
+
+        ui_region_name = self.gamedata['regions'][region_id]['ui_name']
+
+        channel = 'r:' + region_id
+
+        # try to figure out a good message
+        if not self.ui_public_message:
+            ui_reason = self.args.get('ui_reason')
+            if ui_reason and ('hack' in ui_reason.lower()) and ('public_banned_for_hacking' in self.gamedata['strings']):
+                self.ui_public_message = self.gamedata['strings']['public_banned_for_hacking']['ui_description']
+
+        if not self.ui_public_message:
+            return
+
+        msg = self.ui_public_message.replace('%player_name', ui_player_name).replace('%region_name', ui_region_name)
+
+        self.gamesite.chat_mgr.send(channel, None,
+                                    {'chat_name': 'System',
+                                     'type': 'system',
+                                     'time': self.time_now,
+                                     'user_id': -1},
+                                    msg)
+
     def do_exec_online(self, session, retmsg):
         session.player.banned_until = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
+        ui_player_name = '%s L%d' % (session.user.get_ui_name(session.player), session.player.resources.player_level)
+        self.do_public_announce(ui_player_name, session.player.home_region)
         return ReturnValue(result = 'ok', kill_session = True)
     def do_exec_offline(self, user, player):
         player['banned_until'] = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
+        ui_player_name = '%s L%d' % (self.get_player_ui_name_offline(user, player), player['resources']['player_level'])
+        self.do_public_announce(ui_player_name, player.get('home_region'))
         return ReturnValue(result = 'ok')
+
 class HandleUnban(Handler):
     need_user = False
     def do_exec_online(self, session, retmsg):
@@ -276,21 +334,7 @@ class HandleClearAlias(Handler):
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         if 'alias' in player: del player['alias']
-        # needs to match User.get_real_name()
-        if user.get('bh_username'):
-            new_ui_name = user['bh_username']
-        elif user.get('mm_username'):
-            new_ui_name = user['mm_username']
-        elif user.get('ag_username'):
-            new_ui_name = user['ag_username']
-        elif user.get('kg_username'):
-            new_ui_name = user['kg_username']
-        elif user.get('facebook_first_name'):
-            new_ui_name = user['facebook_first_name']
-        elif user.get('facebook_name'):
-            new_ui_name = user['facebook_name'].split(' ')[0]
-        else:
-            new_ui_name = 'Unknown(user)'
+        new_ui_name = self.get_player_ui_name_offline(user, player)
         self.update_player_cache_ui_name(new_ui_name)
         return ReturnValue(result = 'ok')
 
