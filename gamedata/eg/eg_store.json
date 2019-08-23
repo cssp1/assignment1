@@ -90,7 +90,8 @@
         ["SEK", "0.10"],
         ["NOK", "0.10"],
         ["QAR", "0.05"],
-        ["BRL", "0.02"]
+        ["BRL", "0.02"],
+        ["IDR", "142.23"]
     ],
 
     // this is the exchange rate used when offering the player "top-ups", i.e. purchases of arbitrary amounts of gamebucks
@@ -145,6 +146,9 @@
 
         // South America
         [{"predicate": "COUNTRY", "countries": ["br"]}, "BRL"],
+
+        // Indonesia
+        [{"predicate": "COUNTRY", "countries": ["id"]}, "IDR"],
 
         [{"predicate": "ALWAYS_TRUE"}, "USD"]
     ],
