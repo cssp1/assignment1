@@ -2560,6 +2560,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$MATTERMOST_API_PATH$': ("'"+SpinConfig.config['mattermost_api_path']+"'") if SpinConfig.config.get('mattermost_api_path') else 'null',
             '$BATTLEHOUSE_API_PATH$': ("'"+SpinConfig.config['battlehouse_api_path']+"'") if SpinConfig.config.get('battlehouse_api_path') else 'null',
             '$BATTLEHOUSE_ACCESS_TOKEN$': "'"+visitor.battlehouse_auth_token+"'" if isinstance(visitor, BHVisitor) else 'null',
+            '$DISCORD_CLIENT_ID$': SpinConfig.config.get('discord_client_id', ''),
             '$KONGREGATE_ID$': "'"+visitor.kongregate_id+"'" if isinstance(visitor, KGVisitor) else 'null',
             '$SIGNED_REQUEST$': "'"+visitor.raw_signed_request+"'" if isinstance(visitor, FBVisitor) else 'null',
             '$FACEBOOK_PERMISSIONS$': visitor.scope_string if (isinstance(visitor, FBVisitor) and visitor.scope_string) else '', # note: client may get more permissions later, this is just the set available upon login
