@@ -375,7 +375,9 @@ var method_chat_abuse_violate = function() {
 var method_ban = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#ban_reason")[0].value);
-    args = {'ui_reason': ui_reason};
+    args = {'ui_reason': ui_reason,
+            'remove_from_map': $("#ban_remove_from_map")[0].checked ? '1' : '0'
+           };
 
     if( $("#ban_public_announce")[0].checked) {
         args['public_announce'] = '1';
@@ -1901,12 +1903,14 @@ $(function() {
     <div id="player_tools_ban">
       <button onclick="method_ban()" class="spin_button">Ban</button>
       <button onclick="method_unban()" class="spin_button">Unban</button>
+      <br>
+      <input id="ban_remove_from_map" type="checkbox" style="height:initial;" checked="1"></input>Also remove home base and all quarries from regional map
       <p>
-      Reason for this action:
+    Reason for this action:
       <br>
       <input type="text" id="ban_reason" style="width:500px;">
       <p>
-      <input id="ban_public_announce" type="checkbox" style="height:initial;" onclick="if(this.checked) { $('#ban_public_message').removeAttr('disabled'); } else { $('#ban_public_message').attr('disabled', 'disabled'); }"></input>Announce the ban in public region chat:<br>
+      <input id="ban_public_announce" type="checkbox" style="height:initial;" onclick="if(this.checked) { $('#ban_public_message').removeAttr('disabled'); } else { $('#ban_public_message').attr('disabled', 'disabled'); }"></input>Announce the ban in public chat:<br>
       <input type="text" id="ban_public_message" style="width:800px;" disabled="disabled" value="%player_name in region %region_name has been banned for hacking. Have a nice day!"></input>
     </div>
 

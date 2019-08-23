@@ -27,6 +27,12 @@ import ResLoot
 import Notification2
 from Predicates import read_predicate
 
+# for process spawning
+import os
+import twisted.internet.reactor
+import twisted.internet.error
+import twisted.internet.protocol
+
 def get_leveled_quantity(qty, level): # XXX duplicate
     if type(qty) == list:
         return qty[level-1]
@@ -242,10 +248,29 @@ class HandleAddNote(Handler):
     def do_exec_offline(self, user, player):
         return ReturnValue(result = 'ok')
 
+class ExternalProcess(twisted.internet.protocol.ProcessProtocol):
+    def __init__(self, exe):
+        self.exe = exe
+        self.error = ''
+        self.output = ''
+        self.d = twisted.internet.defer.Deferred()
+    def connectionMade(self):
+        self.transport.closeStdin()
+    def errReceived(self, data):
+        self.error += data
+    def outReceived(self, data):
+        self.output += data
+    def processEnded(self, status):
+        if not isinstance(status.value, twisted.internet.error.ProcessDone):
+            self.d.errback('error running %s: %s\n%s' % (self.exe, repr(status), self.error))
+        else:
+            self.d.callback('%s was run successfully: %s' % (self.exe, self.output.strip()))
+
 class HandleBan(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         self.enable_public_announce = bool(int(self.args.get('public_announce', '0')))
+        self.enable_remove_from_map = bool(int(self.args.get('remove_from_map', '1')))
         self.ui_public_message = self.args.get('ui_public_message', None)
 
     def do_public_announce(self, ui_player_name, region_id):
@@ -278,15 +303,36 @@ class HandleBan(Handler):
                                      'user_id': -1},
                                     msg)
 
+    def do_remove_from_map(self, user_id, region_id):
+        if not self.enable_remove_from_map or not region_id:
+            return
+
+        # the code for this is quite complicated. Punt by shelling out to maptool.py
+        exe = './maptool.py'
+        args = [exe, region_id, 'home', 'pluck', '--user-id', str(user_id)]
+        proc = ExternalProcess(exe)
+        proc.d.addBoth(lambda result, _self=self: _self.gamesite.exception_log.event(_self.time_now, result))
+
+        # delay first to allow gameserver to drop the lock
+        DELAY = 10
+        self.gamesite.exception_log.event(self.time_now, 'will attempt to remove from map %s in %d seconds...' % (region_id, DELAY))
+        twisted.internet.reactor.callLater(DELAY,
+                                           twisted.internet.reactor.spawnProcess,
+                                           proc, exe, args=args, env=os.environ)
+
     def do_exec_online(self, session, retmsg):
         session.player.banned_until = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
         ui_player_name = '%s L%d' % (session.user.get_ui_name(session.player), session.player.resources.player_level)
+        self.gamesite.exception_log.event(self.time_now, 'banned player %d' % self.user_id)
         self.do_public_announce(ui_player_name, session.player.home_region)
+        self.do_remove_from_map(self.user_id, session.player.home_region)
         return ReturnValue(result = 'ok', kill_session = True)
     def do_exec_offline(self, user, player):
         player['banned_until'] = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
         ui_player_name = '%s L%d' % (self.get_player_ui_name_offline(user, player), player['resources']['player_level'])
+        self.gamesite.exception_log.event(self.time_now, 'banned player %d' % self.user_id)
         self.do_public_announce(ui_player_name, player.get('home_region'))
+        self.do_remove_from_map(self.user_id, player.get('home_region'))
         return ReturnValue(result = 'ok')
 
 class HandleUnban(Handler):
