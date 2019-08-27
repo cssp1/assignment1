@@ -8083,7 +8083,7 @@ class Building(MapBlockingGameObject):
     def is_minefield(self):
         return self.spec.equip_slots and ('mine' in self.spec.equip_slots)
     def is_minefield_armed(self):
-        return Equipment.equip_has(self.equipment, ('mine',0))
+        return self.equipment and Equipment.equip_has(self.equipment, ('mine',0))
     def minefield_item(self): # note: returns spec name
         item = Equipment.equip_get(self.equipment, ('mine',0))
         if item: return item['spec']
@@ -13206,7 +13206,16 @@ class Player(AbstractPlayer):
                 to_remove = []
                 for entry in obj.crafting.queue:
                     if entry.craft_state['recipe'] not in gamedata['crafting']['recipes']:
-                        to_remove.append(entry)
+                        if gamedata['server'].get('migrate_landmines_to_leveled_items', False) and not self.history.get('landmine_leveled_item_migrated', False) and 'make_mine_' in entry.craft_state['recipe'] and '_L' in entry.craft_state['recipe']:
+                            recipe_level = int(entry.craft_state['recipe'][entry.craft_state['recipe'].index('_L') + 2:])
+                            recipe_spec = entry.craft_state['recipe'][:entry.craft_state['recipe'].index('_L')]
+                            if recipe_spec in gamedata['crafting']['recipes']:
+                                entry.craft_state['recipe'] = recipe_spec
+                                entry.craft_state['level'] = recipe_level
+                            else:
+                                to_remove.append(entry)
+                        else:
+                            to_remove.append(entry)
                 if to_remove:
                     for entry in to_remove:
                         obj.crafting.queue.remove(entry)
@@ -14974,6 +14983,34 @@ class LivePlayer(Player):
             self.scores2.prune({Scores2.FREQ_SEASON: SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time()),
                                 Scores2.FREQ_WEEK:   SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time()),
                                 Scores2.FREQ_DAY:    SpinConfig.get_pvp_day(gamedata['matchmaking']['week_origin'], self.get_absolute_time())})
+
+        if gamedata['server'].get('migrate_landmines_to_leveled_items', False) and not self.history.get('landmine_leveled_item_migrated', False):
+            # landmine equip and config migration is handled here. Crafting is in migrate_proxy because migrate_proxy removes any recipe not in gamedata
+            for obj in self.home_base_iter():
+                # only minefields need to be processed for mines
+                if obj.is_building() and obj.is_minefield():
+                    # equip values for armed mines get processed
+                    if obj.is_minefield_armed() and '_L' in obj.minefield_item():
+                        mine_level = int(obj.minefield_item()[obj.minefield_item().index('_L') + 2:]) # makes int from all characters after _L, which is mine level
+                        mine_spec = obj.minefield_item()[:obj.minefield_item().index('_L')] # makes string from all characters before _L, which is mine spec
+                        # last check ensures that new object is in the gamedata
+                        if mine_spec in gamedata['items']:
+                            obj.equipment['mine'][0] = {"spec": mine_spec, "level": mine_level} # replaces old mine with new mine
+                    # if the minefield has a config value, it has to be checked item by item since config is an array
+                    if obj.config:
+                        for key in obj.config:
+                            if isinstance(obj.config[key], dict) and 'spec' in obj.config[key] and 'mine_' in obj.config[key]['spec'] and '_L' in obj.config[key]['spec']:
+                                mine_level = int(obj.config[key]['spec'][obj.config[key]['spec'].index('_L') + 2:]) # makes int from all characters after _L, which is mine level
+                                mine_spec = obj.config[key]['spec'][:obj.config[key]['spec'].index('_L')] # makes string from all characters before _L, which is mine spec
+                                if mine_spec in gamedata['items']:
+                                    obj.config[key]['spec'] = mine_spec
+                                    obj.config[key]['level'] = mine_level
+                            elif (isinstance(obj.config[key], str) or isinstance(obj.config[key], unicode)) and 'mine_' in obj.config[key] and '_L' in obj.config[key]:
+                                mine_level = int(obj.config[key][obj.config[key].index('_L') + 2:]) # makes int from all characters after _L, which is mine level
+                                mine_spec = obj.config[key][:obj.config[key].index('_L')] # makes string from all characters before _L, which is mine spec
+                                if mine_spec in gamedata['items']:
+                                    obj.config[key] = {'spec':mine_spec, 'level':mine_level}
+            self.history['landmine_leveled_item_migrated'] = 1
 
     def recalculate_xp(self):
         new_player_xp = gamedata['player_xp']

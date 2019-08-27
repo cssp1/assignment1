@@ -592,36 +592,53 @@ class FindAndReplaceItemsConsequent(Consequent):
     def execute(self, session, player, retmsg, context=None):
         obj_updates = set()
 
-        # XXX note: this doesn't handle leveled items specially
-
         for obj in player.home_base_iter():
             if obj.is_building():
                 if self.recipe_map and self.affect_crafting and obj.is_crafting():
                     for entry in obj.crafting.queue:
                         if entry.craft_state['recipe'] in self.recipe_map:
-                            entry.craft_state['recipe'] = self.recipe_map[entry.craft_state['recipe']]
+                            if isinstance(self.recipe_map[entry.craft_state['recipe']], dict):
+                                entry.craft_state['recipe'] = self.recipe_map[entry.craft_state['recipe']]['spec']
+                                entry.craft_state['level'] = self.recipe_map[entry.craft_state['recipe']]['level']
+                            else:
+                                entry.craft_state['recipe'] = self.recipe_map[entry.craft_state['recipe']]
                             obj_updates.add(obj)
                 if self.item_map and self.affect_equipment and obj.equipment:
                     for slot_type in obj.equipment:
                         for i in xrange(len(obj.equipment[slot_type])):
-                            if type(obj.equipment[slot_type][i]) is dict:
+                            if isinstance(obj.equipment[slot_type][i], dict):
                                 if obj.equipment[slot_type][i]['spec'] in self.item_map:
-                                    obj.equipment[slot_type][i]['spec'] = self.item_map[obj.equipment[slot_type][i]['spec']]
+                                    if isinstance(self.item_map[obj.equipment[slot_type][i]['spec']], dict):
+                                        obj.equipment[slot_type][i]['spec'] = self.item_map[obj.equipment[slot_type][i]['spec']]['spec']
+                                        obj.equipment[slot_type][i]['level'] = self.item_map[obj.equipment[slot_type][i]['spec']]['level']
+                                    else:
+                                        obj.equipment[slot_type][i]['spec'] = self.item_map[obj.equipment[slot_type][i]['spec']]
                                     obj_updates.add(obj)
                             elif obj.equipment[slot_type][i] in self.item_map:
-                                obj.equipment[slot_type][i] = self.item_map[obj.equipment[slot_type][i]]
+                                if isinstance(self.item_map[obj.equipment[slot_type][i]], dict):
+                                    obj.equipment[slot_type][i] = {'spec': self.item_map[obj.equipment[slot_type][i]]['spec'], 'level': self.item_map[obj.equipment[slot_type][i]]['level']}
+                                else:
+                                    obj.equipment[slot_type][i] = self.item_map[obj.equipment[slot_type][i]]
                                 obj_updates.add(obj)
                 if self.config_map and self.affect_config and obj.config:
                     for key in obj.config:
                         if key in self.config_map:
-                            if type(obj.config[key]) is dict:
+                            if isinstance(obj.config[key], dict):
                                 if obj.config[key]['spec'] in self.config_map[key]:
-                                    obj.config[key]['spec'] = self.config_map[key][obj.config[key]['spec']]
+                                    if isinstance(self.config_map[key][obj.config[key]['spec']], dict):
+                                        obj.config[key]['spec'] = self.config_map[key][obj.config[key]['spec']]['spec']
+                                        obj.config[key]['level'] = self.config_map[key][obj.config[key]['spec']]['level']
+                                    else:
+                                        obj.config[key]['spec'] = self.config_map[key][obj.config[key]['spec']]
                                     obj_updates.add(obj)
                             elif obj.config[key] in self.config_map[key]:
-                                obj.config[key] = self.config_map[key][obj.config[key]]
+                                if isinstance(self.config_map[key][obj.config[key]], dict):
+                                    obj.config[key] = {'spec':self.config_map[key][obj.config[key]]['spec'], 'level':self.config_map[key][obj.config[key]]['level']}
+                                else:
+                                    obj.config[key] = self.config_map[key][obj.config[key]]
                                 obj_updates.add(obj)
 
+        # xxx unit_equipment doesn't support levelled items
         if self.item_map and self.affect_equipment and player.unit_equipment:
             for equipment in player.unit_equipment.itervalues():
                 for slot_type in equipment:
@@ -634,7 +651,12 @@ class FindAndReplaceItemsConsequent(Consequent):
 
         if self.item_map and self.affect_inventory:
             for entry in player.inventory:
-                entry['spec'] = self.item_map.get(entry['spec'], entry['spec'])
+                if entry['spec'] in self.item_map:
+                    if isinstance(self.item_map[entry['spec']], dict):
+                        entry['spec'] = self.item_map[entry['spec']]['spec']
+                        entry['item'] = self.item_map[entry['spec']]['item']
+                    else:
+                        entry['spec'] = self.item_map[entry['spec']]
 
         for obj in obj_updates:
             retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])

@@ -1100,6 +1100,24 @@ def check_crafting_recipe(recname, spec):
         if 'consumes_power' not in spec:
             error |= 1; print '%s: missing consumes_power (while crafting)' % (recname,)
 
+    if spec['crafting_category'] == 'mines' and '_L' not in spec['name']:
+        if 'max_level' not in spec:
+            error |= 1; print '%s: missing max_level (required for leveled landmine recipes)' % (recname,)
+        if 'associated_tech' not in spec:
+            error |= 1; print '%s: missing associated_tech (required for leveled landmine recipes)' % (recname,)
+        if not isinstance(spec['product'], list):
+            error |= 1; print '%s: product should be a list' % (recname,)
+        if len(spec['product']) < spec['max_level']:
+            error |= 1; print '%s: product is %d, needs to be at least %d' % (recname,spec['max_level'],len(spec['product']),)
+        for level, product in enumerate(spec['product']):
+            for prod in product:
+                if not isinstance(prod, dict):
+                    error |= 1; print '%s: product list entry %d needs to be a dictionary' % (recname, level + 1,)
+                elif 'spec' not in prod:
+                    error |= 1; print '%s: product list entry %d needs a "spec" value' % (recname, level + 1,)
+                elif 'level' not in prod:
+                    error |= 1; print '%s: product list entry %d needs a "level" value' % (recname, level + 1,)
+
     if 'associated_item' in spec:
         if spec['associated_item'] not in gamedata['items']:
             error |=1; print '%s: associated_item % not found' % (recname, spec['associated_item'])
@@ -1230,7 +1248,10 @@ def check_item(itemname, spec):
 #            error |= 1
 #            print '%s:unit_icon is missing from units.json' % itemname
     elif spec['icon'] != 'gamebucks_inventory_icon':
-        error |= require_art_asset(spec['icon'], itemname+':icon')
+        if isinstance(spec['icon'], list):
+            for icon in spec['icon']: error |= require_art_asset(icon, itemname+':icon')
+        else:
+            error |= require_art_asset(spec['icon'], itemname+':icon')
 
     if type(spec['ui_description']) is list:
         ui_descr_list = [val for pred, val in spec['ui_description']]
@@ -2046,13 +2067,17 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
             for fr, to in cons['item_map'].iteritems():
                 if ((not cons['item_map'].get('legacy',False)) and fr not in gamedata['items']):
                     error |= 1; print '%s: %s consequent refers to invalid item %s\n' % (reason, cons['consequent'], fr)
-                if (to not in gamedata['items']):
+                if isinstance(to, dict) and to['spec'] not in gamedata['items']:
+                    error |= 1; print '%s: %s consequent refers to invalid item %s\n' % (reason, cons['consequent'], to['spec'])
+                elif isinstance(to, str) and (to not in gamedata['items']):
                     error |= 1; print '%s: %s consequent refers to invalid item %s\n' % (reason, cons['consequent'], to)
         if 'recipe_map' in cons:
             for fr, to in cons['recipe_map'].iteritems():
                 if ((not cons['recipe_map'].get('legacy',False)) and fr not in gamedata['crafting']['recipes']):
                     error |= 1; print '%s: %s consequent refers to invalid crafting recipe %s\n' % (reason, cons['consequent'], fr)
-                if (to not in gamedata['crafting']['recipes']):
+                if isinstance(to, dict) and (to['spec'] not in gamedata['crafting']['recipes']):
+                    error |= 1; print '%s: %s consequent refers to invalid crafting recipe %s\n' % (reason, cons['consequent'], to['spec'])
+                elif isinstance(to, str) and (to not in gamedata['crafting']['recipes']):
                     error |= 1; print '%s: %s consequent refers to invalid crafting recipe %s\n' % (reason, cons['consequent'], to)
     elif cons['consequent'] == "FIND_AND_REPLACE_OBJECTS":
         for find, replace in cons['replacements']:
