@@ -2855,6 +2855,9 @@ GameObject.prototype.run_control_shooting = function(world) {
             }
 
             var spell = gamedata['spells'][this.control_spellname];
+            if (!spell) {
+                throw Error(this.control_spellname + ' missing from gamedata, needed by ' + this.spec['name']);
+            }
             var spell_level = this.get_auto_spell_level(); // assumes auto_spell here
 
             if(('firing_arc' in spell) && ('turn_rate' in this.spec)) {
