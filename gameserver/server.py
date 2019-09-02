@@ -23510,7 +23510,7 @@ class GAMEAPI(resource.Resource):
                 if PRED in recipe:
                     req = Predicates.read_predicate(GameObjectSpec.get_leveled_quantity(recipe[PRED], arg.recipe_level))
                     if (not player.is_cheater) and (not req.is_satisfied2(session, player, None)):
-                        if retmsg is not None: retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", recipe[PRED]])
+                        if retmsg is not None: retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", GameObjectSpec.get_leveled_quantity(recipe[PRED], arg.recipe_level)])
                         return False
 
         # check resource cost

@@ -35668,22 +35668,23 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                 var build_error_ui_text = null;
 
                 if(build_recipe_spec) {
-                    var max_level = (build_recipe_spec['max_level'] || 1);
-                    var associated_tech = (build_recipe_spec['associated_tech'] || false);
+                    var build_recipe_max_level = (build_recipe_spec['max_level'] || 1);
+                    var build_recipe_associated_tech = (build_recipe_spec['associated_tech'] || false);
+                    var build_recipe_level = 1;
+                    if((build_recipe_max_level || 1) > 1 && build_recipe_associated_tech && player.tech[build_recipe_associated_tech]) {
+                        build_recipe_level = player.tech[build_recipe_associated_tech];
+                    }
                     var can_cast = can_cast_spell_detailed(builder.id, 'CRAFT_FOR_FREE', [{'recipe': build_recipe_spec['name'], // XXX level
                                                                                            'delivery': {'obj_id':obj.id, 'slot_type':delivery_slot_type, 'slot_index': delivery_slot_index}}]);
                     if(can_cast[0]) {
                         // the real build function
-                        build_cb = (function (_builder, _build_recipe_spec, _obj, _delivery_slot_index) { return function() {
-                            var extra_params = {'delivery': {'obj_id':_obj.id, 'slot_type':delivery_slot_type, 'slot_index': _delivery_slot_index}};
-                            if((max_level || 1) > 1 && associated_tech && player.tech[associated_tech]) {
-                                extra_params['level'] = player.tech[associated_tech];
-                            }
+                        build_cb = (function (_builder, _build_recipe_spec, _obj, _delivery_slot_index, _build_recipe_level) { return function() {
+                            var extra_params = {'delivery': {'obj_id':_obj.id, 'slot_type':delivery_slot_type, 'slot_index': _delivery_slot_index}, 'level': _build_recipe_level };
                             start_crafting(_builder, _build_recipe_spec, extra_params);
                             // play sound effect
                             GameArt.play_canned_sound('action_button_134px');
                             return true;
-                        }; })(builder, build_recipe_spec, obj, delivery_slot_index);
+                        }; })(builder, build_recipe_spec, obj, delivery_slot_index, build_recipe_level);
                     } else {
                         build_error_ui_text = can_cast[1];
                         // get helper function
