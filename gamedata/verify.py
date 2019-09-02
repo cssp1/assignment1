@@ -672,12 +672,21 @@ def check_enhancement(specname, keyname, spec, maxlevel):
         error |= 1
         print '%s:enhance_time MUST be a per-level list' % specname
 
+    # checks any item that has both 'weapon' and 'weapon_level' to make sure that the weapon spell has the weapon level needed
     if 'effects' in spec:
+        weapon_spell_name = None
+        weapon_spell_max_level = 0
         for effect in spec['effects']:
-            if effect['code'] != 'modstat':
-                error |= 1
-                print '%s: uses invalid effect code %s' % effect['code']
-            error |= check_modstat(effect, specname, affects = effect.get('affects',None), expect_strength_array_length = maxlevel)
+            if 'stat' in effect and effect['stat'] == 'weapon':
+                # be sure it's a string:
+                if not isinstance(effect['strength'], basestring):
+                    error |= 1; print '%s: unexpected type for "strength", should be a string in gamedata["spells"]' % effect['code']
+                weapon_spell_name = effect['strength']
+            elif 'stat' in effect and effect['stat'] == 'weapon_level':
+                # handle both single numbers and lists, and take the max() over all effects
+                weapon_spell_max_level = max(weapon_spell_max_level, max(effect['strength']) if isinstance(effect['strength'], list) else effect['strength'])
+        if weapon_spell_name and weapon_spell_max_level:
+            check_spell_level(weapon_spell_name, weapon_spell_max_level, reason = 'enhancement %s: effects' % itemname)
 
     # check resource requirement vs CC level
     if verbose:
@@ -833,6 +842,26 @@ def check_visual_effect(name, effect):
 
     return error
 
+def check_spell_level(spellname, level, reason):
+    # take a spell name and level and confirms that the spell has the requested level
+    error = 0
+    if spellname not in gamedata['spells']:
+        error |= 1; print '%s: spell "%s" not in spells.json' % (reason, spellname)
+    spec = gamedata['spells'][spellname]
+    for key in spec:
+        if isinstance(spec[key], list) and key not in ('impact_auras', 'projectile_color'):
+            if len(spec[key]) < level:
+                error |= 1
+                print '%s: spell %s stat %s array length is %d, but a "spell_level" modstat requires it to be %d' % (reason, spellname, key, len(spec[key]), level )
+    if 'impact_auras' in spec:
+        for aura in spec['impact_auras']:
+            if isinstance(aura, dict) and 'strength' in aura and isinstance(aura['strength'], list):
+                if len(aura['strength']) < level:
+                    error |= 1
+                    key = 'impact_aura ' + aura['spec'] + ' strength'
+                    print '%s: spell %s stat %s array length is %d, but a "spell_level" modstat requires it to be %d' % (reason, spellname, key, len(aura['strength']), level )
+    return error
+
 def check_spell(spellname, spec):
     error = 0
     icon = spec.get('new_store_icon', spec.get('icon', None))
@@ -890,9 +919,37 @@ def check_spell(spellname, spec):
             this_aura_spec = {'name': spec['applies_aura'], 'aura_strength': spec.get('aura_strength', 1), 'aura_duration': spec.get('aura_duration', -1)}
             error |= check_aura('aura:'+spec['applies_aura'], this_aura_spec, 1) # validate the aura data. Assume maxlevel value of 1
 
-    if spellname.endswith('_SHOOT') and ('cooldown' not in spec):
-        error |= 1
-        print '%s is missing a "cooldown"' % (spellname)
+    if spellname.endswith('_SHOOT'):
+        if 'cooldown' not in spec:
+            error |= 1
+            print '%s is missing a "cooldown"' % (spellname)
+
+        # gets longest key in the _SHOOT spell and compares with all other lists. Reports any mismatches
+        longest_key = ''
+        longest_key_length = 0
+        for key in spec:
+            if isinstance(spec[key], list) and key not in ('impact_auras', 'projectile_color'):
+                if len(spec[key]) > longest_key_length:
+                    longest_key = key
+                    longest_key_length = len(spec[key])
+        if 'impact_auras' in spec:
+            for aura in spec['impact_auras']:
+                if isinstance(aura, dict) and 'strength' in aura and isinstance(aura['strength'], list):
+                    if len(aura['strength']) > longest_key_length:
+                        longest_key = 'impact_aura ' + aura['spec'] + ' strength'
+                        longest_key_length = len(aura['strength'])
+        for key in spec:
+            if isinstance(spec[key], list) and key not in ('impact_auras', 'projectile_color'):
+                if len(spec[key]) < longest_key_length:
+                    error |= 1
+                    print '%s has array length mismatch. Longest value is %s with %d entries, while key %s has %d entries' % (spellname, longest_key, longest_key_length, key, len(spec[key]))
+        if 'impact_auras' in spec:
+            for aura in spec['impact_auras']:
+                if isinstance(aura, dict) and 'strength' in aura and isinstance(aura['strength'], list):
+                    if len(aura['strength']) < longest_key_length:
+                        error |= 1
+                        bad_aura = 'impact_aura ' + aura['spec'] + ' strength'
+                        print '%s has array length mismatch. Longest value is %s with %d entries, while key %s has %d entries' % (spellname, longest_key, longest_key_length, bad_aura, len(aura['strength']))
 
     if ('cooldown_interval' in spec) != ('cooldown_origin' in spec):
         error |= 1; print '%s must have both cooldown_origin and cooldown_interval' % spellname
@@ -1452,6 +1509,23 @@ def check_item(itemname, spec):
                 error |= check_consequent(effect['consequent'], reason = 'item %s: effects' % itemname)
 
         equip = spec['equip']
+
+        # checks any item that has both 'weapon' and 'weapon_level' to make sure that the weapon spell has the weapon level needed
+        if 'effects' in equip:
+            weapon_spell_name = None
+            weapon_spell_max_level = 0
+            for effect in equip['effects']:
+                if 'stat' in effect and effect['stat'] == 'weapon':
+                    # be sure it's a string:
+                    if not isinstance(effect['strength'], basestring):
+                        error |= 1; print '%s: unexpected type for "strength", should be a string in gamedata["spells"]' % effect['code']
+                    weapon_spell_name = effect['strength']
+                elif 'stat' in effect and effect['stat'] == 'weapon_level':
+                    # handle both single numbers and lists, and take the max() over all effects
+                    weapon_spell_max_level = max(weapon_spell_max_level, max(effect['strength']) if isinstance(effect['strength'], list) else effect['strength'])
+            if weapon_spell_name and weapon_spell_max_level:
+                check_spell_level(weapon_spell_name, weapon_spell_max_level, reason = 'item %s: equip effects' % itemname)
+
         # check compatibility criteria
         if 'compatible' in equip:
             crit_list = equip['compatible']
