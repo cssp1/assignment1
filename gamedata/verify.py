@@ -959,7 +959,7 @@ def check_spell(spellname, spec):
             error |= 1; print '%s: "name" needs to be set to "%s"' % (spellname, spellname.split(':')[1])
 
     if if gamedata['id'] in ('tr','dv') and 'splash_range' in spec and 'damage' in spec and spec['damage'] != 0 and 'blast' not in spec['damage_vs']:
-        error |= 1; print '%s: weapons with "splash_range" that have "damage" > 0 need a "blast":1 entry in "damage_vs".' % (spellname, spellname.split(':')[1])
+        error |= 1; print '%s: weapons with "splash_range" that have "damage" > 0 need a "blast":1 entry in "damage_vs".' % (spellname,)
 
 
     for EFFECT in ('muzzle_flash_effect', 'impact_visual_effect'):
