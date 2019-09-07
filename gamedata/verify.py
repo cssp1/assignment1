@@ -1163,15 +1163,15 @@ def check_crafting_recipe(recname, spec):
         if 'consumes_power' not in spec:
             error |= 1; print '%s: missing consumes_power (while crafting)' % (recname,)
 
-    if spec['crafting_category'] == 'mines' and '_L' not in spec['name']:
+    if spec['crafting_category'] in ('mines','turret_heads','barrier_traps','building_weapons') and '_L' not in spec['name']:
         if 'max_level' not in spec:
-            error |= 1; print '%s: missing max_level (required for leveled landmine recipes)' % (recname,)
+            error |= 1; print '%s: missing max_level (required for leveled %s recipes)' % (recname,spec['crafting_category'],)
         if 'associated_tech' not in spec:
-            error |= 1; print '%s: missing associated_tech (required for leveled landmine recipes)' % (recname,)
+            error |= 1; print '%s: missing associated_tech (required for leveled %s recipes)' % (recname,spec['crafting_category'],)
         if not isinstance(spec['product'], list):
             error |= 1; print '%s: product should be a list' % (recname,)
-        if len(spec['product']) < spec['max_level']:
-            error |= 1; print '%s: product is %d, needs to be at least %d' % (recname,spec['max_level'],len(spec['product']),)
+        elif len(spec['product']) != spec['max_level']:
+            error |= 1; print '%s: product is %d, should be equal to the recipe max_level value, %d' % (recname,spec['max_level'],len(spec['product']),)
         for level, product in enumerate(spec['product']):
             for prod in product:
                 if not isinstance(prod, dict):
