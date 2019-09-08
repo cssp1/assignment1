@@ -810,6 +810,9 @@ class IOSystem (object):
     def __init__(self, config):
         self.slowtest = config.get('slowtest', -1)
 
+        # track size of largest objects processed, for logging purposes
+        self.warn_size = gamedata['server'].get('io_warn_size', 10*1024*1024) # warn at this many bytes, and every power of 2 thereafter
+
     def start(self): pass
     def overloaded(self): return False
     def get_post_write_delay(self): return 0
@@ -845,7 +848,13 @@ class IOSystem (object):
         self.async_delete(SpinUserDB.driver.get_base_path(region_id, base_id), cb, procnum = SpinUserDB.driver.io_channel_for_base(base_id))
 
     # PRIVATE IMPLEMENTATION
-    def call_cb(self, cb, reason, request_time, *args):
+    def call_cb(self, method, filename, cb, reason, request_time, *args):
+
+        if method == 'read':
+            buf = args[0]
+            if buf and (isinstance(buf, basestring) or isinstance(buf, bytes)):
+                self.check_size(method, filename, len(buf))
+
         if self.slowtest > 0:
             reactor.callLater(self.slowtest, cb, *args)
             return
@@ -860,11 +869,13 @@ class IOSystem (object):
     def async_write(self, filename, buf, success_cb, fsync, reason = None, procnum = None):
         if procnum is None: procnum = 0
         request_time = 0 # time.time()
-        self.do_async_write(filename, buf, functools.partial(self.call_cb, success_cb, reason, request_time), fsync, procnum)
+        self.check_size('write', filename, len(buf))
+        self.do_async_write(filename, buf, functools.partial(self.call_cb, 'write', filename, success_cb, reason, request_time), fsync, procnum)
     def async_read(self, filename, success_cb, error_cb, reason = None, procnum = None):
         if procnum is None: procnum = 0
         request_time = 0 # time.time()
-        self.do_async_read(filename, functools.partial(self.call_cb, success_cb, reason, request_time), error_cb, procnum)
+        # check_size() has to come after the read completes...
+        self.do_async_read(filename, functools.partial(self.call_cb, 'read', filename, success_cb, reason, request_time), error_cb, procnum)
     def async_delete(self, filename, success_cb, procnum = None):
         if procnum is None: procnum = 0
         self.do_async_delete(filename, success_cb, procnum)
@@ -909,6 +920,14 @@ class IOSystem (object):
     def shutdown(self):
         # override if necessary
         return defer.succeed(True)
+
+    def check_size(self, method, filename, size):
+        # warn about abnormally large objects
+        if size > self.warn_size:
+            # for next time, increase warn_size to the next power of 2 above size
+            self.warn_size = 1 << size.bit_length()
+            gamesite.exception_log.event(server_time, 'IOSystem: large object during %s of %r: %d kB' % \
+                                         (method, filename, size/1024.0))
 
 class FileIOSystem (IOSystem):
     def __init__(self, config):
