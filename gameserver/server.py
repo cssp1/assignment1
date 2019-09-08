@@ -811,7 +811,7 @@ class IOSystem (object):
         self.slowtest = config.get('slowtest', -1)
 
         # track size of largest objects processed, for logging purposes
-        self.warn_size = gamedata['server'].get('io_warn_size', 10*1024*1024) # warn at this many bytes, and every power of 2 thereafter
+        self.warn_size = gamedata['server'].get('io_warn_size', 32*1024*1024) # warn at this many bytes, and every power of 2 thereafter
 
     def start(self): pass
     def overloaded(self): return False
