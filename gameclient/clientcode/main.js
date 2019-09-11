@@ -36539,8 +36539,9 @@ function research_dialog_change_category(dialog, category, num)
 {
     dialog.user_data['category'] = category;
     last_research_dialog_category = dialog.user_data['category'];
-    dialog.widgets['army_dialog_buttons_crafting'].widgets['production_button'].show = (category in gamedata['crafting']['categories'] && !('dialog' in gamedata['crafting']['categories'][category]));
-
+    if(dialog.user_data['parent_category'] === 'crafting'){
+        dialog.widgets['army_dialog_buttons_crafting'].widgets['production_button'].show = (category in gamedata['crafting']['categories'] && !('dialog' in gamedata['crafting']['categories'][category]));
+    }
     var page_ui_name = null;
     goog.array.forEach(gamedata['strings']['research_categories'][dialog.user_data['parent_category']], function(entry) {
         if(entry['name'] == category) {
