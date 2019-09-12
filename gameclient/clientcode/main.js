@@ -34599,14 +34599,6 @@ function crafting_subcategory_setup_row(dialog, row_col, rowdata) {
     @param {string|null=} newsubcategory
     @param {number=} newpage */
 function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
-    if(!newcategory) { // pick a reasonable default
-        goog.object.forEach(gamedata['crafting']['categories'], function(entry, name) {
-            if('dialog' in entry && entry['dialog'] != 'crafting_dialog') { return; } // do not display
-            if(entry['table_of_contents']) { return; } // too complex to handle
-            newcategory = name;
-        });
-    }
-
     var dialog = new SPUI.Dialog(gamedata['dialogs']['crafting_dialog']);
     install_child_dialog(dialog);
     dialog.auto_center();
