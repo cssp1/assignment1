@@ -269,7 +269,7 @@
                            "ui_name_crafting_turret_head": "Destroy Weapon",
                            "ui_name_crafting_barrier_trap": "Discard Trap",
                            "ui_name_crafting_building_weapon": "Destroy Weapon",
-                           "ui_name_crafting_building_weapon": "Destroy Weapon",
+                           "ui_name_crafting_townhall_weapon": "Destroy Weapon",
                            "ui_name_fishing": "Cancel Dispatch" }
         }
     },
