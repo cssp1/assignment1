@@ -254,6 +254,9 @@
                              "ui_name_research": "Are you sure you want to cancel this research?\nOnly half of your resources will be returned.",
                              "ui_name_crafting": "Are you sure you want to cancel production?\nOnly half of your resources will be returned.",
                              "ui_name_crafting_turret_head": "Are you sure? The weapon will be lost, and only half of your resources will be returned.",
+                             "ui_name_crafting_barrier_trap": "Are you sure? The trap will be lost, and only half of your resources will be returned.",
+                             "ui_name_crafting_building_weapon": "Are you sure? The weapon will be lost, and only half of your resources will be returned.",
+                             "ui_name_crafting_townhall_weapon": "Are you sure? The weapon will be lost, and only half of your resources will be returned.",
                              "ui_name_fishing": "Are you sure you want to cancel this dispatch?\nCanceling this dispatch discards its progress.",
                              "ui_name_ingredient_loss": "Items used for this upgrade will NOT be returned."
                            },
@@ -264,6 +267,9 @@
                            "ui_name_research": "Cancel Research",
                            "ui_name_crafting": "Cancel Work",
                            "ui_name_crafting_turret_head": "Destroy Weapon",
+                           "ui_name_crafting_barrier_trap": "Discard Trap",
+                           "ui_name_crafting_building_weapon": "Destroy Weapon",
+                           "ui_name_crafting_building_weapon": "Destroy Weapon",
                            "ui_name_fishing": "Cancel Dispatch" }
         }
     },
@@ -570,18 +576,18 @@
         }
     },
 
-    "emplacement_context_menu": {
+    "mounted_weapon_context_menu": {
         "dimensions": [172,168],
         "clip_children": 1,
-        "default_button": "head_button0",
+        "default_button": "mounted_button0",
         "widgets": {
             // virtual widget that catches clicks outside the area, acts like close button
             "bg_close_button": { "kind": "ActionButton", "xy": [-1000,-1000], "dimensions": [2000,2000] },
             "bg": { "kind": "StaticImage", "xy":[0,0], "dimensions":[172,168], "asset": "dialog_resizable", "bg_image_resizable": 1},
 
-            "head_title":  { "kind": "TextField", "xy": [0,8], "dimensions": [172, 17], "text_style": "bold", "text_size": 13, "ui_name_empty": "No Weapon" },
-            "head_level":  { "kind": "TextField", "xy": [0,24], "dimensions": [172, 17], "text_style": "normal", "text_size": 13, "ui_name": "Level %d0 of %d1" },
-            "head_button": { "kind": "ActionButton", "xy": [9,47], "dimensions": [154,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
+            "mounted_title":  { "kind": "TextField", "xy": [0,8], "dimensions": [172, 17], "text_style": "bold", "text_size": 13, "ui_name_empty": "Nothing Mounted" },
+            "mounted_level":  { "kind": "TextField", "xy": [0,24], "dimensions": [172, 17], "text_style": "normal", "text_size": 13, "ui_name": "Level %d0 of %d1" },
+            "mounted_button": { "kind": "ActionButton", "xy": [9,47], "dimensions": [154,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
                              "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                              "array": [1,2], "array_offset": [0,36] },
             "separator": {"kind": "Line", "xy": [29,121], "dimensions": [114,0], "color":  [1,1,1,0.5], "stroke_width": 2 },
@@ -2390,7 +2396,7 @@
         }
     },
 
-    "turret_head_dialog": {
+    "mounted_weapon_dialog": {
         "dimensions": [736,423],
         "clip_children": 0,
         "default_button": "use_resources_button",
@@ -2452,13 +2458,13 @@
             // display for currently-equipped head item
             "no_current": { "kind": "TextField", "xy":[25,140], "dimensions": [160,17], "text_size": 13, "text_style": "thick",
                             "ui_name": "No weapon equipped", "text_color": [0.4,0.4,0.4,1] },
-            "current": { "show": 0, "kind": "Dialog", "dialog": "turret_head_dialog_stats", "xy": [25,105], "dimensions":[160,205] },
+            "current": { "show": 0, "kind": "Dialog", "dialog": "mounted_weapon_dialog_stats", "xy": [25,105], "dimensions":[160,205] },
 
             // display for head item produced by selected recipe
-            "selected": { "show": 0, "kind": "Dialog", "dialog": "turret_head_dialog_recipe", "xy": [350,105], "dimensions":[360,205] },
+            "selected": { "show": 0, "kind": "Dialog", "dialog": "mounted_weapon_dialog_recipe", "xy": [350,105], "dimensions":[360,205] },
 
             "flavor_text": { "kind": "TextField", "xy": [16,342], "dimensions": [378,60], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
-                             "ui_name": "Change turret weapons to change defensive capabilities.\nUnlock higher turret weapon levels in the %s." },
+                             "ui_name": "Change mounted weapons to change defensive capabilities.\nUnlock higher weapon levels in the %s." },
 
             "instant_credits": { "kind": "ActionButton", "xy": [470,335], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                                  "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
@@ -2479,7 +2485,7 @@
         }
     },
 
-    "turret_head_dialog_stats": {
+    "mounted_weapon_dialog_stats": {
         "dimensions": [160,205],
         "widgets": {
             "name": { "kind": "TextField", "xy": [13,9], "dimensions": [176,30], "text_size": 15, "text_style": "thick", "text_hjustify": "left" },
@@ -2503,14 +2509,14 @@
     },
 
     // stats on the left, requirements on the right
-    "turret_head_dialog_recipe": {
+    "mounted_weapon_dialog_recipe": {
         "dimensions": [360,205],
         "widgets": {
             "description": { "kind": "ActionButton", // needed to support an inventory context tooltip
                              "xy": [171,103], "dimensions": [170,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "bottom",
                              "max_lines": 3, "ui_tooltip": "", "tooltip_delay": 0},
 
-            "stats": {"kind": "Dialog", "dialog": "turret_head_dialog_stats", "xy":[1,0], "dimensions":[160,205]},
+            "stats": {"kind": "Dialog", "dialog": "mounted_weapon_dialog_stats", "xy":[1,0], "dimensions":[160,205]},
 
             "requirements": { "kind": "TextField", "xy": [160,11], "dimensions": [135,26], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "REQUIREMENTS" },
 

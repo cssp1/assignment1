@@ -48,14 +48,22 @@ BattleLog.one_unit = function(kind, level, is_mine, props) {
     if(level && (level > 0) && (is_mine || gamedata['battle_log_detail'])) {
         tx += ' (L'+level.toString()+')';
     }
+    var mounted_weapon = null;
     if(props && props['turret_head'] && props['turret_head']['spec'] in gamedata['items']) {
-        var head_spec = ItemDisplay.get_inventory_item_spec(props['turret_head']['spec']);
-        var head_name = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(head_spec));
-        var head_level = props['turret_head']['level'] || head_spec['level'];
-        if(head_level && (head_level > 0) && (is_mine || head_spec['battle_log_detail'] || gamedata['battle_log_detail'])) {
-            head_name += ' (L'+head_level.toString()+')';
+        mounted_weapon = 'turret_head';
+    } else if(props && props['barrier_trap'] && props['barrier_trap']['spec'] in gamedata['items']) {
+        mounted_weapon = 'barrier_trap';
+    } else if(props && props['building_weapon'] && props['building_weapon']['spec'] in gamedata['items']) {
+        mounted_weapon = 'building_weapon';
+    }
+    if(mounted_weapon) {
+        var mounted_spec = ItemDisplay.get_inventory_item_spec(props[mounted_weapon]['spec']);
+        var mounted_name = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(mounted_spec));
+        var mounted_level = props[mounted_weapon]['level'] || mounted_spec['level'];
+        if(mounted_level && (mounted_level > 0) && (is_mine || mounted_spec['battle_log_detail'] || gamedata['battle_log_detail'])) {
+            mounted_name += ' (L'+mounted_level.toString()+')';
         }
-        tx += ' / ' + head_name;
+        tx += ' / ' + mounted_name;
     }
     return tx;
 };
@@ -84,6 +92,10 @@ BattleLog.unit = function(met, is_mine) {
         var props = {};
         if('turret_head' in met) {
             props['turret_head'] = met['turret_head'];
+        } else if('barrier_trap' in met) {
+            props['barrier_trap'] = met['barrier_trap'];
+        } else if('building_weapon' in met) {
+            props['building_weapon'] = met['building_weapon'];
         }
         return BattleLog.one_unit(met['unit_type'], met['level'], is_mine, props);
     }
@@ -135,6 +147,12 @@ BattleLog.compress_group = function(group) {
         if(met['turret_head']) {
             var props = {'turret_head': met['turret_head']};
             key += '|'+JSON.stringify(props);
+        } else if(met['barrier_trap']) {
+            var props = {'barrier_trap': met['barrier_trap']};
+            key += '|'+JSON.stringify(props);
+        } else if(met['building_weapon']) {
+            var props = {'building_weapon': met['building_weapon']};
+            key += '|'+JSON.stringify(props);
         }
         units[key] = (units[key] || 0) + 1;
         for(var prop in met) {
@@ -146,6 +164,7 @@ BattleLog.compress_group = function(group) {
     var met = {};
     for(var prop in group[0]) {
         if(prop == 'unit_type' || prop == 'level' || prop == 'turret_head' ||
+           prop == 'barrier_trap' || prop == 'building_weapon' ||
            prop.indexOf('looted_') === 0 || prop.indexOf('lost_') === 0) {
             continue;
         }
