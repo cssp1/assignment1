@@ -33528,7 +33528,11 @@ var ARMY_DIALOG_BUTTONS = {
                 }
 };
 
-function init_army_dialog_buttons(dialog, mode, my_dialog_name) {
+/** @param {SPUI.Dialog} dialog
+    @param {string|null} mode
+    @param {string} my_dialog_name
+    @param {(string|null)=} category_name optional research/crafting category name */
+function init_army_dialog_buttons(dialog, mode, my_dialog_name, category_name) {
     var use_squads = player.squads_enabled();
     goog.object.forEach(ARMY_DIALOG_BUTTONS[mode], function(data, btn) {
         if(!(btn in dialog.widgets)) { return; }
@@ -33573,6 +33577,9 @@ function init_army_dialog_buttons(dialog, mode, my_dialog_name) {
             dialog.widgets[btn].str = spell_ui_names.join(' & ');
         }
     });
+    if(mode === 'crafting' && category_name){
+        dialog.widgets['production_button'].show = (category_name in gamedata['crafting']['categories'] && !('dialog' in gamedata['crafting']['categories'][category_name]));
+    }
 }
 function hide_army_dialog_buttons(dialog, mode) {
     goog.object.forEach(ARMY_DIALOG_BUTTONS[mode], function(data, btn) {
@@ -34592,14 +34599,6 @@ function crafting_subcategory_setup_row(dialog, row_col, rowdata) {
     @param {string|null=} newsubcategory
     @param {number=} newpage */
 function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
-    if(!newcategory || newcategory == 'turret_heads' || newcategory == 'ambushes') { // pick a reasonable default
-        goog.object.forEach(gamedata['crafting']['categories'], function(entry, name) {
-            if('dialog' in entry && entry['dialog'] != 'crafting_dialog') { return; } // do not display
-            if(entry['table_of_contents']) { return; } // too complex to handle
-            newcategory = name;
-        });
-    }
-
     var dialog = new SPUI.Dialog(gamedata['dialogs']['crafting_dialog']);
     install_child_dialog(dialog);
     dialog.auto_center();
@@ -36499,8 +36498,9 @@ function invoke_research_dialog(parent_category, newcategory, newpage) {
     dialog.widgets['army_dialog_buttons_army'].show = (parent_category == 'army');
     dialog.widgets['army_dialog_buttons_crafting'].show = (parent_category == 'crafting');
     dialog.widgets['army_dialog_buttons_leaders'].show = (parent_category == 'leaders');
-    init_army_dialog_buttons(dialog.widgets['army_dialog_buttons_'+parent_category], parent_category, 'research_dialog');
-
+    if(parent_category) {
+        init_army_dialog_buttons(dialog.widgets['army_dialog_buttons_'+parent_category], parent_category, 'research_dialog');
+    }
 
     // set up category buttons
     var i = 0;
@@ -36539,6 +36539,7 @@ function research_dialog_change_category(dialog, category, num)
 {
     dialog.user_data['category'] = category;
     last_research_dialog_category = dialog.user_data['category'];
+    init_army_dialog_buttons(dialog.widgets['army_dialog_buttons_'+dialog.user_data['parent_category']], dialog.user_data['parent_category'], 'research_dialog', category);
 
     var page_ui_name = null;
     goog.array.forEach(gamedata['strings']['research_categories'][dialog.user_data['parent_category']], function(entry) {
