@@ -64,7 +64,7 @@ goog.require('Showcase');
 goog.require('PlayerInfoDialog');
 goog.require('SquadControlDialog');
 goog.require('SquadManageDialog');
-goog.require('TurretHeadDialog');
+goog.require('MountedWeaponDialog');
 goog.require('ObstacleDialog');
 goog.require('QuestBar');
 goog.require('UpgradeBar');
@@ -5279,7 +5279,7 @@ Building.update_modstats = function(team, update) {
         if(obj.is_building() && obj.team == team) {
             obj.modstats = (obj.id in update ? update[obj.id] : {});
 
-            if(obj.is_minefield() || obj.is_ambush() || obj.is_emplacement()) {
+            if(obj.has_weapon_mount()) {
                 // initialize AI state
                 obj.ai_state = (obj.is_shooter() ? ai_states.AI_ATTACK_ANY : ai_states.AI_STOP);
             }
@@ -5402,6 +5402,20 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
 };
 Building.prototype.is_turret = function() { return this.spec['history_category'] === 'turrets'; };
 Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
+Building.prototype.is_barrier = function() { return this.spec['name'] === 'barrier'; };
+Building.prototype.is_trapped_barrier = function() { return this.spec['equip_slots'] && ('barrier_trap' in this.spec['equip_slots']); };
+Building.prototype.is_armed_building = function() { return this.spec['equip_slots'] && ('building_weapon' in this.spec['equip_slots']); };
+Building.prototype.is_armed_townhall = function() { return this.spec['equip_slots'] && ('townhall_weapon' in this.spec['equip_slots']); };
+
+/** @return {Object|null} the turret head item currently being crafted (assumes is_crafting() is true) */
+Building.prototype.first_crafting_inprogress_item = function() {
+    var craft_queue = this.get_crafting_queue();
+    if(craft_queue.length > 0) {
+        return get_crafting_recipe_product_list(gamedata['crafting']['recipes'][craft_queue[0]['craft']['recipe']],
+                                                craft_queue[0]['craft']['level'] || 1)[0];
+    }
+    return null;
+};
 
 /** @return {Object|null} the instance of the turret head item equipped here, if any, otherwise null */
 Building.prototype.turret_head_item = function() {
@@ -5411,18 +5425,43 @@ Building.prototype.turret_head_item = function() {
     return null;
 };
 /** @return {Object|null} the turret head item currently being crafted (assumes is_crafting() is true) */
-Building.prototype.turret_head_inprogress_item = function() {
-    var craft_queue = this.get_crafting_queue();
-    if(craft_queue.length > 0) {
-        return get_crafting_recipe_product_list(gamedata['crafting']['recipes'][craft_queue[0]['craft']['recipe']],
-                                                craft_queue[0]['craft']['level'] || 1)[0];
+Building.prototype.turret_head_inprogress_item = Building.prototype.first_crafting_inprogress_item;
+
+/** @return {Object|null} the instance of the barrier trap item equipped here, if any, otherwise null */
+Building.prototype.barrier_trap_item = function() {
+    if(this.equipment && this.equipment['barrier_trap'] && this.equipment['barrier_trap'].length > 0) {
+        return this.equipment['barrier_trap'][0] ? player.decode_equipped_item(this.equipment['barrier_trap'][0]) : null;
     }
     return null;
 };
+/** @return {Object|null} the barrier trap item currently being crafted (assumes is_crafting() is true) */
+Building.prototype.barrier_trap_inprogress_item = Building.prototype.first_crafting_inprogress_item;
+
+/** @return {Object|null} the instance of the building weapon item equipped here, if any, otherwise null */
+Building.prototype.building_weapon_item = function() {
+    if(this.equipment && this.equipment['building_weapon'] && this.equipment['building_weapon'].length > 0) {
+        return this.equipment['building_weapon'][0] ? player.decode_equipped_item(this.equipment['building_weapon'][0]) : null;
+    }
+    return null;
+};
+/** @return {Object|null} the building weapon item currently being crafted (assumes is_crafting() is true) */
+Building.prototype.building_weapon_inprogress_item = Building.prototype.first_crafting_inprogress_item;
+
+/** @return {Object|null} the instance of the townhall weapon item equipped here, if any, otherwise null */
+Building.prototype.townhall_weapon_item = function() {
+    if(this.equipment && this.equipment['townhall_weapon'] && this.equipment['townhall_weapon'].length > 0) {
+        return this.equipment['townhall_weapon'][0] ? player.decode_equipped_item(this.equipment['townhall_weapon'][0]) : null;
+    }
+    return null;
+};
+/** @return {Object|null} the building weapon item currently being crafted (assumes is_crafting() is true) */
+Building.prototype.townhall_weapon_inprogress_item = Building.prototype.first_crafting_inprogress_item;
+
 Building.prototype.is_minefield = function() { return this.spec['equip_slots'] && ('mine' in this.spec['equip_slots']); };
 Building.prototype.is_ambush = function() { return this.spec['equip_slots'] && ('ambush' in this.spec['equip_slots']); };
 Building.prototype.is_minefield_armed = function() { return (this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0); };
 Building.prototype.is_ambush_armed = function() { return (this.equipment && this.equipment['ambush'] && this.equipment['ambush'].length > 0); };
+Building.prototype.has_weapon_mount = function() { return (this.spec['equip_slots'] && ('ambush' in this.spec['equip_slots'] || 'mine' in this.spec['equip_slots'] || 'turret_head' in this.spec['equip_slots'] || 'barrier_trap' in this.spec['equip_slots'] || 'building_weapon' in this.spec['equip_slots'])) };
 
 /** @param {string} slot_name
     @return {string|null}
@@ -9632,6 +9671,12 @@ function get_killer_info(killer) {
                 ret['ambush'] = killer.ambush_item();
             } else if(killer.is_emplacement() && killer.turret_head_item()) {
                 ret['turret_head'] = killer.turret_head_item()['spec'];
+            } else if(killer.is_trapped_barrier() && killer.barrier_trap_item()) {
+                ret['barrier_trap'] = killer.barrier_trap_item()['spec'];
+            } else if(killer.is_armed_building() && killer.building_weapon_item()) {
+                ret['building_weapon'] = killer.building_weapon_item()['spec'];
+            } else if(killer.is_armed_townhall() && killer.townhall_weapon_item()) {
+                ret['townhall_weapon'] = killer.townhall_weapon_item()['spec'];
             }
         }
         return ret;
@@ -20750,6 +20795,18 @@ function do_invoke_speedup_dialog(kind) {
             var product = selection.unit.turret_head_inprogress_item();
             var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
             description_finish = gamedata['strings']['speedup']['finish_turret_head'].replace('%s', ui_name);
+        } else if(selection.unit.is_trapped_barrier()) {
+            var product = selection.unit.barrier_trap_inprogress_item();
+            var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
+            description_finish = gamedata['strings']['speedup']['finish_barrier_trap'].replace('%s', ui_name);
+        } else if(selection.unit.is_armed_building()) {
+            var product = selection.unit.building_weapon_inprogress_item();
+            var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
+            description_finish = gamedata['strings']['speedup']['finish_building_weapon'].replace('%s', ui_name);
+        } else if(selection.unit.is_armed_townhall()) {
+            var product = selection.unit.townhall_weapon_inprogress_item();
+            var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
+            description_finish = gamedata['strings']['speedup']['finish_townhall_weapon'].replace('%s', ui_name);
         } else {
             description_finish = gamedata['strings']['speedup']['finish_crafting'].replace('%s', selection.unit.spec['ui_name']);
         }
@@ -22458,8 +22515,11 @@ function invoke_building_context_menu(mouse_xy) {
             if(obj.is_crafter() && (session.home_base || quarry_upgradable)) {
                 upgrade_is_active = false;
                 var cat = gamedata['crafting']['categories'][obj.spec['crafting_categories'][0]];
+                if(!cat) {
+                    throw Error('Missing crafting_categories for crafter: ' + obj.spec['ui_name']);
+                }
 
-                if(!obj.is_emplacement()) { // turret emplacements have special case, see below
+                if(!obj.is_emplacement() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall()) { // mounted weapons have special case, see below
                     buttons.push(new ContextMenuButton({ui_name: cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
                                                         asset: 'action_button_resizable',
                                                         onclick: (function (_cat) { return function() {
@@ -22476,9 +22536,9 @@ function invoke_building_context_menu(mouse_xy) {
                 if(obj.is_crafting()) {
                     // for turret emplacements, add the speedup/cancel buttons above the divider
                     var which_buttons;
-                    if(obj.is_emplacement()) {
-                        if(!('head' in special_buttons)) { special_buttons['head'] = []; }
-                        which_buttons = special_buttons['head'];
+                    if(obj.is_emplacement() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) {
+                        if(!('mounted' in special_buttons)) { special_buttons['mounted'] = []; }
+                        which_buttons = special_buttons['mounted'];
                     } else {
                         which_buttons = buttons;
                     }
@@ -22526,9 +22586,18 @@ function invoke_building_context_menu(mouse_xy) {
                 }
             }
 
-            if(obj.is_emplacement() && (session.home_base || quarry_upgradable)) { // special case for emplacements
-                dialog_name = 'emplacement_context_menu';
-                var cur_item = obj.turret_head_item();
+            if((obj.is_emplacement() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) && (session.home_base || quarry_upgradable)) { // special case for mounted weapons
+                dialog_name = 'mounted_weapon_context_menu';
+                var cur_item = null;
+                if (obj.is_emplacement()) {
+                    cur_item = obj.turret_head_item();
+                } else if (obj.is_trapped_barrier()) {
+                    cur_item = obj.barrier_trap_item();
+                } else if (obj.is_armed_building()) {
+                    cur_item = obj.building_weapon_item();
+                } else if (obj.is_armed_townhall()) {
+                    cur_item = obj.townhall_weapon_item();
+                }
                 var item_spec = (cur_item ? ItemDisplay.get_inventory_item_spec(cur_item['spec']) : null);
                 var under_leveled = false;
                 if(item_spec && item_spec['associated_tech']) {
@@ -22551,10 +22620,18 @@ function invoke_building_context_menu(mouse_xy) {
 
                 if(obj.time_until_finish() <= 0) {
                     var spell = gamedata['spells']['CRAFT_FOR_FREE'];
-                    special_buttons['head'] = [];
-                    special_buttons['head'].push(new ContextMenuButton({ui_name: spell['ui_name_building_context_emplacement'],
-                                                                        onclick: (function (_obj) { return function(w) { TurretHeadDialog.invoke(_obj); }; })(obj),
-                                                                        asset: (cur_item && !under_leveled ? 'menu_button_resizable' : null) // yellow only if no current head is equipped, or head is under-leveled
+                    special_buttons['mounted'] = [];
+                    var this_ui_context = 'ui_name_building_context_emplacement';
+                    if (obj.is_trapped_barrier()) {
+                        this_ui_context = 'ui_name_building_context_barrier_trap';
+                    } else if (obj.is_armed_townhall()) {
+                        this_ui_context = 'ui_name_building_context_building_weapon';
+                    } else if (obj.is_armed_building()) {
+                        this_ui_context = 'ui_name_building_context_townhall_weapon';
+                    }
+                    special_buttons['mounted'].push(new ContextMenuButton({ui_name: spell[this_ui_context],
+                                                                           onclick: (function (_obj) { return function(w) { MountedWeaponDialog.invoke(_obj); }; })(obj),
+                                                                           asset: (cur_item && !under_leveled ? 'menu_button_resizable' : null) // yellow only if no mounted weapon is equipped, or weapon is under-leveled
                                                                        }));
                 }
 
@@ -22562,8 +22639,8 @@ function invoke_building_context_menu(mouse_xy) {
                 if(session.home_base && cur_item) {
                     upgrade_is_active = !under_leveled;
                     var upgr_spell = gamedata['spells']['RESEARCH_FOR_FREE'];
-                    special_buttons['head'].push(new ContextMenuButton({ui_name: upgr_spell['ui_name_building_context_emplacement'],
-                                                                        onclick: (function (_techname) { return function() {
+                    special_buttons['mounted'].push(new ContextMenuButton({ui_name: upgr_spell[this_ui_context],
+                                                                           onclick: (function (_techname) { return function() {
                                                                             // hack (?) to work around issues with upgrade dialog
                                                                             // when looking at a weapon tech with selection.unit still set
                                                                             // (it incorrectly keys the level off the unit, not player.tech)
@@ -22697,23 +22774,31 @@ function invoke_building_context_menu(mouse_xy) {
         dialog.widgets['level'].str = '';
     }
 
-    if(dialog_name == 'emplacement_context_menu') {
-        var cur_item = obj.turret_head_item() || obj.turret_head_inprogress_item();
-
+    if(dialog_name == 'mounted_weapon_context_menu') {
+        var cur_item = false;
+        if (obj.is_emplacement()) {
+            cur_item = obj.turret_head_item() || obj.turret_head_inprogress_item();
+        } else if (obj.is_trapped_barrier()) {
+            cur_item = obj.barrier_trap_item() || obj.barrier_trap_inprogress_item();
+        } else if (obj.is_armed_building()) {
+            cur_item = obj.building_weapon_item() || obj.building_weapon_inprogress_item();
+        } else if (obj.is_armed_townhall()) {
+            cur_item = obj.townhall_weapon_item() || obj.townhall_weapon_inprogress_item();
+        }
         if(cur_item) {
             var item_spec = ItemDisplay.get_inventory_item_spec(cur_item['spec']);
             if(item_spec) {
-                dialog.widgets['head_title'].str = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(item_spec));
+                dialog.widgets['mounted_title'].str = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(item_spec));
                 if(item_spec['associated_tech']) {
                     var item_cur_level = ItemDisplay.get_inventory_item_level(cur_item); // note: level of item itself, NOT the tech
                     var tech_max_level = get_max_ui_level(gamedata['tech'][item_spec['associated_tech']]);
-                    dialog.widgets['head_level'].show = true;
-                    dialog.widgets['head_level'].str = dialog.data['widgets']['level']['ui_name'].replace('%d0', item_cur_level).replace('%d1', tech_max_level);
+                    dialog.widgets['mounted_level'].show = true;
+                    dialog.widgets['mounted_level'].str = dialog.data['widgets']['level']['ui_name'].replace('%d0', item_cur_level).replace('%d1', tech_max_level);
                 }
             }
         } else {
-            dialog.widgets['head_title'].str = dialog.data['widgets']['head_title']['ui_name_empty'];
-            dialog.widgets['head_level'].show = false;
+            dialog.widgets['mounted_title'].str = dialog.data['widgets']['mounted_title']['ui_name_empty'];
+            dialog.widgets['mounted_level'].show = false;
         }
     }
 
@@ -44502,7 +44587,7 @@ function update_upgrade_dialog(dialog) {
 
         if(unit.is_researcher()) { feature_list.push('research_level'); }
         if(unit.is_researcher()) { feature_list.push('research_speed'); }
-        if(unit.is_crafter() && !unit.is_emplacement() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
+        if(unit.is_crafter() && !unit.is_emplacement() && !unit.is_trapped_barrier() && !unit.is_armed_building() && !unit.is_armed_townhall() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
         if(unit.is_crafter() && ('crafting_queue_space' in unit.spec)) { feature_list.push('crafting_queue_space'); }
 
         if('provides_quarry_control' in unit.spec && session.region.map_enabled()) { feature_list.push('provides_quarry_control'); }
@@ -44631,7 +44716,7 @@ function update_upgrade_dialog(dialog) {
                                    (stat.indexOf('weapon_')!=0 ||
                                     stat.indexOf('weapon_damage_vs:')==0 ||
                                     (stat === 'weapon_range_pvp' && goog.array.contains(feature_list, 'weapon_range'))) &&
-                                   (stat != 'weapon' || !(unit && unit.is_emplacement())) && /* don't show "weapon" stat on emplacements */
+                                   (stat != 'weapon' || !(unit && unit.is_emplacement()) || !(unit && unit.is_trapped_barrier()) || !(unit && unit.is_armed_building()) || !(unit && unit.is_armed_townhall())) && /* don't show "weapon" stat on mounted weapon buildings */
                                    (modchain['mods'].length>1 && modchain['val'] != modchain['mods'][0]['val'])) {
                                     feature_list.push(stat);
                                 }
@@ -51613,8 +51698,25 @@ function create_mouse_tooltip() {
                 return;
             }
 
-            if(obj.is_building() && obj.is_emplacement() && obj.turret_head_item) {
-                var item = obj.turret_head_item();
+            if(obj.is_building() && ((obj.is_emplacement() && obj.turret_head_item()) || (obj.is_trapped_barrier() && obj.barrier_trap_item()) || (obj.is_armed_building() && obj.building_weapon_item()) || (obj.is_armed_townhall() && obj.townhall_weapon_item()))) {
+                var item = null;
+                var low_power_warning_cursor = null;
+                if (obj.is_emplacement()) {
+                    item = obj.turret_head_item();
+                    low_power_warning_cursor = 'low_power_turret';
+                } else if (obj.is_trapped_barrier()) {
+                    item = obj.barrier_trap_item();
+                    low_power_warning_cursor = 'low_power_barrier_trap';
+                } else if (obj.is_armed_building()) {
+                    item = obj.building_weapon_item();
+                    low_power_warning_cursor = 'low_power_building_weapon';
+                } else if (obj.is_armed_townhall()) {
+                    item = obj.townhall_weapon_item();
+                    low_power_warning_cursor = 'low_power_townhall_weapon';
+                }
+                if(!(low_power_warning_cursor in gamedata['strings']['cursors'])) {
+                    throw Error('Missing power warning curson in gamedata: ' + low_power_warning_cursor);
+                }
                 if(item) {
                     var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
                     var ui_name = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(item_spec));
@@ -51626,15 +51728,15 @@ function create_mouse_tooltip() {
                         str.push(gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', cur_level.toString()).replace('%max', max_level.toString()));
                     }
 
-                    // low power on turret emplacements with heads
+                    // low power on armed mounted weapon slots
                     var powerfac = obj.combat_power_factor(world.base);
                     if(powerfac < 1) {
-                        var ui_power_warning = gamedata['strings']['cursors']['low_power_turret']
+                        var ui_power_warning = gamedata['strings']['cursors'][low_power_warning_cursor]
                             .replace('%d', Math.min(99, 100.0*powerfac).toFixed(0));
                         str.push(ui_power_warning);
                     }
 
-                    str.push('---'); // separator between head and emplacement
+                    str.push('---'); // separator between mounted weapon and slot
                 }
             }
 
@@ -51644,7 +51746,7 @@ function create_mouse_tooltip() {
             }
             str.push(nameline);
 
-            if(obj.team === 'player' && obj.is_building() && obj.is_shooter() && !obj.is_minefield() && !obj.is_ambush() && !obj.is_emplacement()) {
+            if(obj.team === 'player' && obj.is_building() && obj.is_shooter() && !obj.is_minefield() && !obj.is_ambush() && !obj.is_emplacement() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall()) {
                 // low power on ordinary turrets
                 var powerfac = obj.combat_power_factor(world.base);
                 if(powerfac < 1) {
@@ -53753,7 +53855,7 @@ Building.prototype.get_idle_state_legacy = function() {
     } else if(this.is_researcher()) {
         if(!this.is_researching()) { draw_idle_icon = 'research'; }
     } else if(this.is_crafter()) {
-        if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item())) {
+        if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item()) && !(this.is_trapped_barrier() && this.barrier_trap_item()) && !(this.is_armed_building() && this.building_weapon_item()) && !(this.is_armed_townhall() && this.townhall_weapon_item())) {
             for(var i = 0; i < this.spec['crafting_categories'].length; i++) {
                 var catname = this.spec['crafting_categories'][i];
                 var cat = gamedata['crafting']['categories'][catname];
@@ -53782,16 +53884,35 @@ Building.prototype.get_idle_state_legacy = function() {
             /* draw_idle_icon = 'craft_done'; */
         }
 
-        if(this.is_emplacement() && this.turret_head_item()) { // assumes emplacements are crafters
-            var item = this.turret_head_item();
-            var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+        if((this.is_emplacement() && this.turret_head_item()) || (this.is_trapped_barrier() && this.barrier_trap_item()) || (this.is_armed_building() && this.building_weapon_item()) || (this.is_armed_townhall() && this.townhall_weapon_item())){ // assumes mounted weapon recipients are crafters
+            var item = null;
+            var mounted_weapon_idle_icon = null;
+            if(this.is_emplacement()) {
+                item = this.turret_head_item();
+                mounted_weapon_idle_icon = 'under_leveled_turret_head';
+            } else if(this.is_trapped_barrier()) {
+                item = this.barrier_trap_item();
+                mounted_weapon_idle_icon = 'under_leveled_barrier_trap';
+            } else if(this.is_armed_building()) {
+                item = this.building_weapon_item();
+                mounted_weapon_idle_icon = 'under_leveled_building_weapon';
+            } else if(this.is_armed_townhall()) {
+                item = this.townhall_weapon_item();
+                mounted_weapon_idle_icon = 'under_leveled_townhall_weapon';
+            }
+            if (!(mounted_weapon_idle_icon in gamedata['strings']['idle_buildings'])) {
+                throw Error('Icon ' + mounted_weapon_idle_icon + ' missing from gamedata');
+            }
+            if(item) {
+                var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
 
-            if('associated_tech' in item_spec) {
-                // check if our tech level for this item is above its own level
-                var item_level = ItemDisplay.get_inventory_item_level(item);
-                var tech_level = player.tech[item_spec['associated_tech']] || 0;
-                if(tech_level > item_level) {
-                    draw_idle_icon = 'under_leveled_turret_head';
+                if('associated_tech' in item_spec) {
+                    // check if our tech level for this item is above its own level
+                    var item_level = ItemDisplay.get_inventory_item_level(item);
+                    var tech_level = player.tech[item_spec['associated_tech']] || 0;
+                    if(tech_level > item_level) {
+                        draw_idle_icon = mounted_weapon_idle_icon;
+                    }
                 }
             }
         }
@@ -53910,6 +54031,7 @@ Building.prototype.get_idle_state_advanced = function() {
             if(space_usage['ALL'] < player.stattab['total_space']) {
                 for(var specname in gamedata['units']) {
                     var spec = gamedata['units'][specname];
+
                     if(spec['manufacture_category'] == this.spec['manufacture_category']) {
                         var level = unit_unlock_level(specname);
                         if(level > 0) {
@@ -53970,7 +54092,7 @@ Building.prototype.get_idle_state_advanced = function() {
             }
         }
     } else if(this.is_crafter()) {
-        if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item())) {
+        if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item()) && !(this.is_trapped_barrier() && this.barrier_trap_item()) && !(this.is_armed_building() && this.building_weapon_item()) && !(this.is_armed_townhall() && this.townhall_weapon_item())) {
             for(var i = 0; i < this.spec['crafting_categories'].length; i++) {
                 var catname = this.spec['crafting_categories'][i];
                 var cat = gamedata['crafting']['categories'][catname];
@@ -54028,16 +54150,32 @@ Building.prototype.get_idle_state_advanced = function() {
             /* draw_idle_icon = 'craft_done'; */
         }
 
-        if(this.is_emplacement() && this.turret_head_item()) { // assumes emplacements are crafters
-            var item = this.turret_head_item();
+        if((this.is_emplacement() && this.turret_head_item()) || (this.is_trapped_barrier() && this.barrier_trap_item()) || (this.is_armed_building() && this.building_weapon_item()) || (this.is_armed_townhall() && this.townhall_weapon_item())){ // assumes mounted weapon recipients are crafters
+            var item = null;
+            var mounted_weapon_idle_icon = null;
+            if(this.is_emplacement()) {
+                item = this.turret_head_item();
+                mounted_weapon_idle_icon = 'under_leveled_turret_head';
+            } else if(this.is_trapped_barrier()) {
+                item = this.barrier_trap_item();
+                mounted_weapon_idle_icon = 'under_leveled_barrier_trap';
+            } else if(this.is_armed_building()) {
+                item = this.building_weapon_item();
+                mounted_weapon_idle_icon = 'under_leveled_building_weapon';
+            } else if(this.is_armed_townhall()) {
+                item = this.townhall_weapon_item();
+                mounted_weapon_idle_icon = 'under_leveled_townhall_weapon';
+            }
+            if (!(mounted_weapon_idle_icon in gamedata['strings']['idle_buildings'])) {
+                throw Error('Icon ' + mounted_weapon_idle_icon + ' missing from gamedata');
+            }
             var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
-
             if('associated_tech' in item_spec) {
                 // check if our tech level for this item is above its own level
                 var item_level = ItemDisplay.get_inventory_item_level(item);
                 var tech_level = player.tech[item_spec['associated_tech']] || 0;
                 if(tech_level > item_level) {
-                    draw_idle_icon = 'under_leveled_turret_head';
+                    draw_idle_icon = mounted_weapon_idle_icon;
                 }
             }
         }
@@ -54524,6 +54662,9 @@ function draw_building_or_inert(world, obj, powerfac) {
     if(obj.is_building() && obj.equipment && !obj.is_ambush()) {
         var ecount = 0, elevel = 0;
         for(var slot_type in obj.equipment) {
+            if(!(slot_type in gamedata['strings']['equip_slots'])) {
+                throw Error('Equipment slot type ' + slot_type + ' missing from gamedata strings');
+            }
             if(slot_type == "mine" || // maybe set "show":0 on mine slots?
                (('show' in gamedata['strings']['equip_slots'][slot_type]) && !gamedata['strings']['equip_slots'][slot_type]['show']) ||
                (('show_if' in gamedata['strings']['equip_slots'][slot_type]) &&

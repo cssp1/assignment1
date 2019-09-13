@@ -8550,8 +8550,12 @@ class Base(object):
                         for item in Equipment.equip_iter(obj.equipment):
                             if item['spec'] in gamedata['items']:
                                 item_spec = gamedata['items'][item['spec']]
+                                item_level = 1
+                                if 'level' in item:
+                                    item_level = item['level']
                                 if 'equip' in item_spec:
-                                    power[1] += item_spec['equip'].get('consumes_power',0)
+                                    equip_power = item_spec['equip'].get('consumes_power',0)
+                                    power[1] += GameObjectSpec.get_leveled_quantity(item_spec['equip'].get('consumes_power', 0), item_level)
 
                     # in-progress crafting recipes
                     if obj.is_crafting():
@@ -8559,7 +8563,8 @@ class Base(object):
                         for entry in obj.crafting.queue:
                             if not entry.is_complete(server_time):
                                 if entry.craft_state['recipe'] in gamedata['crafting']['recipes']:
-                                    to_add = max(to_add, gamedata['crafting']['recipes'][entry.craft_state['recipe']].get('consumes_power',0))
+                                    recipe_consumes_power = GameObjectSpec.get_leveled_quantity(gamedata['crafting']['recipes'][entry.craft_state['recipe']].get('consumes_power',0), entry.craft_state['level'])
+                                    to_add = max(to_add, recipe_consumes_power)
                         power[1] += to_add
         return power
 
@@ -17679,8 +17684,9 @@ class Store(object):
 
                 if (not session.player.is_cheater):
                     for res, resdata in gamedata['resources'].iteritems():
-                        if (not resdata.get('allow_instant', True)) and \
-                           GameObjectSpec.get_leveled_quantity(recipe['cost'].get(res,0), arg.recipe_level) > 0:
+                        if (not resdata.get('allow_instant', True)) and ( \
+                        (isinstance(GameObjectSpec.get_leveled_quantity(recipe['cost'], arg.recipe_level), dict) and GameObjectSpec.get_leveled_quantity(recipe['cost'], arg.recipe_level).get(res,0) > 0) \
+                        or (isinstance(GameObjectSpec.get_leveled_quantity(recipe['cost'], arg.recipe_level), list) and GameObjectSpec.get_leveled_quantity(recipe['cost'].get(res,0), arg.recipe_level) > 0)):
                             error_reason.append('requires rare resource: %s' % resdata['name'])
                             return -1, p_currency
 
