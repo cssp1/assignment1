@@ -690,18 +690,42 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     dialog.widgets['requirements_bg'].show =
         dialog.widgets['requirements_time_icon'].show =
         dialog.widgets['requirements_time_value'].show = (dialog.widgets['start_repair_button'].show && hover);
+    var res_count = 2; // set to show two-resource layout by default
+    var pred = read_predicate(gamedata['resources']['res3']['show_if']);
+    if(pred.is_satisfied(player, null)){
+        res_count = 3; // set to three-resource layout if res3 is available to the player
+    }
     for(var res in gamedata['resources']) {
-        if('requirements_'+res+'_icon' in dialog.widgets) {
-            dialog.widgets['requirements_'+res+'_icon'].show =
-                dialog.widgets['requirements_'+res+'_value'].show = dialog.widgets['requirements_time_icon'].show;
+        // both versions show by default, so first we hide them
+        // we'll show the correct one if it applies
+        if('requirements_2_'+res+'_icon' in dialog.widgets) {
+            dialog.widgets['requirements_2_'+res+'_icon'].show =
+                dialog.widgets['requirements_2_'+res+'_value'].show = false;
+        }
+        if('requirements_3_'+res+'_icon' in dialog.widgets) {
+            dialog.widgets['requirements_3_'+res+'_icon'].show =
+                dialog.widgets['requirements_3_'+res+'_value'].show = false;
+        }
+        // the squad_tile dialog has requirements_2 and requirements_3 versions of the icon and value widgets
+        // so it can switch to however many the current title uses
+        if('requirements_'+res_count.toString()+'_'+res+'_icon' in dialog.widgets) {
+            dialog.widgets['requirements_'+res_count.toString()+'_'+res+'_icon'].show =
+                dialog.widgets['requirements_'+res_count.toString()+'_'+res+'_value'].show = dialog.widgets['requirements_time_icon'].show;
         }
     }
 
     if(dialog.widgets['start_repair_button'].show) {
         if(hover) {
             for(var resname in gamedata['resources']) {
-                if('requirements_'+resname+'_value' in dialog.widgets) {
-                    dialog.widgets['requirements_'+resname+'_value'].str = pretty_print_number(cost_to_repair[resname]||0);
+                if('requirements_'+res_count.toString()+'_'+resname+'_value' in dialog.widgets) {
+                    if(res_count < 3) {
+                        dialog.widgets['requirements_'+res_count.toString()+'_'+resname+'_value'].str = pretty_print_number(cost_to_repair[resname]||0);
+                    } else {
+                        // when three resources are used, the resource requirement number has to be abbreviated
+                        // the full number is the hovertext for the resource icon
+                        dialog.widgets['requirements_'+res_count.toString()+'_'+resname+'_icon'].ui_tooltip = pretty_print_number(cost_to_repair[resname]||0);
+                        dialog.widgets['requirements_'+res_count.toString()+'_'+resname+'_value'].str = pretty_print_abbreviated_number(cost_to_repair[resname]||0);
+                    }
                 }
             }
             dialog.widgets['requirements_time_value'].str = pretty_print_time(cost_to_repair['time']||0);

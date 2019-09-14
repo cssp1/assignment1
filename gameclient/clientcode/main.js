@@ -587,6 +587,26 @@ function pretty_print_number(n) {
     return sign + ret.reverse().join(',');
 }
 
+/** print a number in the form XXXk. for thousands, XXXm. for millions, XXXb. for billions, etc
+    always rounds up by 1
+    @param {number} n
+    @return {string} */
+function pretty_print_abbreviated_number(n) {
+    var result = '';
+    if(n < 1000) {
+        result = result + n.toString();
+    } else if(n >= 1000 && n < 1000000) {
+        result = result + (Math.round(n / 1000) + 1).toString() + 'k.';
+    } else if (n >= 1000000 && n < 1000000000) {
+        result = result + (Math.round(n / 1000000) + 1).toString() + 'm.';
+    } else if (n >= 1000000000 && n < 1000000000000) {
+        result = result + (Math.round(n / 1000000000) + 1).toString() + 'b.';
+    } else if (n >= 1000000000000) {
+        result = result + (Math.round(n / 1000000000000) + 1).toString() + 't.';
+    }
+    return result;
+}
+
 function reverse_digits(n) {
     if(n <= 0) { return '0'; }
     n = Math.ceil(n);
