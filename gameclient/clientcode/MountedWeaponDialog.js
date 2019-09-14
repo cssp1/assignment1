@@ -350,9 +350,10 @@ MountedWeaponDialog.ondraw = function(dialog) {
     @param {string} recipe_name of the recipe
     @param {SPUI.Dialog} parent dialog that contains the "Use Resource"/"Instant" buttons and price/time displays */
 MountedWeaponDialog.set_recipe_display = function(dialog, mounting_obj, recipe_name, parent) {
-    var current_item = null;
-    var slot_type = dialog.user_data['slot_type']; // default to turret_head, change based on type of crafting
+    var slot_type = dialog.user_data['slot_type']; // default to turret_head, changes based on type of crafting
+    var current_item = mounting_obj['equipment'][slot_type][0];
     var current_spec = (current_item ? ItemDisplay.get_inventory_item_spec(current_item['spec']) : null);
+    var current_level = mounting_obj['equipment'][slot_type][0]['level'] || 1;
     var recipe_spec = gamedata['crafting']['recipes'][recipe_name];
     var category = gamedata['crafting']['categories'][recipe_spec['crafting_category']];
 
@@ -460,9 +461,9 @@ MountedWeaponDialog.set_recipe_display = function(dialog, mounting_obj, recipe_n
 
     // POWER requirement
     if(1) {
-        var old_power = (current_spec ? current_spec['equip']['consumes_power']||0 : 0);
-        var during_power = get_leveled_quantity(recipe_spec['consumes_power']||0, recipe_level);
-        var new_power = get_leveled_quantity(product_spec['equip']['consumes_power']||0, product_level);
+        var old_power = (current_spec ? get_leveled_quantity(current_spec['equip']['consumes_power'], current_level) : 0);
+        var during_power = get_leveled_quantity(recipe_spec['consumes_power'] || 0, recipe_level);
+        var new_power = get_leveled_quantity(product_spec['equip']['consumes_power'] || 0, product_level);
         dialog.widgets['cost_power'].show =
             dialog.widgets['resource_power_icon'].show = (new_power > 0 || old_power > 0);
         if(dialog.widgets['cost_power'].show) {
