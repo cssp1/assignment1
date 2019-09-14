@@ -330,7 +330,7 @@ MountedWeaponDialog.ondraw = function(dialog) {
     dialog.widgets['selected'].show = !!selected_recipe_name;
 
     if(dialog.widgets['selected'].show) {
-
+        dialog.widgets['selected'].user_data['current_item'] = current_item;
         dialog.widgets['selected'].user_data['slot_type'] = dialog.user_data['slot_type']; // adds slot type to subdialog for delivery slot later
         MountedWeaponDialog.set_recipe_display(dialog.widgets['selected'], dialog.user_data['emplacement'], selected_recipe_name, dialog);
 
@@ -351,7 +351,7 @@ MountedWeaponDialog.ondraw = function(dialog) {
     @param {SPUI.Dialog} parent dialog that contains the "Use Resource"/"Instant" buttons and price/time displays */
 MountedWeaponDialog.set_recipe_display = function(dialog, mounting_obj, recipe_name, parent) {
     var slot_type = dialog.user_data['slot_type']; // default to turret_head, changes based on type of crafting
-    var current_item = (mounting_obj['equipment'] && (slot_type in mounting_obj['equipment']) && (mounting_obj['equipment'][slot_type].length >= 1) ? mounting_obj['equipment'][slot_type][0] : null);
+    var current_item = dialog.user_data['current_item']; // set in MountedWeaponDialog.ondraw(), where it defaults to null and changes based on mounting type
     var current_spec = (current_item ? ItemDisplay.get_inventory_item_spec(current_item['spec']) : null);
     var current_level = (current_item ? current_item['level'] : 1);
     var recipe_spec = gamedata['crafting']['recipes'][recipe_name];
