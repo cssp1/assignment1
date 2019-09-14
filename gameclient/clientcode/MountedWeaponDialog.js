@@ -351,9 +351,9 @@ MountedWeaponDialog.ondraw = function(dialog) {
     @param {SPUI.Dialog} parent dialog that contains the "Use Resource"/"Instant" buttons and price/time displays */
 MountedWeaponDialog.set_recipe_display = function(dialog, mounting_obj, recipe_name, parent) {
     var slot_type = dialog.user_data['slot_type']; // default to turret_head, changes based on type of crafting
-    var current_item = mounting_obj['equipment'][slot_type][0];
+    var current_item = (mounting_obj['equipment'] && (slot_type in mounting_obj['equipment']) && (mounting_obj['equipment'][slot_type].length >= 1) ? mounting_obj['equipment'][slot_type][0] : null);
     var current_spec = (current_item ? ItemDisplay.get_inventory_item_spec(current_item['spec']) : null);
-    var current_level = mounting_obj['equipment'][slot_type][0]['level'] || 1;
+    var current_level = (current_item ? current_item['level'] : 1);
     var recipe_spec = gamedata['crafting']['recipes'][recipe_name];
     var category = gamedata['crafting']['categories'][recipe_spec['crafting_category']];
 
