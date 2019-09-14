@@ -690,11 +690,20 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     dialog.widgets['requirements_bg'].show =
         dialog.widgets['requirements_time_icon'].show =
         dialog.widgets['requirements_time_value'].show = (dialog.widgets['start_repair_button'].show && hover);
-    var res_count = 2; // set to show two-resource layout by default
-    var pred = read_predicate(gamedata['resources']['res3']['show_if']);
-    if(pred.is_satisfied(player, null)){
-        res_count = 3; // set to three-resource layout if res3 is available to the player
-    }
+    var res_count = 0;
+    for(var res in gamedata['resources']) {
+        var data = gamedata['resources'][res];
+        var increment = false;
+        if ('show_if' in data) {
+            var pred = read_predicate(data['show_if']);
+            increment = pred.is_satisfied(player, null);
+        } else {
+            increment = true;
+        }
+        if(increment) {
+            res_count ++;
+        }
+    if(res_count < 2 || res_count > 3) { throw Error('unhandled res_count, must be 2 or 3'); }
     for(var res in gamedata['resources']) {
         // both versions show by default, so first we hide them
         // we'll show the correct one if it applies

@@ -587,7 +587,7 @@ function pretty_print_number(n) {
     return sign + ret.reverse().join(',');
 }
 
-/** print a number in the form XXXk. for thousands, XXXm. for millions, XXXb. for billions, etc
+/** print a number in the form XXXk for thousands, XXXm for millions, XXXb for billions, etc
     always rounds up by 1
     @param {number} n
     @return {string} */
@@ -596,13 +596,13 @@ function pretty_print_abbreviated_number(n) {
     if(n < 1000) {
         result = result + n.toString();
     } else if(n >= 1000 && n < 1000000) {
-        result = result + (Math.round(n / 1000) + 1).toString() + 'k.';
+        result = result + (Math.round(n / 1000) + 1).toString() + 'k';
     } else if (n >= 1000000 && n < 1000000000) {
-        result = result + (Math.round(n / 1000000) + 1).toString() + 'm.';
+        result = result + (Math.round(n / 1000000) + 1).toString() + 'm';
     } else if (n >= 1000000000 && n < 1000000000000) {
-        result = result + (Math.round(n / 1000000000) + 1).toString() + 'b.';
+        result = result + (Math.round(n / 1000000000) + 1).toString() + 'b';
     } else if (n >= 1000000000000) {
-        result = result + (Math.round(n / 1000000000000) + 1).toString() + 't.';
+        result = result + (Math.round(n / 1000000000000) + 1).toString() + 't';
     }
     return result;
 }
