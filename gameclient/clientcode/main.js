@@ -576,6 +576,8 @@ function pretty_print_cost_brief(n) {
         return (Math.round(n / 1000000000) + 1).toString() + 'b';
     } else if (n >= 1000000000000) {
         return (Math.round(n / 1000000000000) + 1).toString() + 't';
+    } else {
+        return 'Cost overrun';
     }
 }
 
