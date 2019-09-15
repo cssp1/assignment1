@@ -703,18 +703,16 @@ SquadControlDialog.update_squad_tile = function(dialog) {
         if(increment) {
             res_count ++;
         }
+    }
     if(res_count < 2 || res_count > 3) { throw Error('unhandled res_count, must be 2 or 3'); }
+    for(var widget in dialog.widgets) {
+        // hides all of the resources except time
+        // the correct ones will be shown later
+        if(widget.includes('requirements') && !widget.includes('time') && !widget.includes('_bg')) {
+            dialog.widgets[widget].show = false;
+        }
+    }
     for(var res in gamedata['resources']) {
-        // both versions show by default, so first we hide them
-        // we'll show the correct one if it applies
-        if('requirements_2_'+res+'_icon' in dialog.widgets) {
-            dialog.widgets['requirements_2_'+res+'_icon'].show =
-                dialog.widgets['requirements_2_'+res+'_value'].show = false;
-        }
-        if('requirements_3_'+res+'_icon' in dialog.widgets) {
-            dialog.widgets['requirements_3_'+res+'_icon'].show =
-                dialog.widgets['requirements_3_'+res+'_value'].show = false;
-        }
         // the squad_tile dialog has requirements_2 and requirements_3 versions of the icon and value widgets
         // so it can switch to however many the current title uses
         if('requirements_'+res_count.toString()+'_'+res+'_icon' in dialog.widgets) {
