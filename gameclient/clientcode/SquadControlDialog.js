@@ -703,7 +703,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
             res_count++;
         }
     }
-    if(res_count < 2 || res_count > 3) { throw Error('unhandled res_count, must be 2 or 3'); }
+    if(res_count < 1 || res_count > 3) { throw Error('unhandled res_count, must be 1, 2 or 3'); }
     for(var res in gamedata['resources']) {
         // the squad_tile dialog has requirements_2 and requirements_3 versions of the icon and value widgets
         // so it can switch to however many the current title uses
