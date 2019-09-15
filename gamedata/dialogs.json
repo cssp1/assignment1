@@ -7436,6 +7436,10 @@
 
             "requirements_iron_icon": { "kind": "StaticImage", "xy": [315,366], "dimensions": [21,21], "asset": "resource_icon_iron" },
             "requirements_iron_value": { "kind": "TextField", "xy": [346,366], "dimensions": [53,21], "text_size": 13, "text_hjustify": "center", "ui_name": "xxx,xxx,xxx" },
+
+            "requirements_res3_icon": { "kind": "StaticImage", "xy": [315,366], "dimensions": [21,21], "asset": "resource_icon_res3" },
+            "requirements_res_value": { "kind": "TextField", "xy": [346,366], "dimensions": [53,21], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx,xxx,xxx" },
+
             "requirements_time_icon": { "kind": "StaticImage", "xy": [425,366], "dimensions": [21,21], "asset": "resource_icon_combat_time" },
             "requirements_time_value": { "kind": "TextField", "xy": [454,366], "dimensions": [53,21], "text_size": 13, "text_hjustify": "left", "ui_name": "xxm xxs" },
 
@@ -7600,10 +7604,16 @@
             // WHILE DAMAGED
             "start_repair_button": { "kind": "ActionButton", "xy": [14,61], "dimensions": [134,28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Repair", "ui_name_pending": "Working..." },
             "requirements_bg": { "kind": "StaticImage", "xy": [2,88], "dimensions": [160,76], "bg_image_resizable":1, "asset": "dialog_sunken_resizable", "alpha": 0.9},
-            "requirements_water_icon": { "kind": "StaticImage", "xy": [14,95], "dimensions": [21,21], "asset": "resource_icon_water" },
-            "requirements_water_value": { "kind": "TextField", "xy": [40,95], "dimensions": [102,21], "text_size": 13, "text_hjustify": "center", "drop_shadow": 1 },
-            "requirements_iron_icon": { "kind": "StaticImage", "xy": [14,117], "dimensions": [21,21], "asset": "resource_icon_iron" },
-            "requirements_iron_value": { "kind": "TextField", "xy": [40,117], "dimensions": [102,21], "text_size": 13, "text_hjustify": "center", "drop_shadow": 1 },
+            "requirements_2_water_icon": { "kind": "StaticImage", "xy": [14,95], "dimensions": [21,21], "asset": "resource_icon_water" },
+            "requirements_2_water_value": { "kind": "TextField", "xy": [40,95], "dimensions": [102,21], "text_size": 13, "text_hjustify": "center", "drop_shadow": 1 },
+            "requirements_2_iron_icon": { "kind": "StaticImage", "xy": [14,117], "dimensions": [21,21], "asset": "resource_icon_iron" },
+            "requirements_2_iron_value": { "kind": "TextField", "xy": [40,117], "dimensions": [102,21], "text_size": 13, "text_hjustify": "center", "drop_shadow": 1 },
+            "requirements_3_water_icon": { "kind": "StaticImage", "xy": [14,95], "dimensions": [21,21], "asset": "resource_icon_water", "ui_tooltip": "", "tooltip_delay": 0   },
+            "requirements_3_water_value": { "kind": "TextField", "xy": [40,95], "dimensions": [51,21], "text_size": 13, "text_hjustify": "left", "drop_shadow": 1},
+            "requirements_3_iron_icon": { "kind": "StaticImage", "xy": [84,95], "dimensions": [21,21], "asset": "resource_icon_iron", "ui_tooltip": "", "tooltip_delay": 0   },
+            "requirements_3_iron_value": { "kind": "TextField", "xy": [110,95], "dimensions": [51,21], "text_size": 13, "text_hjustify": "left", "drop_shadow": 1},
+            "requirements_3_res3_icon": { "kind": "StaticImage", "xy": [14,117], "dimensions": [21,21], "asset": "resource_icon_res3", "ui_tooltip": "", "tooltip_delay": 0   },
+            "requirements_3_res3_value": { "kind": "TextField", "xy": [40,117], "dimensions": [51,21], "text_size": 13, "text_hjustify": "left", "drop_shadow": 1},
             "requirements_time_icon": { "kind": "StaticImage", "xy": [14,139], "dimensions": [21,21], "asset": "resource_icon_combat_time" },
             "requirements_time_value": { "kind": "TextField", "xy": [40,139], "dimensions": [102,21], "text_size": 13, "text_hjustify": "center", "drop_shadow": 1 },
 

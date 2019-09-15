@@ -686,22 +686,45 @@ SquadControlDialog.update_squad_tile = function(dialog) {
 
     //console.log('squad ' +player.squads[dialog.user_data['squad_id'].toString()]['ui_name']+' mode '+dlg_mode+' damaged '+squad_is_damaged+' under_rep '+squad_is_under_repair+' is deployed '+squad_is_deployed+' in battle '+squad_in_battle);
 
+    for(var widget in dialog.widgets) {
+        // select widget names that begin with "requirements_" and end with "_icon" or "_value"
+        if(widget.indexOf('requirements_') === 0 && (widget.indexOf('_icon') > 0 || widget.indexOf('_value') > 0)) {
+            dialog.widgets[widget].show = false;
+        }
+    }
     dialog.widgets['start_repair_button'].show = (dlg_mode=='normal') && (squad_is_damaged && !squad_is_under_repair && !squad_is_deployed && !squad_in_battle && (dialog.user_data['squad_id'] !== SQUAD_IDS.RESERVES));
     dialog.widgets['requirements_bg'].show =
         dialog.widgets['requirements_time_icon'].show =
         dialog.widgets['requirements_time_value'].show = (dialog.widgets['start_repair_button'].show && hover);
+    var res_count = 0;
     for(var res in gamedata['resources']) {
-        if('requirements_'+res+'_icon' in dialog.widgets) {
-            dialog.widgets['requirements_'+res+'_icon'].show =
-                dialog.widgets['requirements_'+res+'_value'].show = dialog.widgets['requirements_time_icon'].show;
+        var data = gamedata['resources'][res];
+        if(!('show_if' in data) || read_predicate(data['show_if']).is_satisfied(player, null)) {
+            res_count++;
+        }
+    }
+    if(res_count < 2 || res_count > 3) { throw Error('unhandled res_count, must be 2 or 3'); }
+    for(var res in gamedata['resources']) {
+        // the squad_tile dialog has requirements_2 and requirements_3 versions of the icon and value widgets
+        // so it can switch to however many the current title uses
+        if('requirements_'+res_count.toString()+'_'+res+'_icon' in dialog.widgets) {
+            dialog.widgets['requirements_'+res_count.toString()+'_'+res+'_icon'].show =
+                dialog.widgets['requirements_'+res_count.toString()+'_'+res+'_value'].show = dialog.widgets['requirements_time_icon'].show;
         }
     }
 
     if(dialog.widgets['start_repair_button'].show) {
         if(hover) {
             for(var resname in gamedata['resources']) {
-                if('requirements_'+resname+'_value' in dialog.widgets) {
-                    dialog.widgets['requirements_'+resname+'_value'].str = pretty_print_number(cost_to_repair[resname]||0);
+                if('requirements_'+res_count.toString()+'_'+resname+'_value' in dialog.widgets) {
+                    if(res_count < 3) {
+                        dialog.widgets['requirements_'+res_count.toString()+'_'+resname+'_value'].str = pretty_print_number(cost_to_repair[resname]||0);
+                    } else {
+                        // when three resources are used, the resource requirement number has to be abbreviated
+                        // the full number is the hovertext for the resource icon
+                        dialog.widgets['requirements_'+res_count.toString()+'_'+resname+'_icon'].ui_tooltip = pretty_print_number(cost_to_repair[resname]||0);
+                        dialog.widgets['requirements_'+res_count.toString()+'_'+resname+'_value'].str = pretty_print_cost_brief(cost_to_repair[resname]||0);
+                    }
                 }
             }
             dialog.widgets['requirements_time_value'].str = pretty_print_time(cost_to_repair['time']||0);

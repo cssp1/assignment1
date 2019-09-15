@@ -543,6 +543,10 @@ function pad_with_zeros(s, n) {
     return ret;
 }
 
+/** uses decimal points and rounds down (useful for displaying resources that the player has or will be rewarded)
+    @param {number} n
+    @return {string}
+*/
 function pretty_print_qty_brief(n) {
     if(n >= 10000000) { // 10m+: 1 digit after the decimal, e.g. "18.5m"
         var d = n/1000000, rem = n % 1000000;
@@ -555,6 +559,25 @@ function pretty_print_qty_brief(n) {
         return d.toFixed(rem == 0 ? 0 : 1)+'k';
     } else {
         return n.toFixed(0);
+    }
+}
+
+/** uses whole numbers and rounds up (useful for displaying resource costs that the player will have to pay)
+    @param {number} n
+    @return {string} */
+function pretty_print_cost_brief(n) {
+    if(n < 1000) {
+        return n.toString();
+    } else if(n >= 1000 && n < 1000000) {
+        return (Math.round(n / 1000) + 1).toString() + 'k';
+    } else if (n >= 1000000 && n < 1000000000) {
+        return (Math.round(n / 1000000) + 1).toString() + 'm';
+    } else if (n >= 1000000000 && n < 1000000000000) {
+        return (Math.round(n / 1000000000) + 1).toString() + 'b';
+    } else if (n >= 1000000000000) {
+        return (Math.round(n / 1000000000000) + 1).toString() + 't';
+    } else {
+        return 'Cost overrun';
     }
 }
 
