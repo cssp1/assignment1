@@ -39,6 +39,7 @@ def credits_schema(sql_util):
              ('currency_amount', 'FLOAT NOT NULL'),
              ('tax_amount', 'FLOAT'),
              ('tax_country', 'CHAR(2)'),
+             ('country', 'CHAR(2)'),
              ('payout_foreign_exchange_rate', 'FLOAT'),
              ('usd_receipts_cents', 'INT NOT NULL'),
              ('description', 'VARCHAR(255) NOT NULL'),
@@ -197,7 +198,7 @@ if __name__ == '__main__':
                         keyvals.append(('gamebucks', sign * int(found.groups()[0])))
 
                 for FIELD in ('quantity', 'payout_foreign_exchange_rate', 'tax_amount', 'tax_country',
-                              'last_purchase_time', 'num_purchases'):
+                              'country', 'last_purchase_time', 'num_purchases'):
                     if FIELD in row:
                         keyvals.append((FIELD,row[FIELD]))
 
@@ -303,4 +304,3 @@ if __name__ == '__main__':
                                    'day', 86400, verbose=verbose, dry_run=dry_run,
                                    execute_func = functools.partial(update_top_spenders, day_window),
                                    resummarize_tail = 86400)
-
