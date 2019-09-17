@@ -1547,7 +1547,15 @@ def check_item(itemname, spec):
                     if 'slot_type' not in crit:
                         error |= 1;  print '%s: equip is missing a "slot_type"' % (itemname,)
                     elif (not crit.get('dev_only',False)) and (crit['slot_type'] not in host_spec.get('equip_slots',{})):
-                        error |= 1; print '%s: equips to %s but %s.json is missing a "%s" slot for it' % (itemname, crit['name'], source, crit['slot_type'])
+                        if isinstance(host_spec.get('equip_slots',{}), list):
+                            matching_slots = 0
+                            for host_level in host_spec.get('equip_slots',{}):
+                                if crit['slot_type'] in host_level:
+                                    matching_slots += 1
+                            if matching_slots == 0:
+                                error |= 1; print '%s: equips to %s but %s.json is missing a "%s" slot for it' % (itemname, crit['name'], source, crit['slot_type'])
+                        else:
+                            error |= 1; print '%s: equips to %s but %s.json is missing a "%s" slot for it' % (itemname, crit['name'], source, crit['slot_type'])
                     elif ('min_level' in crit):
                         level_list = crit['min_level'] if isinstance(crit['min_level'],list) else [crit['min_level'],]
                         if len(level_list) != 1 and len(level_list) != spec['max_level']:
