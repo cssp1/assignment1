@@ -562,25 +562,6 @@ function pretty_print_qty_brief(n) {
     }
 }
 
-/** uses whole numbers and rounds up (useful for displaying resource costs that the player will have to pay)
-    @param {number} n
-    @return {string} */
-function pretty_print_cost_brief(n) {
-    if(n < 1000) {
-        return n.toString();
-    } else if(n >= 1000 && n < 1000000) {
-        return (Math.round(n / 1000) + 1).toString() + 'k';
-    } else if (n >= 1000000 && n < 1000000000) {
-        return (Math.round(n / 1000000) + 1).toString() + 'm';
-    } else if (n >= 1000000000 && n < 1000000000000) {
-        return (Math.round(n / 1000000000) + 1).toString() + 'b';
-    } else if (n >= 1000000000000) {
-        return (Math.round(n / 1000000000000) + 1).toString() + 't';
-    } else {
-        return 'Cost overrun';
-    }
-}
-
 /** print a number in the form xxx,xxx,xxx
     @param {number} n
     @return {string} */
