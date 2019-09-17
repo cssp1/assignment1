@@ -723,7 +723,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
                         // when three resources are used, the resource requirement number has to be abbreviated
                         // the full number is the hovertext for the resource icon
                         dialog.widgets['requirements_'+res_count.toString()+'_'+resname+'_icon'].ui_tooltip = pretty_print_number(cost_to_repair[resname]||0);
-                        dialog.widgets['requirements_'+res_count.toString()+'_'+resname+'_value'].str = pretty_print_cost_brief(cost_to_repair[resname]||0);
+                        dialog.widgets['requirements_'+res_count.toString()+'_'+resname+'_value'].str = pretty_print_qty_brief(cost_to_repair[resname]||0);
                     }
                 }
             }
