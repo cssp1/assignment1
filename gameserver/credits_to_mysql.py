@@ -39,7 +39,7 @@ def credits_schema(sql_util):
              ('currency_amount', 'FLOAT NOT NULL'),
              ('tax_amount', 'FLOAT'),
              ('tax_country', 'CHAR(2)'),
-             ('country', 'CHAR(2)' ),
+             ('country', 'CHAR(2)'),
              ('payout_foreign_exchange_rate', 'FLOAT'),
              ('usd_receipts_cents', 'INT NOT NULL'),
              ('description', 'VARCHAR(255) NOT NULL'),
