@@ -2173,7 +2173,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
                             if slot_type not in gamedata['strings']['equip_slots']:
                                 error |= 1; print '%s: invalid slot_type %s' % (reason, slot_type)
                             for name in name_list:
-                                if isinstance(name, str):
+                                if isinstance(name, basestr):
                                     if name not in gamedata['items']:
                                         error |= 1; print '%s: invalid item %s' % (reason, name)
                                 elif isinstance(name, dict):
