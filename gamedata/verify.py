@@ -2181,8 +2181,16 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
                             if slot_type not in gamedata['strings']['equip_slots']:
                                 error |= 1; print '%s: invalid slot_type %s' % (reason, slot_type)
                             for name in name_list:
-                                if name not in gamedata['items']:
-                                    error |= 1; print '%s: invalid item %s' % (reason, name)
+                                if isinstance(name, basestring):
+                                    if name not in gamedata['items']:
+                                        error |= 1; print '%s: invalid item %s' % (reason, name)
+                                elif isinstance(name, dict):
+                                    if 'spec' not in name:
+                                        error |= 1; print '%s: "spec" needs to be in %s' % (reason, name)
+                                    if name['spec'] not in gamedata['items']:
+                                        error |= 1; print '%s: invalid item %s' % (reason, name['spec'])
+                                else:
+                                    error |= 1; print '%s: equipment map entry should be str or dict, but is %s' % (reason, str(type(name)))
     elif cons['consequent'] == "SPAWN_SECURITY_TEAM":
         for name, qty in cons['units'].iteritems():
             error |= check_unit_name(name, reason)
