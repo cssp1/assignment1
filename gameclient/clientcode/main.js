@@ -5465,7 +5465,7 @@ Building.prototype.is_minefield = function() { return this.spec['equip_slots'] &
 Building.prototype.is_ambush = function() { return this.spec['equip_slots'] && ('ambush' in this.spec['equip_slots']); };
 Building.prototype.is_minefield_armed = function() { return (this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0); };
 Building.prototype.is_ambush_armed = function() { return (this.equipment && this.equipment['ambush'] && this.equipment['ambush'].length > 0); };
-Building.prototype.has_weapon_mount = function() { return (this.spec['equip_slots'] && ('ambush' in this.spec['equip_slots'] || 'mine' in this.spec['equip_slots'] || 'turret_head' in this.spec['equip_slots'] || 'barrier_trap' in this.spec['equip_slots'] || 'building_weapon' in this.spec['equip_slots'])) };
+Building.prototype.has_weapon_mount = function() { return (this.spec['equip_slots'] && ('ambush' in this.spec['equip_slots'] || 'mine' in this.spec['equip_slots'] || 'turret_head' in this.spec['equip_slots'] || 'barrier_trap' in this.spec['equip_slots'] || 'building_weapon' in this.spec['equip_slots'] || 'townhall_weapon' in this.spec['equip_slots'])) };
 
 /** @param {string} slot_name
     @return {string|null}
