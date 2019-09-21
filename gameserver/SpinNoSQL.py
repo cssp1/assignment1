@@ -985,7 +985,7 @@ class NoSQLClient (object):
     def chat_report_is_obsolete(self, target_report, reason=''):
         # look for any later resolved-violated chat report on the same player
         qs = {'_id': {'$ne': self.encode_object_id(target_report['id'])},
-              'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(target_report['time'] - 1))}, # add fudge margin
+              'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(target_report['time'] - 5))}, # add fudge margin
               'resolved': True, 'resolution': {'$ne':'ignore'}, 'target_id': target_report['target_id']}
         later_resolved_reports = self.instrument('chat_report_is_obsolete(%s)'%reason, self._chat_reports_query, (qs, 1))
         return len(later_resolved_reports) > 0
@@ -1805,7 +1805,7 @@ class NoSQLClient (object):
         if 'base_map_loc' in props: props['base_map_loc'] = [int(props['base_map_loc'][0]), int(props['base_map_loc'][1])]
 
         # omit path data for (non-raid) moving features that have already arrived at their destination by now
-        if props.get('base_map_path') and props['base_map_path'][-1]['eta'] < self.time - 1 and not props.get('raid'): # map_path_fudge_time
+        if props.get('base_map_path') and props['base_map_path'][-1]['eta'] < self.time - 5 and not props.get('raid'): # map_path_fudge_time
             del props['base_map_path']
 
         # omit unwanted fields
@@ -2145,7 +2145,7 @@ class NoSQLClient (object):
         # get rid of path data for moving features that have already arrived at their destination by now
         self.region_table(region, 'map').update_many({'$and': [{'raid':{'$exists':False}}, # don't delete paths for raids, since they are short-term, and need to know how to get home
                                                                {'$or': [{'base_map_path':{'$exists':True, '$type':10}}, # somehow a null path got left in here
-                                                                        {'base_map_path_eta':{'$exists':True, '$lt': self.time - 1}}]}, # map_path_fudge_time
+                                                                        {'base_map_path_eta':{'$exists':True, '$lt': self.time - 5}}]}, # map_path_fudge_time
                                                                ]},
                                                      {'$unset':{'base_map_path':1,'base_map_path_eta':1}})
 
