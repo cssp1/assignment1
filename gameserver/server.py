@@ -9694,7 +9694,7 @@ class Player(AbstractPlayer):
         # add extra fudge time to reduce chance of race conditions
         # "assume_moving" is a hint to favor the most likely case for this check (giving "benefit of the doubt")
         # note: we must add at LEAST 1 sec of padding time, because the server_time resolution is integer seconds, while 'eta' can be fractional.
-        fudge_time = (-1 if assume_moving else 1) * (gamedata['server'].get('map_path_fudge_time',4.0) + 1.0)
+        fudge_time = (-1 if assume_moving else 1) * (gamedata['server'].get('map_path_fudge_time',0.25) + 1.0)
         return ('map_path' in squad) and \
                squad['map_path'][-1]['eta'] > server_time + fudge_time
 
