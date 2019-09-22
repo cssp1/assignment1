@@ -5411,7 +5411,7 @@ Building.prototype.is_barrier = function() { return this.spec['name'] === 'barri
 Building.prototype.is_trapped_barrier = function() { return this.spec['equip_slots'] && ('barrier_trap' in this.spec['equip_slots']); };
 Building.prototype.is_armed_building = function() { return this.spec['equip_slots'] && ('building_weapon' in this.spec['equip_slots']); };
 Building.prototype.is_armed_townhall = function() {
-    return this.is_townhall() && this.spec['equip_slots'] && ('townhall_weapon' in get_leveled_quantity(this.spec['equip_slots'],this.level));
+    return this.is_townhall() && this.spec['equip_slots'] && ('townhall_weapon' in this.spec['equip_slots']) && (get_leveled_quantity(this.spec['equip_slots']['townhall_weapon'], this.level) > 0);
 };
 
 /** @return {Object|null} the turret head item currently being crafted (assumes is_crafting() is true) */
