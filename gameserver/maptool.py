@@ -1065,6 +1065,11 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
             base_qty = spawn_data['num']
         if base_qty <= 0: continue
 
+        if 'num_min_by_region' in spawn_data and region_id in spawn_data['num_min_by_region']:
+            min_qty = spawn_data['num_min_by_region'][region_id]
+        else:
+            min_qty = spawn_data.get('num_min',1)
+
         # get list of start,end spawn times
         if 'spawn_times' in spawn_data:
             spawn_times = spawn_data['spawn_times']
@@ -1126,7 +1131,7 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
             continue
 
         # spawn at least one as long as base_qty is above zero
-        qty = min(max(spawn_data.get('num_min',1), int(base_qty * global_qty_scale * local_qty_scale)), spawn_data.get('num_max', 999999))
+        qty = min(max(min_qty, int(base_qty * global_qty_scale * local_qty_scale)), spawn_data.get('num_max', 999999))
 
         for i in xrange(qty):
             if spawn_hive(hives, map_cache, db, lock_manager, region_id, (spawn_data['id_start']+i), name_idx, spawn_data['template'], template,
