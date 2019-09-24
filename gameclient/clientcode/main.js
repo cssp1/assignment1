@@ -5535,8 +5535,12 @@ Building.prototype.is_researcher = function() {
 Building.prototype.is_crafter = function() {
     var crafting_cat = this.spec['crafting_categories'];
     if(crafting_cat) {
+        // detect if crafting_categories is actually a level-based array,
+        // by checking for any entry that is itself an array. If so,
+        // we want to return true only if the building has some crafting category
+        // at its current level.
         goog.array.forEach(this.spec['crafting_categories'], function(cat) {
-            if(cat && typeof cat === 'object'){
+            if(cat && Array.isArray(cat)){
                 crafting_cat = this.get_leveled_quantity(this.spec['crafting_categories']);
             }
         }, this);
@@ -7602,12 +7606,12 @@ function get_workshop_for(category) {
                 return name;
             } else {
                 goog.array.forEach(cats, function(subcats) {
-                    if(subcats && typeof subcats === 'object'){
+                    if(subcats && Array.isArray(subcats)){
                         if (goog.array.contains(subcats, category)) {
                             return name;
                         }
                     }
-                }, cats);
+                });
             }
         }
     }
@@ -22543,7 +22547,7 @@ function invoke_building_context_menu(mouse_xy) {
                 upgrade_is_active = false;
                 var crafter_cats = obj.spec['crafting_categories'];
                 goog.array.forEach(obj.spec['crafting_categories'], function(cat) {
-                    if(cat && typeof cat === 'object'){
+                    if(cat && Array.isArray(cat)){
                         crafter_cats = obj.get_leveled_quantity(obj.spec['crafting_categories']);
                     }
                 }, obj);
@@ -34656,7 +34660,7 @@ function invoke_crafting_table_of_contents_dialog(category) {
     dialog.widgets['category_name'].onclick = (function (_builder) { return function(w) {
         var builder_cats = _builder.spec['crafting_categories'];
             goog.array.forEach(_builder.spec['crafting_categories'], function(cat) {
-                if(cat && typeof cat === 'object'){
+                if(cat && Array.isArray(cat)){
                     builder_cats = _builder.get_leveled_quantity(_builder.spec['crafting_categories']);
                 }
             }, _builder);
@@ -54140,7 +54144,7 @@ Building.prototype.get_idle_state_advanced = function() {
         if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item()) && !(this.is_trapped_barrier() && this.barrier_trap_item()) && !(this.is_armed_building() && this.building_weapon_item()) && !(this.is_armed_townhall() && this.townhall_weapon_item())) {
             var building_cat = this.spec['crafting_categories'];
             goog.array.forEach(this.spec['crafting_categories'], function(cat) {
-                if(cat && typeof cat === 'object'){
+                if(cat && Array.isArray(cat)){
                     building_cat = this.get_leveled_quantity(this.spec['crafting_categories']);
                 }
             }, this);
