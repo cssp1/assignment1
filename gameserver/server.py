@@ -23440,10 +23440,17 @@ class GAMEAPI(resource.Resource):
                   take_resources = True, take_ingredients = True, check_predicates = True):
 
         recipe = gamedata['crafting']['recipes'].get(arg.recipe_name, None)
+        cat_in_spec = (recipe['crafting_category'] in object.spec.crafting_categories)
+        spec_is_leveled = False
+        for level in object.spec.crafting_categories:
+            if isinstance(level, list):
+                spec_is_leveled = True
+        if spec_is_leveled:
+            cat_in_spec = (recipe['crafting_category'] in GameObjectSpec.get_leveled_quantity(object.spec.crafting_categories, object.level))
+
 
         # check recipe sanity
-        if (not recipe) or (not object.is_crafter()) or \
-           (recipe['crafting_category'] not in object.spec.crafting_categories) or \
+        if (not recipe) or (not object.is_crafter()) or (not cat_in_spec) or \
            (recipe['crafting_category'] not in gamedata['crafting']['categories']):
             if retmsg is not None: retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
             return False

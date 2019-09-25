@@ -5404,12 +5404,15 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
         }
     }
 };
+Building.prototype.is_townhall = function() { return this.spec['name'] === gamedata['townhall']; };
 Building.prototype.is_turret = function() { return this.spec['history_category'] === 'turrets'; };
 Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
 Building.prototype.is_barrier = function() { return this.spec['name'] === 'barrier'; };
 Building.prototype.is_trapped_barrier = function() { return this.spec['equip_slots'] && ('barrier_trap' in this.spec['equip_slots']); };
 Building.prototype.is_armed_building = function() { return this.spec['equip_slots'] && ('building_weapon' in this.spec['equip_slots']); };
-Building.prototype.is_armed_townhall = function() { return this.spec['equip_slots'] && ('townhall_weapon' in this.spec['equip_slots']); };
+Building.prototype.is_armed_townhall = function() {
+    return this.is_townhall() && this.spec['equip_slots'] && ('townhall_weapon' in this.spec['equip_slots']) && (get_leveled_quantity(this.spec['equip_slots']['townhall_weapon'], this.level) > 0);
+};
 
 /** @return {Object|null} the turret head item currently being crafted (assumes is_crafting() is true) */
 Building.prototype.first_crafting_inprogress_item = function() {
@@ -5530,7 +5533,19 @@ Building.prototype.is_researcher = function() {
     return (this.spec['spells'].indexOf("RESEARCH_FOR_FREE") != -1);
 };
 Building.prototype.is_crafter = function() {
-    return (this.spec['spells'].indexOf("CRAFT_FOR_FREE") != -1);
+    var crafting_cat = this.spec['crafting_categories'];
+    if(crafting_cat) {
+        // detect if crafting_categories is actually a level-based array,
+        // by checking for any entry that is itself an array. If so,
+        // we want to return true only if the building has some crafting category
+        // at its current level.
+        goog.array.forEach(this.spec['crafting_categories'], function(cat) {
+            if(cat && Array.isArray(cat)){
+                crafting_cat = this.get_leveled_quantity(this.spec['crafting_categories']);
+            }
+        }, this);
+    }
+    return (this.spec['spells'].indexOf("CRAFT_FOR_FREE") != -1 && crafting_cat);
 };
 Building.prototype.is_manufacturer = function() {
     return (this.spec['spells'].indexOf("MAKE_DROIDS") != -1);
@@ -7586,7 +7601,19 @@ function get_factory_for(category) {
 function get_workshop_for(category) {
     for(var name in gamedata['buildings']) {
         var cats = gamedata['buildings'][name]['crafting_categories'] || null;
-        if(cats && goog.array.contains(cats, category)) { return name; }
+        if(cats) {
+            if (goog.array.contains(cats, category)) {
+                return name;
+            } else {
+                goog.array.forEach(cats, function(subcats) {
+                    if(subcats && Array.isArray(subcats)){
+                        if (goog.array.contains(subcats, category)) {
+                            return name;
+                        }
+                    }
+                });
+            }
+        }
     }
     throw Error('no workshop for category '+category);
 }
@@ -22518,7 +22545,13 @@ function invoke_building_context_menu(mouse_xy) {
 
             if(obj.is_crafter() && (session.home_base || quarry_upgradable)) {
                 upgrade_is_active = false;
-                var cat = gamedata['crafting']['categories'][obj.spec['crafting_categories'][0]];
+                var crafter_cats = obj.spec['crafting_categories'];
+                goog.array.forEach(obj.spec['crafting_categories'], function(cat) {
+                    if(cat && Array.isArray(cat)){
+                        crafter_cats = obj.get_leveled_quantity(obj.spec['crafting_categories']);
+                    }
+                }, obj);
+                var cat = gamedata['crafting']['categories'][crafter_cats[0]];
                 if(!cat) {
                     throw Error('Missing crafting_categories for crafter: ' + obj.spec['ui_name']);
                 }
@@ -34625,8 +34658,14 @@ function invoke_crafting_table_of_contents_dialog(category) {
     dialog.widgets['category_name'].str = catspec['ui_name'];
     // clicking the breadcrumb should function as an "escape hatch" back to the master crafting_dialog for this building
     dialog.widgets['category_name'].onclick = (function (_builder) { return function(w) {
-        if(_builder && _builder.spec['crafting_categories']) {
-            var cat = _builder.spec['crafting_categories'][0];
+        var builder_cats = _builder.spec['crafting_categories'];
+            goog.array.forEach(_builder.spec['crafting_categories'], function(cat) {
+                if(cat && Array.isArray(cat)){
+                    builder_cats = _builder.get_leveled_quantity(_builder.spec['crafting_categories']);
+                }
+            }, _builder);
+        if(_builder && _builder.spec['crafting_categories'] && builder_cats) {
+            var cat = builder_cats[0];
             var catspec = gamedata['crafting']['categories'][cat];
             change_selection_ui(null);
             if(catspec['table_of_contents']) {
@@ -53860,8 +53899,14 @@ Building.prototype.get_idle_state_legacy = function() {
         if(!this.is_researching()) { draw_idle_icon = 'research'; }
     } else if(this.is_crafter()) {
         if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item()) && !(this.is_trapped_barrier() && this.barrier_trap_item()) && !(this.is_armed_building() && this.building_weapon_item()) && !(this.is_armed_townhall() && this.townhall_weapon_item())) {
-            for(var i = 0; i < this.spec['crafting_categories'].length; i++) {
-                var catname = this.spec['crafting_categories'][i];
+            var crafter_cats = this.spec['crafting_categories'];
+            goog.array.forEach(this.spec['crafting_categories'], function(cat) {
+                if(cat && typeof Array.isArray(cat)){
+                    crafter_cats = this.get_leveled_quantity(this.spec['crafting_categories']);
+                }
+            }, this);
+            for(var i = 0; i < crafter_cats.length; i++) {
+                var catname = crafter_cats[i];
                 var cat = gamedata['crafting']['categories'][catname];
                 if(catname == 'mines') {
                     if(!player.all_minefields_armed()) {
@@ -54097,9 +54142,18 @@ Building.prototype.get_idle_state_advanced = function() {
         }
     } else if(this.is_crafter()) {
         if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item()) && !(this.is_trapped_barrier() && this.barrier_trap_item()) && !(this.is_armed_building() && this.building_weapon_item()) && !(this.is_armed_townhall() && this.townhall_weapon_item())) {
-            for(var i = 0; i < this.spec['crafting_categories'].length; i++) {
-                var catname = this.spec['crafting_categories'][i];
+            var building_cat = this.spec['crafting_categories'];
+            goog.array.forEach(this.spec['crafting_categories'], function(cat) {
+                if(cat && Array.isArray(cat)){
+                    building_cat = this.get_leveled_quantity(this.spec['crafting_categories']);
+                }
+            }, this);
+            for(var i = 0; i < building_cat.length; i++) {
+                var catname = building_cat[i];
                 var cat = gamedata['crafting']['categories'][catname];
+                if(!cat) {
+                    throw Error ('no such category as ' + catname);
+                }
                 if(catname == 'mines') {
                     if(!player.all_minefields_armed()) {
                         draw_idle_icon = cat['idle_state'] || 'craft_advanced';
