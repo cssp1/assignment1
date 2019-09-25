@@ -53901,7 +53901,7 @@ Building.prototype.get_idle_state_legacy = function() {
         if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item()) && !(this.is_trapped_barrier() && this.barrier_trap_item()) && !(this.is_armed_building() && this.building_weapon_item()) && !(this.is_armed_townhall() && this.townhall_weapon_item())) {
             var crafter_cats = this.spec['crafting_categories'];
             goog.array.forEach(this.spec['crafting_categories'], function(cat) {
-                if(cat && typeof cat === 'object'){
+                if(cat && typeof Array.isArray(cat)){
                     crafter_cats = this.get_leveled_quantity(this.spec['crafting_categories']);
                 }
             }, this);
