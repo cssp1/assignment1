@@ -34727,6 +34727,12 @@ function crafting_subcategory_setup_row(dialog, row_col, rowdata) {
     @param {string|null=} newsubcategory
     @param {number=} newpage */
 function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
+    if ((newcategory in gamedata['crafting']['categories']) && ('dialog' in gamedata['crafting']['categories'][newcategory])){
+        // there should be no UI path for any crafting category that has its own custom crafting interface to reach this code
+        // in the event of undetected UI pathin, this checks if the category passed has its own custom crafting interface
+        // (defined in crafting.json under categories/dialog) and exits the function if it does
+        return;
+    }
     var dialog = new SPUI.Dialog(gamedata['dialogs']['crafting_dialog']);
     install_child_dialog(dialog);
     dialog.auto_center();
@@ -34796,6 +34802,12 @@ function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
     @param {string} category
     @param {number=} page */
 function crafting_dialog_change_category(dialog, category, page) {
+    if ((category in gamedata['crafting']['categories']) && ('dialog' in gamedata['crafting']['categories'][category])){
+        // there should be no UI path for any crafting category that has its own custom crafting interface to reach this code
+        // in the event of undetected UI pathin, this checks if the category passed has its own custom crafting interface
+        // (defined in crafting.json under categories/dialog) and exits the function if it does
+        return;
+    }
     dialog.user_data['category'] = category;
     dialog.user_data['recipes'] = null;
     dialog.user_data['selected_recipe'] = null;
