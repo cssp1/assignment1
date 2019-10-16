@@ -36866,6 +36866,7 @@ function research_dialog_scroll(dialog, page) {
                         var state = /** @type {!GameArt.Sprite} */ (GameArt.assets['action_button_134px'].states['normal']);
                         if(state.audio) { state.audio.play(client_time); }
                     }
+                    change_selection_unit(null); // clear unit selection, since we may have selected something unrelated to the tech
                     invoke_upgrade_tech_dialog(bname, (function (_cat,_page) { return function() {
                         invoke_research_dialog(null,_cat,_page);
                     }; })(dialog.user_data['category'],dialog.user_data['page']));
