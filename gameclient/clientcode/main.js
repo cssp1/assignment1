@@ -22762,8 +22762,9 @@ function invoke_building_context_menu(mouse_xy) {
          (!(session.viewing_base.base_climate in gamedata['climates']) || !gamedata['climates'][session.viewing_base.base_climate]['exclude_ground_units']))
        )) {
         // "Move" is always the last button
-        if(obj.is_building() && (obj.is_repairing() || obj.is_under_construction() || obj.is_upgrading() || obj.is_enhancing() || obj.is_removing())) {
+        if(obj.is_building() && (obj.is_repairing() || obj.is_under_construction() || obj.is_upgrading() || obj.is_enhancing() || obj.is_removing()) && !(gamedata['always_allow_move_building'])) {
             // moves are not allowed while repairing, constructing, or upgrading
+            // unless 'always_allow_move_building' is set in main.json
         } else {
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['MOVE_BUILDING']['ui_name'],
                                                 onclick: (function (_obj) { return function() {
