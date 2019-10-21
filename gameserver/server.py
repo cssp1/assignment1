@@ -24183,7 +24183,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
             return
 
-        if object.is_building() and (object.is_repairing() or object.is_under_construction() or object.is_upgrading() or object.is_enhancing() or object.is_removing()):
+        if object.is_building() and (object.is_repairing() or object.is_under_construction() or object.is_upgrading() or object.is_enhancing() or object.is_removing()) and not gamedata.get('always_allow_move_building',False):
             retmsg.append(["ERROR", "CANNOT_MOVE_BUILDING_WHILE_BUSY"])
             return
 
