@@ -1466,6 +1466,19 @@
             // valentina
             "missions_button": { "kind": "ActionButton", "xy": [0,102], "dimensions": [102,108], "bg_image": "missions_button", "mouseover_sound": 1 },
 
+            // advisor controls
+            "missions_grow_bg": { "kind": "SolidRect", "xy": [0,281], "dimensions": [28,20], "color": [0.066,0.066,0.066,0.86],
+                                  "bevel": 2,
+                                  "outline_width": 1, "outline_color": [0.33,0.33,0.33,1],
+                                  "fade_unless_hover": 0.8 },
+            "missions_grow_up": { "kind": "SolidRect", "xy": [3,285], "dimensions": [22,10], "color": [1,1,1,0.86],
+                                  "path": [[0,10], [11,0], [22,10], [0,10]],
+                                  "fade_unless_hover": 0.5 },
+            "missions_grow_down": { "kind": "SolidRect", "xy": [3,285], "dimensions": [22,10], "color": [1,1,1,0.86],
+                                    "path": [[0,0], [11,10], [22,0], [0,0]],
+                                    "fade_unless_hover": 0.5 },
+            "missions_grow_toggle": { "kind": "ActionButton", "xy": [0,281], "dimensions": [28,20] }, // extra-wide for clickability
+
 
             "you_have_mail": { "kind": "StaticImage", "xy": [15,106], "dimensions": [23,33], "asset": "quest_icon" },
             "you_have_mail_jewel": { "kind": "Dialog", "xy": [29,104], "dimensions": [17,14], "dialog": "notification_jewel" },
@@ -1543,6 +1556,19 @@
             "resource_bar_tokens_amount": { "show": 0, "kind": "TextField", "xy": [553,175], "dimensions": [86,30],
                                             "text_hjustify": "center",
                                             "text_size": 13, "drop_shadow": 1, "text_style": "thick", "array": [1,1], "array_offset": [0,0] },
+
+            // opponent and event controls
+            "event_grow_bg": { "kind": "SolidRect", "xy": [725,281], "dimensions": [28,20], "color": [0.066,0.066,0.066,0.86],
+                               "bevel": 2,
+                               "outline_width": 1, "outline_color": [0.33,0.33,0.33,1],
+                               "fade_unless_hover": 0.8 },
+            "event_grow_up": { "kind": "SolidRect", "xy": [728,285], "dimensions": [22,10], "color": [1,1,1,0.86],
+                               "path": [[0,10], [11,0], [22,10], [0,10]],
+                               "fade_unless_hover": 0.5 },
+            "event_grow_down": { "kind": "SolidRect", "xy": [728,285], "dimensions": [22,10], "color": [1,1,1,0.86],
+                                 "path": [[0,0], [11,10], [22,0], [0,0]],
+                                 "fade_unless_hover": 0.5 },
+            "event_grow_toggle": { "kind": "ActionButton", "xy": [725,281], "dimensions": [28,20] }, // extra-wide for clickability
 
             "regional_bg": { "show":0, "kind": "StaticImage", "xy": [-1,-7], "dimensions": [217,103], "asset": "dialog_resizable", "bg_image_resizable":1 },
             "regional_sunken": { "show":0, "kind": "StaticImage", "xy": [8,3], "dimensions": [200,84], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },

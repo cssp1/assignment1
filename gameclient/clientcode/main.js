@@ -11650,8 +11650,20 @@ function init_desktop_dialogs() {
                     invoke_missions_dialog(true);
                 }
             };
+            dialog.widgets['missions_grow_up'].show = !(dialog.widgets['missions_grow_down'].show =
+            dialog.widgets['missions_button'].show = !('missions_button_minimized' in player.preferences && player.preferences['missions_button_minimized']));
             dialog.widgets['map_button'].onclick = function() { invoke_map_dialog(null); };
             dialog.widgets['store_button'].onclick = function(w) { invoke_store(); };
+            dialog.widgets['missions_grow_toggle'].onclick = function(w) {
+                dialog.widgets['missions_grow_up'].show = !(dialog.widgets['missions_grow_up'].show);
+                dialog.widgets['missions_grow_down'].show = !(dialog.widgets['missions_grow_down'].show);
+                dialog.widgets['you_have_mail'].show = !(dialog.widgets['you_have_mail'].show);
+                dialog.widgets['you_have_mail_jewel'].show = !(dialog.widgets['you_have_mail_jewel'].show);
+                dialog.widgets['you_have_mail_glow'].show = !(dialog.widgets['you_have_mail_glow'].show);
+                dialog.widgets['missions_button'].show = !(dialog.widgets['missions_button'].show);
+                player.preferences['missions_button_minimized'] = !(dialog.widgets['missions_button'].show);
+                send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+            };
 
             var do_add_friend = function() {
                 change_selection(null);
@@ -13773,10 +13785,10 @@ function update_desktop_dialogs() {
         }
 
         if(num_waiting > 0 && enable_missions) {
-            dialog.widgets['you_have_mail'].show = dialog.widgets['you_have_mail_glow'].show = true;
+            dialog.widgets['you_have_mail'].show = dialog.widgets['you_have_mail_glow'].show = !('missions_button_minimized' in player.preferences && player.preferences['missions_button_minimized']);
             dialog.widgets['you_have_mail_glow'].alpha = gamedata['client']['notification_icon_glow_intensity']*(0.5 + 0.5 * Math.sin(2*Math.PI*(client_time*gamedata['client']['notification_icon_glow_freq'])));
             if(player.get_any_abtest_value('show_notification_counter', gamedata['client']['show_notification_counter'])) {
-                dialog.widgets['you_have_mail_jewel'].show = true;
+                dialog.widgets['you_have_mail_jewel'].show = !('missions_button_minimized' in player.preferences && player.preferences['missions_button_minimized']);
                 dialog.widgets['you_have_mail_jewel'].user_data['count'] = num_waiting;
             } else {
                 dialog.widgets['you_have_mail_jewel'].show = false;
@@ -13925,7 +13937,16 @@ function update_desktop_dialogs() {
 
                 if(props['gui_mode'] == 'event_preview') {
                     // preannouncement only
-                    dialog.widgets['event_preview_info'].show = true;
+                    dialog.widgets['event_grow_up'].show = !(dialog.widgets['event_grow_down'].show =
+                    dialog.widgets['event_preview_info'].show = !('event_button_minimized' in player.preferences && player.preferences['event_button_minimized']));
+
+                    dialog.widgets['event_grow_toggle'].onclick = function(w) {
+                        dialog.widgets['event_grow_up'].show = !(dialog.widgets['event_grow_up'].show);
+                        dialog.widgets['event_grow_down'].show = !(dialog.widgets['event_grow_down'].show);
+                        dialog.widgets['event_preview_info'].show = !(dialog.widgets['event_preview_info'].show);
+                        player.preferences['event_button_minimized'] = !(dialog.widgets['event_preview_info'].show);
+                        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+                    };
                     d = dialog.widgets['event_preview_info'];
                     d.widgets['title'].str = props['ui_title'];
 
@@ -13936,7 +13957,16 @@ function update_desktop_dialogs() {
                     // live event
                     if(props['gui_mode'] == 'map_event') {
                         // new-style map event info
-                        dialog.widgets['map_event_info'].show = true;
+                        dialog.widgets['event_grow_up'].show = !(dialog.widgets['event_grow_down'].show =
+                        dialog.widgets['map_event_info'].show = !('event_button_minimized' in player.preferences && player.preferences['event_button_minimized']));
+
+                        dialog.widgets['event_grow_toggle'].onclick = function(w) {
+                            dialog.widgets['event_grow_up'].show = !(dialog.widgets['event_grow_up'].show);
+                            dialog.widgets['event_grow_down'].show = !(dialog.widgets['event_grow_down'].show);
+                            dialog.widgets['map_event_info'].show = !(dialog.widgets['map_event_info'].show);
+                            player.preferences['event_button_minimized'] = !(dialog.widgets['map_event_info'].show);
+                            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+                        };
                         d = dialog.widgets['map_event_info'];
                         fight_button = d.widgets['fight_button'];
                         d.widgets['title'].str = props['ui_title'];
@@ -14010,10 +14040,11 @@ function update_desktop_dialogs() {
 
                         // add "Map Battle" button and token counter to legacy guy-in-corner if the event is specified as a "map_and_base_event"
                         if(props['gui_mode'] == 'map_and_base_event' && !player.is_cheater) { // turn off if player is using dev edit mode
-                            dialog.widgets['map_battle_bg'].show =
+                            dialog.widgets['event_grow_up'].show = !(dialog.widgets['event_grow_down'].show =
+                                dialog.widgets['map_battle_bg'].show =
                                 dialog.widgets['resource_bar_tokens'].show =
                                 dialog.widgets['resource_bar_tokens_icon'].show =
-                                dialog.widgets['resource_bar_tokens_amount'].show = true;
+                                dialog.widgets['resource_bar_tokens_amount'].show = !('event_button_minimized' in player.preferences && player.preferences['event_button_minimized']));
 
                             if(props['token_item']) {
                                 var item_list = (props['token_item'] instanceof Array ? props['token_item'] : [props['token_item']]);
@@ -14033,6 +14064,9 @@ function update_desktop_dialogs() {
                             }
 
                             dialog.widgets['map_battle_button'].show = !!props['map_battle_action'];
+                            if(dialog.widgets['map_battle_button'].show) {
+                                dialog.widgets['map_battle_button'].show = !('event_button_minimized' in player.preferences && player.preferences['event_button_minimized']);
+                            }
                             dialog.widgets['map_battle_button'].str = (props['map_battle_ui_name'] || dialog.data['widgets']['map_battle_button']['ui_name']);
                             if(props['map_battle_pred'] && !props['map_battle_pred'].is_satisfied(player, null)) {
                                 dialog.widgets['map_battle_button'].tooltip.str = dialog.data['widgets']['map_battle_button']['ui_tooltip_locked'].replace('%s', props['map_battle_pred'].ui_describe(player));
@@ -14050,7 +14084,7 @@ function update_desktop_dialogs() {
                             }
                         }
 
-                        show_evil_valentina = true;
+                        show_evil_valentina = !('event_button_minimized' in player.preferences && player.preferences['event_button_minimized']);
                         fight_button = dialog.widgets['attacker_fight_button'];
                         dialog.widgets['attacker_timer'].str = pretty_print_time_brief(props['time_to_go']);
                         dialog.widgets['attacker_portrait'].bg_image = props['portrait_asset'];
@@ -14058,8 +14092,23 @@ function update_desktop_dialogs() {
                         dialog.widgets['attacker_prepare'].str = props['speech_str'];
 
                         dialog.widgets['attacker_info_button'].show = !!props['info_action'];
+                        if (dialog.widgets['attacker_info_button'].show) {
+                            dialog.widgets['attacker_info_button'].show = !('event_button_minimized' in player.preferences && player.preferences['event_button_minimized']);
+                        }
                         dialog.widgets['attacker_prepare'].text_hjustify = (props['info_action'] ? 'left' : 'center');
                         dialog.widgets['attacker_info_button'].onclick = props['info_action'] || null;
+
+                        dialog.widgets['event_grow_toggle'].onclick = function(w) {
+                            dialog.widgets['event_grow_up'].show = !(dialog.widgets['event_grow_up'].show);
+                            dialog.widgets['event_grow_down'].show = !(dialog.widgets['event_grow_down'].show);
+                            dialog.widgets['resource_bar_tokens'].show = !(dialog.widgets['resource_bar_tokens'].show);
+                            dialog.widgets['resource_bar_tokens_icon'].show = !(dialog.widgets['resource_bar_tokens_icon'].show);
+                            dialog.widgets['map_battle_bg'].show = !(dialog.widgets['map_battle_bg'].show);
+                            dialog.widgets['attacker_info_button'].show = !(dialog.widgets['attacker_info_button'].show);
+                            show_evil_valentina = !show_evil_valentina
+                            player.preferences['event_button_minimized'] = !(dialog.widgets['map_battle_bg'].show);
+                            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+                        };
                     }
 
                     // common event info
