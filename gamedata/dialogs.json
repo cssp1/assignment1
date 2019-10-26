@@ -1477,6 +1477,7 @@
             "missions_grow_down": { "kind": "SolidRect", "xy": [3,285], "dimensions": [22,10], "color": [1,1,1,0.86],
                                     "path": [[0,0], [11,10], [22,0], [0,0]],
                                     "fade_unless_hover": 0.5 },
+            "missions_grow_glow": { "kind": "StaticImage", "xy": [-2,281], "dimensions": [30,22], "asset": "quest_icon_glow" },
             "missions_grow_toggle": { "kind": "ActionButton", "xy": [0,281], "dimensions": [28,20] }, // extra-wide for clickability
 
 
