@@ -666,7 +666,7 @@ var pad_string = function(s, len) {
 var log_ignore_re = new RegExp('Object expected|Cannot read property \'postMessage\' of null', 'g');
 var log_formats = [
     // serious things that need investigation
-    [(new RegExp('gamedata checksum FAIL|REFUND|DISPUTE|async write error')), function(t) { return '<font color="#dd0000"><b>'+t+'</b></font>'; }],
+    [(new RegExp('gamedata checksum FAIL|REFUND|DISPUTE|async write error|trusting Facebook that')), function(t) { return '<font color="#dd0000"><b>'+t+'</b></font>'; }],
     // warning messages
     [(new RegExp('LOGIN_ABUSE|I/O overload|IOSystem: large object')), function(t) { return '<font color="#b04000"><b>'+t+'</b></font>'; }],
     // less important messages that can usually be ignored
