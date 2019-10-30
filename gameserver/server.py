@@ -18269,8 +18269,8 @@ class Store(object):
         # In 2019, Facebook started sending payments in currencies other than the published SKU, i.e. accepting EUR payments for BRL SKUs.
         # This accepts a payment processed by Facebook regardless of the exchange rate.
         elif currency != spell.get('currency') and spell['price_formula'] == 'constant' and currency.startswith('fbpayments:') and spell.get('currency','').startswith('fbpayments:'):
-            gamesite.exception_log.event(server_time, 'player %d making %s order (payment_id %r) with currency %s amount %s when sku wants currency %s amount %s, trusting Facebook that purchase is valid!' % \
-                                         (session.player.user_id, spellname, payment_id, currency, repr(amount_willing_to_pay), spell['currency'], store_price))
+            gamesite.exception_log.event(server_time, 'player %d making %s order (payment_id %r) with currency %s amount %s when sku wants currency %s, trusting Facebook that purchase is valid!' % \
+                                         (session.player.user_id, spellname, payment_id, currency, repr(amount_willing_to_pay), spell['currency']))
             store_price = amount_willing_to_pay
 
         else:
