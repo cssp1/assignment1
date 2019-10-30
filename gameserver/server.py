@@ -8556,7 +8556,6 @@ class Base(object):
                                 if 'level' in item:
                                     item_level = item['level']
                                 if 'equip' in item_spec:
-                                    equip_power = item_spec['equip'].get('consumes_power',0)
                                     power[1] += GameObjectSpec.get_leveled_quantity(item_spec['equip'].get('consumes_power', 0), item_level)
 
                     # in-progress crafting recipes
