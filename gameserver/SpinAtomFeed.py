@@ -75,7 +75,7 @@ class AtomFeed(object):
 
 def get_feed(game_id, game_name, raw_bytes):
     include_expr = game_name
-    exclude_expr = ('Firestrike' if game_id in ('tr','dv') else None)
+    exclude_expr = None # ('Firestrike' if game_id in ('tr','dv') else None)
     entry_filter = AtomEntryFilter(include_expr = include_expr, exclude_expr = exclude_expr)
     feed = AtomFeed(raw_bytes, entry_filter = entry_filter)
     return feed
