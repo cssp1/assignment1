@@ -46380,7 +46380,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
                 var s = gamedata['auras'][x['spec']];
                 // 'harm' auras are debuffs and don't count towards the player aura limit
                 // 'limited':0 auras are special and don't count towards the player aura limit
-                if(!(('harm' in s) && s['harm']) && !(('limited' in s) && !s['limited'])) {
+                if(!s['harm'] && !(('limited' in s) && !s['limited'])) {
                     aura_count += 1;
                 }
             });
