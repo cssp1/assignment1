@@ -727,11 +727,11 @@ MountedWeaponDialog._has_anti_missile = function(item_spec) {
     @param {!Object} item_spec
     @return {!ModChain.ModChain}
     @private */
-MountedWeaponDialog._add_anti_missile_mod = function(modchain, item_spec) {
+MountedWeaponDialog._add_anti_missile_mod = function(modchain, item_spec, item_level) {
     goog.array.forEach(item_spec['equip']['effects'], function(effect) {
         if(effect['stat'] == 'anti_missile') {
             modchain = ModChain.clone(modchain);
-            modchain = ModChain.add_mod(modchain, effect['method'], effect['strength'], 'equipment', item_spec['name']);
+            modchain = ModChain.add_mod(modchain, effect['method'], get_leveled_quantity(effect['strength'], item_level), 'equipment', item_spec['name']);
         }
     });
     return modchain;
@@ -819,10 +819,10 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
             if(stat == 'anti_missile') { // needs special handling because it is a stat of the building, not the weapon spell
                 // strip off anti-missile mods from any other turret head (but leave alone mods from leader items etc)
                 modchain = MountedWeaponDialog._remove_turret_head_anti_missile_mod(modchain);
-                modchain = MountedWeaponDialog._add_anti_missile_mod(modchain, spec);
+                modchain = MountedWeaponDialog._add_anti_missile_mod(modchain, spec, level);
                 if(relative_modchain && relative_spec) {
                     relative_modchain = MountedWeaponDialog._remove_turret_head_anti_missile_mod(relative_modchain);
-                    relative_modchain = MountedWeaponDialog._add_anti_missile_mod(relative_modchain, relative_spec);
+                    relative_modchain = MountedWeaponDialog._add_anti_missile_mod(relative_modchain, relative_spec, relative_level);
                 }
             }
 
