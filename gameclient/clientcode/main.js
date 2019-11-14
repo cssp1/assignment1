@@ -44195,9 +44195,9 @@ function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
 
     // instantiate the dialog
     var dialog = new SPUI.Dialog(gamedata['dialogs']['upgrade_dialog']);
-    dialog.user_data['force_stats_only'] = false;
+    dialog.user_data['stats_when_busy'] = false;
     if (bldg.time_until_finish() > 0 && gamedata['always_allow_show_building_stats']) {
-        dialog.user_data['force_stats_only'] = true;
+        dialog.user_data['stats_when_busy'] = true;
     };
 
     // make the dialog modal and add it to the "desktop" (replacing any existing selection.ui)
@@ -44298,6 +44298,7 @@ function update_upgrade_dialog(dialog) {
 
     // flag that we can't do any upgrades, and this is just for showing stats
     var stats_only = (techname === 'BUILDING' && !session.home_base && !unit.spec['quarry_upgradable']);
+    var stats_when_busy = dialog.user_data['stats_when_busy']
 
     // whether it is possible to perform the upgrade using resources (vs. instant purchase)
     var use_resources_offered = true;
@@ -44351,7 +44352,7 @@ function update_upgrade_dialog(dialog) {
         } else {
             instant_requirements_ok = false;
         }
-    } else if(builder && builder.time_until_finish() > 0 && !dialog.user_data['force_stats_only']) {
+    } else if(builder && builder.time_until_finish() > 0 && !stats_when_busy) {
         req.push(dialog.data['widgets']['requirements_text']['ui_name_busy'].replace('%s',builder.spec['ui_name']));
         use_resources_requirements_ok = false;
         if(tech) {
@@ -44386,7 +44387,7 @@ function update_upgrade_dialog(dialog) {
             widget.str = widget.data['ui_name'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
         }
     } else {
-        if(new_level > max_level || stats_only || dialog.user_data['force_stats_only']) {
+        if(new_level > max_level || stats_only || stats_when_busy) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
             widget.str = widget.data['ui_name_stats'].replace('%s',unit.spec['ui_name']).replace('%d',old_level.toString());
         } else {
@@ -44445,9 +44446,9 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['icon'].bg_image_offset = vec_add(dialog.data['widgets']['icon']['bg_image_offset'], unit.spec['hero_icon_pos'] || [0,0]);
     }
 
-    dialog.widgets['cost_time'].show = (!stats_only && new_level <= max_level && !dialog.user_data['force_stats_only']);
+    dialog.widgets['cost_time'].show = (!stats_only && new_level <= max_level && !stats_when_busy);
     for(var res in gamedata['resources']) {
-        var show_res = (!dialog.user_data['force_stats_only'] && !stats_only && new_level <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
+        var show_res = (!stats_when_busy && !stats_only && new_level <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
         if('resource_'+res+'_icon' in dialog.widgets) {
             dialog.widgets['resource_'+res+'_icon'].show = show_res;
             dialog.widgets['resource_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
@@ -44465,7 +44466,7 @@ function update_upgrade_dialog(dialog) {
         (!tech && (unit.spec['kind'] === 'building') && (get_leveled_quantity(unit.spec['consumes_power']||0, max_level) > 0));
 
     // resource costs
-    if(stats_only || new_level > max_level || dialog.user_data['force_stats_only']) {
+    if(stats_only || new_level > max_level || stats_when_busy) {
         // don't show resource costs if already at max level
         if(dialog.widgets['cost_power'].show) {
             dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip_maxlevel'] : null);
@@ -44925,7 +44926,7 @@ function update_upgrade_dialog(dialog) {
         if(stat_name == 'xp') {
             // special case for XP gain
             feature_widget(dialog, grid_y, 0).show = true;
-            if (dialog.user_data['force_stats_only']) {
+            if (stats_when_busy) {
                 feature_widget(dialog, grid_y, 0).show = false;
             }
             feature_widget(dialog, grid_y, 0).str = gamedata['strings']['modstats']['stats']['xp']['ui_name'];
@@ -44933,7 +44934,7 @@ function update_upgrade_dialog(dialog) {
             var xp_col = (new_level == 1 ? 1 : 2);
             feature_widget(dialog, grid_y, (xp_col == 1 ? 2 : 1)).show = false;
             feature_widget(dialog, grid_y, xp_col).show = true;
-            if (dialog.user_data['force_stats_only']) {
+            if (stats_when_busy) {
                 feature_widget(dialog, grid_y, xp_col).show = false;
             }
             feature_widget(dialog, grid_y, xp_col).str = '+'+pretty_print_number(xp_amount)+' XP';
@@ -45111,7 +45112,7 @@ function update_upgrade_dialog(dialog) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
             ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, new_chain, spec, new_chain_level, new_auto_spell, new_spell_level, enable_tooltip);
-        } else if(stats_only || new_level > max_level || dialog.user_data['force_stats_only']) {
+        } else if(stats_only || new_level > max_level || stats_when_busy) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
             ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
@@ -45212,7 +45213,7 @@ function update_upgrade_dialog(dialog) {
     } else if(old_level <= 0 && !show_level_0) {
         dialog.widgets['header0'].str = dialog.widgets['header0'].data[(tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name'].replace('%d', new_level);
         dialog.widgets['header1'].show = false;
-    } else if(stats_only || new_level > max_level || dialog.user_data['force_stats_only']) {
+    } else if(stats_only || new_level > max_level || stats_when_busy) {
         dialog.widgets['header0'].str = dialog.widgets['header0'].data[(old_level <= 0 ? 'ui_name_unmodified' : (tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name')].replace('%d', old_level);
         dialog.widgets['header1'].show = false;
     } else {
@@ -45379,7 +45380,7 @@ function update_upgrade_dialog(dialog) {
         // do nothing
     } else if(new_level > max_level) {
         req.push(gamedata['errors']['MAX_LEVEL_REACHED']['ui_name']);
-    } else if (dialog.user_data['force_stats_only']) {
+    } else if (stats_when_busy) {
         req.push(gamedata['errors']['STATS_WHILE_UPGRADING']['ui_name']);
     } else if(builder && builder.is_damaged()) {
         // builder needs repair
@@ -45507,10 +45508,20 @@ function update_upgrade_dialog(dialog) {
 
     // connect button widget onclick() handlers
 
-    if(stats_only || new_level > max_level || dialog.user_data['force_stats_only']) {
+    if(stats_only || new_level > max_level) {
         // hide all buttons
         dialog.widgets['instant_button'].show = dialog.widgets['instant_credits'].show = dialog.widgets['use_resources_button'].show = false;
         // note: timer bar already hidden above
+    } else if (stats_when_busy) {
+        // hide resources, but show instant buy button
+        dialog.widgets['use_resources_button'].show = false;
+        dialog.widgets['instant_button'].show = dialog.widgets['instant_credits'].show = true;
+        dialog.widgets['instant_button']['ui_name'] = gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'];
+        dialog.widgets['instant_button'].spellname = 'SPEEDUP_FOR_MONEY';
+        dialog.widgets['instant_button'].onclick = (function (_builder) { return function() {change_selection_unit(_builder); invoke_speedup_dialog('speedup');}; })(builder)
+        var instant_price = Store.get_user_currency_price(builder.id, gamedata['spells']['SPEEDUP_FOR_MONEY'], null)
+        dialog.widgets['instant_credits'].str = Store.display_user_currency_price(instant_price);
+        dialog.widgets['instant_credits'].tooltip.str = Store.display_user_currency_price_tooltip(instant_price);
     } else {
         dialog.widgets['instant_button'].show = dialog.widgets['instant_credits'].show = dialog.widgets['use_resources_button'].show = true;
 
