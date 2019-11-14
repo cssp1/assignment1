@@ -24027,12 +24027,13 @@ class GAMEAPI(resource.Resource):
     def do_build(self, session, retmsg, spellargs, is_instant):
         building_type = spellargs[0]
         j, i = spellargs[1]
+        spec = session.player.get_abtest_spec(GameObjectSpec, building_type)
+        build_time = GameObjectSpec.get_leveled_quantity(spec.build_time, 1)
 
-        if (not is_instant) and session.player.foreman_is_busy():
+        if (not is_instant) and build_time > 0 and session.player.foreman_is_busy():
             retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
             return
 
-        spec = session.player.get_abtest_spec(GameObjectSpec, building_type)
         if spec.kind == 'inert':
             if (not session.player.is_cheater):
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])

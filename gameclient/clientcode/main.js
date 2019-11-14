@@ -43211,8 +43211,10 @@ function build_dialog_scroll(dialog, page) {
     // this is the function that actually starts the build command
     var build_closure = function(kind, bname) {
         return function() {
+            var spec = gamedata[kind][bname];
+            var build_time = get_leveled_quantity(spec['build_time'], 1);
             // if foreman is busy, prompt player to add foreman or speed up current operation
-            if(player.foreman_is_busy()) {
+            if(player.foreman_is_busy() && build_time > 0) {
                 if(gamedata['enable_multiple_foremen'] && player.tutorial_state == "COMPLETE") {
                     var helper = get_requirements_help('foreman', null);
                     if(helper) {
@@ -43226,7 +43228,6 @@ function build_dialog_scroll(dialog, page) {
                 return;
             }
 
-            var spec = gamedata[kind][bname];
             // prime targeted "build" spell
             selection.spellname = "BUILD";
             selection.spellkind = bname;
@@ -54056,7 +54057,7 @@ Building.prototype.get_idle_state_advanced = function() {
     var can_upgrade = false;
 
     // check for upgradeability
-    if(!player.foreman_is_busy() && this.time_until_finish() < 0 && this.level < this.get_max_ui_level()) {
+    if((!player.foreman_is_busy() || this.time_until_finish() <= 0) && this.time_until_finish() < 0 && this.level < this.get_max_ui_level()) {
         var req = get_leveled_quantity(this.spec['requires']||null, this.level+1);
         if(req && !read_predicate(req).is_satisfied(player, null)) {
             // cannot upgrade due to requirement predicate
