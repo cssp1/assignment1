@@ -43214,7 +43214,7 @@ function build_dialog_scroll(dialog, page) {
             var spec = gamedata[kind][bname];
             var build_time = get_leveled_quantity(spec['build_time'], 1);
             // if foreman is busy, prompt player to add foreman or speed up current operation
-            if(player.foreman_is_busy() && build_time > 0) {
+            if(player.foreman_is_busy() && (build_time > 0 || !gamedata['foreman_ignore_zero_time_building'])) {
                 if(gamedata['enable_multiple_foremen'] && player.tutorial_state == "COMPLETE") {
                     var helper = get_requirements_help('foreman', null);
                     if(helper) {
