@@ -22950,7 +22950,7 @@ class GAMEAPI(resource.Resource):
             return # ignore invalid request
 
         if session.home_base:
-            if session.player.foreman_is_busy() and (GameObjectSpec.get_leveled_quantity(object.spec.build_time, object.level + 1) > 0 or 'foreman_ignore_zero_time_building' not in gamedata):
+            if session.player.foreman_is_busy() and (GameObjectSpec.get_leveled_quantity(object.spec.build_time, object.level + 1) > 0 or not gamedata.get('foreman_ignore_zero_time_building', False)):
                 retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
                 return
         else:
@@ -24029,7 +24029,7 @@ class GAMEAPI(resource.Resource):
         j, i = spellargs[1]
         spec = session.player.get_abtest_spec(GameObjectSpec, building_type)
 
-        if (not is_instant) and (GameObjectSpec.get_leveled_quantity(spec.build_time, 1) > 0 or 'foreman_ignore_zero_time_building' not in gamedata) and session.player.foreman_is_busy():
+        if (not is_instant) and (GameObjectSpec.get_leveled_quantity(spec.build_time, 1) > 0 or not gamedata.get('foreman_ignore_zero_time_building', False)) and session.player.foreman_is_busy():
             retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
             return
 

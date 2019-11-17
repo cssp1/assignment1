@@ -54057,7 +54057,7 @@ Building.prototype.get_idle_state_advanced = function() {
     var can_upgrade = false;
 
     // check for upgradeability
-    if((!player.foreman_is_busy() || this.time_until_finish() <= 0) && this.time_until_finish() < 0 && this.level < this.get_max_ui_level()) {
+    if((!player.foreman_is_busy() || (this.time_until_finish() <= 0 && gamedata['foreman_ignore_zero_time_building'])) && this.time_until_finish() < 0 && this.level < this.get_max_ui_level()) {
         var req = get_leveled_quantity(this.spec['requires']||null, this.level+1);
         if(req && !read_predicate(req).is_satisfied(player, null)) {
             // cannot upgrade due to requirement predicate
