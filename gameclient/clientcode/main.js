@@ -44195,12 +44195,6 @@ function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
 
     // instantiate the dialog
     var dialog = new SPUI.Dialog(gamedata['dialogs']['upgrade_dialog']);
-    dialog.user_data['stats_when_busy'] = false;
-    dialog.user_data['bldg'] = false;
-    if (bldg.time_until_finish() > 0 && gamedata['always_allow_show_building_stats']) {
-        dialog.user_data['stats_when_busy'] = true;
-        dialog.user_data['bldg'] = bldg;
-    };
 
     // make the dialog modal and add it to the "desktop" (replacing any existing selection.ui)
     install_child_dialog(dialog);
@@ -44300,11 +44294,6 @@ function update_upgrade_dialog(dialog) {
 
     // flag that we can't do any upgrades, and this is just for showing stats
     var stats_only = (techname === 'BUILDING' && !session.home_base && !unit.spec['quarry_upgradable']);
-    var stats_when_busy = dialog.user_data['stats_when_busy'];
-    var bldg = dialog.user_data['bldg'];
-    if (!(bldg && stats_when_busy && bldg.time_until_finish() > 0)) {
-        stats_when_busy = false;
-    }
 
     // whether it is possible to perform the upgrade using resources (vs. instant purchase)
     var use_resources_offered = true;
@@ -44344,6 +44333,12 @@ function update_upgrade_dialog(dialog) {
         builder = unit;
     }
     dialog.user_data['builder'] = builder;
+
+    // check if viewing a building and if always viewing stats is enabled
+    var stats_when_busy = false;
+    if (builder && builder.is_building() && builder.time_until_finish() > 0 && gamedata['always_allow_show_building_stats']) {
+        stats_when_busy = true;
+    };
 
     // building is missing, damaged or busy with something, cannot
     // perform upgrade/research
