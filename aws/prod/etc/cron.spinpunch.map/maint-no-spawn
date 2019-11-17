@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# load environment variables on legacy systems
+if [ -r /etc/spinpunch ]; then
+    . /etc/spinpunch
+fi
+
+cd $GAME_DIR/gameserver
+
+for REGION in `./get_region_names.py`; do
+    TODAY=`date +%Y%m%d`
+    TIME_NOW=`date`
+    LOG="logs/${TODAY}-${REGION}-region-maint.txt"
+    echo "=== ${TIME_NOW} ===" >> $LOG
+    ./maptool.py $REGION ALL maint --no-spawn --quiet >> $LOG
+done

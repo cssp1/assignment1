@@ -1970,7 +1970,7 @@ def update_squad_space_values(db, lock_manager, region_id, dry_run = True):
 if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run', 'throttle=', 'base-id=', 'user-id=', 'threshold-days=', 'repair-days=', 'repair-pct=',
                                                        'score-week=', 'event-time-override=', 'quiet',
-                                                       'force-rotation', 'skip-quarry-owners', 'yes-i-am-sure'])
+                                                       'force-rotation', 'skip-quarry-owners', 'yes-i-am-sure','no-spawn'])
     if len(args) < 3:
         print 'usage: maptool.py REGION_ID home|hives|quarries|raids ACTION [options]'
         print 'Actions:'
@@ -1997,6 +1997,7 @@ if __name__ == '__main__':
         print '    --skip-quarry-owners   Do not weed players who own quarries (means that the refund/mail system is not used)'
         print '    --force-rotation       Rotate all bases even if not marked "rotatable"'
         print '    --yes-i-am-sure        Required when doing a "clear" operation since it is very destructive'
+        print '    --no-spawn             Only applies to the "maint" command. Stops it from spawning hives/quarries/raids.'
         print '    -q, --quiet            Reduce verbosity'
         sys.exit(1)
 
@@ -2026,6 +2027,7 @@ if __name__ == '__main__':
     base_id = None
     user_id = None
     yes_i_am_sure = False
+    maint_enable_spawn = True
     threshold_days = get_region_variable('weed_churned_players_after', 30*86400)/86400.0
     repair_days = get_region_variable('repair_churned_players_after', -1)/86400.0
     repair_pct = get_region_variable('repair_churned_players_leave_damaged_pct', -1)
@@ -2059,6 +2061,8 @@ if __name__ == '__main__':
             force_rotation = True
         elif key == '--event-time-override':
             event_time_override = int(val)
+        elif key == '--no-spawn':
+            maint_enable_spawn = False
         elif key == '-q' or key == '--quiet':
             verbose = False
 
@@ -2152,14 +2156,15 @@ if __name__ == '__main__':
                                             check_interval = gamedata['quarries_client']['alliance_bonuses']['check_interval'],
                                             dry_run=dry_run)
 
-                # 70. respawn hives/quarries/raids
-                print "%s: spawning hives..." % region_id
-                spawn_all_hives(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
-                print "%s: spawning quarries..." % region_id
-                spawn_all_quarries(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
-                if raids_enabled:
-                    print "%s: spawning raids..." % region_id
-                    spawn_all_raids(db, lock_manager, region_id, dry_run=dry_run)
+                if maint_enable_spawn:
+                    # 70. respawn hives/quarries/raids
+                    print "%s: spawning hives..." % region_id
+                    spawn_all_hives(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
+                    print "%s: spawning quarries..." % region_id
+                    spawn_all_quarries(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
+                    if raids_enabled:
+                        print "%s: spawning raids..." % region_id
+                        spawn_all_raids(db, lock_manager, region_id, dry_run=dry_run)
 
         elif action == 'update-alliance-bonuses':
             update_alliance_bonuses(db, lock_manager, region_id,
