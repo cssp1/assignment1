@@ -1,4 +1,4 @@
-version: 2 
+version: 2
 
 jobs:
   # check that we can install requirements.txt dependencies
