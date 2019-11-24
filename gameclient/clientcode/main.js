@@ -16809,6 +16809,9 @@ function recensor_chat_frame(dialog) {
     }
 }
 
+/**
+    @param {!SPUI.Dialog} dialog
+*/
 function update_chat_frame(dialog) {
     // check for unseen chat messages, and set jewel states appropriately
     var any_unseen = false;
@@ -16887,6 +16890,25 @@ function update_chat_frame(dialog) {
                 SPUI.root.add_after(desktop_dialogs['desktop_bottom'], dialog);
             }
         }
+    }
+}
+
+/** scrolls chat window by the amount and direction of delta
+    @param {!SPUI.Dialog} dialog
+    @param {number} delta
+*/
+function scroll_chat_frame(dialog, delta) {
+    // error catching to prevent attempting to scroll if not receiving a dialog or a delta
+    if (!dialog || !delta) { return; }
+    var cur_tab = dialog.user_data['cur_tab'];
+    // if no channel is selected, this will prevent any attempted scrolling
+    if (!cur_tab || cur_tab < 0) { return ;}
+    var tab = 'tabs' + cur_tab.toString();
+    var channel = dialog.widgets[tab].widgets['output'];
+    if (delta > 0 && channel.can_scroll_up()) {
+        channel.scroll_up();
+    } else if (delta < 0 && channel.can_scroll_down()) {
+        channel.scroll_down();
     }
 }
 
@@ -52134,12 +52156,17 @@ function do_on_mousewheel(e) {
         return;
     }
 
+    // check if chat window is open and the pointer is over the chat window
+    var chat_scrolling = (global_chat_frame && global_chat_frame.user_data['size'] === 'big' && xy[0] < gamedata['dialogs']['chat_frame2']['dimensions'][0]);
+
     // apply desktop zoom
-    if(!selection.ui) {
+    if(!selection.ui && !chat_scrolling) {
         var new_zoom = view_zoom_linear + delta * gamedata['client']['view_zoom_mousewheel_increment']
         set_view_zoom(new_zoom);
         if(e.preventDefault) { e.preventDefault(); }
         return;
+    } else if (!selection.ui && chat_scrolling) {
+        scroll_chat_frame(global_chat_frame, delta)
     }
 }
 
