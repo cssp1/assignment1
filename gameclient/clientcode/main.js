@@ -16902,7 +16902,7 @@ function scroll_chat_frame(dialog, delta) {
     if (!dialog || !delta) { return; }
     var cur_tab = dialog.user_data['cur_tab'];
     // if no channel is selected, this will prevent any attempted scrolling
-    if (!cur_tab || cur_tab < 0) { return ;}
+    if (cur_tab == null || cur_tab < 0) { return ;}
     var tab = 'tabs' + cur_tab.toString();
     var channel = dialog.widgets[tab].widgets['output'];
     if (delta > 0 && channel.can_scroll_up()) {
@@ -52166,7 +52166,9 @@ function do_on_mousewheel(e) {
         if(e.preventDefault) { e.preventDefault(); }
         return;
     } else if (!selection.ui && chat_scrolling) {
-        scroll_chat_frame(global_chat_frame, delta)
+        scroll_chat_frame(global_chat_frame, delta);
+        if(e.preventDefault) { e.preventDefault(); }
+        return;
     }
 }
 
