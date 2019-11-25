@@ -52165,7 +52165,7 @@ function do_on_mousewheel(e) {
         set_view_zoom(new_zoom);
         if(e.preventDefault) { e.preventDefault(); }
         return;
-    } else if (!selection.ui && chat_scrolling) {
+    } else if (chat_scrolling) {
         scroll_chat_frame(global_chat_frame, delta);
         if(e.preventDefault) { e.preventDefault(); }
         return;
