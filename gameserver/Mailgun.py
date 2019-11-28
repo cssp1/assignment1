@@ -27,13 +27,17 @@ class Mailgun(object):
         else:
             domain = self.domain
 
-            # Ooverride sender domain depending on the email provider.
+            # Override sender domain depending on the email provider.
             # This allows us to work around spam blacklists.
             if not ('@' in email and len(email.split('@')) >= 2):
                 raise Exception('invalid email address: %r' % email)
 
             provider = email.split('@')[1].lower()
             domain = self.domain_by_provider.get(provider, domain)
+
+        # domain_by_provider can specify a "null" domain, which means "don't send anything to this provider"
+        if domain is None:
+            return None
 
         sender_email = self.sender_email.replace('${DOMAIN}', domain)
 
