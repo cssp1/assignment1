@@ -224,7 +224,7 @@ ItemDisplay.get_inventory_item_ui_name = function(spec, level, stack) {
     @returns {string} */
 ItemDisplay.strip_inventory_item_ui_name_level_suffix = function(ui_name) {
     var fields = ui_name.split(' ');
-    if(fields[fields.length-1][0] == 'L') {
+    if((fields[fields.length-1][0] == 'L') && !(isNaN(fields[fields.length-1][1]))) {
         fields = fields.slice(0, fields.length-1);
         ui_name = fields.join(' ');
     }
