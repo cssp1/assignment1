@@ -3609,18 +3609,22 @@ def check_store_sku(sku_name, sku, state):
     expect_library_preds = None
 
     if 'item' in sku:
-        if sku['item'].startswith('leader_'):
+        if sku['item'].startswith('leader_') and 'promotion_token' not in sku['item']:
             expect_items_unique_equipped = set([gamedata['items'][sku['item']]['unique_equipped']])
 
             # check that duplicates of the same item have "requires" predicates
             # this was a very common copy/paste typo for TR leader releases
+            # removed on 2019-11-10 for L5 leaders. A legacy section needs the requires to be different.
+            """
             if 'requires' in sku:
                 if sku['item'] in state['leaders']:
                     other = state['leaders'][sku['item']]
-                    if sku['requires'] != other['requires']:
-                        error |= 1; print 'Store: leader item %s has inconsistent \"requires\" predicates among its multiple listings' % sku['item']
+                    # due to a legacy section different sec
+                    #if sku['requires'] != other['requires']:
+                        #error |= 1; print 'Store: leader item %s has inconsistent \"requires\" predicates among its multiple listings' % sku['item']
                 else:
                     state['leaders'][sku['item']] = sku
+            """
         else:
             # guard against typos where a predicate refers to the wrong item or level
             expect_items = set([sku['item']])
