@@ -219,16 +219,15 @@ ItemDisplay.get_inventory_item_ui_name = function(spec, level, stack) {
     }
 };
 
-/** hack - cut off the " Lxx" level suffix where we don't want it
+/** cut off the " Lxx" level suffix where we don't want it
+    supports L1 through L999
     @param {string} ui_name
     @returns {string} */
 ItemDisplay.strip_inventory_item_ui_name_level_suffix = function(ui_name) {
-    var fields = ui_name.split(' ');
-    if((fields[fields.length-1][0] == 'L') && !(isNaN(fields[fields.length-1][1]))) {
-        fields = fields.slice(0, fields.length-1);
-        ui_name = fields.join(' ');
-    }
-    return ui_name;
+    // match a "Lxx" suffix, where xx is a number
+    var level_suffix_regexp = new RegExp(' L[0-9]{1,3}$');
+    // replace any Lxx suffix with an empty string, to strip it off:
+    return ui_name.replace(level_suffix_regexp, '');
 };
 
 /** return displayable name for item of given spec, using "ui_name_long" if available
