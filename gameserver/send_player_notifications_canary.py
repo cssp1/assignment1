@@ -103,7 +103,7 @@ req = mailgun.send(email,
 
 if dry_run:
     print req
-else:
+elif req:
     mg_response = getattr(requests_session, req['method'].lower())(req['url'], data = req['params'], headers = req['headers'])
     if verbose:
         print 'Mailgun Sent! response: %d %r' % (mg_response.status_code, mg_response.json())

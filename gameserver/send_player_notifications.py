@@ -471,7 +471,7 @@ class Sender(object):
 
                 if self.dry_run:
                     print >> self.msg_fd, '(dry-run) mailgun: %r' % req
-                else:
+                elif req:
                     mg_response = getattr(self.requests_session, req['method'].lower())(req['url'], data = req['params'], headers = req['headers'])
                     print >> self.msg_fd, 'Mailgun Sent! response: %d %r' % (mg_response.status_code, mg_response.json())
 
