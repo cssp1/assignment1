@@ -5951,11 +5951,12 @@ Building.prototype.get_idle_state_appearance = function() {
         var icon_name = state_data['icon'];
         if(!icon_name) { return {idle: idle}; } // no icon
 
-        if(!(icon_name in GameArt.assets)) { throw Error('invalid draw_idle_icon '+icon_name); }
+        if(!(icon_name in GameArt.assets)) { throw Error('invalid draw_idle_icon ' + icon_name); }
 
         // all coordinates here are in playfield coordinate system
 
         var icon_sprite = GameArt.assets[icon_name].states['normal'];
+        if(!icon_sprite) { throw Error('No normal state defined for icon asset ' + icon_name); }
         var xy = this.playfield_xy();
         var default_text_height = this.get_health_bar_dims()[2];
         var icon_pos = vec_add(xy, [0, -Math.floor(0.75*default_text_height + icon_sprite.wh[1]/2)]);
