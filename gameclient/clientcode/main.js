@@ -2597,8 +2597,12 @@ GameObject.prototype.create_aura = function(world, creator_id, creator_team, aur
         // check for existing applications of the aura, and update them if found
         for(i = 0; i < this.auras.length; i++) {
             if(this.auras[i].spec === aura_spec) {
-                if(!(isNaN(this.auras[i].strength)) && !(isNaN(strength))){
+                if(typeof this.auras[i].strength === 'number' && typeof strength === 'number') {
+                    // both old and new strength are numbers, so use the max
                     this.auras[i].strength = Math.max(this.auras[i].strength, strength);
+                } else {
+                    // not a number - overwrite the existing strength
+                    this.auras[i].strength = strength;
                 }
                 this.auras[i].range = Math.max(this.auras[i].range, range);
                 this.auras[i].start_tick = session.get_real_world().combat_engine.cur_tick;
