@@ -1139,13 +1139,8 @@ Aura.prototype.apply = function(world, obj) {
                 return;
             }
 
-            var damage_type = this.strength['type'];
-            if(!damage_type) {
-                // if there's no defense type in the strength, don't apply
-                return;
-            }
-            var targets_air = this.strength['targets_air']
-            var targets_ground = this.strength['targets_ground']
+            var targets_air = this.strength['targets_air'];
+            var targets_ground = this.strength['targets_ground'];
 
             var obj_list = world.query_objects_within_distance(obj.raw_pos(),
                                                                gamedata['map']['range_conversion'] * this.range,
@@ -1215,9 +1210,9 @@ Aura.prototype.apply = function(world, obj) {
             var damage_type = this.strength['type'];
             if(!damage_type) { return; };
             var val = obj.combat_stats.damage_taken_from[damage_type] || 1.0;
-            var shield_strength = this.strength['pct'];
+            var shield_strength = this.strength['shield_strength'];
             if(!shield_strength) { return; };
-            obj.combat_stats.damage_taken_from[damage_type] = val * shield_strength;
+            obj.combat_stats.damage_taken_from[damage_type] = val * (1 - shield_strength);
         } else if(code === 'weak_zombie') {
             obj.combat_stats.maxvel *= this.spec['zombie_speed'];
             obj.combat_stats.weapon_damage *= this.spec['zombie_damage'];
@@ -2602,7 +2597,9 @@ GameObject.prototype.create_aura = function(world, creator_id, creator_team, aur
         // check for existing applications of the aura, and update them if found
         for(i = 0; i < this.auras.length; i++) {
             if(this.auras[i].spec === aura_spec) {
-                this.auras[i].strength = Math.max(this.auras[i].strength, strength);
+                if(!(isNaN(this.auras[i].strength)) && !(isNaN(strength))){
+                    this.auras[i].strength = Math.max(this.auras[i].strength, strength);
+                }
                 this.auras[i].range = Math.max(this.auras[i].range, range);
                 this.auras[i].start_tick = session.get_real_world().combat_engine.cur_tick;
                 if(creator_id) {
