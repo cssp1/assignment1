@@ -1131,6 +1131,26 @@ Aura.prototype.apply = function(world, obj) {
             obj.combat_stats.weapon_damage *= (1 + this.strength);
         } else if(code === 'armor_boosted') {
             obj.combat_stats.extra_armor = Math.max(obj.combat_stats.extra_armor, this.strength);
+        } else if(code.indexOf('damage_type_shielder') === 0) { // this handles both damage_type_shielder and damage_type_shielder_invisible
+            // apply the damage_type_shielded or damage_type_shielded_invisible aura to this and nearby units
+
+            if(obj.is_destroyed()) {
+                // but don't apply if the shielder is dead
+                return;
+            }
+
+            var targets_air = this.strength['targets_air'];
+            var targets_ground = this.strength['targets_ground'];
+
+            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
+                                                               gamedata['map']['range_conversion'] * this.range,
+                                                               { only_team: obj.team, mobile_only: true,
+                                                                 exclude_flying: !targets_air,
+                                                                 flying_only: !targets_ground });
+            for(var i = 0; i < obj_list.length; i++) {
+                var o = obj_list[i].obj;
+                o.create_aura(world, obj.id, obj.team, code.replace('shielder', 'shielded'), this.strength, new GameTypes.TickCount(1), 0);
+            }
         } else if(code.indexOf('defense_booster') === 0) { // this handles both defense_booster and defense_booster_invisible
             // apply the defense_boosted or defense_boosted_invisible aura to this and nearby units
 
@@ -1186,6 +1206,13 @@ Aura.prototype.apply = function(world, obj) {
         } else if(code === 'range_boosted') {
             obj.combat_stats.weapon_range *= Math.max(0, (1+this.strength));
             obj.combat_stats.effective_weapon_range *= Math.max(0, (1+this.strength));
+        } else if(code === 'damage_type_shielded') {
+            var damage_type = this.strength['type'];
+            if(!damage_type) { return; };
+            var val = obj.combat_stats.damage_taken_from[damage_type] || 1.0;
+            var shield_strength = this.strength['shield_strength'];
+            if(!shield_strength) { return; };
+            obj.combat_stats.damage_taken_from[damage_type] = val * (1 - shield_strength);
         } else if(code === 'weak_zombie') {
             obj.combat_stats.maxvel *= this.spec['zombie_speed'];
             obj.combat_stats.weapon_damage *= this.spec['zombie_damage'];
@@ -2554,6 +2581,9 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
     @param {Object=} vs_table */
 GameObject.prototype.create_aura = function(world, creator_id, creator_team, aura_name, strength, duration, range, vs_table) {
     var aura_spec = gamedata['auras'][aura_name];
+    if(!aura_spec) {
+        throw Error('Bad aura name ' + aura_name);
+    }
     var end_tick;
     if(duration.is_infinite()) {
         end_tick = GameTypes.TickCount.infinity; // infinite
@@ -2567,7 +2597,13 @@ GameObject.prototype.create_aura = function(world, creator_id, creator_team, aur
         // check for existing applications of the aura, and update them if found
         for(i = 0; i < this.auras.length; i++) {
             if(this.auras[i].spec === aura_spec) {
-                this.auras[i].strength = Math.max(this.auras[i].strength, strength);
+                if(typeof this.auras[i].strength === 'number' && typeof strength === 'number') {
+                    // both old and new strength are numbers, so use the max
+                    this.auras[i].strength = Math.max(this.auras[i].strength, strength);
+                } else {
+                    // not a number - overwrite the existing strength
+                    this.auras[i].strength = strength;
+                }
                 this.auras[i].range = Math.max(this.auras[i].range, range);
                 this.auras[i].start_tick = session.get_real_world().combat_engine.cur_tick;
                 if(creator_id) {
