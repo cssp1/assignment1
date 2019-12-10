@@ -76,6 +76,8 @@
 
     "damage_types": {
         // these are used as keys for "damage_vs", "ui_damage_vs", and "damage_taken_from:*"
+        "aoefire": {"ui_name": "AOE Fire", "ui_description": "Area of effect weapon.", "asset": "damage_type_special"},
+        "sonic": {"ui_name": "Sonic", "ui_description": "Disrupts the target's senses with loud or uncomfortable sound", "asset": "damage_type_special"}
     },
 
     "unboosted_value": "%val (Level %lev Base %stat)",
