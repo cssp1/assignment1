@@ -964,6 +964,15 @@ def check_spell(spellname, spec):
         if not any(x in special_damages for x in spec['damage_vs']):
             error |= 1; print '%s: weapons with "splash_range" that have "damage" > 0 need a damage type entry in "damage_vs". Did you mean to include "aoefire", "mine", "sonic", "fragmentation", "rapid_fire", or "blast"?' % (spellname,)
 
+    # checks to make sure special damage_vs types are in strings.json
+    if 'damage_vs' in spec:
+        for key in spec['damage_vs']:
+            # certain defaults are ignored
+            # all entries with , are ignored
+            # special elite_XXXUNIT_defense values are ignored
+            if key not in ('rover','transport','light_transport','heavy_transport','starcraft','building','turret_weapon','turret','ambush_point','ignores_armor') and ',' not in key and not ('elite_' in key and '_defense' in key):
+                if key not in gamedata['strings']['damage_types']:
+                    error |= 1; print '%s: has unmatched damage type %s. Spells with a special damage_vs entry need a corresponding entry in strings.json["damage_types"].' % (spellname,key,)
 
     for EFFECT in ('muzzle_flash_effect', 'impact_visual_effect'):
         if EFFECT in spec:
