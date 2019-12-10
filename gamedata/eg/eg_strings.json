@@ -74,6 +74,10 @@
     "damage_vs_ui_qualities": ["Ineffective", "Fair", "Good", "Excellent"],
     "damage_vs_string": "%quality vs %category",
 
+    "damage_types": {
+        // these are used as keys for "damage_vs", "ui_damage_vs", and "damage_taken_from:*"
+    },
+
     "unboosted_value": "%val (Level %lev Base %stat)",
     "boosted_value": "(Level %modlev Mod)",
     "mod_tech_names": { // obsolete
