@@ -147,6 +147,13 @@ if __name__ == '__main__':
                     out[key] = { "states": { "normal": { "subassets": ["inventory_bg_%s" % rarity_color,
                                                                        "inventory_%s" % unit_type_plural,
                                                                        "inventory_%s" % kind] } } }
+                    key_gift = key + '_gift'
+                    outkeys.append(key_gift)
+                    out[key_gift] = \
+                    out[key] = { "states": { "normal": { "subassets": ["inventory_bg_%s" % rarity_color,
+                                                                       "inventory_%s" % unit_type_plural,
+                                                                       "inventory_%s" % kind,
+                                                                       "inventory_giftwrap"] } } }
 
     if game_id in ('tr','dv','sg','bfm'):
         # TR only - create icons for damage_vs mods for tr unit categories (infantry, armor, aircraft)
