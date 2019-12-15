@@ -85,6 +85,18 @@
     "fbpayments_D1SALE_in_effect": {"predicate": "EVENT_TIME", "event_kind": "facebook_sale", "event_name": "event_fbpayments_D1SALE", "method": "inprogress", "ignore_activation": 1},
     "fbpayments_D2SALE_in_effect": {"predicate": "EVENT_TIME", "event_kind": "facebook_sale", "event_name": "event_fbpayments_D2SALE", "method": "inprogress", "ignore_activation": 1},
 
+    // selectors for individual discount SKUs
+    "buy_gamebucks_FLASH25_500_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_FLASH50_500_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_FLASH25_1000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_FLASH50_1000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_FLASH25_5000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_FLASH50_5000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_FLASH25_10000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_FLASH50_10000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_FLASH25_20000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_FLASH50_20000_available": {"predicate": "ALWAYS_FALSE"},
+
     // whether an ONP event is currently happening - controls visibility of ONP category on leaderboard.
     "token_event_happening": { "predicate": "OR", "subpredicates": [
         //{"predicate": "EVENT_TIME", "event_name": "event_queen", "method": "inprogress", "ignore_activation": 1},
