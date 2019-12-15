@@ -1371,7 +1371,7 @@ if __name__ == '__main__':
                 slate_match_predicate = {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_kind', 'value': slate_kind or 'UNUSED'}
 
                 # allow enabling individual FLASH SKUs by predicate, outside of normal FLASH whole-slate sale
-                if slate_kind in ('FLASH25','FLASH50') and loot_level in (500,1000,5000,10000,20000) and game_id in ('tr','dv'):
+                if slate_kind in ('FLASH25','FLASH50') and loot_level in (500,1000,5000,10000,20000):
 
                     sku_match_predname = 'buy_gamebucks_%s_%d_available' % (slate_kind, loot_level)
                     #print sku_name, sku_match_predname
