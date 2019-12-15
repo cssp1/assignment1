@@ -9,5 +9,13 @@
                                                                           {"predicate": "EVENT_TIME", "event_kind": "facebook_sale", "method": "inprogress", "ignore_activation": 1}]},
          "then": {"consequent": "APPLY_AURA", "aura_name": "generic_sale", "aura_duration_from_event": {"event_kind": "facebook_sale"}, "aura_strength": 0.30,
                   "aura_data": {"kind": "facebook_sale"}}}
-    ]}
+    ]},
+
+    // these do nothing, just prevent a verify.py error
+    "buy_gamebucks_FLASH_firstbuy_check": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_FLASH_500_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_FLASH_1000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_FLASH_5000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_FLASH_10000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_FLASH_20000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" }
 }
