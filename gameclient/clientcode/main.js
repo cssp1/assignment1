@@ -1730,6 +1730,7 @@ function CombatStats() {
     this.projectile_speed = 1;
     this.splash_range = 1;
     this.art_asset = null;
+    this.invisible = 0;
 
     // Mobile only
 
@@ -1761,6 +1762,7 @@ CombatStats.prototype.clear = function() {
     this.maxvel = 1;
     this.erratic_flight = 0;
     this.art_asset = null;
+    this.invisible = 0;
 };
 
 /** @override */
@@ -1792,6 +1794,7 @@ CombatStats.prototype.serialize = function() {
     if(this.maxvel != 1) { ret['maxvel'] = this.maxvel; }
     if(this.erratic_flight) { ret['erratic_flight'] = this.erratic_flight; }
     if(this.art_asset) { ret['art_asset'] = this.art_asset; }
+    if(this.invisible) { ret['invisible'] = this.invisible; }
     return ret;
 };
 
@@ -1820,6 +1823,7 @@ CombatStats.prototype.apply_snapshot = function(snap) {
     if('maxvel' in snap) { this.maxvel = snap['maxvel']; }
     if('erratic_flight' in snap) { this.erratic_flight = snap['erratic_flight']; }
     if('art_asset' in snap) { this.art_asset = snap['art_asset']; }
+    if('invisible' in snap) { this.invisible = snap['invisible']; }
 };
 
 // "merge" together two damage_vs tables, returning a table that has
