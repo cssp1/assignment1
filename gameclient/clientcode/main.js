@@ -1196,6 +1196,30 @@ Aura.prototype.apply = function(world, obj) {
                 var o2 = obj_list[i].obj;
                 o2.create_aura(world, obj.id, obj.team, code.replace('booster', 'boosted'), this.strength, new GameTypes.TickCount(1), 0);
             }
+        } else if(code.indexOf('invisible_detector') === 0) {
+            // apply the invisible_detected aura to nearby units
+
+            if(obj.is_destroyed()) {
+                // but don't apply if the booster is dead
+                return;
+            }
+
+            var enemy = '';
+            if(obj.team === 'enemy') {
+                enemy = 'player';
+            } else {
+                enemy = 'enemy';
+            }
+
+            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
+                                                               gamedata['map']['range_conversion'] * this.range,
+                                                               { only_team: enemy });
+            for(var i = 0; i < obj_list.length; i++) {
+                var o2 = obj_list[i].obj;
+                o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), new GameTypes.TickCount(1), 0);
+            }
+        } else if(code === 'invisible_detected') {
+            obj.combat_stats.invisible = 0;
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
         } else if(code === 'disarmed') {
@@ -1242,7 +1266,7 @@ Aura.prototype.apply = function(world, obj) {
 /** @param {!World.World} world
     @param {!GameObject} obj */
 Aura.prototype.update_effect = function(world, obj) {
-    if(('visual_effect' in this.spec) && !obj.spec['worth_less_xp'] && (!obj.is_invisible() || (obj.team === 'player' && !session.is_replay()))) {
+    if(('visual_effect' in this.spec) && !obj.spec['worth_less_xp'] && (!obj.combat_stats.invisible || (obj.team === 'player' && !session.is_replay()))) {
         // do not show FX on barriers or invisible objects
         var vfx_props = {'radius': 0.8*obj.hit_radius() };
         this.visual_effect = world.fxworld.add_visual_effect_at_time(obj.interpolate_pos(world), (obj.is_mobile() ? obj.altitude : 0), [0,1,0], client_time, this.spec['visual_effect'], true, vfx_props);
@@ -1923,6 +1947,7 @@ GameObject.prototype.update_aura_effects = function(world) {
     @param {World.World|null} world - null for phantom/scenery objects */
 GameObject.prototype.update_stats = function(world) {
     this.combat_stats.clear();
+    this.combat_stats.invisible = this.is_invisible();
     this.modify_stats_by_modstats();
     if(world) {
         this.update_and_apply_auras(world);
@@ -8567,7 +8592,7 @@ function find_object_at_screen_pixel(world, xy, ji, include_unselectable) {
             }
         }
 
-        if(temp.is_invisible() && (temp.team !== 'player' || session.is_replay())) { return; }
+        if(temp.combat_stats.invisible && (temp.team !== 'player' || session.is_replay())) { return; }
 
         if(!temp.is_mobile()) {
             // in combat, skip destroyed buildings (but in peacetime keep them, because you want the context menu to repair)
@@ -8890,7 +8915,7 @@ Mobile.prototype.serialize = function() {
     //ret['path_valid'] = this.path_valid; // only needed for pathing
     //ret['path'] = deepcopy_array(this.path); // only needed for pathing
     //ret['stuck_loc'] = (this.stuck_loc ? deepcopy_array(this.stuck_loc) : null); // only needed for pathing
-    ret['is_invisible'] = (this.is_invisible() ? 1 : 0);
+    ret['is_invisible'] = (this.combat_stats.invisible ? 1 : 0);
     return ret;
 };
 /** @override */
@@ -51886,7 +51911,7 @@ function create_mouse_tooltip() {
         var str = [];
 
         if(obj.is_mobile() || obj.is_building()) {
-            if(obj.is_invisible() && (obj.team !== 'player' || session.is_replay())) {
+            if(obj.combat_stats.invisible && (obj.team !== 'player' || session.is_replay())) {
                 mouse_tooltip.onleave();
                 return;
             }
@@ -53763,7 +53788,7 @@ function do_draw() {
                 world.objects.for_each(function(obj) {
                     // highlight enemy units
                     if(session.has_attacked && obj.is_mobile() && obj.team != 'player' && !obj.is_destroyed() &&
-                       (!obj.spec['cloaked'] || !obj.is_invisible())) {
+                       (!obj.spec['cloaked'] || !obj.combat_stats.invisible)) {
                         draw_selection_highlight(world, obj);
 
                     } else if(!session.has_attacked && (obj.force_team === 'attacker' || (!session.home_base && !session.viewing_base.deployment_allowed && obj.team === 'player'))) {
@@ -54562,7 +54587,7 @@ function draw_building_or_inert(world, obj, powerfac) {
         }
     }
 
-    if(obj.is_invisible() && (obj.team !== 'player' || session.is_replay()) && !obj.is_destroyed()) {
+    if(obj.combat_stats.invisible && (obj.team !== 'player' || session.is_replay()) && !obj.is_destroyed()) {
         return text_list; // hidden building!
     }
 
@@ -55215,11 +55240,11 @@ function draw_unit(world, unit) {
         }
 
         if(unit.spec['cloaked']) {
-            if(unit.is_invisible() && (unit.team !== 'player' || session.is_replay())) {
+            if(unit.combat_stats.invisible && (unit.team !== 'player' || session.is_replay())) {
                 return false; // hidden unit!
             }
             if(unit.team === 'player') {
-                if(unit.is_invisible()) {
+                if(unit.combat_stats.invisible) {
                     alpha = gamedata['client']['invisible_opacity'];
                 } else {
                     alpha = gamedata['client']['cloaked_opacity'];
@@ -55639,7 +55664,7 @@ function draw_selection_highlight(world, unit, config_override) {
 
         // draw weapon range
         if(unit.team === 'player' &&
-           (gamedata['client']['always_draw_mobile_weapon_range'] || unit.is_invisible())) {
+           (gamedata['client']['always_draw_mobile_weapon_range'] || unit.combat_stats.invisible)) {
             var ran = unit.weapon_range();
             var range = ran[1], aoe = ran[2], min_range = ran[4];
             if(range > 0) {
