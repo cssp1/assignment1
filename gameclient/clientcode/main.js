@@ -1216,7 +1216,9 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: enemy });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), new GameTypes.TickCount(1), 0);
+                if(o2.combat_stats.invisible){
+                    o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), this.strength, new GameTypes.TickCount(1), 0);
+                }    
             }
         } else if(code === 'invisible_detected') {
             obj.combat_stats.invisible = 0;
