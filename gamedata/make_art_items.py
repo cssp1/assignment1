@@ -149,8 +149,7 @@ if __name__ == '__main__':
                                                                        "inventory_%s" % kind] } } }
                     key_gift = key + '_gift'
                     outkeys.append(key_gift)
-                    out[key_gift] = \
-                    out[key] = { "states": { "normal": { "subassets": ["inventory_bg_%s" % rarity_color,
+                    out[key_gift] = { "states": { "normal": { "subassets": ["inventory_bg_%s" % rarity_color,
                                                                        "inventory_%s" % unit_type_plural,
                                                                        "inventory_%s" % kind,
                                                                        "inventory_giftwrap"] } } }
