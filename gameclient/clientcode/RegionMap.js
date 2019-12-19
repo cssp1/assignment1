@@ -10,6 +10,7 @@ goog.provide('RegionMap');
 
 goog.require('SPUI');
 goog.require('SPFX');
+goog.require('SPClockRace');
 goog.require('GameArt');
 goog.require('ItemDisplay');
 goog.require('SquadControlDialog');
@@ -3038,6 +3039,8 @@ RegionMap.RegionMap.prototype.draw = function(offset) {
         this.last_quest_tracked_dirty_time = this.time;
         player.quest_tracked_dirty = true;
     }
+
+    SPClockRace.launch(); // keep comparing client clock speed to server
 };
 
 /** @param {number} squad_id */

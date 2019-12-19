@@ -175,6 +175,16 @@ if __name__ == '__main__':
             elif row['event_name'] == '3974_ui_latency':
                 keyvals.append(('spec', '%.4f' % row.get('latency',-1.0)))
 
+            elif row['event_name'] == '3975_clock_race':
+                client_interval = row.get('client_interval', -1)
+                server_interval = row.get('server_interval', -1)
+                if client_interval > 0 and server_interval > 0:
+                    ratio = float(client_interval) / float(server_interval)
+                else:
+                    ratio = -1
+                keyvals.append(('spec', '%.4f' % ratio))
+                keyvals.append(('stack', int(client_interval)))
+
             elif row['event_name'] in ('0113_account_deauthorized',
                                        '0140_tutorial_oneway_ticket',
                                        '0140_tutorial_start',

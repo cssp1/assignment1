@@ -50,6 +50,7 @@ goog.require('FBInviteFriends');
 goog.require('FBSendRequests');
 goog.require('AGSendRequests');
 goog.require('BHInvites');
+goog.require('SPClockRace');
 goog.require('SPay');
 goog.require('SProbe');
 goog.require('SPWebsocket');
@@ -53516,6 +53517,11 @@ function do_draw() {
 
         // perform squad movement
         player.advance_squads();
+
+        // if in battle, keep comparing client clock speed to server
+        if(session.has_deployed) {
+            SPClockRace.launch();
+        }
 
         // send lock state query
         if(!session.home_base && !session.has_attacked &&
