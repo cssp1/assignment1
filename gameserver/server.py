@@ -10464,7 +10464,7 @@ class Player(AbstractPlayer):
                                                      (self.user_id, squad_id, repr(squad['map_loc']), repr(home_objects_by_squad[squad_id])))
                     must_recall = True
                 if (squad_id not in map_objects_by_squad) and not squad.get('raid'): # XXX snap dead raids back to home?
-                    if gamedata['server'].get('log_nosql',0) >= 1:
+                    if gamedata['server'].get('log_nosql',0) >= 1 and gamedata['game_id'] != 'fs': # This silences a bug warning in Firestrike. This is a bug and should be fixed eventually.
                         gamesite.exception_log.event(server_time, 'player %d squad %d has map_loc %s but no objects in NoSQL' % \
                                                      (self.user_id, squad_id, repr(squad['map_loc'])))
                     must_recall = True
