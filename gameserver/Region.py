@@ -6,6 +6,8 @@
 
 # helper for reading region data out of gamedata
 
+import time
+
 class Region:
     def __init__(self, gamedata, region_id):
         self.gamedata = gamedata
@@ -45,7 +47,13 @@ class Region:
     def feature_is_moving(self, feature, time_now, assume_moving = False):
         # add extra fudge time to reduce chance of race conditions
         # "assume_moving" is a hint to favor the most likely case for this check (giving "benefit of the doubt")
-        # note: we must add at LEAST 1 sec of padding time, because the server_time resolution is integer seconds, while 'eta' can be fractional.
-        fudge_time = (-1 if assume_moving else 1) * (self.gamedata['server'].get('map_path_fudge_time',0.25) + 1.0)
-        return bool(feature.get('base_map_path',None)) and \
-               feature['base_map_path'][-1]['eta'] > time_now + fudge_time
+        if self.gamedata['server'].get('map_path_highres_time'):
+            # use precise sub-second timing
+            fudge_time = (-1 if assume_moving else 1) * (self.gamedata['server'].get('map_path_fudge_time',0.25))
+            return bool(feature.get('base_map_path',None)) and \
+                   feature['base_map_path'][-1]['eta'] > time.time() + fudge_time
+        else:
+            # old algorithm adds at LEAST 1 sec of padding time, because the server_time resolution is integer seconds, while 'eta' can be fractional.
+            fudge_time = (-1 if assume_moving else 1) * (self.gamedata['server'].get('map_path_fudge_time',0.25) + 1.0)
+            return bool(feature.get('base_map_path',None)) and \
+                   feature['base_map_path'][-1]['eta'] > time_now + fudge_time
