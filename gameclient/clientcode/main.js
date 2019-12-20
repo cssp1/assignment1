@@ -1216,9 +1216,9 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: enemy });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                if(o2.combat_stats.invisible){
+                if(o2.is_invisible()){
                     o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), this.strength, new GameTypes.TickCount(1), 0);
-                }    
+                }
             }
         } else if(code === 'invisible_detected') {
             obj.combat_stats.invisible = 0;
@@ -1268,7 +1268,7 @@ Aura.prototype.apply = function(world, obj) {
 /** @param {!World.World} world
     @param {!GameObject} obj */
 Aura.prototype.update_effect = function(world, obj) {
-    if(('visual_effect' in this.spec) && !obj.spec['worth_less_xp'] && (!obj.combat_stats.invisible || (obj.team === 'player' && !session.is_replay()))) {
+    if(('visual_effect' in this.spec) && !obj.spec['worth_less_xp'] && (!obj.is_invisible() || (obj.team === 'player' && !session.is_replay()))) {
         // do not show FX on barriers or invisible objects
         var vfx_props = {'radius': 0.8*obj.hit_radius() };
         this.visual_effect = world.fxworld.add_visual_effect_at_time(obj.interpolate_pos(world), (obj.is_mobile() ? obj.altitude : 0), [0,1,0], client_time, this.spec['visual_effect'], true, vfx_props);
@@ -1949,7 +1949,7 @@ GameObject.prototype.update_aura_effects = function(world) {
     @param {World.World|null} world - null for phantom/scenery objects */
 GameObject.prototype.update_stats = function(world) {
     this.combat_stats.clear();
-    this.combat_stats.invisible = this.is_invisible();
+    this.combat_stats.invisible = this.is_invisible_default();
     this.modify_stats_by_modstats();
     if(world) {
         this.update_and_apply_auras(world);
@@ -5990,7 +5990,10 @@ Building.prototype.modify_stats_by_modstats = function() {
 };
 
 // return true if the object should be invisible to opponents
-Building.prototype.is_invisible = function() { return !!this.spec['invisible']; };
+Building.prototype.is_invisible_default = function() { return !!this.spec['invisible']; };
+
+// return true if the object should be invisible to opponents
+Building.prototype.is_invisible = function() { return !!this.combat_stats.invisible; };
 
 /** return position/text/icon/etc for the idle state, if it should be drawn in the GUI
     @return {({idle: Object,
@@ -8594,7 +8597,7 @@ function find_object_at_screen_pixel(world, xy, ji, include_unselectable) {
             }
         }
 
-        if(temp.combat_stats.invisible && (temp.team !== 'player' || session.is_replay())) { return; }
+        if(temp.is_invisible() && (temp.team !== 'player' || session.is_replay())) { return; }
 
         if(!temp.is_mobile()) {
             // in combat, skip destroyed buildings (but in peacetime keep them, because you want the context menu to repair)
@@ -8917,7 +8920,7 @@ Mobile.prototype.serialize = function() {
     //ret['path_valid'] = this.path_valid; // only needed for pathing
     //ret['path'] = deepcopy_array(this.path); // only needed for pathing
     //ret['stuck_loc'] = (this.stuck_loc ? deepcopy_array(this.stuck_loc) : null); // only needed for pathing
-    ret['is_invisible'] = (this.combat_stats.invisible ? 1 : 0);
+    ret['is_invisible'] = (this.is_invisible() ? 1 : 0);
     return ret;
 };
 /** @override */
@@ -8964,11 +8967,7 @@ Mobile.prototype.passes_through_walls = function() { return this.spec['flying'] 
 Mobile.prototype.is_under_repair = function() { return this.under_repair_finish > 0; };
 
 // return true if the object should be invisible to opponents
-Mobile.prototype.is_invisible = function() {
-
-    // override dynamic value with recorded value, since orders and AI state are not recorded
-    if(session.is_replay()) { return this.replay_invisible; }
-
+Mobile.prototype.is_invisible_default = function() {
     // mobile units only go invisible when:
     // 1) invis_on_hold: 1 in unit spec
     // 2) unit is in hold position mode
@@ -8986,6 +8985,15 @@ Mobile.prototype.is_invisible = function() {
         }
     }
     return false;
+};
+
+// return true if the object should be invisible to opponents
+Mobile.prototype.is_invisible = function() {
+
+    // override dynamic value with recorded value, since orders and AI state are not recorded
+    if(session.is_replay()) { return this.replay_invisible; }
+
+    return this.combat_stats.invisible;
 };
 
 function get_player_stat(stattab, stat) { return ModChain.get_stat(stattab['player'][stat], null); }
@@ -51913,7 +51921,7 @@ function create_mouse_tooltip() {
         var str = [];
 
         if(obj.is_mobile() || obj.is_building()) {
-            if(obj.combat_stats.invisible && (obj.team !== 'player' || session.is_replay())) {
+            if(obj.is_invisible() && (obj.team !== 'player' || session.is_replay())) {
                 mouse_tooltip.onleave();
                 return;
             }
@@ -53790,7 +53798,7 @@ function do_draw() {
                 world.objects.for_each(function(obj) {
                     // highlight enemy units
                     if(session.has_attacked && obj.is_mobile() && obj.team != 'player' && !obj.is_destroyed() &&
-                       (!obj.spec['cloaked'] || !obj.combat_stats.invisible)) {
+                       (!obj.spec['cloaked'] || !obj.is_invisible())) {
                         draw_selection_highlight(world, obj);
 
                     } else if(!session.has_attacked && (obj.force_team === 'attacker' || (!session.home_base && !session.viewing_base.deployment_allowed && obj.team === 'player'))) {
@@ -54589,7 +54597,7 @@ function draw_building_or_inert(world, obj, powerfac) {
         }
     }
 
-    if(obj.combat_stats.invisible && (obj.team !== 'player' || session.is_replay()) && !obj.is_destroyed()) {
+    if(obj.is_invisible() && (obj.team !== 'player' || session.is_replay()) && !obj.is_destroyed()) {
         return text_list; // hidden building!
     }
 
@@ -55242,11 +55250,11 @@ function draw_unit(world, unit) {
         }
 
         if(unit.spec['cloaked']) {
-            if(unit.combat_stats.invisible && (unit.team !== 'player' || session.is_replay())) {
+            if(unit.is_invisible() && (unit.team !== 'player' || session.is_replay())) {
                 return false; // hidden unit!
             }
             if(unit.team === 'player') {
-                if(unit.combat_stats.invisible) {
+                if(unit.is_invisible()) {
                     alpha = gamedata['client']['invisible_opacity'];
                 } else {
                     alpha = gamedata['client']['cloaked_opacity'];
@@ -55666,7 +55674,7 @@ function draw_selection_highlight(world, unit, config_override) {
 
         // draw weapon range
         if(unit.team === 'player' &&
-           (gamedata['client']['always_draw_mobile_weapon_range'] || unit.combat_stats.invisible)) {
+           (gamedata['client']['always_draw_mobile_weapon_range'] || unit.is_invisible())) {
             var ran = unit.weapon_range();
             var range = ran[1], aoe = ran[2], min_range = ran[4];
             if(range > 0) {
