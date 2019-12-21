@@ -578,7 +578,7 @@ ItemDisplay.get_inventory_item_refund_str = function(item, count) {
             glow:(boolean|undefined),
             hide_stack:(boolean|undefined),
             hide_tooltip:(boolean|undefined),
-            context_parent:(SPUI.Dialog|undefined)
+            context_parent:(SPUI.Element|SPUI.Dialog|undefined)
             }=} opts
  */
 ItemDisplay.display_item_array = function(dialog, prefix, item_list, opts) {
