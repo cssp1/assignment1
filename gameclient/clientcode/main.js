@@ -15033,6 +15033,7 @@ function inventory_item_is_usable_in_combat(spec, session) {
     return UsableInCombat.NOT_USABLE;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_combat_item_bar(dialog) {
     var indices_by_spec = {}; // mapping from specname to index within entry_list
     var entry_list = [];
@@ -16837,6 +16838,7 @@ function display_user_chat_body_nodes(user_data) {
     return disp_text;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function recensor_chat_frame(dialog) {
     for(var i = 0; i < dialog.data['widgets']['tabs']['array'][0]; i++) {
         var tab = dialog.widgets['tabs'+i];
@@ -18180,6 +18182,7 @@ function invoke_idle_check_dialog(request) {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_idle_check_dialog(dialog) {
     dialog.widgets['ok_button'].state = (dialog.widgets['input'].str ? 'normal' : 'disabled');
 }
@@ -19059,6 +19062,7 @@ function retreat_from_attack(bypass_timer) {
     window.setTimeout(visit_base_after_attack, 1000.0*retreat_time);
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_attack_button_dialog(dialog) {
     var top = desktop_dialogs['desktop_top']; // since we need to adjust some widgets on there
     var placement = (session.has_attacked ? gamedata['client']['end_attack_button_placement'] || 'top_center' : 'top_center');
@@ -19519,6 +19523,7 @@ function update_attack_button_dialog(dialog) {
 
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_retreating_dialog(dialog) {
     var str;
     if(session.retreat_pending < 0 || client_time >= session.retreat_pending) {
@@ -19790,6 +19795,7 @@ function tutorial_step_valentina_help_message(data) {
     }
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_valentina_nonmodal_message(dialog) {
     if(dialog.user_data['show_if']) {
         dialog.show = dialog.user_data['show_if'].is_satisfied(player, null);
@@ -22028,6 +22034,7 @@ function apply_animation(dialog, wname, widget, anim_data, anim_time, anim) {
     }
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_fancy_victory_dialog(dialog) {
     if(dialog.widgets['trophy_expires'].show) {
         var togo = player.current_trophy_challenge_togo();
@@ -23096,6 +23103,8 @@ function setup_region_map_feature_list_header(dialog, mode) {
     };
     dialog.ondraw = update_region_map_feature_list_header;
 }
+
+/** @param {SPUI.Dialog} dialog */
 function update_region_map_feature_list_header(dialog) {
     var mode = dialog.user_data['mode'];
     var feature_list = dialog.user_data['feature_list'] = session.region.find_own_features_by_type((mode == 'squads' ? 'squad' : 'quarry'));
@@ -23309,6 +23318,8 @@ function invoke_region_map_scroll_help(parent) {
     }
     return dialog;
 }
+
+/** @param {SPUI.Dialog} dialog */
 function update_region_map_scroll_help(dialog) {
     if(dialog.user_data['map_widget'].parent) {
         // center on parent dialog's map widget
@@ -23396,6 +23407,7 @@ function toggle_region_map() {
     }
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_region_map(dialog) {
     update_map_dialog_header_buttons(dialog.widgets['header_buttons']);
 
@@ -23827,6 +23839,7 @@ function region_map_finder_update(dialog, kind, state) {
     return new RegionMapFinderUpdateResult(show, false, button_name, button_state, tooltip_str, onclick);
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_map_dialog_header_buttons(dialog) {
     dialog.user_data['buttons'] = [];
     var i = 0;
@@ -23993,6 +24006,7 @@ function invoke_map_ladder_pvp() {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_map_ladder_pvp_dialog(dialog) {
     update_map_dialog_header_buttons(dialog.widgets['header_buttons']);
     if(dialog.user_data['transition']) {
@@ -24097,6 +24111,7 @@ function invoke_change_alias_dialog(callback, spellname) {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_change_alias_dialog(dialog) {
     var ok = true;
     var s = dialog.widgets['input'].str;
@@ -24313,6 +24328,7 @@ function change_region_dialog_pop_results(dialog, populations) {
     }
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_change_region_dialog(dialog) {
     for(var row = 0; row < dialog.data['widgets']['region_button']['array'][1]; row++) {
         var w = dialog.widgets['region_button'+row];
@@ -24520,6 +24536,8 @@ function invoke_map_bookmarks_dialog(mapwidget) {
     refresh_map_bookmarks_dialog(dialog);
     return dialog;
 }
+
+/** @param {SPUI.Dialog} dialog */
 function refresh_map_bookmarks_dialog(dialog) {
     var mapwidget = dialog.user_data['mapwidget'];
     var region = mapwidget.region.data['id'];
@@ -24842,6 +24860,7 @@ function mail_dialog_scroll(dialog, first_row) {
     mail_dialog_select_mail(dialog, dialog.user_data['selected_row']);
 }
 
+/** @param {SPUI.Dialog} dialog */
 function frame_update_mail_dialog(dialog) {
     if(dialog.user_data['selected_row'] < 0 || dialog.user_data['selected_row'] >= player.mailbox_count()) {
         return;
@@ -24854,6 +24873,8 @@ function frame_update_mail_dialog(dialog) {
     }
 }
 
+/** @param {SPUI.Dialog} dialog
+    @param {number} row */
 function mail_dialog_select_mail(dialog, row) {
     dialog.user_data['selected_row'] = row;
     dialog.user_data['selected_row'] = Math.min(Math.max(dialog.user_data['selected_row'], dialog.user_data['first_row']), Math.min(dialog.user_data['first_row']+dialog.user_data['visible_rows']-1, player.mailbox_count()-1));
@@ -25187,6 +25208,7 @@ function mail_dialog_invoke_context(inv_dialog, slot, item) {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_mail_dialog_context(dialog) {
     var item = dialog.user_data['item'];
     if('expire_time' in item) {
@@ -25422,6 +25444,7 @@ function warehouse_busy_helper(warehouse) {
     }
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_loot_dialog(dialog) {
     // reuse inventory code
     update_inventory_grid(dialog);
@@ -26891,7 +26914,8 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
     return dialog;
 }
 
-/** @return {boolean} false if the dialog is empty */
+/** @param {SPUI.Dialog} dialog
+    @return {boolean} false if the dialog is empty */
 function update_equip_chooser(dialog) {
     var tech = dialog.user_data['tech'];
     var unit = dialog.user_data['unit'];
@@ -27540,6 +27564,8 @@ function invoke_unit_donation_dialog(req) {
     dialog.ondraw = update_unit_donation_dialog;
     return dialog;
 }
+
+/** @param {SPUI.Dialog} dialog */
 function update_unit_donation_dialog(dialog) {
     var req = dialog.user_data['req'];
     var donation = dialog.user_data['donation'];
@@ -27869,6 +27895,7 @@ function invoke_lottery_dialog(scanner, reason) {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function lottery_dialog_refresh_slate(dialog) {
     dialog.user_data['slate_pending'] = true;
     get_lottery_slate(dialog.user_data['scanner'], (function (_dialog) { return function(result) { lottery_dialog_got_slate(_dialog, result); }; })(dialog));
@@ -27955,6 +27982,8 @@ function lottery_dialog_randomize_cursor(dialog, state) {
     state['last_time'] = client_time;
     state['next_time'] = client_time + vec_distance(state['next'], state['last'])/dialog.data['widgets']['cursor']['anim_speed'];
 }
+
+/** @param {SPUI.Dialog} dialog */
 function update_lottery_dialog(dialog) {
 
     // XXX horrible awkward hack to suppress lottery_dialog tooltips when covered by the item_discovered_dialog
@@ -28192,6 +28221,7 @@ function invoke_abtest_dialog() {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_abtest_dialog(dialog) {
     var NUM = 6, CNUM = 2;
     var i = 0;
@@ -28334,6 +28364,7 @@ function battle_history_change_chapter(dialog, chapter) {
 }
 
 /** Return timestamp of oldest battle summary in the dialog's sumlist, or -1 if no summaries exist */
+/** @param {SPUI.Dialog} dialog */
 function battle_history_oldest(dialog) {
     var oldest = -1;
     if(dialog.user_data['sumlist'] !== null) {
@@ -28344,6 +28375,7 @@ function battle_history_oldest(dialog) {
     return oldest;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function send_battle_history_query(dialog) {
     dialog.user_data['pending'] = true;
     dialog.user_data['sumlist_is_final'] = false;
@@ -28733,6 +28765,7 @@ function battle_history_change_page(dialog, page) {
     return dialog;
 };
 
+/** @param {SPUI.Dialog} dialog */
 function update_battle_history_dialog(dialog) {
 
     if(dialog.user_data['sumlist_is_error'] === 'offline') {
@@ -29942,6 +29975,7 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
     dialog.widgets['scroll_right'].onclick = function(w) { leaderboard_change_page(w.parent, null, null, selection.ui.user_data['chapter'], selection.ui.user_data['page']+1); };
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_leaderboard_dialog(dialog) {
     if(dialog.widgets['contest_leader_rect'].show) {
         dialog.widgets['contest_leader_rect'].opacity = 0.5 + 0.5*(0.5*(1+Math.sin(client_time/0.25)));
@@ -30121,6 +30155,7 @@ function invoke_achievement_brag(ach) {
                     ref:'cheeve'});
 }
 
+/** @param {SPUI.Dialog} dialog */
 function animate_notify_achievements(dialog) {
     var ach_list = dialog.user_data['ach_list'];
 
@@ -30330,6 +30365,7 @@ function alliance_list_onclick(w) {
     alliance_list_change_tab(_d.parent.parent, 'info', _d.user_data['alliance_id']);
 }
 
+/** @param {SPUI.Dialog} dialog */
 function alliance_list_row_update(dialog) {
     if(!dialog.show) { return; }
     var togo = player.current_trophy_challenge_togo();
@@ -31271,6 +31307,7 @@ function init_alliance_info_tab(dialog, alliance_id) {
     update_alliance_info_tab(dialog);
 }
 
+/** @param {SPUI.Dialog} dialog */
 function resort_alliance_info_tab(dialog) {
     var trophy_type = dialog.user_data['trophy_type'];
 
@@ -31460,6 +31497,7 @@ function alliance_leave_ui_description(s, is_last_member, is_leader) {
     return s['ui_description'].replace('%conditions', ui_conditions);
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_alliance_info_tab(dialog) {
     var alliance_id = dialog.user_data['alliance_id'];
 
@@ -31655,6 +31693,7 @@ function set_rank_widget(d, ui_rank) {
     d.widgets['rank_bg'].color = new SPUI.Color(col[0], col[1], col[2], col[3]);
 }
 
+/** @param {SPUI.Dialog} dialog */
 function alliance_info_member_row_update(dialog) {
     if(!dialog.show || !dialog.parent) { return; }
     // optional - may not be part of an alliance
@@ -32117,6 +32156,8 @@ function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override
     }
     dialog.ondraw = unit_icon_update;
 }
+
+/** @param {SPUI.Dialog} dialog */
 function unit_icon_update(dialog) {
     // update repair/wrench icon
     var obj = dialog.user_data['obj'];
@@ -33209,6 +33250,7 @@ function army_unit_is_under_repair(obj_id) {
     return false;
 };
 
+/** @param {SPUI.Dialog} dialog */
 function update_repair_control(dialog) {
 
     dialog.widgets['squad_radio_base_defenders'].state = (dialog.user_data['squad_id'] == SQUAD_IDS.BASE_DEFENDERS ? 'active' : 'normal');
@@ -34137,6 +34179,7 @@ function cancel_manuf_item(builder, queue_slot, spec_name) {
 }
 
 /** Main per-frame update - takes care of grid buttons and status displays*/
+/** @param {SPUI.Dialog} dialog */
 function update_manufacture_dialog(dialog) {
     var builder = dialog.user_data['builder'];
 
@@ -35331,7 +35374,7 @@ function crafting_dialog_select_recipe_merge_items(dialog, specname, rec) {
     }
 }
 
-/** @param {SPUI.Dialog} dialog */
+/** @param {SPUI.Dialog|SPUI.Element} dialog */
 function update_crafting_dialog_recipe_common(dialog) {
     var specname = dialog.parent.user_data['selected_recipe']['spec'];
     var recipe_level = dialog.parent.user_data['selected_recipe']['level'] || 1;
@@ -35388,6 +35431,8 @@ function update_crafting_dialog_recipe_mines(dialog) {
 function update_crafting_dialog_recipe_missiles(dialog) {
     update_crafting_dialog_recipe_merge_items(dialog);
 }
+
+/** @param {SPUI.Dialog} dialog */
 function update_crafting_dialog_recipe_merge_items(dialog) {
     update_crafting_dialog_recipe_common(dialog);
     var specname = dialog.parent.user_data['selected_recipe']['spec'];
@@ -35803,6 +35848,7 @@ function cancel_unfinished_crafting(builder) {
     }
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_crafting_dialog_status_mines_and_missiles(dialog) {
     var dims = dialog.data['widgets']['mine_slot']['array'];
     var builder = dialog.parent.user_data['builder'];
@@ -36111,6 +36157,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
     }
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_crafting_dialog_status_merge_items(dialog) {
     var builder = dialog.parent.user_data['builder'];
     var pending = (builder && !builder.is_in_sync());
@@ -36295,6 +36342,7 @@ function update_notification_choice_button(w, pref_key, config_name) {
     }
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_fishing_dialog(dialog) {
     update_notification_choice_button(dialog.widgets['notify_choice'], 'enable_fishing_notifications', 'fishing_complete');
 
@@ -37015,6 +37063,7 @@ function research_dialog_scroll(dialog, page) {
 }
 
 // responsible for updating "grid_status", "grid_price" "grid_finish_button" only
+/** @param {SPUI.Dialog} dialog */
 function update_research_dialog(dialog) {
     if(!dialog.user_data['techs_by_widget']) { return; }
 
@@ -37229,6 +37278,7 @@ function invoke_missions_dialog(do_animation, preselect_quest) {
 }
 
 // animate Missions dialog zooming out of Valentina
+/** @param {SPUI.Dialog} dialog */
 function animate_valentina_dialog(dialog) {
     // handle invalidation of FB likes cache
     if(dialog.user_data['selected_row'] >= 0 && dialog.user_data['selected_row'] < dialog.user_data['quest_list'].length) {
@@ -37310,6 +37360,7 @@ function animate_dialog_zoom_effect(dialog, src_widget) {
 
 // refresh missions dialog with a new quest list
 // completely resets selection and scrolling
+/** @param {SPUI.Dialog} dialog */
 function update_missions_dialog(dialog) {
 
     if(dialog.widgets['messages_button'].show) {
@@ -37908,6 +37959,7 @@ function map_dialog_get_default_page() {
     return map_dialog_default_page;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_map_dialog(dialog) {
     update_map_dialog_header_buttons(dialog.widgets['header_buttons']);
 
@@ -38849,6 +38901,7 @@ function daily_tip_pageable_show_tip(dialog, idx) {
 }
 
 // this mainly just handles the link button
+/** @param {SPUI.Dialog} dialog */
 function update_daily_tip_pageable(dialog) {
     var idx = dialog.user_data['idx'];
     if(idx < 0 || dialog.user_data['tiplist'].length < 1) { return; }
@@ -39511,6 +39564,7 @@ function invoke_sprobe_dialog() {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_sprobe_dialog(dialog) {
     dialog.widgets['your_framerate'].str = dialog.data['widgets']['your_framerate']['ui_name'].replace('%s', fps_counter.cur_fps.toFixed(1));
 
@@ -39666,6 +39720,7 @@ function get_preference_setting(prefs, pref_name) {
     return eval_cond_or_literal(data['default_val'], player, null);
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_settings_dialog(dialog) {
     var settings = dialog.user_data['settings'];
     for(var row = 0; row < settings.length; row++) {
@@ -39714,11 +39769,16 @@ function invoke_keyboard_shortcuts() {
     dialog.ondraw = keyboard_shortcuts_update;
     return dialog;
 }
+
+/** @param {SPUI.Dialog} dialog
+    @param {number} page */
 function keyboard_shortcuts_change_page(dialog, page) {
     dialog.user_data['page'] = Math.min(Math.max(page, 0), dialog.user_data['text'].length-1);
     dialog.widgets['shortcut_text'].clear_text();
     dialog.widgets['shortcut_text'].append_text(SPText.cstring_to_ablocks_bbcode(dialog.user_data['text'][dialog.user_data['page']]));
 }
+
+/** @param {SPUI.Dialog} dialog */
 function keyboard_shortcuts_update(dialog) {
     dialog.widgets['prev_button'].state = (dialog.user_data['page'] > 0 ? 'normal' : 'disabled');
     dialog.widgets['next_button'].state = (dialog.user_data['page'] < 1 ? 'normal' : 'disabled');
@@ -40298,6 +40358,7 @@ function buy_gamebucks_dialog_change_chapter(dialog, chapter) {
     buy_gamebucks_dialog_select(dialog, dialog.user_data['selection']); // recalculate SKUs
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_buy_gamebucks_dialog(dialog) {
     dialog.widgets['loading_rect'].show =
         dialog.widgets['loading_text'].show =
@@ -40631,6 +40692,8 @@ function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg, expect_loot)
     dialog.ondraw = update_gamebucks_sku_highlight_dialog;
     return dialog;
 }
+
+/** @param {SPUI.Dialog} dialog */
 function update_gamebucks_sku_highlight_dialog(dialog) {
     dialog.widgets['close_button'].state = (dialog.user_data['pending'] ? 'disabled' : 'normal');
     if(!dialog.widgets['sku'].show) {
@@ -40923,6 +40986,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_buy_gamebucks_dialog23(dialog) {
     dialog.widgets['close_button'].state = (dialog.user_data['pending'] ? 'disabled' : 'normal');
 
@@ -40961,6 +41025,7 @@ function update_buy_gamebucks_dialog23(dialog) {
     update_buy_gamebucks_dialog23_warning_text(dialog);
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_buy_gamebucks_dialog23_warning_text(dialog) {
     // set dialog "warning" text and expire_time
     // note: this uses the ui_buy_gamebucks_warning cond chain, which is separate from per-SKU expire_times
@@ -41021,6 +41086,7 @@ function gamebucks_spell_ui_expire_time(spell, spellarg) {
     return expire_time;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_buy_gamebucks_sku23(dialog) {
     // info needed from the parent/context
     // note: callbacks also look at parent's user_data['pending']
@@ -41662,6 +41728,8 @@ function invoke_ui_locker(sync_marker, cb) {
     g_ui_locker = dialog;
     return dialog;
 }
+
+/** @param {SPUI.Dialog} dialog */
 function update_ui_locker(dialog) {
     if(synchronizer.is_in_sync(dialog.user_data['sync_marker'])) {
         //console.log('ui_locker DOWN '+dialog.user_data['sync_marker'].toString());
@@ -41811,6 +41879,7 @@ function close_item_discovered(widget) {
     }
 }
 
+/** @param {SPUI.Dialog} dialog */
 function animate_item_discovered(dialog) {
     var items = dialog.user_data['items'];
 
@@ -41939,6 +42008,7 @@ function invoke_new_store_dialog() {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_new_store(dialog) {
     // how big can we be?
     var new_width = canvas_width - 2*dialog.data['margin'][0];
@@ -42400,6 +42470,7 @@ function new_store_category_scroll(dialog, incr) {
     dialog.widgets['scroll_right'].state = (dialog.user_data['scroll_goal'] >= dialog.user_data['scroll_limits'][1] ? 'disabled' : 'normal');
 };
 
+/** @param {SPUI.Dialog} dialog */
 function update_new_store_category(dialog) {
     update_resource_bars(dialog, false, false, true);
     var skulist = dialog.user_data['skulist'];
@@ -45892,6 +45963,7 @@ function update_upgrade_dialog(dialog) {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog */
 function update_upgrade_dialog_equipment(dialog) {
     var tech = dialog.user_data['tech'];
     var unit = dialog.user_data['unit'];
@@ -48196,6 +48268,7 @@ Store.trialpay_callback = function(result, data) {
 };
 
 // install a new dialog as a child of the current dialog (or at toplevel, if no UI is up)
+/** @param {SPUI.Dialog} dialog */
 function install_child_dialog(dialog) {
     // note: this should ideally be a check to make sure selection.ui inherits from SPUI.Container
     var parent = (selection.ui && selection.ui.add ? selection.ui : null);
@@ -48226,6 +48299,7 @@ function install_child_dialog(dialog) {
 }
 
 // Removes the parent. Works for both top-level and child dialogs.
+/** @param {SPUI.Dialog|SPUI.Element} dialog */
 function close_dialog(dialog) {
     if(selection.ui === dialog) {
         change_selection_ui(null);
