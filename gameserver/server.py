@@ -4277,6 +4277,9 @@ class Session(object):
 
         self.sent_metrics = {} # keep track of once-per-session Consequent metric events we've already sent
 
+        # track ongoing timers used to compare server and client clock speeds
+        self.clock_races = {} # mapping of 'tag' -> server-side start time
+
         gamesite.chat_mgr.join(self, 'BROADCAST')
         if self.player.is_developer():
             gamesite.chat_mgr.join(self, 'DEVELOPER')
@@ -31058,6 +31061,24 @@ class GAMEAPI(resource.Resource):
             assert len(name) <= 64 # protect against DoS
             key = 'client:'+name
             session.increment_player_metric(key, incr, time_series = False)
+
+        elif arg[0] == "WORLD_COUNTER_UPDATE": # camouflaged name for "start a clock race"
+            tag = arg[1]
+            assert isinstance(tag, basestring) and len(tag) <= 64
+            assert len(session.clock_races) < 64
+            session.clock_races[tag] = time.time()
+
+        elif arg[0] == "WORLD_COUNTER_QUERY": # camouflaged name for "end a clock race"
+            tag = arg[1]
+            client_elapsed_time = float(arg[2])
+            client_timeout_target = float(arg[3])
+            if tag not in session.clock_races:
+                return
+            server_elapsed_time = time.time() - session.clock_races[tag]
+            del session.clock_races[tag]
+            metric_event_coded(session.user.user_id, '3975_clock_race', {'client_interval': client_elapsed_time,
+                                                                         'client_timeout_target': client_timeout_target,
+                                                                         'server_interval': server_elapsed_time})
 
         elif arg[0] == "MAP_BOOKMARK_UPDATE":
             region = arg[1]
