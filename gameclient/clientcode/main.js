@@ -24627,6 +24627,9 @@ function scrollable_dialog_change_page(dialog, page) {
     var chapter_items = dialog.user_data['rowdata'].length;
     var items_per_page = rows_per_page * cols_per_page;
     var chapter_pages = Math.floor((chapter_items+items_per_page-1)/items_per_page);
+    if(scroll_by_row) {
+        chapter_pages = Math.floor(chapter_items - items_per_page);
+    }
     dialog.user_data['page'] = page = (chapter_items == 0 ? 0 : clamp(page, 0, chapter_pages-1));
 
     var item_num = 0, row = 0, col = 0;
@@ -24708,12 +24711,16 @@ function scrollable_dialog_change_page(dialog, page) {
     @param {number} delta
 */
 function scrollable_dialog_mousewheel(dialog, delta) {
+    var scroll_by_row = dialog.user_data['scroll_by_row'] || false;
     var page = dialog.user_data['page'];
     var rows_per_page = dialog.user_data['rows_per_page'];
     var cols_per_page = dialog.user_data['cols_per_page'] || 1;
     var chapter_items = dialog.user_data['rowdata'].length;
     var items_per_page = rows_per_page * cols_per_page;
     var chapter_pages = Math.floor((chapter_items+items_per_page-1)/items_per_page);
+    if(scroll_by_row) {
+        chapter_pages = Math.floor(chapter_items - items_per_page);
+    }
     if(delta < 0 && page != 0) {
         scrollable_dialog_change_page(dialog, page - 1);
     } else if(delta > 0 && page < (chapter_pages - 1)) {
@@ -52308,17 +52315,25 @@ function do_on_mousewheel(e) {
     // check if a scrollable dialog is selected
     var scrollable_dialog = (selection.ui && selection.ui.user_data && 'page' in selection.ui.user_data && 'rows_per_page' in selection.ui.user_data && 'rowdata' in selection.ui.user_data);
 
+    // check if player has reverse mousewheel scrolling checked
+    var reverse_mousewheel_scroll = player.preferences['reverse_mousewheel_scroll'];
+
     // apply desktop zoom
     if(!selection.ui && !chat_scrolling) {
+        // check if player has reverse mousewheel scrolling checked
+        var reverse_mousewheel_zoom = player.preferences['reverse_mousewheel_zoom'];
+        if(reverse_mousewheel_zoom) { delta = delta * -1; }
         var new_zoom = view_zoom_linear + delta * gamedata['client']['view_zoom_mousewheel_increment']
         set_view_zoom(new_zoom);
         if(e.preventDefault) { e.preventDefault(); }
         return;
     } else if (scrollable_dialog && !chat_scrolling) {
+        if(reverse_mousewheel_scroll) { delta = delta * -1; }
         scrollable_dialog_mousewheel(selection.ui, delta);
         if(e.preventDefault) { e.preventDefault(); }
         return;
     } else if (chat_scrolling) {
+        if(reverse_mousewheel_scroll) { delta = delta * -1; }
         scroll_chat_frame(global_chat_frame, delta);
         if(e.preventDefault) { e.preventDefault(); }
         return;
