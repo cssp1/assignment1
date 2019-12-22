@@ -39687,8 +39687,6 @@ function invoke_settings_dialog() {
     dialog.user_data['page'] = -1;
     dialog.user_data['rows_per_page'] = dialog.data['widgets']['separator']['array'][1];
     dialog.user_data['rowdata'] = [];
-    dialog.user_data['changed_row'] = -1;
-    dialog.user_data['changed_rowdata'] = {};
     for(var name in settings) {
         var data = settings[name];
         if('show_if' in data && !read_predicate(data['show_if']).is_satisfied(player, null)) {
@@ -39731,10 +39729,6 @@ function refresh_settings_dialog(dialog) {
     if(total_rows <= rows_per_page) {
         dialog.widgets['scroll_up'].show = false;
         dialog.widgets['scroll_down'].show = false;
-    }
-    if(dialog.user_data['changed_row'] >= 0) {
-        dialog.user_data['rowfunc'] = settings_dialog_setup_row;
-        dialog.user_data['changed_row'] = -1;
     }
     scrollable_dialog_change_page(dialog, (dialog.user_data['page'] >= 0 ? dialog.user_data['page'] : 0));
     return dialog;
