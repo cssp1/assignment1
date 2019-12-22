@@ -24627,6 +24627,9 @@ function scrollable_dialog_change_page(dialog, page) {
     var chapter_items = dialog.user_data['rowdata'].length;
     var items_per_page = rows_per_page * cols_per_page;
     var chapter_pages = Math.floor((chapter_items+items_per_page-1)/items_per_page);
+    if(scroll_by_row) {
+        chapter_pages = Math.floor(chapter_items - items_per_page);
+    }
     dialog.user_data['page'] = page = (chapter_items == 0 ? 0 : clamp(page, 0, chapter_pages-1));
 
     var item_num = 0, row = 0, col = 0;
@@ -24708,12 +24711,16 @@ function scrollable_dialog_change_page(dialog, page) {
     @param {number} delta
 */
 function scrollable_dialog_mousewheel(dialog, delta) {
+    var scroll_by_row = dialog.user_data['scroll_by_row'] || false;
     var page = dialog.user_data['page'];
     var rows_per_page = dialog.user_data['rows_per_page'];
     var cols_per_page = dialog.user_data['cols_per_page'] || 1;
     var chapter_items = dialog.user_data['rowdata'].length;
     var items_per_page = rows_per_page * cols_per_page;
     var chapter_pages = Math.floor((chapter_items+items_per_page-1)/items_per_page);
+    if(scroll_by_row) {
+        chapter_pages = Math.floor(chapter_items - items_per_page);
+    }
     if(delta < 0 && page != 0) {
         scrollable_dialog_change_page(dialog, page - 1);
     } else if(delta > 0 && page < (chapter_pages - 1)) {
