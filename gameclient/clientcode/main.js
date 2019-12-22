@@ -24689,17 +24689,12 @@ function scrollable_dialog_change_page(dialog, page) {
     // checks dialog info for which arrows to use
     // gives preference to left/right arrows if there are both up/down and left/right,
     // but uses up/down arrows if there are no left/right
-    var dialog_name = dialog.user_data['dialog'];
-    var widget_data = gamedata['dialogs'][dialog_name];
-    if(widget_data) {
-        widget_data = widget_data['widgets'];
-    }
     var scroll_back = 'scroll_left';
     var scroll_forward = 'scroll_right';
-    if(widget_data && ('scroll_up' in widget_data) && !('scroll_left' in widget_data)) {
+    if(('scroll_up' in dialog.data['widgets']) && !('scroll_left' in dialog.data['widgets'])) {
         scroll_back = 'scroll_up';
     }
-    if(widget_data && ('scroll_down' in widget_data) && !('scroll_right' in widget_data)) {
+    if(('scroll_down' in dialog.data['widgets']) && !('scroll_right' in dialog.data['widgets'])) {
         scroll_forward = 'scroll_down';
     }
     dialog.widgets[scroll_back].state = (page != 0 ? 'normal' : 'disabled');
@@ -39704,13 +39699,15 @@ function invoke_settings_dialog() {
         }
     }
     dialog.user_data['rowfunc'] = settings_dialog_setup_row;
-    dialog.widgets['close_button'].onclick = close_parent_dialog;
     dialog.ondraw = refresh_settings_dialog;
     return dialog;
 }
 
 /** @param {Object} prefs     The dictionary of current preferences (usually player.preferences)
-    @param {string} pref_name Name of an entry in gamedata['strings']['settings'] order of precedence */
+    @param {string} pref_name Name of an entry in gamedata['strings']['settings']
+                              order of precedence:
+                              manual setting >> A/B test >> default value from gamedata_main.json
+*/
 function get_preference_setting(prefs, pref_name) {
     var data = gamedata['strings']['settings'][pref_name];
     if(!data) { return null; } // not active
@@ -39764,9 +39761,8 @@ function settings_dialog_setup_row(dialog, row, rowdata) {
             dialog.widgets['choice'+c+','+row].tooltip.str = choice['ui_tooltip'];
             dialog.widgets['choice'+c+','+row].onclick = (function (_dialog, _rowdata, _choice, _row) { return function() {
                 _dialog.user_data['preferences'][_rowdata['preference_key']] = _choice['preference_val'];
-                _dialog.user_data['requires_reload'] |= !!_rowdata['requires_reload'];
                 dialog.widgets['apply_button'].state = 'normal';
-                dialog.user_data['changed_row'] = _row;
+                scrollable_dialog_change_page(dialog, dialog.user_data['page']);
             }; })(dialog, rowdata, choice, row);
             var choice_selected = (cur_value == choice['preference_val']);
             dialog.widgets['choice'+c+','+row].state = (choice_selected ? 'active' : 'normal');
