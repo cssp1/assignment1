@@ -6210,8 +6210,14 @@
             "tab_jewel": { "kind": "Dialog", "xy": [60,4], "dimensions": [17,14], "dialog": "notification_jewel",
                            "array": [4,1], "array_offset": [66,0] },
 
-            "input_bg": { "kind": "StaticImage", "xy": [8,42], "dimensions": [297,28], "asset": "chat_input", "bg_image_resizable": 1 },
-            "input": { "kind": "TextInput", "xy": [15,44], "dimensions": [285,26], "text_size": 13, "text_hjustify": "left",
+            "input_bg": { "kind": "StaticImage",
+                          "xy": [8,42],
+                          "reversed_xy": [8,673],
+                          "dimensions": [297,28], "asset": "chat_input", "bg_image_resizable": 1 },
+            "input": { "kind": "TextInput",
+                       "xy": [15,44],
+                       "reversed_xy": [15,675],
+                       "dimensions": [285,26], "text_size": 13, "text_hjustify": "left",
                        "text_color": [1,1,1,1], "ui_name": "Click here and type to chat", "blank_on_enter": true,
                        "fade_unless_hover": 0.001 }
         }
@@ -6228,9 +6234,16 @@
                                          "ui_tooltip_cooldown": "Request more reinforcements in %s",
                                          "ui_tooltip_space_limit": "No space for more reinforcements.\nTo make room, upgrade %s or deploy\nexisting reinforcements in battle.",
                                          "tooltip_delay": 0 },
-            "output_bg": { "kind": "StaticImage", "xy": [8,76], "dimensions": [297,180], "asset": "chat_output", "bg_image_resizable": 1 },
-            "output": { "kind": "ScrollingTextField", "xy": [16,81], "dimensions": [282,155],
+            "output_bg": { "kind": "StaticImage",
+                           "xy": [8,76],
+                           "reversed_xy": [8,42], // takes position of non-reversed input_bg
+                           "dimensions": [297,180], "asset": "chat_output", "bg_image_resizable": 1 },
+            "output": { "kind": "ScrollingTextField",
+                        "dimensions": [282,155],
+                        "xy": [16,81],
                         "clip_to": [16,81,287,155],
+                        "reversed_xy": [16,47],
+                        "reversed_clip_to": [16,81,287,155],
                         "text_size": 13, "text_hjustify": "left",
                         "text_vjustify": "top", "scrollback_buffer": -1, "invert": 1, "ui_tooltip": "", "tooltip_delay": 0 },
 

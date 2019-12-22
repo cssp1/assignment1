@@ -16855,8 +16855,40 @@ function recensor_chat_frame(dialog) {
 function update_chat_frame(dialog) {
     // check for unseen chat messages, and set jewel states appropriately
     var any_unseen = false;
+    var last_invert = dialog.user_data['last_invert'];
+    var reverse_chat_window = player.preferences['reverse_chat_window'];
+    if(reverse_chat_window){
+        dialog.widgets['input_bg'].xy = dialog.data['widgets']['input_bg']['reversed_xy'];
+        dialog.widgets['input'].xy = dialog.data['widgets']['input']['reversed_xy'];
+    } else {
+        dialog.widgets['input_bg'].xy = dialog.data['widgets']['input_bg']['xy'];
+        dialog.widgets['input'].xy = dialog.data['widgets']['input']['xy'];
+    }
     for(var i = 0; i < dialog.data['widgets']['tabs']['array'][0]; i++) {
         var tab = dialog.widgets['tabs'+i];
+        if(reverse_chat_window){
+            tab.widgets['output_bg'].xy = tab.data['widgets']['output_bg']['reversed_xy'];
+            tab.widgets['output'].xy = tab.data['widgets']['output']['reversed_xy'];
+            tab.widgets['output'].clip_to = tab.data['widgets']['output']['reversed_clip_to'];
+            var invert = !tab.data['widgets']['output']['invert'];
+            tab.widgets['output'].invert = invert;
+            tab.widgets[(invert ? 'scroll_down' : 'scroll_up')].onclick = function(w) { w.parent.widgets['output'].scroll_up(); };
+            tab.widgets[(invert ? 'scroll_up' : 'scroll_down')].onclick = function(w) { w.parent.widgets['output'].scroll_down(); };
+        } else {
+            tab.widgets['output_bg'].xy = tab.data['widgets']['output_bg']['xy'];
+            tab.widgets['output'].xy = tab.data['widgets']['output']['xy'];
+            tab.widgets['output'].clip_to = tab.data['widgets']['output']['clip_to'];
+            var invert = tab.data['widgets']['output']['invert'];
+            tab.widgets['output'].invert = invert;
+            tab.widgets[(invert ? 'scroll_down' : 'scroll_up')].onclick = function(w) { w.parent.widgets['output'].scroll_up(); };
+            tab.widgets[(invert ? 'scroll_up' : 'scroll_down')].onclick = function(w) { w.parent.widgets['output'].scroll_down(); };
+        }
+        // a mismatch signals that the player recently changed the orientation preference.
+        // this refreshes the text so the orientation and message order is correct
+        if(last_invert != reverse_chat_window){
+            tab.widgets['output'].update_text();
+        }
+        dialog.user_data['last_invert'] = reverse_chat_window;
         var channel_name = tab.user_data['channel_name'];
         var unseen = false;
         if(dialog.user_data['size'] == 'big' && tab.show) {
@@ -17003,6 +17035,8 @@ function init_chat_frame() {
         tab.user_data['earliest_id'] = null;
         tab.user_data['earliest_timestamp'] = Infinity;
         var invert = !!tab.data['widgets']['output']['invert'];
+        var reverse_chat_window = player.preferences['reverse_chat_window'];
+        dialog.user_data['last_invert'] = reverse_chat_window;
         tab.widgets['output'].scroll_up_button = tab.widgets[(invert ? 'scroll_down' : 'scroll_up')];
         tab.widgets['output'].scroll_down_button = tab.widgets[(invert ? 'scroll_up' : 'scroll_down')];
         tab.widgets['output'].getmore_cb = (gamedata['client']['enable_chat_getmore'] ? function(w) {
