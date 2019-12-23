@@ -52316,12 +52316,12 @@ function do_on_mousewheel(e) {
     var scrollable_dialog = (selection.ui && selection.ui.user_data && 'page' in selection.ui.user_data && 'rows_per_page' in selection.ui.user_data && 'rowdata' in selection.ui.user_data);
 
     // check if player has reverse mousewheel scrolling checked
-    var reverse_mousewheel_scroll = player.preferences['reverse_mousewheel_scroll'];
+    var reverse_mousewheel_scroll = !!player.preferences['reverse_mousewheel_scroll'];
 
     // apply desktop zoom
     if(!selection.ui && !chat_scrolling) {
         // check if player has reverse mousewheel scrolling checked
-        var reverse_mousewheel_zoom = player.preferences['reverse_mousewheel_zoom'];
+        var reverse_mousewheel_zoom = !!player.preferences['reverse_mousewheel_zoom'];
         if(reverse_mousewheel_zoom) { delta = delta * -1; }
         var new_zoom = view_zoom_linear + delta * gamedata['client']['view_zoom_mousewheel_increment']
         set_view_zoom(new_zoom);
