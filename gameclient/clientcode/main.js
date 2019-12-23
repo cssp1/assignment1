@@ -24658,6 +24658,7 @@ function invoke_map_bookmark_rename_dialog(bookmarks_dialog, bookmark) {
 }
 
 function scrollable_dialog_change_page(dialog, page) {
+    var scroll_by_row = dialog.user_data['scroll_by_row'] || false;
     var rows_per_page = dialog.user_data['rows_per_page'];
     var cols_per_page = dialog.user_data['cols_per_page'] || 1;
     var rowfunc = dialog.user_data['rowfunc'];
@@ -24665,12 +24666,20 @@ function scrollable_dialog_change_page(dialog, page) {
     var chapter_items = dialog.user_data['rowdata'].length;
     var items_per_page = rows_per_page * cols_per_page;
     var chapter_pages = Math.floor((chapter_items+items_per_page-1)/items_per_page);
+    if(scroll_by_row) {
+        chapter_pages = Math.floor(chapter_items - items_per_page);
+    }
     dialog.user_data['page'] = page = (chapter_items == 0 ? 0 : clamp(page, 0, chapter_pages-1));
 
     var item_num = 0, row = 0, col = 0;
     if(chapter_items > 0) {
         var first_on_page = page * items_per_page;
         var last_on_page = (page+1)*items_per_page - 1;
+        if(scroll_by_row) {
+            first_on_page = page;
+            last_on_page = page + items_per_page - 1;
+            last_on_page = Math.max(0, Math.min(last_on_page, chapter_items-1));
+        }
         last_on_page = Math.max(0, Math.min(last_on_page, chapter_items-1));
         if('scroll_text' in dialog.widgets) {
             dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_items.toString());
@@ -24719,11 +24728,45 @@ function scrollable_dialog_change_page(dialog, page) {
     }
 
     // set clickability of scroll arrows
-    dialog.widgets['scroll_left'].state = (page != 0 ? 'normal' : 'disabled');
-    dialog.widgets['scroll_right'].state = (page < (chapter_pages-1) ? 'normal' : 'disabled');
+    // checks dialog info for which arrows to use
+    // gives preference to left/right arrows if there are both up/down and left/right,
+    // but uses up/down arrows if there are no left/right
+    var scroll_back = 'scroll_left';
+    var scroll_forward = 'scroll_right';
+    if(('scroll_up' in dialog.data['widgets']) && !('scroll_left' in dialog.data['widgets'])) {
+        scroll_back = 'scroll_up';
+    }
+    if(('scroll_down' in dialog.data['widgets']) && !('scroll_right' in dialog.data['widgets'])) {
+        scroll_forward = 'scroll_down';
+    }
+    dialog.widgets[scroll_back].state = (page != 0 ? 'normal' : 'disabled');
+    dialog.widgets[scroll_forward].state = (page < (chapter_pages-1) ? 'normal' : 'disabled');
+    dialog.widgets[scroll_back].onclick =  (function (_dialog) { return function() { scrollable_dialog_change_page(_dialog, _dialog.user_data['page']-1); }; })(dialog);
+    dialog.widgets[scroll_forward].onclick = (function (_dialog) { return function() { scrollable_dialog_change_page(_dialog, _dialog.user_data['page']+1); }; })(dialog);
+}
 
-    dialog.widgets['scroll_left'].onclick =  (function (_dialog) { return function() { scrollable_dialog_change_page(_dialog, _dialog.user_data['page']-1); }; })(dialog);
-    dialog.widgets['scroll_right'].onclick = (function (_dialog) { return function() { scrollable_dialog_change_page(_dialog, _dialog.user_data['page']+1); }; })(dialog);
+/** scrolls any scrollable dialog by the amount and direction of delta
+    @param {SPUI.Dialog|null} dialog
+    @param {number} delta
+*/
+function scrollable_dialog_mousewheel(dialog, delta) {
+    var scroll_by_row = dialog.user_data['scroll_by_row'] || false;
+    var page = dialog.user_data['page'];
+    var rows_per_page = dialog.user_data['rows_per_page'];
+    var cols_per_page = dialog.user_data['cols_per_page'] || 1;
+    var chapter_items = dialog.user_data['rowdata'].length;
+    var items_per_page = rows_per_page * cols_per_page;
+    var chapter_pages = Math.floor((chapter_items+items_per_page-1)/items_per_page);
+    if(scroll_by_row) {
+        chapter_pages = Math.floor(chapter_items - items_per_page);
+    }
+    if(delta < 0 && page != 0) {
+        scrollable_dialog_change_page(dialog, page - 1);
+    } else if(delta > 0 && page < (chapter_pages - 1)) {
+        scrollable_dialog_change_page(dialog, page + 1);
+    } else {
+        return;
+    }
 }
 
 /** Find the 'row' coordinates, as passed to rowfunc, of the visible elements for this rowdata element.
@@ -39650,30 +39693,24 @@ function invoke_settings_dialog() {
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
-
+    dialog.user_data['scroll_by_row'] = true;
     dialog.user_data['preferences'] = {};
     for(var key in player.preferences) {
         dialog.user_data['preferences'][key] = player.preferences[key];
     }
     dialog.user_data['requires_reload'] = false;
-
     dialog.widgets['sprobe_button'].onclick = function() { invoke_sprobe_dialog(); };
-
     dialog.widgets['close_button'].onclick = close_parent_dialog;
     dialog.widgets['apply_button'].onclick = function(w) {
         var dialog = w.parent;
         if(!dialog) { return; }
-
         dialog.widgets['apply_button'].state = 'disabled';
         dialog.widgets['apply_button'].str = dialog.data['widgets']['apply_button']['ui_name_applying'];
-
         send_to_server.func(["UPDATE_PREFERENCES", dialog.user_data['preferences']]);
-
         // special case to re-enable unacked notifications
         if(dialog.user_data['preferences']['enable_fb_notifications']) {
             send_to_server.func(["RESET_NOTIFICATION", 'ALL']);
         }
-
         if(dialog.user_data['requires_reload']) {
             flush_message_queue(true);
             window.setTimeout(function() { reload_game(); }, 1000);
@@ -39684,65 +39721,37 @@ function invoke_settings_dialog() {
                 get_preference_setting(player.preferences, 'chat_filter'))) {
                 requires_recensor = true
             }
-
             player.preferences = dialog.user_data['preferences'];
             change_selection(null);
-
             if(requires_recensor) {
                 recensor_chat_frame(global_chat_frame);
             }
         }
     };
     dialog.widgets['apply_button'].state = 'disabled';
-
     var settings = gamedata['strings']['settings'];
-    dialog.user_data['settings'] = [];
-    var row = 0;
+    dialog.user_data['page'] = -1;
+    dialog.user_data['rows_per_page'] = dialog.data['widgets']['separator']['array'][1];
+    dialog.user_data['rowdata'] = [];
     for(var name in settings) {
         var data = settings[name];
         if('show_if' in data && !read_predicate(data['show_if']).is_satisfied(player, null)) {
             continue;
         }
-        dialog.user_data['settings'].push(data);
-        dialog.widgets['description'+row].str = data['ui_description'];
-        for(var c = 0; c < 2; c++) {
-            var choice = data['choices'][c];
-            dialog.widgets['choice'+c+','+row].str = choice['ui_name'];
-            dialog.widgets['choice'+c+','+row].tooltip.str = choice['ui_tooltip'];
-            dialog.widgets['choice'+c+','+row].onclick = (function (_dialog, _data, _choice) { return function() {
-                _dialog.user_data['preferences'][_data['preference_key']] = _choice['preference_val'];
-                _dialog.user_data['requires_reload'] |= !!_data['requires_reload'];
-                //console.log('set '+_data['preference_key']+' to '+_choice['preference_val']);
-
-                dialog.widgets['apply_button'].state = 'normal';
-            }; })(dialog, data, choice);
+        if('name' in data) {
+            dialog.user_data['rowdata'].push(data);
         }
-        if('help_url' in data) {
-            dialog.widgets['help'+row].show = true;
-            dialog.widgets['help'+row].onclick = (function (_data) { return function(w) {
-                url_open_in_new_tab(_data['help_url']);
-            }; })(data);
-        }
-        row += 1;
     }
-    // blank out unused entries
-    while(row < dialog.data['widgets']['separator']['array'][1]) {
-        dialog.widgets['separator'+row].show =
-            dialog.widgets['description'+row].show = false;
-        for(var c = 0; c < 2; c++) {
-            dialog.widgets['choice'+c+','+row].show = false;
-        }
-        row += 1;
-    }
-    dialog.ondraw = update_settings_dialog;
+    dialog.user_data['rowfunc'] = settings_dialog_setup_row;
+    dialog.ondraw = refresh_settings_dialog;
     return dialog;
 }
 
-// get the value of a player-controllable preference setting
-// @param {object} prefs The dictionary of current preferences (usually player.preferences)
-// @param {string} pref_name Name of an entry in gamedata['strings']['settings']
-// order of precedence:
-// manual setting >> A/B test >> default value from gamedata_main.json
+/** @param {Object} prefs     The dictionary of current preferences (usually player.preferences)
+    @param {string} pref_name Name of an entry in gamedata['strings']['settings']
+                              order of precedence:
+                              manual setting >> A/B test >> default value from gamedata_main.json
+*/
 function get_preference_setting(prefs, pref_name) {
     var data = gamedata['strings']['settings'][pref_name];
     if(!data) { return null; } // not active
@@ -39760,17 +39769,49 @@ function get_preference_setting(prefs, pref_name) {
 }
 
 /** @param {SPUI.Dialog} dialog */
-function update_settings_dialog(dialog) {
-    var settings = dialog.user_data['settings'];
-    for(var row = 0; row < settings.length; row++) {
-        var data = settings[row];
-        var enabled = ('enable_if' in data ? read_predicate(data['enable_if']).is_satisfied(player, null) : true);
-        dialog.widgets['coverup'+row].show = !enabled;
-        var cur_value = get_preference_setting(dialog.user_data['preferences'], data['name']);
+function refresh_settings_dialog(dialog) {
+    var rows_per_page = dialog.user_data['rows_per_page'];
+    var total_rows = dialog.user_data['rowdata'].length;
+    if(total_rows <= rows_per_page) {
+        dialog.widgets['scroll_up'].show = false;
+        dialog.widgets['scroll_down'].show = false;
+    }
+    scrollable_dialog_change_page(dialog, (dialog.user_data['page'] >= 0 ? dialog.user_data['page'] : 0));
+    return dialog;
+}
+
+/** @param {SPUI.Dialog} dialog
+    @param {number} row
+    @param {Object} rowdata */
+function settings_dialog_setup_row(dialog, row, rowdata) {
+    dialog.widgets['separator'+row].show =
+        dialog.widgets['description'+row].show =
+        dialog.widgets['coverup'+row].show =
+        dialog.widgets['choice0,'+row].show =
+        dialog.widgets['choice1,'+row].show = (rowdata !== null);
+
+    if(rowdata !== null) {
+        dialog.widgets['description'+row].str = rowdata['ui_description'];
+        var row_enabled = ('enable_if' in rowdata ? read_predicate(rowdata['enable_if']).is_satisfied(player, null) : true);
+        dialog.widgets['coverup'+row].show = !row_enabled;
+        var cur_value = get_preference_setting(dialog.user_data['preferences'], rowdata['name']);
         for(var c = 0; c < 2; c++) {
-            var choice = data['choices'][c];
+            var choice = rowdata['choices'][c];
+            dialog.widgets['choice'+c+','+row].str = choice['ui_name'];
+            dialog.widgets['choice'+c+','+row].tooltip.str = choice['ui_tooltip'];
+            dialog.widgets['choice'+c+','+row].onclick = (function (_dialog, _rowdata, _choice, _row) { return function() {
+                _dialog.user_data['preferences'][_rowdata['preference_key']] = _choice['preference_val'];
+                dialog.widgets['apply_button'].state = 'normal';
+                scrollable_dialog_change_page(dialog, dialog.user_data['page']);
+            }; })(dialog, rowdata, choice, row);
             var choice_selected = (cur_value == choice['preference_val']);
             dialog.widgets['choice'+c+','+row].state = (choice_selected ? 'active' : 'normal');
+        }
+        if('help_url' in rowdata) {
+            dialog.widgets['help'+','+row].show = true;
+            dialog.widgets['help'+','+row].onclick = (function (_rowdata) { return function(w) {
+                url_open_in_new_tab(_rowdata['help_url']);
+            }; })(rowdata);
         }
     }
 }
@@ -52310,13 +52351,28 @@ function do_on_mousewheel(e) {
     // check if chat window is open and the pointer is over the chat window
     var chat_scrolling = (global_chat_frame && global_chat_frame.user_data['size'] === 'big' && xy[0] < gamedata['dialogs']['chat_frame2']['dimensions'][0]);
 
+    // check if a scrollable dialog is selected
+    var scrollable_dialog = (selection.ui && selection.ui.user_data && 'page' in selection.ui.user_data && 'rows_per_page' in selection.ui.user_data && 'rowdata' in selection.ui.user_data);
+
+    // check if player has reverse mousewheel scrolling checked
+    var reverse_mousewheel_scroll = !!player.preferences['reverse_mousewheel_scroll'];
+
     // apply desktop zoom
     if(!selection.ui && !chat_scrolling) {
+        // check if player has reverse mousewheel scrolling checked
+        var reverse_mousewheel_zoom = !!player.preferences['reverse_mousewheel_zoom'];
+        if(reverse_mousewheel_zoom) { delta = delta * -1; }
         var new_zoom = view_zoom_linear + delta * gamedata['client']['view_zoom_mousewheel_increment']
         set_view_zoom(new_zoom);
         if(e.preventDefault) { e.preventDefault(); }
         return;
+    } else if (scrollable_dialog && !chat_scrolling) {
+        if(reverse_mousewheel_scroll) { delta = delta * -1; }
+        scrollable_dialog_mousewheel(selection.ui, delta);
+        if(e.preventDefault) { e.preventDefault(); }
+        return;
     } else if (chat_scrolling) {
+        if(reverse_mousewheel_scroll) { delta = delta * -1; }
         scroll_chat_frame(global_chat_frame, delta);
         if(e.preventDefault) { e.preventDefault(); }
         return;
