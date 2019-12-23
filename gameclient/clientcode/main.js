@@ -24669,7 +24669,7 @@ function scrollable_dialog_change_page(dialog, page) {
     var items_per_page = rows_per_page * cols_per_page;
     var chapter_pages = Math.max(1,Math.floor((chapter_items+items_per_page-1)/items_per_page));
     if(scroll_by_row) {
-        chapter_pages = Math.max(1,Math.floor(chapter_items - items_per_page));
+        chapter_pages = Math.max(1,Math.floor(chapter_items - items_per_page + 1));
     }
     dialog.user_data['page'] = page = (chapter_items == 0 ? 0 : clamp(page, 0, chapter_pages-1));
 
@@ -24760,7 +24760,7 @@ function scrollable_dialog_mousewheel(dialog, delta) {
     var items_per_page = rows_per_page * cols_per_page;
     var chapter_pages = Math.max(1,Math.floor((chapter_items+items_per_page-1)/items_per_page));
     if(scroll_by_row) {
-        chapter_pages = Math.max(1,Math.floor(chapter_items - items_per_page));
+        chapter_pages = Math.max(1,Math.floor(chapter_items - items_per_page + 1));
     }
     if(delta < 0 && page != 0) {
         scrollable_dialog_change_page(dialog, page - 1);
@@ -39814,6 +39814,8 @@ function settings_dialog_setup_row(dialog, row, rowdata) {
             dialog.widgets['help'+row].onclick = (function (_rowdata) { return function(w) {
                 url_open_in_new_tab(_rowdata['help_url']);
             }; })(rowdata);
+        } else {
+            dialog.widgets['help'+row].show = false;
         }
     }
 }
