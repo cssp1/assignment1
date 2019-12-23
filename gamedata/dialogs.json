@@ -6212,11 +6212,12 @@
 
             "input_bg": { "kind": "StaticImage",
                           "xy": [8,42],
-                          "reversed_xy": [8,673],
+                          "default_y": 42, //stores the default value so dialog.data['widgets'] can call up the default when turning off inverted
+                          "inverted_y_offset": 48, // adjust this to ensure the chat input is correctly offset from the output when reversed
                           "dimensions": [297,28], "asset": "chat_input", "bg_image_resizable": 1 },
             "input": { "kind": "TextInput",
                        "xy": [15,44],
-                       "reversed_xy": [15,675],
+                       "default_y": 44, //stores the default value so dialog.data['widgets'] can call up the default when turning off inverted
                        "dimensions": [285,26], "text_size": 13, "text_hjustify": "left",
                        "text_color": [1,1,1,1], "ui_name": "Click here and type to chat", "blank_on_enter": true,
                        "fade_unless_hover": 0.001 }
@@ -6236,14 +6237,13 @@
                                          "tooltip_delay": 0 },
             "output_bg": { "kind": "StaticImage",
                            "xy": [8,76],
-                           "reversed_xy": [8,42], // takes position of non-reversed input_bg
+                           "inverted_xy": [8,42],
                            "dimensions": [297,180], "asset": "chat_output", "bg_image_resizable": 1 },
             "output": { "kind": "ScrollingTextField",
                         "dimensions": [282,155],
                         "xy": [16,81],
                         "clip_to": [16,81,287,155],
-                        "reversed_xy": [16,47],
-                        "reversed_clip_to": [16,81,287,155],
+                        "inverted_xy": [16,47],
                         "text_size": 13, "text_hjustify": "left",
                         "text_vjustify": "top", "scrollback_buffer": -1, "invert": 1, "ui_tooltip": "", "tooltip_delay": 0 },
 
