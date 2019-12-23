@@ -39808,8 +39808,8 @@ function settings_dialog_setup_row(dialog, row, rowdata) {
             dialog.widgets['choice'+c+','+row].state = (choice_selected ? 'active' : 'normal');
         }
         if('help_url' in rowdata) {
-            dialog.widgets['help'+','+row].show = true;
-            dialog.widgets['help'+','+row].onclick = (function (_rowdata) { return function(w) {
+            dialog.widgets['help'+row].show = true;
+            dialog.widgets['help'+row].onclick = (function (_rowdata) { return function(w) {
                 url_open_in_new_tab(_rowdata['help_url']);
             }; })(rowdata);
         }
