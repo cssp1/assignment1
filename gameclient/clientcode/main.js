@@ -16950,8 +16950,8 @@ function update_chat_frame(dialog) {
                 dialog.widgets['input_bg'].xy[1] = input_bg_new_y_pos;
                 dialog.widgets['input'].xy[1] = input_new_y_pos;
             } else {
-                input_bg_new_y_pos = dialog.data['widgets']['input_bg']['default_y'];
-                input_new_y_pos = input_bg_new_y_pos + (dialog.widgets['input'].xy[1] - dialog.widgets['input_bg'].xy[1]);
+                input_bg_new_y_pos = dialog.data['widgets']['input_bg']['xy'][1];
+                input_new_y_pos = input_bg_new_y_pos + (dialog.data['widgets']['input']['xy'][1] - dialog.data['widgets']['input_bg']['xy'][1]);
                 dialog.widgets['input_bg'].xy[1] = input_bg_new_y_pos;
                 dialog.widgets['input'].xy[1] = input_new_y_pos;
             }
