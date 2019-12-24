@@ -52380,6 +52380,8 @@ function do_on_mousewheel(e) {
         if(e.preventDefault) { e.preventDefault(); }
         return;
     } else if (chat_scrolling) {
+        var invert_chat_window = !!player.preferences['invert_chat_window'];
+        if(invert_chat_window) { delta = delta * -1; }
         if(reverse_mousewheel_scroll) { delta = delta * -1; }
         scroll_chat_frame(global_chat_frame, delta);
         if(e.preventDefault) { e.preventDefault(); }
