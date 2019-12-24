@@ -3696,10 +3696,18 @@ SPUI.ScrollingTextField.prototype.update_text = function() {
     SPUI.ctx.restore();
 
     if(this.scroll_up_button) {
-        this.scroll_up_button.state = (this.can_scroll_up() ? 'normal' : 'disabled');
+        if(this.invert) {
+            this.scroll_up_button.state = (this.can_scroll_up() ? 'normal' : 'disabled');
+        } else {
+            this.scroll_up_button.state = (this.can_scroll_down() ? 'normal' : 'disabled');
+        }
     }
     if(this.scroll_down_button) {
-        this.scroll_down_button.state = (this.can_scroll_down() ? 'normal' : 'disabled');
+        if(this.invert) {
+            this.scroll_down_button.state = (this.can_scroll_down() ? 'normal' : 'disabled');
+        } else {
+            this.scroll_down_button.state = (this.can_scroll_up() ? 'normal' : 'disabled');
+        }
     }
 };
 
