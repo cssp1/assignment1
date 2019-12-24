@@ -16894,8 +16894,31 @@ function recensor_chat_frame(dialog) {
 function update_chat_frame(dialog) {
     // check for unseen chat messages, and set jewel states appropriately
     var any_unseen = false;
+    var last_invert = dialog.user_data['last_invert'];
+    var invert_chat_window = !!player.preferences['invert_chat_window'];
     for(var i = 0; i < dialog.data['widgets']['tabs']['array'][0]; i++) {
         var tab = dialog.widgets['tabs'+i];
+        if(invert_chat_window){
+            tab.widgets['output_bg'].xy = tab.data['widgets']['output_bg']['inverted_xy'];
+            tab.widgets['output'].xy = tab.data['widgets']['output']['inverted_xy'];
+            var invert = !tab.data['widgets']['output']['invert'];
+            tab.widgets['output'].invert = invert;
+            tab.widgets[(invert ? 'scroll_down' : 'scroll_up')].onclick = function(w) { w.parent.widgets['output'].scroll_up(); };
+            tab.widgets[(invert ? 'scroll_up' : 'scroll_down')].onclick = function(w) { w.parent.widgets['output'].scroll_down(); };
+        } else {
+            tab.widgets['output_bg'].xy = tab.data['widgets']['output_bg']['xy'];
+            tab.widgets['output'].xy = tab.data['widgets']['output']['xy'];
+            var invert = tab.data['widgets']['output']['invert'];
+            tab.widgets['output'].invert = invert;
+            tab.widgets[(invert ? 'scroll_down' : 'scroll_up')].onclick = function(w) { w.parent.widgets['output'].scroll_up(); };
+            tab.widgets[(invert ? 'scroll_up' : 'scroll_down')].onclick = function(w) { w.parent.widgets['output'].scroll_down(); };
+        }
+        // a mismatch signals that the player recently changed the orientation preference.
+        // this refreshes the text so the orientation and message order is correct
+        if(last_invert != invert_chat_window){
+            tab.widgets['output'].update_text();
+        }
+        dialog.user_data['last_invert'] = invert_chat_window; // makes sure the dialog knows that the last_invert value matches the current invert_chat_window value
         var channel_name = tab.user_data['channel_name'];
         var unseen = false;
         if(dialog.user_data['size'] == 'big' && tab.show) {
@@ -16955,6 +16978,22 @@ function update_chat_frame(dialog) {
             tab.widgets['output'].clip_to = [tab.widgets['output'].xy[0], tab.widgets['output'].xy[1],
                                              tab.widgets['output'].wh[0] + (tab.widgets['output'].data['clip_to'][2] - tab.widgets['output'].data['dimensions'][0]),
                                              tab.widgets['output'].wh[1] + (tab.widgets['output'].data['clip_to'][3] - tab.widgets['output'].data['dimensions'][1])];
+            var input_bg_new_y_pos = 0;
+            var input_new_y_pos = 0;
+            if(invert_chat_window){
+                // this repositions the input based on the output wh value
+                // which is necessary for fullscreen
+                input_bg_new_y_pos = tab.widgets['output_bg'].wh[1] + dialog.data['widgets']['input_bg']['inverted_y_offset'];
+                // ensures the input widget xy position is adjusted based on the existing space offset between input and input_bg
+                input_new_y_pos = input_bg_new_y_pos + (dialog.widgets['input'].xy[1] - dialog.widgets['input_bg'].xy[1]);
+                dialog.widgets['input_bg'].xy[1] = input_bg_new_y_pos;
+                dialog.widgets['input'].xy[1] = input_new_y_pos;
+            } else {
+                input_bg_new_y_pos = dialog.data['widgets']['input_bg']['xy'][1];
+                input_new_y_pos = input_bg_new_y_pos + (dialog.data['widgets']['input']['xy'][1] - dialog.data['widgets']['input_bg']['xy'][1]);
+                dialog.widgets['input_bg'].xy[1] = input_bg_new_y_pos;
+                dialog.widgets['input'].xy[1] = input_new_y_pos;
+            }
             if(tab.widgets['output'].wh[1] != tab.user_data['last_output_h']) {
                 tab.widgets['output'].update_text();
             }
@@ -17042,6 +17081,8 @@ function init_chat_frame() {
         tab.user_data['earliest_id'] = null;
         tab.user_data['earliest_timestamp'] = Infinity;
         var invert = !!tab.data['widgets']['output']['invert'];
+        var invert_chat_window = !!player.preferences['invert_chat_window'];
+        dialog.user_data['last_invert'] = invert_chat_window;
         tab.widgets['output'].scroll_up_button = tab.widgets[(invert ? 'scroll_down' : 'scroll_up')];
         tab.widgets['output'].scroll_down_button = tab.widgets[(invert ? 'scroll_up' : 'scroll_down')];
         tab.widgets['output'].getmore_cb = (gamedata['client']['enable_chat_getmore'] ? function(w) {
