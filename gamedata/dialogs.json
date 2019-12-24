@@ -6212,7 +6212,6 @@
 
             "input_bg": { "kind": "StaticImage",
                           "xy": [8,42],
-                          "default_y": 42, //stores the default value so dialog.data['widgets'] can call up the default when turning off inverted
                           "inverted_y_offset": 48, // adjust this to ensure the chat input is correctly offset from the output when reversed
                           "dimensions": [297,28], "asset": "chat_input", "bg_image_resizable": 1 },
             "input": { "kind": "TextInput",
