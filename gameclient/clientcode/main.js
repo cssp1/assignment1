@@ -32307,7 +32307,7 @@ function army_unit_repair_state(obj) {
 
 // compare units/buildings by "coolnesss" - used for sorting units in squad displays
 function compare_specnames(a,b) {
-    // sort by max health then space consumption
+    // sort by max health then space consumption then alphabet of the ui_name
     var aspec = (gamedata['units'][a] || gamedata['buildings'][a]), bspec = (gamedata['units'][b] || gamedata['buildings'][b]);
     var amax = get_leveled_quantity(aspec['max_hp'] || 0,1);
     var bmax = get_leveled_quantity(bspec['max_hp'] || 0,1);
@@ -32317,6 +32317,10 @@ function compare_specnames(a,b) {
     var bspace = get_leveled_quantity(bspec['consumes_space'] || 0,1);
     if(aspace < bspace) { return 1; }
     if(aspace > bspace) { return -1; }
+    var aname = aspec['ui_name'];
+    var bname = bspec['ui_name'];
+    if(aname < bname) { return 1; }
+    if(aname > bname) { return -1; }
     return 0;
 }
 function army_unit_compare(a,b) {
