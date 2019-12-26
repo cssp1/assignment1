@@ -364,6 +364,16 @@ def check_object_spells(specname, spec, maxlevel):
             print '%s refers to missing spell "%s"' % (specname, spellname)
             return error
 
+    if 'MAKE_DROIDS' in spec['spells']:
+        if 'manufacture_category' not in spec:
+            error |= 1
+            print '%s has the MAKE_DROIDS spell, but has no "manufacture_category" list in its spec."' % (specname)
+
+    if 'RESEARCH_FOR_FREE' in spec['spells']:
+        if 'research_categories' not in spec:
+            error |= 1
+            print '%s has the RESEARCH_FOR_FREE spell, but has no "research_categories" list in its spec. This will cause a client crash!"' % (specname)
+
     if len(spec['spells']) > 0:
         auto_spell_name = spec['spells'][0]
         auto_spell = gamedata['spells'][auto_spell_name]
