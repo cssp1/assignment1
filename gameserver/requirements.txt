@@ -15,12 +15,12 @@ certifi>=2018.1.18
 cffi==1.13.2
 cryptography>=2.1.4
 futures==3.2.0
-geoip2==2.9.0
+geoip2==3.0.0
 google_api_python_client==1.7.11
 ipaddress==1.0.23
 Jinja2==2.10.3
 lz4==0.18.1
-maxminddb==1.5.1
+maxminddb==1.5.2
 
 # MySQL library
 PyMySQL==0.9.3 # pure-Python implementation
