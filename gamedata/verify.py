@@ -364,6 +364,16 @@ def check_object_spells(specname, spec, maxlevel):
             print '%s refers to missing spell "%s"' % (specname, spellname)
             return error
 
+    if 'MAKE_DROIDS' in spec['spells']:
+        if 'manufacture_category' not in spec:
+            error |= 1
+            print '%s has the MAKE_DROIDS spell, but has no "manufacture_category" list in its spec."' % (specname)
+
+    if 'RESEARCH_FOR_FREE' in spec['spells']:
+        if 'research_categories' not in spec:
+            error |= 1
+            print '%s has the RESEARCH_FOR_FREE spell, but has no "research_categories" list in its spec. This will cause a client crash!"' % (specname)
+
     if len(spec['spells']) > 0:
         auto_spell_name = spec['spells'][0]
         auto_spell = gamedata['spells'][auto_spell_name]
@@ -1276,6 +1286,25 @@ def check_item(itemname, spec):
     if spec['name'] != itemname.split(':')[1]:
         error |= 1
         print '%s:name mismatch' % itemname
+
+    if 'max_level' in spec:
+        max_level = spec['max_level']
+        if 'icon' in spec and isinstance(spec['icon'], list):
+            if len(spec['icon']) != max_level:
+                error |= 1
+                print '%s: has max_level value of %d, but "icon" length is %d' % (itemname, max_level, len(spec['icon']))
+        if 'equip' in spec:
+            if 'consumes_power' in spec['equip']:
+                if isinstance(spec['equip']['consumes_power'], list):
+                    if len(spec['icon']) != max_level:
+                        error |= 1
+                        print '%s: has max_level value of %d, but "consumes_power" length is %d' % (itemname, max_level, len(spec['equip']['consumes_power']))
+            if 'effects' in spec:
+                effects = spec['effects']
+                for effect in effects:
+                    if isinstance(effect['strength'],list) and len(effect['strength']) != max_level:
+                        error |= 1
+                        print '%s: has max_level value of %d, but the "strength" of an effect length is %d' % (itemname, max_level, len(effect['strength']))
 
     if 'leader' in spec['name'] and (gamedata['game_id'] in ('tr','dv')):
         if 'ui_precious' not in spec:

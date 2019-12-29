@@ -1758,6 +1758,9 @@ function CombatStats() {
     this.splash_range = 1;
     this.art_asset = null;
     this.invisible = 0;
+    this.weapon_facing_fudge = 0;
+    this.muzzle_offset = [0,0,0];
+    this.muzzle_height = 0;
 
     // Mobile only
 
@@ -1790,6 +1793,9 @@ CombatStats.prototype.clear = function() {
     this.erratic_flight = 0;
     this.art_asset = null;
     this.invisible = 0;
+    this.weapon_facing_fudge = 0;
+    this.muzzle_offset = [0,0,0];
+    this.muzzle_height = 0;
 };
 
 /** @override */
@@ -1822,6 +1828,9 @@ CombatStats.prototype.serialize = function() {
     if(this.erratic_flight) { ret['erratic_flight'] = this.erratic_flight; }
     if(this.art_asset) { ret['art_asset'] = this.art_asset; }
     if(this.invisible) { ret['invisible'] = this.invisible; }
+    if(this.weapon_facing_fudge) { ret['weapon_facing_fudge'] = this.weapon_facing_fudge; }
+    if(this.muzzle_offset) { ret['muzzle_offset'] = this.muzzle_offset; }
+    if(this.muzzle_height) { ret['muzzle_height'] = this.muzzle_height; }
     return ret;
 };
 
@@ -1913,6 +1922,10 @@ GameObject.prototype.modify_stats_by_modstats_table = function(table) {
     if('anti_missile' in table) { this.combat_stats.anti_missile *= table['anti_missile']['val']; }
     if('splash_range' in table) { this.combat_stats.splash_range *= table['splash_range']['val']; }
 
+    if('weapon_facing_fudge' in table) { this.combat_stats.weapon_facing_fudge = table['weapon_facing_fudge']['val']; }
+    if('muzzle_offset' in table) { this.combat_stats.muzzle_offset = table['muzzle_offset']['val']; }
+    if('muzzle_height' in table) { this.combat_stats.muzzle_height = table['muzzle_height']['val']; }
+
     // apply weapon_damage_vs:something and damage_taken_from:something effects
     for(var key in table) {
         if(key.indexOf('weapon_damage_vs:') === 0) {
@@ -1951,6 +1964,9 @@ GameObject.prototype.update_aura_effects = function(world) {
 GameObject.prototype.update_stats = function(world) {
     this.combat_stats.clear();
     this.combat_stats.invisible = this.is_invisible_default();
+    this.combat_stats.weapon_facing_fudge = this.spec['weapon_facing_fudge'] || 0;
+    this.combat_stats.muzzle_offset = this.spec['muzzle_offset'] || [0,0,0];
+    this.combat_stats.muzzle_height = this.spec['muzzle_height'] || 0;
     this.modify_stats_by_modstats();
     if(world) {
         this.update_and_apply_auras(world);
@@ -3859,15 +3875,12 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
     // note: this is only for visual effect, the combat-engine firing position is always unit origin,
     // to avoid pathfinding issues with facing
 
-    if('muzzle_offset' in this.spec) {
-        var facing = this.interpolate_facing(world);
-        // note: convert muzzle_offset from model coordinates (+z north) to map coordinates (-z north)
-        var offset = v3_rotate_by_facing(facing, v3_mul([1,1,-1], this.spec['muzzle_offset']));
-        my_muzzle_pos = vec_add(my_muzzle_pos, [offset[0], offset[2]]);
-        my_height += this.spec['muzzle_offset'][1];
-    } else if('muzzle_height' in this.spec) {
-        my_height += this.spec['muzzle_height'];
-    }
+    var facing = this.interpolate_facing(world);
+    // note: convert muzzle_offset from model coordinates (+z north) to map coordinates (-z north)
+    var offset = v3_rotate_by_facing(facing, v3_mul([1,1,-1], this.combat_stats.muzzle_offset));
+    my_muzzle_pos = vec_add(my_muzzle_pos, [offset[0], offset[2]]);
+    my_height += this.combat_stats.muzzle_offset[1];
+    my_height += this.combat_stats.muzzle_height;
 
     if(spell['kills_self']) {
         // special for Detonator Droids - kill self
@@ -54997,7 +55010,7 @@ function draw_building_or_inert(world, obj, powerfac) {
                 var x = obj.x + odd_shift[0], z = obj.y + odd_shift[1];
                 var weapon_offset = obj.get_leveled_quantity(obj.spec['weapon_offset']);
                 var pos = draw_quantize(ortho_to_draw_3d(v3_add([x,0,z], weapon_offset)));
-                weapon_icon.draw(pos, facing + ((Math.PI/180)*(obj.spec['weapon_facing_fudge']||0)), icon_time, icon_state);
+                weapon_icon.draw(pos, facing + ((Math.PI/180)*(obj.combat_stats.weapon_facing_fudge)), icon_time, icon_state);
             } else {
                 //console.log('cannot find '+weapon_asset);
             }
