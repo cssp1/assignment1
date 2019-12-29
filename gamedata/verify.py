@@ -1287,6 +1287,25 @@ def check_item(itemname, spec):
         error |= 1
         print '%s:name mismatch' % itemname
 
+    if 'max_level' in spec:
+        max_level = spec['max_level']
+        if 'icon' in spec and isinstance(spec['icon'], list):
+            if len(spec['icon']) != max_level:
+                error |= 1
+                print '%s: has max_level value of %d, but "icon" length is %d' % (itemname, max_level, len(spec['icon']))
+        if 'equip' in spec:
+            if 'consumes_power' in spec['equip']:
+                if isinstance(spec['equip']['consumes_power'], list):
+                    if len(spec['icon']) != max_level:
+                        error |= 1
+                        print '%s: has max_level value of %d, but "consumes_power" length is %d' % (itemname, max_level, len(spec['equip']['consumes_power']))
+            if 'effects' in spec:
+                effects = spec['effects']
+                for effect in effects:
+                    if isinstance(effect['strength'],list) and len(effect['strength']) != max_level:
+                        error |= 1
+                        print '%s: has max_level value of %d, but the "strength" of an effect length is %d' % (itemname, max_level, len(effect['strength']))
+
     if 'leader' in spec['name'] and (gamedata['game_id'] in ('tr','dv')):
         if 'ui_precious' not in spec:
             error |=1; print '%s: is a leader but does not have ui_precious flag' % (itemname)
