@@ -39821,6 +39821,8 @@ function settings_dialog_setup_row(dialog, row, rowdata) {
             dialog.widgets['choice'+c+','+row].onclick = (function (_dialog, _rowdata, _choice, _row) { return function() {
                 _dialog.user_data['preferences'][_rowdata['preference_key']] = _choice['preference_val'];
                 dialog.widgets['apply_button'].state = 'normal';
+                var requires_reload = _rowdata['requires_reload'];
+                if(requires_reload) { dialog.user_data['requires_reload'] = 1; }
                 scrollable_dialog_change_page(dialog, dialog.user_data['page']);
             }; })(dialog, rowdata, choice, row);
             var choice_selected = (cur_value == choice['preference_val']);
