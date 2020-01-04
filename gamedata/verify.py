@@ -1854,7 +1854,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'FACEBOOK_LIKES_CLIENT', 'PRICE_REGION', 'COUNTRY', 'COUNTRY_TIER', 'PRIVACY_CONSENT', 'LOCALE', 'EVENT_TIME', 'ABSOLUTE_TIME', 'TIME_OF_DAY', 'BROWSER_HARDWARE', 'BROWSER_STANDALONE_MODE',
                    'BROWSER_OS', 'BROWSER_NAME', 'BROWSER_VERSION', 'SELECTED', 'REGION_MAP_SELECTED', 'SQUAD_IS_MOVING', 'SQUAD_IS_DEPLOYED', 'SQUAD_LOCATION', 'UI_CLEAR', 'QUEST_CLAIMABLE', 'HOME_BASE', 'HAS_ATTACKED', 'HAS_DEPLOYED',
                    'PRE_DEPLOY_UNITS', 'DIALOG_OPEN', 'FOREMAN_IS_BUSY', 'GAMEBUCKS_BALANCE', 'INVENTORY', 'HAS_ITEM', 'HAS_ITEM_SET', 'HOME_REGION', 'REGION_PROPERTY', 'LADDER_PLAYER',
-                   'HOSTILE_UNIT_NEAR', 'HOSTILE_UNIT_EXISTS', 'DAY_OF_WEEK',
+                   'HOSTILE_UNIT_NEAR', 'HOSTILE_UNIT_EXISTS', 'DAY_OF_WEEK', 'HAS_ACHIEVEMENT',
                    'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AURA_INACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE', 'USING_TITLE', 'PLAYER_LEVEL',
                    'PURCHASED_RECENTLY', 'SESSION_LENGTH_TREND', 'ARMY_SIZE',
                    'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE', 'BASE_TYPE', 'BASE_RICHNESS', 'QUERY_STRING',
@@ -1991,6 +1991,13 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if expect_item_sets and pred['item_set'] not in expect_item_sets:
             error |= 1
             print '%s: %s predicate refers to item set "%s" when one of %s is expected instead' % (reason, pred['predicate'], pred['item_set'], repr(expect_item_sets))
+
+    elif pred['predicate'] == 'HAS_ACHIEVEMENT':
+        if 'achievement' not in pred:
+            error |= 1; print '%s: %s predicate does not have an "achievement" key' % (reason, pred['predicate'])
+        if pred['achievement'] not in gamedata['achievements']:
+            error |= 1; print '%s: %s predicate refers to nonexistent achievement "%s"' % (reason, pred['predicate'], pred['achievement'])
+
     elif pred['predicate'] == 'LIBRARY':
         if pred['name'] not in gamedata['predicate_library']:
             error |= 1
