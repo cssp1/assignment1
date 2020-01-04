@@ -127,6 +127,7 @@ SPFX.FXWorld.prototype.now_time = function() { return new SPFX.When(this.time, n
 SPFX.init = function(ctx, use_low_gfx, use_high_gfx) {
     SPFX.ctx = ctx;
     SPFX.last_id = 0;
+    SPFX.enable_camera_shake = 1;
 
     // turn down number of particles/sprites for higher performance
     if(use_low_gfx) {
@@ -260,6 +261,7 @@ SPFX.FXWorld.prototype.get_phantom_objects = function() {
 };
 
 SPFX.FXWorld.prototype.get_camera_shake = function() {
+    if(!SPFX.enable_camera_shake) { return [0,0,0]; }
     if(this.shake_impulses.length < 1) { return [0,0,0]; }
 
     if(this.shake_origin_time < 0) {
