@@ -2110,6 +2110,17 @@ HasItemSetPredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function HasAchievementPredicate(data) {
+    goog.base(this, data);
+    this.achievement = data['achievement'];
+}
+goog.inherits(HasAchievementPredicate, Predicate);
+HasAchievementPredicate.prototype.is_satisfied = function(player, qdata) {
+    return (this.achievement in player.achievements);
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function IsInAlliancePredicate(data) {
     goog.base(this, data);
 }
@@ -2425,6 +2436,8 @@ function read_predicate(data) {
         return new HasItemPredicate(data);
     } else if(kind === 'HAS_ITEM_SET') {
         return new HasItemSetPredicate(data);
+    } else if(kind === 'HAS_ACHIEVEMENT') {
+        return new HasAchievementPredicate(data);
     } else if(kind === 'LADDER_PLAYER') {
         return new LadderPlayerPredicate(data);
     } else if(kind === 'IS_IN_ALLIANCE') {
