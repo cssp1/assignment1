@@ -105,8 +105,18 @@ if __name__ == '__main__':
         import cStringIO
         import geoip2.database
         import boto3
+        import SpinConfig
+        import urllib
 
-        url = 'https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz'
+        # Maxmind now requires registration and a (free) license key to download this file
+        # It's stored in EnvKey in the "Management" environment, MAXMIND_LICENSE_KEY variable
+        if 'maxmind_license_key' not in SpinConfig.config:
+            print 'Please add "maxmind_license_key" to config.json'
+            sys.exit(1)
+
+        url = 'https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&suffix=tar.gz&' + \
+              urllib.urlencode({'license_key': SpinConfig.config['maxmind_license_key']})
+
         log.info('Downloading %s...', url)
         r = cStringIO.StringIO(requests.get(url).content)
 
@@ -122,8 +132,12 @@ if __name__ == '__main__':
         if not data:
             log.error('did not find the .mmdb file in the archive!')
         else:
-            print type(data)
-            log.info('Downloaded and unpacked successfully')
+            log.info('MMDB file data type %r, length %d' % (type(data), len(data)))
+            if len(data) < 1000:
+                log.error('Hmm, file seems abnormally small: "%s"' % data)
+                sys.exit(1)
+
+            log.info('Downloaded and unpacked successfully (%d bytes)' % len(data))
             log.info('Uploading to s3://%s/%s...', s3_bucket_name, s3_key_name)
             boto3.client('s3').upload_fileobj(cStringIO.StringIO(data), s3_bucket_name, s3_key_name,
                                               ExtraArgs = {'ContentType': 'application/octet-stream'})

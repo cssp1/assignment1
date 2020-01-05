@@ -876,6 +876,13 @@ class HasItemSetPredicate(Predicate):
             min_count = len(spec['members'])
         return len(player.stattab.item_sets[self.item_set]) >= min_count
 
+class HasAchievementPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.achievement = data['achievement']
+    def is_satisfied(self, player, qdata):
+        return (self.achievement in player.achievements)
+
 class HasAliasPredicate(Predicate):
     def is_satisfied(self, player, qdata):
         return bool(player.alias)
@@ -1136,6 +1143,8 @@ def read_predicate(data):
         return HasItemPredicate(data)
     elif kind == 'HAS_ITEM_SET':
         return HasItemSetPredicate(data)
+    elif kind == 'HAS_ACHIEVEMENT':
+        return HasAchievementPredicate(data)
     elif kind == 'NEW_BIRTHDAY':
         return NewBirthdayPredicate(data)
     elif kind == 'HAS_TITLE':

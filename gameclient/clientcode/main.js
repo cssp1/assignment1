@@ -39779,10 +39779,18 @@ function invoke_settings_dialog() {
                 get_preference_setting(player.preferences, 'chat_filter'))) {
                 requires_recensor = true
             }
+            var requires_switch_camera_shake = false;
+            if(get_preference_setting(dialog.user_data['preferences'], 'enable_camera_shake') !=
+               get_preference_setting(player.preferences, 'enable_camera_shake')) {
+                   requires_switch_camera_shake = true;
+            }
             player.preferences = dialog.user_data['preferences'];
             change_selection(null);
             if(requires_recensor) {
                 recensor_chat_frame(global_chat_frame);
+            }
+            if(requires_switch_camera_shake) {
+                SPFX.enable_camera_shake = !('enable_camera_shake' in player.preferences && !player.preferences['enable_camera_shake']); 
             }
         }
     };
@@ -39860,6 +39868,8 @@ function settings_dialog_setup_row(dialog, row, rowdata) {
             dialog.widgets['choice'+c+','+row].onclick = (function (_dialog, _rowdata, _choice, _row) { return function() {
                 _dialog.user_data['preferences'][_rowdata['preference_key']] = _choice['preference_val'];
                 dialog.widgets['apply_button'].state = 'normal';
+                var requires_reload = _rowdata['requires_reload'];
+                if(requires_reload) { dialog.user_data['requires_reload'] = 1; }
                 scrollable_dialog_change_page(dialog, dialog.user_data['page']);
             }; })(dialog, rowdata, choice, row);
             var choice_selected = (cur_value == choice['preference_val']);
@@ -48846,6 +48856,7 @@ function handle_server_message(data) {
 
         if(!ctx) { throw Error('ctx not initialized'); }
         SPFX.init(ctx, use_low_gfx, false);
+        SPFX.enable_camera_shake = !('enable_camera_shake' in player.preferences && !player.preferences['enable_camera_shake']);
 
         // set html_text_input
         if(read_predicate(gamedata['client']['enable_html_text_input']).is_satisfied(player)) {
