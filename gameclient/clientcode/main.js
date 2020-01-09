@@ -1197,8 +1197,8 @@ Aura.prototype.apply = function(world, obj) {
                 var o2 = obj_list[i].obj;
                 o2.create_aura(world, obj.id, obj.team, code.replace('booster', 'boosted'), this.strength, new GameTypes.TickCount(1), 0);
             }
-        } else if(code.indexOf('invisible_detector') === 0) {
-            // apply the invisible_detected aura to nearby units
+        } else if(code.indexOf('detector') === 0) {
+            // apply the detected aura to nearby units
 
             if(obj.is_destroyed()) {
                 // but don't apply if the booster is dead
@@ -1217,12 +1217,12 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: enemy });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                if(o2.is_invisible()){
+                if(o2.is_invisible_default()){
                     o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), this.strength, new GameTypes.TickCount(1), 0);
                 }
             }
-        } else if(code === 'invisible_detected') {
-            obj.combat_stats.invisible = 0;
+        } else if(code === 'detected') {
+            obj.combat_stats.detected = 1;
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
         } else if(code === 'disarmed') {
@@ -1758,6 +1758,7 @@ function CombatStats() {
     this.splash_range = 1;
     this.art_asset = null;
     this.invisible = 0;
+    this.detected = 0;
     this.weapon_facing_fudge = 0;
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
@@ -1793,6 +1794,7 @@ CombatStats.prototype.clear = function() {
     this.erratic_flight = 0;
     this.art_asset = null;
     this.invisible = 0;
+    this.detected = 0;
     this.weapon_facing_fudge = 0;
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
@@ -1828,6 +1830,7 @@ CombatStats.prototype.serialize = function() {
     if(this.erratic_flight) { ret['erratic_flight'] = this.erratic_flight; }
     if(this.art_asset) { ret['art_asset'] = this.art_asset; }
     if(this.invisible) { ret['invisible'] = this.invisible; }
+    if(this.detected) { ret['detected'] = this.detected; }
     if(this.weapon_facing_fudge) { ret['weapon_facing_fudge'] = this.weapon_facing_fudge; }
     if(this.muzzle_offset) { ret['muzzle_offset'] = this.muzzle_offset; }
     if(this.muzzle_height) { ret['muzzle_height'] = this.muzzle_height; }
@@ -1860,6 +1863,7 @@ CombatStats.prototype.apply_snapshot = function(snap) {
     if('erratic_flight' in snap) { this.erratic_flight = snap['erratic_flight']; }
     if('art_asset' in snap) { this.art_asset = snap['art_asset']; }
     if('invisible' in snap) { this.invisible = snap['invisible']; }
+    if('detected' in snap) { this.detected = snap['detected']; }
 };
 
 // "merge" together two damage_vs tables, returning a table that has
@@ -6011,7 +6015,7 @@ Building.prototype.modify_stats_by_modstats = function() {
 Building.prototype.is_invisible_default = function() { return !!this.spec['invisible']; };
 
 // return true if the object should be invisible to opponents
-Building.prototype.is_invisible = function() { return !!this.combat_stats.invisible; };
+Building.prototype.is_invisible = function() { return (!!this.combat_stats.invisible && !this.combat_stats.detected); };
 
 /** return position/text/icon/etc for the idle state, if it should be drawn in the GUI
     @return {({idle: Object,
@@ -9011,7 +9015,7 @@ Mobile.prototype.is_invisible = function() {
     // override dynamic value with recorded value, since orders and AI state are not recorded
     if(session.is_replay()) { return this.replay_invisible; }
 
-    return this.combat_stats.invisible;
+    return (!!this.combat_stats.invisible && !this.combat_stats.detected);
 };
 
 function get_player_stat(stattab, stat) { return ModChain.get_stat(stattab['player'][stat], null); }
@@ -39794,7 +39798,7 @@ function invoke_settings_dialog() {
                 recensor_chat_frame(global_chat_frame);
             }
             if(requires_switch_camera_shake) {
-                SPFX.enable_camera_shake = !('enable_camera_shake' in player.preferences && !player.preferences['enable_camera_shake']); 
+                SPFX.enable_camera_shake = !('enable_camera_shake' in player.preferences && !player.preferences['enable_camera_shake']);
             }
         }
     };
