@@ -218,6 +218,7 @@ World.World.prototype.on_object_removed = function(event) {
              only_team:(string|null|undefined),
              ignore_object:(Object|undefined),
              exclude_barriers:(boolean|undefined),
+             exclude_minefields:(boolean|undefined),
              exclude_invul:(boolean|undefined),
              include_collidable_inerts:(boolean|undefined),
              include_destroyed:(boolean|undefined),
@@ -281,6 +282,7 @@ World.World.prototype.query_objects_within_distance = function(loc, dist, params
 
                     if(params.ignore_object && temp === params.ignore_object) { continue; }
                     if(params.exclude_barriers && temp.spec['name'] === 'barrier') { continue; }
+                    if(params.exclude_minefields && temp.spec['name'] === 'minefield') { continue; }
                     if(params.exclude_invul && temp.is_invul()) { continue; }
                     if(temp.is_inert() && (!params.include_collidable_inerts || !temp.spec['unit_collision_gridsize'][0])) { continue; }
                     if(params.only_team && params.only_team !== temp.team) { continue; }

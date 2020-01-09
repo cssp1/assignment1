@@ -2244,6 +2244,9 @@ GameObject.prototype.interpolate_facing = function(world) {
 /** @return {boolean} */
 GameObject.prototype.is_invisible = function() { return false; };
 
+/** @return {boolean} */
+GameObject.prototype.is_invisible_default = function() { return false; };
+
 /** @param {World.World|null} world
     return [[x,y], depth] for sprite drawing on game field */
 GameObject.prototype.calc_draw_pos = function(world) {
@@ -4108,6 +4111,7 @@ GameObject.prototype.ai_pick_target_classic = function(world, auto_spell, auto_s
                                                    only_team: target_team,
                                                    exclude_full_health: !target_full_health_objects,
                                                    exclude_barriers: exclude_barriers,
+                                                   exclude_minefields: true,
                                                    mobile_only: target_mobile_only,
                                                    exclude_flying: !(auto_spell['targets_air'] || this.combat_stats.anti_air),
                                                    flying_only: !auto_spell['targets_ground'],
