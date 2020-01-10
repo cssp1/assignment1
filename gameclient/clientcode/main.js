@@ -1211,10 +1211,7 @@ Aura.prototype.apply = function(world, obj) {
             } else {
                 enemy = 'enemy';
             }
-            var aura_strength = 1;
-            if(this.strength) {
-                aura_strength = this.strength;
-            }
+            var aura_strength = this.strength || 1; // in this case, aura strength means chance of detection
 
             var obj_list = world.query_objects_within_distance(obj.raw_pos(),
                                                                gamedata['map']['range_conversion'] * this.range,
@@ -1222,11 +1219,9 @@ Aura.prototype.apply = function(world, obj) {
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
                 if(o2.is_invisible_default()) {
-                    var apply_aura = 1;
+                    // apply_aura represents the "roll" against the chance of failing detection, only calculates if aura_strength isn't 1 (100%)
+                    var apply_aura = (aura_strength < 1) ? Math.random() : 1;
                     var avoided_detection = false;
-                    if(aura_strength < 1) { // if strength isn't 1, calculate chance of applying with "roll under" method
-                        apply_aura = Math.random();
-                    }
                     for(var i = 0; i < o2.auras.length; i++) {
                         var a = o2.auras[i];
                         if(a.spec['name'] === 'avoided_detection') {
