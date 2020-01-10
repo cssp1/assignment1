@@ -1211,8 +1211,9 @@ Aura.prototype.apply = function(world, obj) {
             } else {
                 enemy = 'enemy';
             }
-            if(!this.strength) {
-                this.strength = 1; // sets strength to 1 if not specified
+            var aura_strength = 1;
+            if(this.strength) {
+                aura_strength = this.strength;
             }
 
             var obj_list = world.query_objects_within_distance(obj.raw_pos(),
@@ -1220,16 +1221,23 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: enemy });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                if(o2.is_invisible_default() && !o2.combat_stats.avoided_detection) {
+                if(o2.is_invisible_default()) {
                     var apply_aura = 1;
-                    var avoided_detection = 0;
-                    goog.array.forEach(o2.auras, function(aura) { if('effects' in aura.spec and 'code' in aura.spec['effects'] and aura.spec['effects']['code'] === 'avoided_detection') { avoided_detection = 1; } }, o2);
-                    if(this.strength < 1) {
+                    var avoided_detection = false;
+                    if(aura_strength < 1) { // if strength isn't 1, calculate chance of applying with "roll under" method
                         apply_aura = Math.random();
                     }
-                    if((apply_aura <= this.strength) && !avoided_detection) {
+                    for(var i = 0; i < o2.auras.length; i++) {
+                        var a = o2.auras[i];
+                        if(a.spec['name'] === 'avoided_detection') {
+                            avoided_detection = true; // invisible objects that avoided detection stay undetected
+                        } else if(a.spec['name'] === code.replace('detector', 'detected')) {
+                            apply_aura = aura_strength;  // invisible objects that were detected stay detected
+                        }
+                    }
+                    if((apply_aura <= aura_strength) && !avoided_detection) { // apply the aura if the random roll succeeded and the object didn't already avoid detection
                         o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), this.strength, new GameTypes.TickCount(1), 0);
-                    } else if ((apply_aura >= this.strength) || avoided_detection) {
+                    } else if ((apply_aura > aura_strength) || avoided_detection) { // apply the avoided detection aura if the object already avoided detection or the object already avoided detection
                         o2.create_aura(world, obj.id, obj.team, 'avoided_detection', this.strength, new GameTypes.TickCount(1), 0);
                     }
                 }
