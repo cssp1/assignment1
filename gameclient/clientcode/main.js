@@ -1211,14 +1211,24 @@ Aura.prototype.apply = function(world, obj) {
             } else {
                 enemy = 'enemy';
             }
+            if(!this.strength) {
+                this.strength = 1; // sets strength to 1 if not specified
+            }
 
             var obj_list = world.query_objects_within_distance(obj.raw_pos(),
                                                                gamedata['map']['range_conversion'] * this.range,
                                                                { only_team: enemy });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                if(o2.is_invisible_default()){
+                if(o2.is_invisible_default() && !o2.combat_stats.avoided_detection) {
+                    var apply_aura = 1;
+                    if(this.strength < 1) {
+                        apply_aura = Math.random();
+                    }
+                    if(apply_aura < = this.strength)
                     o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), this.strength, new GameTypes.TickCount(1), 0);
+                } else if (o2.is_invisible_default() && o2.combat_stats.avoided_detection) {
+                    o2.combat_stats.avoided_detection = 1;
                 }
             }
         } else if(code === 'detected') {
