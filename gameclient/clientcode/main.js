@@ -1222,17 +1222,22 @@ Aura.prototype.apply = function(world, obj) {
                 var o2 = obj_list[i].obj;
                 if(o2.is_invisible_default() && !o2.combat_stats.avoided_detection) {
                     var apply_aura = 1;
+                    var avoided_detection = 0;
+                    goog.array.forEach(o2.auras, function(aura) { if('effects' in aura.spec and 'code' in aura.spec['effects'] and aura.spec['effects']['code'] === 'avoided_detection') { avoided_detection = 1; } }, o2);
                     if(this.strength < 1) {
                         apply_aura = Math.random();
                     }
-                    if(apply_aura < = this.strength)
-                    o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), this.strength, new GameTypes.TickCount(1), 0);
-                } else if (o2.is_invisible_default() && o2.combat_stats.avoided_detection) {
-                    o2.combat_stats.avoided_detection = 1;
+                    if((apply_aura <= this.strength) && !avoided_detection) {
+                        o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), this.strength, new GameTypes.TickCount(1), 0);
+                    } else if ((apply_aura >= this.strength) || avoided_detection) {
+                        o2.create_aura(world, obj.id, obj.team, 'avoided_detection', this.strength, new GameTypes.TickCount(1), 0);
+                    }
                 }
             }
         } else if(code === 'detected') {
             obj.combat_stats.detected = 1;
+        } else if(code === 'avoided_detection') {
+            obj.combat_stats.detected = 0;
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
         } else if(code === 'disarmed') {
