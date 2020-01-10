@@ -773,7 +773,7 @@ def check_aura(auraname, spec, maxlevel):
                                     'rate_of_fire_boosted', 'damage_boosted', 'range_boosted', 'on_island', 'damage_booster_invisible', 'defense_booster_invisible',
                                     'armor_boosted', 'damage_booster', 'defense_booster', 'stunned', 'disarmed', 'hacked', 'range_reduction', 'weak_zombie',
                                     'on_fire', 'projectile_speed_reduced', 'range_booster', 'sprite_swapped', 'cast_spell_continuously',
-                                    'damage_type_shielder', 'damage_type_shielded', 'damage_type_shielder_invisible'):
+                                    'damage_type_shielder', 'damage_type_shielded', 'damage_type_shielder_invisible', 'detector', 'detector_invisible', 'detected'):
                 if not spec.get('client',False):
                     error |= 1; print '%s: uses a client-side effect code but client != 1' % auraname
                 if spec.get('server',False):

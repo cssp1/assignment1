@@ -1197,6 +1197,32 @@ Aura.prototype.apply = function(world, obj) {
                 var o2 = obj_list[i].obj;
                 o2.create_aura(world, obj.id, obj.team, code.replace('booster', 'boosted'), this.strength, new GameTypes.TickCount(1), 0);
             }
+        } else if(code.indexOf('detector') === 0) {
+            // apply the detected aura to nearby units
+
+            if(obj.is_destroyed()) {
+                // but don't apply if the booster is dead
+                return;
+            }
+
+            var enemy = '';
+            if(obj.team === 'enemy') {
+                enemy = 'player';
+            } else {
+                enemy = 'enemy';
+            }
+
+            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
+                                                               gamedata['map']['range_conversion'] * this.range,
+                                                               { only_team: enemy });
+            for(var i = 0; i < obj_list.length; i++) {
+                var o2 = obj_list[i].obj;
+                if(o2.is_invisible_default()){
+                    o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), this.strength, new GameTypes.TickCount(1), 0);
+                }
+            }
+        } else if(code === 'detected') {
+            obj.combat_stats.detected = 1;
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
         } else if(code === 'disarmed') {
@@ -1731,6 +1757,8 @@ function CombatStats() {
     this.projectile_speed = 1;
     this.splash_range = 1;
     this.art_asset = null;
+    this.invisible = 0;
+    this.detected = 0;
     this.weapon_facing_fudge = 0;
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
@@ -1765,6 +1793,8 @@ CombatStats.prototype.clear = function() {
     this.maxvel = 1;
     this.erratic_flight = 0;
     this.art_asset = null;
+    this.invisible = 0;
+    this.detected = 0;
     this.weapon_facing_fudge = 0;
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
@@ -1799,6 +1829,8 @@ CombatStats.prototype.serialize = function() {
     if(this.maxvel != 1) { ret['maxvel'] = this.maxvel; }
     if(this.erratic_flight) { ret['erratic_flight'] = this.erratic_flight; }
     if(this.art_asset) { ret['art_asset'] = this.art_asset; }
+    if(this.invisible) { ret['invisible'] = this.invisible; }
+    if(this.detected) { ret['detected'] = this.detected; }
     if(this.weapon_facing_fudge) { ret['weapon_facing_fudge'] = this.weapon_facing_fudge; }
     if(this.muzzle_offset) { ret['muzzle_offset'] = this.muzzle_offset; }
     if(this.muzzle_height) { ret['muzzle_height'] = this.muzzle_height; }
@@ -1830,6 +1862,8 @@ CombatStats.prototype.apply_snapshot = function(snap) {
     if('maxvel' in snap) { this.maxvel = snap['maxvel']; }
     if('erratic_flight' in snap) { this.erratic_flight = snap['erratic_flight']; }
     if('art_asset' in snap) { this.art_asset = snap['art_asset']; }
+    if('invisible' in snap) { this.invisible = snap['invisible']; }
+    if('detected' in snap) { this.detected = snap['detected']; }
 };
 
 // "merge" together two damage_vs tables, returning a table that has
@@ -1933,6 +1967,7 @@ GameObject.prototype.update_aura_effects = function(world) {
     @param {World.World|null} world - null for phantom/scenery objects */
 GameObject.prototype.update_stats = function(world) {
     this.combat_stats.clear();
+    this.combat_stats.invisible = this.is_invisible_default();
     this.combat_stats.weapon_facing_fudge = this.spec['weapon_facing_fudge'] || 0;
     this.combat_stats.muzzle_offset = this.spec['muzzle_offset'] || [0,0,0];
     this.combat_stats.muzzle_height = this.spec['muzzle_height'] || 0;
@@ -2212,6 +2247,9 @@ GameObject.prototype.interpolate_facing = function(world) {
 
 /** @return {boolean} */
 GameObject.prototype.is_invisible = function() { return false; };
+
+/** @return {boolean} */
+GameObject.prototype.is_invisible_default = function() { return false; };
 
 /** @param {World.World|null} world
     return [[x,y], depth] for sprite drawing on game field */
@@ -4077,6 +4115,7 @@ GameObject.prototype.ai_pick_target_classic = function(world, auto_spell, auto_s
                                                    only_team: target_team,
                                                    exclude_full_health: !target_full_health_objects,
                                                    exclude_barriers: exclude_barriers,
+                                                   exclude_minefields: true,
                                                    mobile_only: target_mobile_only,
                                                    exclude_flying: !(auto_spell['targets_air'] || this.combat_stats.anti_air),
                                                    flying_only: !auto_spell['targets_ground'],
@@ -5973,7 +6012,10 @@ Building.prototype.modify_stats_by_modstats = function() {
 };
 
 // return true if the object should be invisible to opponents
-Building.prototype.is_invisible = function() { return !!this.spec['invisible']; };
+Building.prototype.is_invisible_default = function() { return !!this.spec['invisible']; };
+
+// return true if the object should be invisible to opponents
+Building.prototype.is_invisible = function() { return (!!this.combat_stats.invisible && !this.combat_stats.detected); };
 
 /** return position/text/icon/etc for the idle state, if it should be drawn in the GUI
     @return {({idle: Object,
@@ -8947,11 +8989,7 @@ Mobile.prototype.passes_through_walls = function() { return this.spec['flying'] 
 Mobile.prototype.is_under_repair = function() { return this.under_repair_finish > 0; };
 
 // return true if the object should be invisible to opponents
-Mobile.prototype.is_invisible = function() {
-
-    // override dynamic value with recorded value, since orders and AI state are not recorded
-    if(session.is_replay()) { return this.replay_invisible; }
-
+Mobile.prototype.is_invisible_default = function() {
     // mobile units only go invisible when:
     // 1) invis_on_hold: 1 in unit spec
     // 2) unit is in hold position mode
@@ -8969,6 +9007,15 @@ Mobile.prototype.is_invisible = function() {
         }
     }
     return false;
+};
+
+// return true if the object should be invisible to opponents
+Mobile.prototype.is_invisible = function() {
+
+    // override dynamic value with recorded value, since orders and AI state are not recorded
+    if(session.is_replay()) { return this.replay_invisible; }
+
+    return (!!this.combat_stats.invisible && !this.combat_stats.detected);
 };
 
 function get_player_stat(stattab, stat) { return ModChain.get_stat(stattab['player'][stat], null); }
@@ -39751,7 +39798,7 @@ function invoke_settings_dialog() {
                 recensor_chat_frame(global_chat_frame);
             }
             if(requires_switch_camera_shake) {
-                SPFX.enable_camera_shake = !('enable_camera_shake' in player.preferences && !player.preferences['enable_camera_shake']); 
+                SPFX.enable_camera_shake = !('enable_camera_shake' in player.preferences && !player.preferences['enable_camera_shake']);
             }
         }
     };
