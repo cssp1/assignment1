@@ -3151,7 +3151,7 @@
         }
     },
 
-    "equip_chooser": {
+    "equip_chooser_dialog": {
         "dimensions": [465,100], // note: this gets resized dynamically
         "clip_children": 0,
         "default_button": "close_button",
