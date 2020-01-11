@@ -27253,9 +27253,9 @@ function equip_chooser_dialog_setup_row(dialog, row, rowdata) {
     dialog.widgets['equip_frame'+row.toString()].show =
         dialog.widgets['equip_stack'+row.toString()].show =
         dialog.widgets['equip_item'+row.toString()].show = (rowdata !== null);
-    dialog.widgets['equip_frame'+row.toString()].state = 'normal';
-    dialog.widgets['equip_frame'+row.toString()].tooltip.str = null;
     if(rowdata !== null) {
+        dialog.widgets['equip_frame'+row.toString()].state = 'normal';
+        dialog.widgets['equip_frame'+row.toString()].tooltip.str = null;
         var inv_slot = rowdata['inv_slot'], item = rowdata['item'], min_level = rowdata['min_level'], unique_conflict = rowdata['unique_conflict'], failed_pred = rowdata['failed_pred'];
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
         ItemDisplay.set_inventory_item_asset(dialog.widgets['equip_item'+row], spec);
