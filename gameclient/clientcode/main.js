@@ -27263,11 +27263,11 @@ function equip_chooser_dialog_setup_row(dialog, row, rowdata) {
         var context_props = {};
         if(min_level > 0) {
             // show red text saying that player needs to upgrade the building
-            dialog.widgets['equip_frame'+i.toString()].state = 'disabled_clickable';
+            dialog.widgets['equip_frame'+row.toString()].state = 'disabled_clickable';
             context_props['error_text'] = gamedata['errors'][(tech ? 'EQUIP_TECH_LEVEL_TOO_LOW' : 'EQUIP_BUILDING_LEVEL_TOO_LOW')]['ui_name'].replace('%s', min_level.toString());
             var helper = get_requirements_help(read_predicate(tech ? {'predicate': 'TECH_LEVEL', 'tech': tech['name'], 'min_level': min_level} :
                                                 {'predicate': 'BUILDING_LEVEL', 'building_type': unit.spec['name'], 'trigger_level': min_level}), null);
-            dialog.widgets['equip_frame'+i.toString()].onclick = (function (_helper) { return function(w) {
+            dialog.widgets['equip_frame'+row.toString()].onclick = (function (_helper) { return function(w) {
                 if(helper) {
                     w.parent.widgets['close_button'].onclick(w.parent.widgets['close_button']);
                     helper();
