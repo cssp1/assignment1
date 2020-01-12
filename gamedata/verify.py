@@ -203,6 +203,38 @@ def check_mandatory_fields(specname, spec, kind):
             if stat_key not in gamedata['strings']['modstats']['stats']:
                 error |= 1; print 'gamedata.strings.modstats.stats is missing "%s"' % stat_key
 
+    if 'proportionate_power_threshold' in spec and 'provides_power' not in spec:
+        error |= 1; print '%s has proportionate_power_threshold but not provides_power' % (specname)
+
+    if 'half_power_threshold' in spec and 'provides_power' not in spec:
+        error |= 1; print '%s has half_power_threshold but not provides_power' % (specname)
+
+    if 'no_power_threshold' in spec and 'provides_power' not in spec:
+        error |= 1; print '%s has no_power_threshold but not provides_power' % (specname)
+
+    if 'provides_power' in spec:
+        proportionate_power_threshold = 1.0
+        half_power_threshold = 1.0
+        no_power_threshold = 1.0
+        if 'proportionate_power_threshold' in spec:
+            if not isinstance(spec['proportionate_power_threshold'], float):
+                error |= 1; print '%s proportionate_power_threshold should be a float value' % (specname)
+            proportionate_power_threshold = spec['proportionate_power_threshold']
+        if 'half_power_threshold' in spec:
+            if not isinstance(spec['half_power_threshold'], float):
+                error |= 1; print '%s half_power_threshold should be a float value' % (specname)
+            half_power_threshold = spec['half_power_threshold']
+        if 'no_power_threshold' in spec:
+            if not isinstance(spec['no_power_threshold'], float):
+                error |= 1; print '%s no_power_threshold should be a float value' % (specname)
+            no_power_threshold = spec['no_power_threshold']
+        if no_power_threshold > half_power_threshold:
+            error |= 1; print '%s no_power_threshold is greater than half_power_threshold' % (specname)
+        if no_power_threshold > proportionate_power_threshold:
+            error |= 1; print '%s no_power_threshold is greater than proportionate_power_threshold' % (specname)
+        if half_power_threshold > proportionate_power_threshold:
+            error |= 1; print '%s half_power_threshold is greater than proportionate_power_threshold' % (specname)
+
     for lev in xrange(1,max_level+1):
         cc_requirement = GameDataUtil.get_cc_requirement(gamedata, spec['requires'], lev) if ('requires' in spec) else 0
         if spec['name'] == gamedata['townhall']:

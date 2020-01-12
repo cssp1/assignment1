@@ -8542,8 +8542,20 @@ class Base(object):
             for obj in self.iter_objects():
                 if obj.is_building() and (not obj.is_under_construction()):
                     # power production
-                    if (not obj.is_damaged()) and (not obj.is_upgrading()) and (not obj.is_enhancing()) and (not obj.is_removing()):
-                        power[0] += obj.get_leveled_quantity(obj.spec.provides_power)
+                    if (not obj.is_upgrading()) and (not obj.is_enhancing()) and (not obj.is_removing()):
+                        provides_power = obj.get_leveled_quantity(obj.spec.provides_power)
+                        if obj.is_damaged():
+                            hp_proportion = obj.hp / obj.max_hp
+                            proportionate_power_threshold = obj.spec.get('proportionate_power_threshold', 1.0)
+                            half_power_threshold = obj.spec.get('half_power_threshold', (proportionate_power_threshold - 0.001))
+                            no_power_threshold = obj.spec.get('no_power_threshold', (half_power_threshold - 0.001))
+                            if hp_proportion >= proportionate_power_threshold:
+                                provides_power = provides_power * hp_proportion
+                            else if hp_proportion >= half_power_threshold:
+                                provides_power = provides_power * 0.5
+                            else if hp_proportion <= no_power_threshold:
+                                provides_power = 0
+                        power[0] += provides_power
                     # power consumption
                     if obj.is_upgrading():
                         power[1] += GameObjectSpec.get_leveled_quantity(obj.spec.consumes_power_while_building, obj.level + 1)
