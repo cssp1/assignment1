@@ -152,6 +152,7 @@ def check_power_settings(specname, spec):
             elif 'proportionate_power_threshold' in spec and isinstance(spec['proportionate_power_threshold'], float):
                 if spec['half_power_threshold'] >= spec['proportionate_power_threshold']:
                     error |= 1; print '%s proportionate_power_threshold should be greater than half_power_threshold' % (specname)
+    return error
 
 def check_mandatory_fields(specname, spec, kind):
     fields = ['name', 'kind', 'gridsize', 'defense_types', 'art_asset']
