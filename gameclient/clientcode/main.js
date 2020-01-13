@@ -51450,7 +51450,7 @@ function flush_dirty_objects(options) {
 
     session.for_each_real_object(function(obj) {
         if(obj.state_dirty != 0) {
-            if(options.urgent_only && !((obj.state_dirty & obj_state_flags.URGENT) || ((obj.state_dirty & obj_state_flags.HIGH_PRIORITY) && flush_high_priority)))) { return; }
+            if(options.urgent_only && !((obj.state_dirty & obj_state_flags.URGENT) || ((obj.state_dirty & obj_state_flags.HIGH_PRIORITY) && flush_high_priority))) { return; }
             if(options.buildings_only && !obj.is_building()) { return; }
             var xy, orders = null;
             if(obj.is_mobile()) {
