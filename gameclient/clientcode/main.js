@@ -1453,6 +1453,7 @@ var obj_state_flags = {
     HP: 2, // health/damage (also includes last_attacker, and killer_info if destroyed)
     ORDERS: 4, // movement orders
     PATROL: 8, // patrol flag
+    HIGH_PRIORITY: 12, // high priority, 1/10 of the usual refresh time or 1 second, whichever is higher
     URGENT: 16, // mark that this object should be flushed immediately at the end of the tick, instead of waiting for the next time-interval-based save
     ALL: 255
 };
@@ -8829,6 +8830,7 @@ function combat_time_scale() {
 };
 
 var last_combat_save = 0;
+var last_high_priority_save = 0;
 var last_server_ping = 0;
 var last_proxy_keepalive = 0;
 
@@ -51438,9 +51440,16 @@ function invoke_login_error_message(error_name) {
 function flush_dirty_objects(options) {
     var args = [];
 
+    // calculate HIGH_PRIORITY message time
+    var flush_high_priority = false;
+    if(client_time - last_high_priority_save > Math.max((gamedata['client']['combat_state_save_interval'] / 10), 1) {
+        last_high_priority_save = client_time;
+        flush_high_priority = true;
+    }
+
     session.for_each_real_object(function(obj) {
         if(obj.state_dirty != 0) {
-            if(options.urgent_only && !(obj.state_dirty & obj_state_flags.URGENT)) { return; }
+            if(options.urgent_only && !(obj.state_dirty & (obj_state_flags.URGENT || (obj_state_flags.HIGH_PRIORITY && flush_high_priority)))) { return; }
             if(options.buildings_only && !obj.is_building()) { return; }
             var xy, orders = null;
             if(obj.is_mobile()) {
