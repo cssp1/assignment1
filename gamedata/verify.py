@@ -120,7 +120,7 @@ def check_power_settings(specname, spec):
                 if not isinstance(threshold, float):
                     error |= 1; print '%s proportionate_power_threshold list entries should all be float values' % (specname)
             if 'half_power_threshold' in spec and not isinstance(spec['half_power_threshold'], list):
-                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)\
+                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)
             elif 'half_power_threshold' in spec and isinstance(spec['half_power_threshold'], list):
                 for i, threshold in enumerate(spec['proportionate_power_threshold']):
                     if spec['half_power_threshold'][i] >= spec['proportionate_power_threshold'][i]:
@@ -139,7 +139,7 @@ def check_power_settings(specname, spec):
                 if not isinstance(threshold, float):
                     error |= 1; print '%s half_power_threshold list entries should all be float values' % (specname)
             if 'proportionate_power_threshold' in spec and not isinstance(spec['proportionate_power_threshold'], list):
-                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)\
+                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)
             elif 'proportionate_power_threshold' in spec and isinstance(spec['proportionate_power_threshold'], list):
                 for i, threshold in enumerate(spec['half_power_threshold']):
                     if spec['half_power_threshold'][i] >= spec['proportionate_power_threshold'][i]:
