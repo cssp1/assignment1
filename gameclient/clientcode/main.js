@@ -1453,8 +1453,8 @@ var obj_state_flags = {
     HP: 2, // health/damage (also includes last_attacker, and killer_info if destroyed)
     ORDERS: 4, // movement orders
     PATROL: 8, // patrol flag
-    HIGH_PRIORITY: 12, // high priority, 1/10 of the usual refresh time or 1 second, whichever is higher
     URGENT: 16, // mark that this object should be flushed immediately at the end of the tick, instead of waiting for the next time-interval-based save
+    HIGH_PRIORITY: 32, // high priority, 1/10 of the usual refresh time or 1 second, whichever is higher
     ALL: 255
 };
 
@@ -5512,6 +5512,7 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
         }
     }
 };
+Building.prototype.provides_power = function() { return this.spec['provides_power']; };
 Building.prototype.is_townhall = function() { return this.spec['name'] === gamedata['townhall']; };
 Building.prototype.is_turret = function() { return this.spec['history_category'] === 'turrets'; };
 Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
@@ -51449,7 +51450,7 @@ function flush_dirty_objects(options) {
 
     session.for_each_real_object(function(obj) {
         if(obj.state_dirty != 0) {
-            if(options.urgent_only && !(obj.state_dirty & (obj_state_flags.URGENT || (obj_state_flags.HIGH_PRIORITY && flush_high_priority)))) { return; }
+            if(options.urgent_only && !((obj.state_dirty & obj_state_flags.URGENT) || ((obj.state_dirty & obj_state_flags.HIGH_PRIORITY) && flush_high_priority)))) { return; }
             if(options.buildings_only && !obj.is_building()) { return; }
             var xy, orders = null;
             if(obj.is_mobile()) {

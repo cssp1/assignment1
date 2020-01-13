@@ -730,6 +730,9 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source, d
     if(target.is_building()) {
         // immediately show that repair/research/upgrade/production stops in the UI. Subsequent OBJECT_STATE_UPDATE will return correct HP value and start/stop times.
         target.repair_finish_time = -1;
+        if(target.provides_power()) {
+            target.state_dirty |= obj_state_flags.HIGH_PRIORITY;
+        }
         if(target.research_start_time > 0) {
             target.research_done_time += server_time - target.research_start_time;
             target.research_start_time = -1;

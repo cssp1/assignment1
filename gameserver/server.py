@@ -8546,14 +8546,15 @@ class Base(object):
                         provides_power = obj.get_leveled_quantity(obj.spec.provides_power)
                         if obj.is_damaged():
                             hp_proportion = obj.hp / obj.max_hp
-                            proportionate_power_threshold = obj.spec.get('proportionate_power_threshold', 1.0)
-                            half_power_threshold = obj.spec.get('half_power_threshold', (proportionate_power_threshold - 0.0001))
-                            no_power_threshold = obj.spec.get('no_power_threshold', (half_power_threshold - 0.0001))
+                            proportionate_power_threshold = obj.get_leveled_quantity(obj.spec.get('proportionate_power_threshold', 1.0))
+                            half_power_threshold = obj.get_leveled_quantity(obj.spec.get('half_power_threshold', (proportionate_power_threshold - 0.0001)))
+                            assert proportionate_power_threshold > half_power_threshold # verify.py should ensure this
+                            assert half_power_threshold > no_power_threshold # verify.py should ensure this
                             if hp_proportion >= proportionate_power_threshold:
                                 provides_power = provides_power * hp_proportion
                             else if hp_proportion >= half_power_threshold:
                                 provides_power = provides_power * 0.5
-                            else if hp_proportion <= no_power_threshold:
+                            else:
                                 provides_power = 0
                         power[0] += provides_power
                     # power consumption
