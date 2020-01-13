@@ -51442,7 +51442,7 @@ function flush_dirty_objects(options) {
 
     // calculate HIGH_PRIORITY message time
     var flush_high_priority = false;
-    if(client_time - last_high_priority_save > Math.max((gamedata['client']['combat_state_save_interval'] / 10), 1) {
+    if(client_time - last_high_priority_save > Math.max((gamedata['client']['combat_state_save_interval'] / 10), 1)) {
         last_high_priority_save = client_time;
         flush_high_priority = true;
     }

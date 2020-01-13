@@ -8547,8 +8547,8 @@ class Base(object):
                         if obj.is_damaged():
                             hp_proportion = obj.hp / obj.max_hp
                             proportionate_power_threshold = obj.spec.get('proportionate_power_threshold', 1.0)
-                            half_power_threshold = obj.spec.get('half_power_threshold', (proportionate_power_threshold - 0.001))
-                            no_power_threshold = obj.spec.get('no_power_threshold', (half_power_threshold - 0.001))
+                            half_power_threshold = obj.spec.get('half_power_threshold', (proportionate_power_threshold - 0.0001))
+                            no_power_threshold = obj.spec.get('no_power_threshold', (half_power_threshold - 0.0001))
                             if hp_proportion >= proportionate_power_threshold:
                                 provides_power = provides_power * hp_proportion
                             else if hp_proportion >= half_power_threshold:
