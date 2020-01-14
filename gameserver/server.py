@@ -8552,7 +8552,7 @@ class Base(object):
                             assert half_power_threshold > no_power_threshold # verify.py should ensure this
                             if hp_proportion >= proportionate_power_threshold:
                                 provides_power = provides_power * hp_proportion
-                            else if hp_proportion >= half_power_threshold:
+                            elif hp_proportion >= half_power_threshold:
                                 provides_power = provides_power * 0.5
                             else:
                                 provides_power = 0
