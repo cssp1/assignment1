@@ -2591,6 +2591,18 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                 world.fxworld.add_visual_effect_at_time(impact_pos, 0, [0,1,0], client_time, this.get_leveled_quantity(vfx), true, vfx_props);
             }
         } else if(code === 'projectile_attack') {
+            // make sure casting unit isn't a weak zombie
+            for(var i = 0; i < this.auras.length; i++) {
+                var a = this.auras[i];
+                if(a.spec['name'] === 'weak_zombie') {
+                    var weak_zombie_message = gamedata['errors']['CANNOT_FIRE_PROJECTILE_WHILE_WEAK_ZOMBIE']['ui_name'];
+                    if('weak_zombie_messages' in gamedata['strings'] && this.spec['name'] in gamedata['strings']['weak_zombie_messages'] && spell['name'] in gamedata['strings']['weak_zombie_messages'][this.spec['name']]) {
+                        weak_zombie_message = gamedata['strings']['weak_zombie_messages'][this.spec['name']][spell['name']];
+                    }
+                    user_log.msg(weak_zombie_message, new SPUI.Color(1,0,0,1));
+                    return false;
+                }
+            }
             // make sure we are in range
             if(location) {
                 var range = gamedata['map']['range_conversion'] * this.get_leveled_quantity(spell['range'] || 0);

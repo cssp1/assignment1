@@ -122,6 +122,7 @@
     "CANNOT_ATTACK_SANDSTORM_MAX": { "ui_name": "Unable to attack because of the intense sandstorm" },
     "CANNOT_ATTACK_QUARRY_LIMIT_REACHED": { "ui_name": "Quarry control limit reached.\nUpgrade Transmitter to raise limit, or abandon one of your other quarries." },
     "CANNOT_ATTACK_QUARRY_MAX_LIMIT_REACHED": { "ui_name": "Quarry control limit reached.\nAbandon one of your other quarries to attack." },
+    "CANNOT_FIRE_PROJECTILE_WHILE_WEAK_ZOMBIE": { "ui_name": "Your unit cannot fire this weapon until it is repaired above 10% of its health."},
 
 
     "CANNOT_ATTACK_MAP_BOTH_SAME_REGION": { "ui_name": "Cannot attack because you have no available battalions within range",
