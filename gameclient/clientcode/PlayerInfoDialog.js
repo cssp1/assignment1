@@ -1258,11 +1258,12 @@ PlayerInfoDialog.achievement_category_rowfunc = function(dialog, row, rowdata) {
         if(dialog.widgets['category_status'+row.toString()].show) {
             var stat = dialog.data['widgets']['category_status']['ui_name'];
             var total = 0, complete = 0;
+            var count_hidden = ('count_hidden' in gamedata['achievement_categories'][rowdata] && !!gamedata['achievement_categories'][rowdata]['count_hidden']);
             for(var achname in gamedata['achievements']) {
                 var data = gamedata['achievements'][achname];
                 if(data['category'] != rowdata) { continue; }
-                if(('show_if' in data) && !read_predicate(data['show_if']).is_satisfied(player, null)) { continue; }
-                if(('activation' in data) && !read_predicate(data['activation']).is_satisfied(player, null)) { continue; }
+                if(('show_if' in data) && !read_predicate(data['show_if']).is_satisfied(player, null) && !count_hidden) { continue; }
+                if(('activation' in data) && !read_predicate(data['activation']).is_satisfied(player, null) && !count_hidden) { continue; }
                 if(achname in dialog.parent.user_data['player_achievements']) {
                     complete += 1;
                 }
