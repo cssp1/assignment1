@@ -2599,7 +2599,7 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                     if('weak_zombie_messages' in gamedata['strings'] && this.spec['name'] in gamedata['strings']['weak_zombie_messages'] && spell['name'] in gamedata['strings']['weak_zombie_messages'][this.spec['name']]) {
                         weak_zombie_message = gamedata['strings']['weak_zombie_messages'][this.spec['name']][spell['name']];
                     }
-                    user_log.msg(weak_zombie_message, new SPUI.Color(1,0,0,1));
+                    user_log.msg(weak_zombie_message.replace('%pct', (100 * gamedata['zombie_debuff_threshold']).toFixed()), new SPUI.Color(1,0,0,1));
                     return false;
                 }
             }
