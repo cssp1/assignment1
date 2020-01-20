@@ -1183,11 +1183,14 @@ PlayerInfoDialog.achievements_tab_set_category = function(dialog, catname) {
     var ach_list = [], total = 0, completed = 0;
 
     if(achdata !== null) {
+        var count_hidden = ('count_hidden' in gamedata['achievement_categories'][catname] && !!gamedata['achievement_categories'][catname]['count_hidden']);
         for(var name in gamedata['achievements']) {
             var data = gamedata['achievements'][name];
             if(data['category'] !== catname) { continue; }
+            if(count_hidden) { total += 1; }
             if(('show_if' in data) && !read_predicate(data['show_if']).is_satisfied(player, null)) { continue; }
             if(('activation' in data) && !read_predicate(data['activation']).is_satisfied(player, null)) { continue; }
+            if(count_hidden) { total -= 1; }
             ach_list.push(data);
             total += 1;
             if(name in achdata) { completed += 1; }
