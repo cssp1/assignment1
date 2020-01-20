@@ -353,9 +353,9 @@
             // unit health bars can change color as a function of the health %
             // these can be specified as step function arrays, [[min_health0, color0], [min_health1, color1], ... ]
             // friendly units change from green to yellow when <50% health
-            "fg": [[0,"rgba(180,180,0,1.0)"], [0.5,"rgba(0,204,0,1.0)"]],
-            "fg_transition": [[0,"rgba(102,102,0,1.0)"], [0.5,"rgba(0,102,0,1.0)"]],
-            "highlight": [[0, "rgba(240,240,0,1)"], [0.5, "rgba(0,255,0,1.0)"]],
+            "fg": [[0,"rgba(204,0,0,1.0)"], [0.1,"rgba(204,102,0,1.0)"], [0.5,"rgba(180,180,0,1.0)"], [0.75,"rgba(0,204,0,1.0)"]],
+            "fg_transition": [[0,"rgba(102,0,0,1.0)"], [0.1,"rgba(102,102,0,1.0)"], [0.5,"rgba(102,102,0,1.0)"], [0.75,"rgba(0,102,0,1.0)"]],
+            "highlight": [[0, "rgba(255,0,0,1)"], [0.1, "rgba(255,140,0,1)"], [0.5, "rgba(240,240,0,1)"], [0.75, "rgba(0,255,0,1.0)"]],
 
             "outline": "rgba(0,0,0,1)", "tick": "rgba(0,0,0,0.5)"
         },
