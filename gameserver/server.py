@@ -22642,6 +22642,11 @@ class GAMEAPI(resource.Resource):
                     power_factor = compute_power_factor(base.get_power_state())
                     object.update_production(object.owner, base.base_type, base.base_region, power_factor)
                     object.update_all(undamaged_time, power_factor = power_factor)
+                elif object.get_leveled_quantity(object.spec.proportionate_power_threshold) > 0 or object.get_leveled_quantity(object.spec.half_power_threshold) > 0:
+                    # handles pings from power generators that use proportionate_power_threshold or half_power_threshold
+                    percent_unrepaired = float(object.repair_finish_time - server_time) / (object.get_leveled_quantity(object.spec.repair_time) / object.get_stat('repair_speed', 1))
+                    object.hp = object.max_hp * (1 - percent_unrepaired)
+                    session.power_changed(base, object, retmsg)
 
             if object.is_building() and object.is_under_construction() and (object.owner is session.player):
                 prog = object.build_done_time

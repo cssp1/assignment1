@@ -5524,7 +5524,10 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
         }
     }
 };
-Building.prototype.provides_power = function() { return this.spec['provides_power']; };
+Building.prototype.provides_power = function() { return !!this.spec['provides_power']; };
+Building.prototype.provides_proportionate_power_threshold = function() { return !!this.spec['proportionate_power_threshold']; };
+Building.prototype.provides_half_power_threshold = function() { return !!this.spec['half_power_threshold']; };
+Building.prototype.provides_power = function() { return !!this.spec['provides_power']; };
 Building.prototype.is_townhall = function() { return this.spec['name'] === gamedata['townhall']; };
 Building.prototype.is_turret = function() { return this.spec['history_category'] === 'turrets'; };
 Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
@@ -8844,6 +8847,7 @@ function combat_time_scale() {
 
 var last_combat_save = 0;
 var last_high_priority_save = 0;
+var last_power_repair_ping = 0;
 var last_server_ping = 0;
 var last_proxy_keepalive = 0;
 
@@ -54862,6 +54866,12 @@ function draw_building_or_inert(world, obj, powerfac) {
                 send_to_server.func(["PING_OBJECT", obj.id, "repair_check", obj.spec['ui_name']]);
                 obj.ping_sent = true;
             }
+        }
+        if(obj.provides_power() && (obj.provides_proportionate_power_threshold() || obj.provides_half_power_threshold()) && (client_time - last_power_repair_ping > Math.max((gamedata['client']['combat_state_save_interval'] / 4), 1))) {
+            // if generator is using the power level that update with HP level, pings at a rate of 1/4 the combat save interval
+            // should be fast enough to update base power while repairing but slow enough to prevent overwhelming traffic
+            last_power_repair_ping = client_time;
+            send_to_server.func(["PING_OBJECT", obj.id, "repair_check", obj.spec['ui_name']]);
         }
         status_text.push(gamedata['strings']['cursors']['repairing']+': '+pretty_print_time(obj.repair_finish_time - server_time));
     }
