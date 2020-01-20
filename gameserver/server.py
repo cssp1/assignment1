@@ -6785,6 +6785,8 @@ class GameObjectSpec(Spec):
         ["exclusion_zone", [0,0]],
         ["ignore_perimeter", 0],
         ["provides_power", 0],
+        ["proportionate_power_threshold", 0],
+        ["half_power_threshold", 0],
         ["consumes_power", 0],
         ["consumes_power_while_building", 0],
         ["provides_space", 0],
@@ -8545,11 +8547,14 @@ class Base(object):
                     if (not obj.is_upgrading()) and (not obj.is_enhancing()) and (not obj.is_removing()):
                         provides_power = obj.get_leveled_quantity(obj.spec.provides_power)
                         if obj.is_damaged():
-                            hp_proportion = obj.hp / obj.max_hp
-                            proportionate_power_threshold = obj.get_leveled_quantity(obj.spec.get('proportionate_power_threshold', 1.0))
-                            half_power_threshold = obj.get_leveled_quantity(obj.spec.get('half_power_threshold', (proportionate_power_threshold - 0.0001)))
+                            cur_health = float(obj.hp)
+                            max_health = float(obj.max_hp)
+                            hp_proportion = float(cur_health / max_health)
+                            proportionate_power_threshold = obj.get_leveled_quantity(obj.spec.proportionate_power_threshold)
+                            if proportionate_power_threshold == 0: proportionate_power_threshold = 1.0
+                            half_power_threshold = obj.get_leveled_quantity(obj.spec.half_power_threshold)
+                            if half_power_threshold == 0: half_power_threshold = proportionate_power_threshold - 0.0001
                             assert proportionate_power_threshold > half_power_threshold # verify.py should ensure this
-                            assert half_power_threshold > no_power_threshold # verify.py should ensure this
                             if hp_proportion >= proportionate_power_threshold:
                                 provides_power = provides_power * hp_proportion
                             elif hp_proportion >= half_power_threshold:

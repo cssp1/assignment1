@@ -44995,6 +44995,8 @@ function update_upgrade_dialog(dialog) {
             if(('vault_'+resname) in unit.spec) { feature_list.push('vault_'+resname); }
         });
         if('provides_power' in unit.spec) { feature_list.push('provides_power'); }
+        if('proportionate_power_threshold' in unit.spec) { feature_list.push('proportionate_power_threshold'); }
+        if('half_power_threshold' in unit.spec) { feature_list.push('half_power_threshold'); }
         if('provides_foremen' in unit.spec) { feature_list.push('provides_foremen'); }
 
         // detect enhanceable stats
