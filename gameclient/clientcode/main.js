@@ -10121,11 +10121,10 @@ var fb_iframe_scroll = null;
 var fb_iframe_offset = null;
 
 /** @return {boolean}
- Check if the Facebook SDK XDM iframe is present. If not, calls to FB.Canvas.*() methods will fail
- with the error "Cannot read property 'postMessage' of null". */
+ Check if the Facebook client SDK, specifically FB.Canvas, seems to be available.
+ If not, calls to FB.Canvas.*() methods will fail with the error "Cannot read property 'postMessage' of null". */
 function fb_canvas_methods_available() {
-    return (typeof FB != 'undefined') &&
-        (document.getElementsByName('fb_xdm_frame_'+location.protocol.replace(':','')).length > 0);
+    return (typeof FB != 'undefined') && (typeof FB.Canvas != 'undefined');
 }
 
 // query Facebook for the iframe viewport dimensions
