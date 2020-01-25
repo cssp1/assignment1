@@ -22646,7 +22646,7 @@ class GAMEAPI(resource.Resource):
                     # handles pings from power generators that use proportionate_power_threshold or half_power_threshold
                     percent_unrepaired = float(object.repair_finish_time - server_time) / (object.get_leveled_quantity(object.spec.repair_time) / object.get_stat('repair_speed', 1))
                     object.hp = object.max_hp * (1 - percent_unrepaired)
-                    session.power_changed(base, object, retmsg)
+                    session.deferred_power_change = True
 
             if object.is_building() and object.is_under_construction() and (object.owner is session.player):
                 prog = object.build_done_time

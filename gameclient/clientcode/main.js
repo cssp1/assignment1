@@ -1476,6 +1476,7 @@ function GameObject() {
     this.x = -1;
     this.y = -1;
     this.hp = 0;
+    this.last_ping_hp = 0;
     this.max_hp = 0;
     /** @type {TeamId} */
     this.team = 'invalid';
@@ -1587,6 +1588,7 @@ GameObject.prototype.serialize = function() {
 
     if(this.max_hp !== 0) {
         ret['hp'] = this.hp;
+        ret['last_ping_hp'] = this.last_ping_hp;
         ret['max_hp'] = this.max_hp;
     }
     if(this.level != 1) {
@@ -1647,6 +1649,7 @@ GameObject.prototype.apply_snapshot = function(snap) {
     if('x' in snap) { this.x = snap['x']; }
     if('y' in snap) { this.y = snap['y']; }
     if('hp' in snap) { this.hp = snap['hp']; }
+    if('last_ping_hp' in snap) { this.last_ping_hp = snap['last_ping_hp']; }
     if('max_hp' in snap) { this.max_hp = snap['max_hp']; }
 
     // XXX serialize creates a fake owner that is -1 for enemy, otherwise player
@@ -54862,14 +54865,16 @@ function draw_building_or_inert(world, obj, powerfac) {
             progress = 1;
             // ping server to see if it's been repaired
             if(/*obj.team === 'player' && */!obj.ping_sent) {
+                obj.last_ping_hp = obj.hp;
                 send_to_server.func(["PING_OBJECT", obj.id, "repair_check", obj.spec['ui_name']]);
                 obj.ping_sent = true;
             }
         }
-        if(obj.provides_power() && (obj.provides_proportionate_power_threshold() || obj.provides_half_power_threshold()) && (client_time - last_power_repair_ping > Math.max((gamedata['client']['combat_state_save_interval'] / 4), 1))) {
-            // if generator is using the power level that update with HP level, pings at a rate of 1/4 the combat save interval
-            // should be fast enough to update base power while repairing but slow enough to prevent overwhelming traffic
-            last_power_repair_ping = client_time;
+
+        if(obj.provides_power() && (obj.provides_proportionate_power_threshold() || obj.provides_half_power_threshold()) && (obj.hp >= (obj.last_ping_hp + (obj.max_hp / 20)))) {
+            // if generator is using the power level that update with HP level, pings every time the current HP is at least 5% of max_hp higher than the last ping
+            // this will max out the number of pings at 20x per generator per player, infrequent enough to prevent overwhelming traffic
+            obj.last_ping_hp = obj.hp;
             send_to_server.func(["PING_OBJECT", obj.id, "repair_check", obj.spec['ui_name']]);
         }
         status_text.push(gamedata['strings']['cursors']['repairing']+': '+pretty_print_time(obj.repair_finish_time - server_time));
