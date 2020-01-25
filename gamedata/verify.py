@@ -251,9 +251,6 @@ def check_mandatory_fields(specname, spec, kind):
     if 'half_power_threshold' in spec and 'provides_power' not in spec:
         error |= 1; print '%s has half_power_threshold but not provides_power' % (specname)
 
-    if 'no_power_threshold' in spec and 'provides_power' not in spec:
-        error |= 1; print '%s has no_power_threshold but not provides_power' % (specname)
-
     if 'provides_power' in spec:
         error |= check_power_settings(spec, specname)
 
