@@ -1454,6 +1454,7 @@ var obj_state_flags = {
     ORDERS: 4, // movement orders
     PATROL: 8, // patrol flag
     URGENT: 16, // mark that this object should be flushed immediately at the end of the tick, instead of waiting for the next time-interval-based save
+    HIGH_PRIORITY: 32, // high priority, 1/10 of the usual refresh time or 1 second, whichever is higher
     ALL: 255
 };
 
@@ -1475,6 +1476,7 @@ function GameObject() {
     this.x = -1;
     this.y = -1;
     this.hp = 0;
+    this.last_ping_hp = 0;
     this.max_hp = 0;
     /** @type {TeamId} */
     this.team = 'invalid';
@@ -5523,6 +5525,10 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
         }
     }
 };
+Building.prototype.provides_power = function() { return !!this.spec['provides_power']; };
+Building.prototype.provides_proportionate_power_threshold = function() { return !!this.spec['proportionate_power_threshold']; };
+Building.prototype.provides_half_power_threshold = function() { return !!this.spec['half_power_threshold']; };
+Building.prototype.needs_power_ping = function() { return (this.provides_power() && (this.provides_proportionate_power_threshold() || this.provides_half_power_threshold())) }
 Building.prototype.is_townhall = function() { return this.spec['name'] === gamedata['townhall']; };
 Building.prototype.is_turret = function() { return this.spec['history_category'] === 'turrets'; };
 Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
@@ -8841,6 +8847,8 @@ function combat_time_scale() {
 };
 
 var last_combat_save = 0;
+var last_high_priority_save = 0;
+var last_power_repair_ping = 0;
 var last_server_ping = 0;
 var last_proxy_keepalive = 0;
 
@@ -44991,6 +44999,8 @@ function update_upgrade_dialog(dialog) {
             if(('vault_'+resname) in unit.spec) { feature_list.push('vault_'+resname); }
         });
         if('provides_power' in unit.spec) { feature_list.push('provides_power'); }
+        if('proportionate_power_threshold' in unit.spec) { feature_list.push('proportionate_power_threshold'); }
+        if('half_power_threshold' in unit.spec) { feature_list.push('half_power_threshold'); }
         if('provides_foremen' in unit.spec) { feature_list.push('provides_foremen'); }
 
         // detect enhanceable stats
@@ -51449,9 +51459,16 @@ function invoke_login_error_message(error_name) {
 function flush_dirty_objects(options) {
     var args = [];
 
+    // calculate HIGH_PRIORITY message time
+    var flush_high_priority = false;
+    if(client_time - last_high_priority_save > Math.max((gamedata['client']['combat_state_save_interval'] / 10), 1)) {
+        last_high_priority_save = client_time;
+        flush_high_priority = true;
+    }
+
     session.for_each_real_object(function(obj) {
         if(obj.state_dirty != 0) {
-            if(options.urgent_only && !(obj.state_dirty & obj_state_flags.URGENT)) { return; }
+            if(options.urgent_only && !((obj.state_dirty & obj_state_flags.URGENT) || ((obj.state_dirty & obj_state_flags.HIGH_PRIORITY) && flush_high_priority))) { return; }
             if(options.buildings_only && !obj.is_building()) { return; }
             var xy, orders = null;
             if(obj.is_mobile()) {
@@ -54849,6 +54866,13 @@ function draw_building_or_inert(world, obj, powerfac) {
                 send_to_server.func(["PING_OBJECT", obj.id, "repair_check", obj.spec['ui_name']]);
                 obj.ping_sent = true;
             }
+        }
+
+        if(obj.needs_power_ping() && (obj.last_ui_hp >= (obj.last_ping_hp + (obj.max_hp / 20)))) {
+            // if generator is using the power level that update with HP level, pings every time the current HP is at least 5% of max_hp higher than the last ping
+            // this will max out the number of pings at 20x per generator per player, infrequent enough to prevent overwhelming traffic
+            obj.last_ping_hp = obj.last_ui_hp;
+            send_to_server.func(["PING_OBJECT", obj.id, "power_repair_check", obj.spec['ui_name']]);
         }
         status_text.push(gamedata['strings']['cursors']['repairing']+': '+pretty_print_time(obj.repair_finish_time - server_time));
     }

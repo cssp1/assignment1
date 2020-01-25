@@ -112,6 +112,48 @@ def check_inert(specname, spec):
         error |= 1; print specname, 'continuous_cast spell "%s" not found' % (spec['continuous_cast'])
     return error
 
+def check_power_settings(specname, spec):
+    error = 0
+    if 'proportionate_power_threshold' in spec:
+        if isinstance(spec['proportionate_power_threshold'], list):
+            for threshold in spec['proportionate_power_threshold']:
+                if not isinstance(threshold, float):
+                    error |= 1; print '%s proportionate_power_threshold list entries should all be float values' % (specname)
+            if 'half_power_threshold' in spec and not isinstance(spec['half_power_threshold'], list):
+                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)
+            elif 'half_power_threshold' in spec and isinstance(spec['half_power_threshold'], list):
+                for i, threshold in enumerate(spec['proportionate_power_threshold']):
+                    if spec['half_power_threshold'][i] >= spec['proportionate_power_threshold'][i]:
+                        error |= 1; print '%s proportionate_power_threshold entries should be greater than half_power_threshold entries' % (specname)
+        else:
+            if not isinstance(spec['proportionate_power_threshold'], float):
+                error |= 1; print '%s proportionate_power_threshold should be a float value or a list' % (specname)
+            if 'half_power_threshold' in spec and not isinstance(spec['half_power_threshold'], float):
+                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)
+            elif 'half_power_threshold' in spec and isinstance(spec['half_power_threshold'], float):
+                if spec['half_power_threshold'] >= spec['proportionate_power_threshold']:
+                    error |= 1; print '%s proportionate_power_threshold should be greater than half_power_threshold' % (specname)
+    if 'half_power_threshold' in spec:
+        if isinstance(spec['half_power_threshold'], list):
+            for threshold in spec['half_power_threshold']:
+                if not isinstance(threshold, float):
+                    error |= 1; print '%s half_power_threshold list entries should all be float values' % (specname)
+            if 'proportionate_power_threshold' in spec and not isinstance(spec['proportionate_power_threshold'], list):
+                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)
+            elif 'proportionate_power_threshold' in spec and isinstance(spec['proportionate_power_threshold'], list):
+                for i, threshold in enumerate(spec['half_power_threshold']):
+                    if spec['half_power_threshold'][i] >= spec['proportionate_power_threshold'][i]:
+                        error |= 1; print '%s proportionate_power_threshold entries should be greater than half_power_threshold entries' % (specname)
+        else:
+            if not isinstance(spec['half_power_threshold'], float):
+                error |= 1; print '%s half_power_threshold should be a float value or a list' % (specname)
+            if 'proportionate_power_threshold' in spec and not isinstance(spec['proportionate_power_threshold'], float):
+                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)
+            elif 'proportionate_power_threshold' in spec and isinstance(spec['proportionate_power_threshold'], float):
+                if spec['half_power_threshold'] >= spec['proportionate_power_threshold']:
+                    error |= 1; print '%s proportionate_power_threshold should be greater than half_power_threshold' % (specname)
+    return error
+
 def check_mandatory_fields(specname, spec, kind):
     fields = ['name', 'kind', 'gridsize', 'defense_types', 'art_asset']
     if kind == 'buildings':
@@ -202,6 +244,15 @@ def check_mandatory_fields(specname, spec, kind):
             stat_key = 'provides_limited_equipped:'+provides_name
             if stat_key not in gamedata['strings']['modstats']['stats']:
                 error |= 1; print 'gamedata.strings.modstats.stats is missing "%s"' % stat_key
+
+    if 'proportionate_power_threshold' in spec and 'provides_power' not in spec:
+        error |= 1; print '%s has proportionate_power_threshold but not provides_power' % (specname)
+
+    if 'half_power_threshold' in spec and 'provides_power' not in spec:
+        error |= 1; print '%s has half_power_threshold but not provides_power' % (specname)
+
+    if 'provides_power' in spec:
+        error |= check_power_settings(spec, specname)
 
     for lev in xrange(1,max_level+1):
         cc_requirement = GameDataUtil.get_cc_requirement(gamedata, spec['requires'], lev) if ('requires' in spec) else 0

@@ -6785,6 +6785,8 @@ class GameObjectSpec(Spec):
         ["exclusion_zone", [0,0]],
         ["ignore_perimeter", 0],
         ["provides_power", 0],
+        ["proportionate_power_threshold", 0],
+        ["half_power_threshold", 0],
         ["consumes_power", 0],
         ["consumes_power_while_building", 0],
         ["provides_space", 0],
@@ -8542,8 +8544,24 @@ class Base(object):
             for obj in self.iter_objects():
                 if obj.is_building() and (not obj.is_under_construction()):
                     # power production
-                    if (not obj.is_damaged()) and (not obj.is_upgrading()) and (not obj.is_enhancing()) and (not obj.is_removing()):
-                        power[0] += obj.get_leveled_quantity(obj.spec.provides_power)
+                    if (not obj.is_upgrading()) and (not obj.is_enhancing()) and (not obj.is_removing()):
+                        provides_power = obj.get_leveled_quantity(obj.spec.provides_power)
+                        if obj.is_damaged():
+                            cur_health = float(obj.hp)
+                            max_health = float(obj.max_hp)
+                            hp_proportion = float(cur_health / max_health)
+                            proportionate_power_threshold = obj.get_leveled_quantity(obj.spec.proportionate_power_threshold)
+                            if proportionate_power_threshold == 0: proportionate_power_threshold = 1.0
+                            half_power_threshold = obj.get_leveled_quantity(obj.spec.half_power_threshold)
+                            if half_power_threshold == 0: half_power_threshold = proportionate_power_threshold - 0.0001
+                            assert proportionate_power_threshold > half_power_threshold # verify.py should ensure this
+                            if hp_proportion >= proportionate_power_threshold:
+                                provides_power = provides_power * hp_proportion
+                            elif hp_proportion >= half_power_threshold:
+                                provides_power = provides_power * 0.5
+                            else:
+                                provides_power = 0
+                        power[0] += provides_power
                     # power consumption
                     if obj.is_upgrading():
                         power[1] += GameObjectSpec.get_leveled_quantity(obj.spec.consumes_power_while_building, obj.level + 1)
@@ -22624,6 +22642,10 @@ class GAMEAPI(resource.Resource):
                     power_factor = compute_power_factor(base.get_power_state())
                     object.update_production(object.owner, base.base_type, base.base_region, power_factor)
                     object.update_all(undamaged_time, power_factor = power_factor)
+                elif object.get_leveled_quantity(object.spec.proportionate_power_threshold) > 0 or object.get_leveled_quantity(object.spec.half_power_threshold) > 0:
+                    # handles pings from power generators that use proportionate_power_threshold or half_power_threshold
+                    object.update_repair_hp_only()
+                    session.deferred_power_change = True
 
             if object.is_building() and object.is_under_construction() and (object.owner is session.player):
                 prog = object.build_done_time
