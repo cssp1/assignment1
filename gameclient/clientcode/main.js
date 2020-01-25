@@ -29644,19 +29644,17 @@ function query_achievements(user_id, cb) {
 function compare_achievements(_achdata) {
     return function(a,b) {
         var order = 1;
-        var ap = (('ui_priority' in a) ? -a['ui_priority'] : (('fb_open_graph' in a) && ('display_order' in a['fb_open_graph']) ? -a['fb_open_graph']['display_order'] : 0));
-        var bp = (('ui_priority' in b) ? -b['ui_priority'] : (('fb_open_graph' in b) && ('display_order' in b['fb_open_graph']) ? -b['fb_open_graph']['display_order'] : 0));
+        var ap = (('ui_priority' in a) ? a['ui_priority'] : (('fb_open_graph' in a) && ('display_order' in a['fb_open_graph']) ? a['fb_open_graph']['display_order'] : 0));
+        var bp = (('ui_priority' in b) ? b['ui_priority'] : (('fb_open_graph' in b) && ('display_order' in b['fb_open_graph']) ? b['fb_open_graph']['display_order'] : 0));
 
         if((a['name'] in _achdata) && !(b['name'] in _achdata)) {
             return -order;
         } else if(!(a['name'] in _achdata) && (b['name'] in _achdata)) {
             return order;
         } else if(ap > bp) {
-            // if both achievements are complete, rank the "awesomer" one first
-            return ((a['name'] in _achdata) && (b['name'] in _achdata) ? order : -order);
+            return -order;
         } else if(ap < bp) {
-            // if both achievements are complete, rank the "awesomer" one first
-            return ((a['name'] in _achdata) && (b['name'] in _achdata) ? -order : order);
+            return order;
         } else {
             return 0;
         }
