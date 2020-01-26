@@ -1144,28 +1144,31 @@ SPUI.Dialog.prototype.on_mousemove = function(uv, offset) {
 };
 
 SPUI.Dialog.prototype.on_mousewheel = function(uv, offset, delta) {
-    var reverse_mousewheel_scroll = !!player.preferences['reverse_mousewheel_scroll'];
-    if(reverse_mousewheel_scroll) { delta = delta * -1; }
     var ret = false;
     var my_offset = [offset[0]+this.xy[0],offset[1]+this.xy[1]];
     var clip_test = (uv[0] >= this.xy[0]+offset[0] && uv[0] < this.xy[0]+offset[0]+this.wh[0] && uv[1] >= this.xy[1]+offset[1] && uv[1] < this.xy[1]+offset[1]+this.wh[1]);
     if(delta != 0) {
+        // first check if children can scroll
         if(!this.clip_children || clip_test) {
             for(var i = this.children.length-1; i >= 0; i--) {
                 if(this.children[i].on_mousewheel && this.children[i].on_mousewheel(uv, my_offset, delta)) {
-                    ret = this.children[i].on_mousewheel(uv, my_offset, delta);
+                    ret = true;
+                    break;
                 }
             }
         }
-        if(this.widgets) {
+        // if no children could scroll, check widgets
+        if(!ret && this.widgets) {
             for(var wname in this.data['widgets']) {
                 var widget = this.widgets[wname];
                 if(widget && widget.on_mousewheel && widget.on_mousewheel(uv, my_offset, delta)) {
-                    ret = widget.on_mousewheel(uv, my_offset, delta);
+                    ret = true;
+                    break;
                 }
             }
         }
-        if(this.on_mousewheel_function && this.mouse_over_visible_elements(uv)) {
+        // if no children or widgets could scroll, check dialog itself
+        if(!ret && this.on_mousewheel_function && this.mouse_over_visible_elements(uv)) {
             this.on_mousewheel_function(this, delta);
             ret = true;
         }
@@ -1184,15 +1187,15 @@ SPUI.Dialog.prototype.mouse_over_visible_elements = function(uv) {
         if(!widget) { continue; }
         if(!widget.show) { continue; }
         var widget_xy = widget.get_absolute_xy();
-        min_x.push(widget_xy[0])
-        min_y.push(widget_xy[1])
-        max_x.push(widget_xy[0] + widget.wh[0])
-        max_y.push(widget_xy[1] + widget.wh[1])
+        min_x.push(widget_xy[0]);
+        min_y.push(widget_xy[1]);
+        max_x.push(widget_xy[0] + widget.wh[0]);
+        max_y.push(widget_xy[1] + widget.wh[1]);
     }
-    min_x.sort(function(a, b){return a-b})
-    min_y.sort(function(a, b){return a-b})
-    max_x.sort(function(a, b){return b-a})
-    max_y.sort(function(a, b){return b-a})
+    min_x.sort(function(a, b){return a-b});
+    min_y.sort(function(a, b){return a-b});
+    max_x.sort(function(a, b){return b-a});
+    max_y.sort(function(a, b){return b-a});
     return(uv[0] >= min_x[0] && uv[0] <= max_x[0] && uv[1] >= min_y[0] && uv[1] <= max_y[0]);
 }
 
