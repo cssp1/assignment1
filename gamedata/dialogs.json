@@ -6647,7 +6647,7 @@
                           "mouseover_sound": 1, "array": [1,11], "array_offset": [0,28] },
 
             "scroll_left": { "kind": "ActionButton", "xy": [202,104], "dimensions": [27,26], "bg_image": "small_scroll_up", "push_bg_image": 1 },
-            "scroll_right": { "kind": "ActionButton", "xy": [202,127], "dimensions": [27,26], "bg_image": "small_scroll_down", "push_bg_image": 1 },
+            "scroll_right": { "kind": "ActionButton", "xy": [202,430], "dimensions": [27,26], "bg_image": "small_scroll_down", "push_bg_image": 1 },
             "scroll_text": { "kind": "TextField", "xy": [25,430], "dimensions": [176,19], "text_size": 13, "text_hjustify": "center", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1]}
         }
     },
@@ -6656,8 +6656,8 @@
         "widgets": {
             "ach": { "kind": "Dialog", "xy": [248,134], "dimensions": [438,74], "dialog": "achievement_widget",
                      "array": [1,4], "array_offset": [0,78] },
-            "scroll_left": { "kind": "ActionButton", "xy": [217,234], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left", "state": "disabled", "push_bg_image": 1 },
-            "scroll_right": { "kind": "ActionButton", "xy": [694,234], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right", "state": "disabled", "push_bg_image": 1 },
+            "scroll_up": { "kind": "ActionButton", "xy": [690,100], "dimensions": [27,26], "bg_image": "small_scroll_up", "state": "disabled", "push_bg_image": 1 },
+            "scroll_down": { "kind": "ActionButton", "xy": [690,410], "dimensions": [27,26], "bg_image": "small_scroll_down", "state": "disabled", "push_bg_image": 1 },
             "scroll_text": { "kind": "TextField", "xy": [249,443], "dimensions": [436,19], "text_size": 13, "text_hjustify": "right", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1]}
         }
     },
