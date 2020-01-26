@@ -269,8 +269,20 @@ class TakeItemsConsequent(Consequent):
         Consequent.__init__(self, data)
         self.item_name = data['item_name']
         self.stack = data.get('stack',1)
+        self.affect_equipment = data.get('affect_equipment',False)
     def execute(self, session, player, retmsg, context=None):
         to_take = self.stack
+        if self.affect_equipment:
+            for obj in player.home_base_iter():
+                if not self.equipment: continue
+                to_destroy = []
+                for addr, item in Equipment.equip_enumerate(self.equipment):
+                    if item['spec'] in gamedata['items']:
+                        spec = gamedata['items'][item['spec']]
+                        if spec['name'] == data['item_name']:
+                            to_destroy.append((addr, item))
+                for addr, item in to_destroy:
+                    Equipment.equip_remove(obj.equipment, addr, item['spec'])
 
         to_take_from_inventory = min(to_take, session.player.inventory_item_quantity(self.item_name))
         if to_take_from_inventory > 0:
