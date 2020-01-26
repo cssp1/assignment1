@@ -1122,15 +1122,19 @@ PlayerInfoDialog.invoke_achievements_tab = function(parent, preselect_category, 
     dialog.user_data['user_id'] = user_id;
 
     dialog.widgets['cat_list'].user_data['page'] = -1;
+    dialog.widgets['cat_list'].user_data['scroll_by_row'] = true;
     dialog.widgets['cat_list'].user_data['rows_per_page'] = dialog.widgets['cat_list'].data['widgets']['category']['array'][1];
     dialog.widgets['cat_list'].user_data['rowfunc'] = PlayerInfoDialog.achievement_category_rowfunc;
     dialog.widgets['cat_list'].user_data['rowdata'] = [];
+    dialog.widgets['cat_list'].on_mousewheel_function = scrollable_dialog_mousewheel;
 
     dialog.widgets['ach_list'].user_data['page'] = -1;
+    dialog.widgets['ach_list'].user_data['scroll_by_row'] = true;
     dialog.widgets['ach_list'].user_data['rows_per_page'] = dialog.widgets['ach_list'].data['widgets']['ach']['array'][1];
     dialog.widgets['ach_list'].user_data['rowfunc'] = PlayerInfoDialog.achievement_rowfunc;
     dialog.widgets['ach_list'].user_data['rowdata'] = [];
     dialog.user_data['player_achievements'] = null;
+    dialog.widgets['ach_list'].on_mousewheel_function = scrollable_dialog_mousewheel;
 
     dialog.widgets['lag_note'].show = (user_id != session.user_id);
 
