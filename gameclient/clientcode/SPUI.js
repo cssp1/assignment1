@@ -1144,6 +1144,8 @@ SPUI.Dialog.prototype.on_mousemove = function(uv, offset) {
 };
 
 SPUI.Dialog.prototype.on_mousewheel = function(uv, offset, delta) {
+    var reverse_mousewheel_scroll = !!player.preferences['reverse_mousewheel_scroll'];
+    if(reverse_mousewheel_scroll) { delta = delta * -1; }
     var ret = false;
     var my_offset = [offset[0]+this.xy[0],offset[1]+this.xy[1]];
     var clip_test = (uv[0] >= this.xy[0]+offset[0] && uv[0] < this.xy[0]+offset[0]+this.wh[0] && uv[1] >= this.xy[1]+offset[1] && uv[1] < this.xy[1]+offset[1]+this.wh[1]);
