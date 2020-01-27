@@ -1152,28 +1152,24 @@ SPUI.Dialog.prototype.on_mousewheel = function(uv, offset, delta) {
         if(!this.clip_children || clip_test) {
             for(var i = this.children.length-1; i >= 0; i--) {
                 if(this.children[i].on_mousewheel && this.children[i].on_mousewheel(uv, my_offset, delta)) {
-                    ret = true;
-                    break;
+                    return true;
                 }
             }
         }
         // if no children could scroll, check widgets
-        if(!ret && this.widgets) {
-            for(var wname in this.data['widgets']) {
-                var widget = this.widgets[wname];
-                if(widget && widget.on_mousewheel && widget.on_mousewheel(uv, my_offset, delta)) {
-                    ret = true;
-                    break;
-                }
+        for(var wname in this.data['widgets']) {
+            var widget = this.widgets[wname];
+            if(widget.on_mousewheel && widget.on_mousewheel(uv, my_offset, delta)) {
+                return true;
             }
         }
         // if no children or widgets could scroll, check dialog itself
         if(!ret && this.on_mousewheel_function && this.mouse_over_visible_elements(uv)) {
             this.on_mousewheel_function(this, delta);
-            ret = true;
+            return true;
         }
     }
-    return ret;
+    return false;
 }
 
 SPUI.Dialog.prototype.mouse_over_visible_elements = function(uv) {

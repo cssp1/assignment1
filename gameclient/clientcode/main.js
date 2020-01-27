@@ -52461,9 +52461,9 @@ function do_on_mousewheel(e) {
     }
     // check if player has reverse mousewheel scrolling checked
     var reverse_mousewheel_scroll = !!player.preferences['reverse_mousewheel_scroll'];
-    if(reverse_mousewheel_scroll) { delta = delta * -1; }
+    var ui_delta = (reverse_mousewheel_scroll ? delta * -1 : delta)
 
-    if(SPUI.root.on_mousewheel(xy, [0,0], delta)) {
+    if(SPUI.root.on_mousewheel(xy, [0,0], ui_delta)) {
         if(e.preventDefault) { e.preventDefault(); }
         return;
     }
@@ -52476,8 +52476,6 @@ function do_on_mousewheel(e) {
 
     // apply desktop zoom
     if(!selection.ui && !chat_scrolling) {
-        // check if player has reverse mousewheel scrolling checked
-        if(reverse_mousewheel_scroll) { delta = delta * -1; } // reverse any reversed delta for desktop zoom.
         var reverse_mousewheel_zoom = !!player.preferences['reverse_mousewheel_zoom'];
         if(reverse_mousewheel_zoom) { delta = delta * -1; }
         var new_zoom = view_zoom_linear + delta * gamedata['client']['view_zoom_mousewheel_increment']
@@ -52486,8 +52484,8 @@ function do_on_mousewheel(e) {
         return;
     } else if (chat_scrolling) {
         var invert_chat_window = !!player.preferences['invert_chat_window'];
-        if(invert_chat_window) { delta = delta * -1; }
-        scroll_chat_frame(global_chat_frame, delta);
+        if(invert_chat_window) { ui_delta = ui_delta * -1; }
+        scroll_chat_frame(global_chat_frame, ui_delta);
         if(e.preventDefault) { e.preventDefault(); }
         return;
     }
