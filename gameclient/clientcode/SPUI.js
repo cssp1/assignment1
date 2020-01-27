@@ -1144,7 +1144,6 @@ SPUI.Dialog.prototype.on_mousemove = function(uv, offset) {
 };
 
 SPUI.Dialog.prototype.on_mousewheel = function(uv, offset, delta) {
-    var ret = false;
     var clip_test = (uv[0] >= this.xy[0]+offset[0] && uv[0] < this.xy[0]+offset[0]+this.wh[0] && uv[1] >= this.xy[1]+offset[1] && uv[1] < this.xy[1]+offset[1]+this.wh[1]);
     if(delta != 0) {
         // first check if children can scroll
