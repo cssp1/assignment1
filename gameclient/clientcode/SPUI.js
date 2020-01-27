@@ -1155,7 +1155,7 @@ SPUI.Dialog.prototype.on_mousewheel = function(uv, offset, delta) {
             }
         }
         // if no children could scroll, check widgets
-        for(var wname in this.data['widgets']) {
+        for(var wname in this.widgets) {
             var widget = this.widgets[wname];
             if(widget.on_mousewheel && widget.on_mousewheel(uv, offset, delta)) {
                 return true;
