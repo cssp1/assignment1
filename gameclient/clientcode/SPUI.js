@@ -1145,13 +1145,12 @@ SPUI.Dialog.prototype.on_mousemove = function(uv, offset) {
 
 SPUI.Dialog.prototype.on_mousewheel = function(uv, offset, delta) {
     var ret = false;
-    var my_offset = [offset[0]+this.xy[0],offset[1]+this.xy[1]];
     var clip_test = (uv[0] >= this.xy[0]+offset[0] && uv[0] < this.xy[0]+offset[0]+this.wh[0] && uv[1] >= this.xy[1]+offset[1] && uv[1] < this.xy[1]+offset[1]+this.wh[1]);
     if(delta != 0) {
         // first check if children can scroll
         if(!this.clip_children || clip_test) {
             for(var i = this.children.length-1; i >= 0; i--) {
-                if(this.children[i].on_mousewheel && this.children[i].on_mousewheel(uv, my_offset, delta)) {
+                if(this.children[i].on_mousewheel && this.children[i].on_mousewheel(uv, offset, delta)) {
                     return true;
                 }
             }
@@ -1159,7 +1158,7 @@ SPUI.Dialog.prototype.on_mousewheel = function(uv, offset, delta) {
         // if no children could scroll, check widgets
         for(var wname in this.data['widgets']) {
             var widget = this.widgets[wname];
-            if(widget.on_mousewheel && widget.on_mousewheel(uv, my_offset, delta)) {
+            if(widget.on_mousewheel && widget.on_mousewheel(uv, offset, delta)) {
                 return true;
             }
         }
