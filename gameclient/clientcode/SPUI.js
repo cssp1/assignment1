@@ -1162,7 +1162,7 @@ SPUI.Dialog.prototype.on_mousewheel = function(uv, offset, delta) {
             }
         }
         // if no children or widgets could scroll, check dialog itself
-        if(!ret && this.on_mousewheel_function && this.mouse_over_visible_elements(uv)) {
+        if(this.on_mousewheel_function && this.mouse_over_visible_elements(uv)) {
             this.on_mousewheel_function(this, delta);
             return true;
         }
