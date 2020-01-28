@@ -17076,6 +17076,8 @@ function update_chat_frame(dialog) {
 function scroll_chat_frame(dialog, delta) {
     // error catching to prevent attempting to scroll if not receiving a dialog or a delta
     if (!dialog || !delta) { return; }
+    var invert_chat_window = !!player.preferences['invert_chat_window'];
+    if(invert_chat_window) { delta = delta * -1; }
     var cur_tab = dialog.user_data['cur_tab'];
     // if no channel is selected, this will prevent any attempted scrolling
     if (cur_tab == null || cur_tab < 0) { return ;}
@@ -17101,6 +17103,7 @@ function init_chat_frame() {
     dialog.user_data['channel_to_tab'] = {};
     //dialog.ondraw = update_chat_frame; this is now called from the master do_draw() because it can change Z order of chat frame and desktop dialogs
     dialog.user_data['channel_names'] = [];
+    dialog.on_mousewheel_function = scroll_chat_frame;
     if(player.get_any_abtest_value('enable_region_map', gamedata['enable_region_map'])) {
         dialog.user_data['channel_names'].push('REGION');
     }
@@ -52524,21 +52527,12 @@ function do_on_mousewheel(e) {
         return;
     }
 
-    // check if chat window is open and the pointer is over the chat window
-    var chat_scrolling = (global_chat_frame && global_chat_frame.user_data['size'] === 'big' && xy[0] < gamedata['dialogs']['chat_frame2']['dimensions'][0]);
-
     // apply desktop zoom
-    if(!selection.ui && !chat_scrolling) {
+    if(!selection.ui) {
         var reverse_mousewheel_zoom = !!player.preferences['reverse_mousewheel_zoom'];
         if(reverse_mousewheel_zoom) { delta = delta * -1; }
         var new_zoom = view_zoom_linear + delta * gamedata['client']['view_zoom_mousewheel_increment']
         set_view_zoom(new_zoom);
-        if(e.preventDefault) { e.preventDefault(); }
-        return;
-    } else if (chat_scrolling) {
-        var invert_chat_window = !!player.preferences['invert_chat_window'];
-        if(invert_chat_window) { ui_delta = ui_delta * -1; }
-        scroll_chat_frame(global_chat_frame, ui_delta);
         if(e.preventDefault) { e.preventDefault(); }
         return;
     }
