@@ -24272,6 +24272,8 @@ function invoke_change_title_dialog(callback, spellname) {
     dialog.user_data['cols_per_page'] = dialog.data['widgets']['choice']['array'][0];
     dialog.user_data['rowfunc'] = change_title_rowfunc;
     dialog.user_data['rowdata'] = []; // title names
+    dialog.user_data['scroll_by_row'] = true;
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
     goog.object.forEach(gamedata['titles'], function(data, name) {
         if(!('show_if' in data) || read_predicate(data['show_if']).is_satisfied(player, null)) {
             dialog.user_data['rowdata'].push(name);
@@ -24406,6 +24408,7 @@ function change_region_dialog_pop_results(dialog, populations) {
     dialog.widgets['loading_spinner'].show = false;
     dialog.user_data['populations'] = populations;
     dialog.user_data['rowdata'] = [];
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
     var ignore_pred = (dialog.user_data['spellname'] == 'CHANGE_REGION_INSTANTLY_ANYWHERE');
 
     for(var id in gamedata['regions']) {
@@ -24666,6 +24669,8 @@ function invoke_map_bookmarks_dialog(mapwidget) {
     dialog.user_data['page'] = -1;
     dialog.user_data['rows_per_page'] = dialog.data['widgets']['name']['array'][1];
     dialog.user_data['rowdata'] = [];
+    dialog.user_data['scroll_by_row'] = true;
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
     dialog.user_data['rowfunc'] = map_bookmarks_dialog_setup_row;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
     install_child_dialog(dialog);
@@ -25968,6 +25973,7 @@ function init_inventory_grid(dialog) {
     dialog.user_data['rowfunc'] = function (dialog, data) { };
     dialog.user_data['roworder'] = 'left_right_top_bottom';
     dialog.user_data['rowdata'] = [];
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
     dialog.user_data['page'] = -1;
     scrollable_dialog_change_page(dialog, dialog.user_data['page']);
 }
@@ -26892,6 +26898,7 @@ function invoke_alliance_mate_gift_dialog(item_ui_name, callback) {
 
     // list of pcache data for alliancemates
     dialog.user_data['rowdata'] = [];
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
 
     install_child_dialog(dialog);
     dialog.auto_center();
@@ -26999,6 +27006,7 @@ function invoke_friend_gift_dialog(callback, pre_use_consequent) {
 
     // list of pcache data for friends
     dialog.user_data['rowdata'] = [];
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
     goog.array.forEach(player.friends, function(friend) {
         if(friend.is_real_friend) {
             dialog.user_data['rowdata'].push(PlayerCache.query_sync(friend.user_id));
@@ -27088,6 +27096,8 @@ function invoke_equip_chooser_dialog(inv_dialog, parent_widget, tech, unit, slot
     dialog.user_data['page'] = -1;
     dialog.user_data['rows_per_page'] = dialog.data['widgets']['equip_frame']['array'][0];
     dialog.user_data['rowdata'] = [];
+    dialog.user_data['scroll_by_row'] = true;
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
     var equip = null, host_spec = null;
     if(tech && ('associated_unit' in tech)) {
         // unit equipment
@@ -28429,6 +28439,25 @@ function update_abtest_dialog(dialog) {
     }
 };
 
+/** scrolls battle log by the amount and direction of delta
+    @param {SPUI.Dialog|null} dialog
+    @param {number} delta
+*/
+function scroll_battle_history(dialog, delta){
+    // error catching to prevent attempting to scroll if not receiving a dialog or a delta
+    if (!dialog || !delta) { return; }
+    var page = dialog.user_data['page'];
+    var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
+    var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
+    var chapter_pages = Math.floor((chapter_battles + rows_per_page - 1) / rows_per_page);
+    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages-1): (chapter_pages-2));
+    if (delta > 0 && page != 0) {
+        battle_history_change_page(dialog, page - 1);
+    } else if (delta < 0 && page < last_showable_page) {
+        battle_history_change_page(dialog, page + 1);
+    }
+}
+
 /** @param {number} from_id
     @param {number} user_id
     @param {number} from_alliance
@@ -28444,6 +28473,7 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.user_data['from_id'] = from_id;
     dialog.user_data['user_id'] = user_id;
     dialog.user_data['from_alliance'] = from_alliance;
+    dialog.on_mousewheel_function = scroll_battle_history;
 
     if(from_id < 0 && from_alliance < 0) {
         throw Error('at least one of from_id or from_alliance must be >=0');
@@ -29047,6 +29077,24 @@ function update_battle_history_dialog(dialog) {
     animate_dialog_zoom_effect(dialog, dialog.user_data['zoom_from_widget']);
 };
 
+/** scrolls battle log by the amount and direction of delta
+    @param {SPUI.Dialog|null} dialog
+    @param {number} delta
+*/
+function scroll_battle_log(dialog, delta){
+    // error catching to prevent attempting to scroll if not receiving a dialog or a delta
+    if (!dialog || !delta) { return; }
+    if(dialog.user_data['log']) {
+        if (delta > 0 && dialog.widgets['log'].can_scroll_up()) {
+            dialog.widgets['log'].scroll_up();
+            battle_log_change_page(dialog, dialog.user_data['page']-1);
+        } else if (delta < 0 && dialog.widgets['log'].can_scroll_down()) {
+            dialog.widgets['log'].scroll_down();
+            battle_log_change_page(dialog, dialog.user_data['page']+1);
+        }
+    }
+}
+
 /** @param {!Object} summary
     @param {number} friendly_id - the "good guy" in this battle - not necessarily the viewing player */
 function invoke_battle_log_dialog(summary, signature, friendly_id) {
@@ -29061,6 +29109,7 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
+    dialog.on_mousewheel_function = scroll_battle_log;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
     dialog.widgets['screenshot_button'].show = post_screenshot_enabled();
@@ -31178,6 +31227,8 @@ function invoke_alliance_logo_chooser(parent, preselect) {
     dialog.user_data['rows_per_page'] = dialog.data['widgets']['logo']['array'][0]*dialog.data['widgets']['logo']['array'][1];
     dialog.user_data['rowfunc'] = alliance_logo_chooser_rowfunc;
     dialog.user_data['rowdata'] = [];
+    dialog.user_data['scroll_by_row'] = true;
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
@@ -31238,6 +31289,7 @@ function invoke_choose_gift_order_dialog(parent, candidate_list) {
 
     // build list of friends/alliancemates
     dialog.user_data['rowdata'] = [];
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
     dialog.user_data['rowdata'] = dialog.user_data['rowdata'].concat(candidate_list);
 
     // sort alphabetically
@@ -31445,6 +31497,7 @@ function init_alliance_info_tab(dialog, alliance_id) {
     dialog.user_data['page'] = -1;
     dialog.user_data['rows_per_page'] = dialog.data['widgets']['members']['array'][1];
     dialog.user_data['rowfunc'] = alliance_info_member_rowfunc;
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
     dialog.user_data['open_time'] = client_time;
     dialog.user_data['needs_sort'] = false;
     dialog.user_data['alliance_points'] = -1;
@@ -31679,6 +31732,7 @@ function update_alliance_info_tab(dialog) {
     dialog.widgets['points_label'].show = dialog.widgets['points_icon'].show = dialog.widgets['points'].show = false;
 
     dialog.user_data['rowdata'] = []; // clear member list
+
     scrollable_dialog_change_page(dialog, 0);
 
     // force refresh on next query
@@ -35002,6 +35056,7 @@ function invoke_crafting_table_of_contents_dialog(category) {
     }; })(builder);
 
     dialog.user_data['rowdata'] = []; // for now, "crafting subcategories" are just the names of item sets
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
 
     dialog.widgets['coverup_all'].show =
         dialog.widgets['coverup_text'].show =
@@ -36450,6 +36505,7 @@ function invoke_fishing_dialog() {
     // {recipe: (pointer to recipe data), bus: (crafting queue entry, may be null),
     //  ui_priority: (display order), time: (collections only - time collected), state: (complete/inprogress/idle)}
     dialog.user_data['rowdata'] = [];
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
 
     dialog.user_data['collections'] = []; // list of jobs that were just collected and are displaying animation (see CRAFT_COMPLETE handler)
     dialog.user_data['ui_priority_overrides'] = {}; // mapping of bus['craft']['ui_tag'] -> ui_priority to keep rows in place across state transitions
@@ -52470,9 +52526,6 @@ function do_on_mousewheel(e) {
 
     // check if chat window is open and the pointer is over the chat window
     var chat_scrolling = (global_chat_frame && global_chat_frame.user_data['size'] === 'big' && xy[0] < gamedata['dialogs']['chat_frame2']['dimensions'][0]);
-
-    // check if a scrollable dialog is selected
-    var scrollable_dialog = (selection.ui && selection.ui.user_data && 'page' in selection.ui.user_data && 'rows_per_page' in selection.ui.user_data && 'rowdata' in selection.ui.user_data);
 
     // apply desktop zoom
     if(!selection.ui && !chat_scrolling) {
