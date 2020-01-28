@@ -916,6 +916,8 @@ SPUI.Dialog = function(data, instance_props) {
     // optional function that is called right before dialog draws itself
     // e.g. to update values in real time
     this.ondraw = null;
+    // optional function that is called when a mousewheel scroll is detected
+    this.on_mousewheel_function = null;
     this.afterdraw = null;
     this.on_destroy = null;
 
@@ -1141,6 +1143,56 @@ SPUI.Dialog.prototype.on_mousemove = function(uv, offset) {
     return ret;
 };
 
+SPUI.Dialog.prototype.on_mousewheel = function(uv, offset, delta) {
+    var clip_test = (uv[0] >= this.xy[0]+offset[0] && uv[0] < this.xy[0]+offset[0]+this.wh[0] && uv[1] >= this.xy[1]+offset[1] && uv[1] < this.xy[1]+offset[1]+this.wh[1]);
+    if(delta != 0) {
+        // first check if children can scroll
+        if(!this.clip_children || clip_test) {
+            for(var i = this.children.length-1; i >= 0; i--) {
+                if(this.children[i].on_mousewheel && this.children[i].on_mousewheel(uv, offset, delta)) {
+                    return true;
+                }
+            }
+        }
+        // if no children could scroll, check widgets
+        for(var wname in this.widgets) {
+            var widget = this.widgets[wname];
+            if(widget.on_mousewheel && widget.on_mousewheel(uv, offset, delta)) {
+                return true;
+            }
+        }
+        // if no children or widgets could scroll, check dialog itself
+        if(this.on_mousewheel_function && this.mouse_over_visible_elements(uv)) {
+            this.on_mousewheel_function(this, delta);
+            return true;
+        }
+    }
+    return false;
+}
+
+SPUI.Dialog.prototype.mouse_over_visible_elements = function(uv) {
+    if(!this.widgets) { return false; }
+    var min_x = [];
+    var max_x = [];
+    var min_y = [];
+    var max_y = [];
+    for(var wname in this.data['widgets']) {
+        var widget = this.widgets[wname];
+        if(!widget) { continue; }
+        if(!widget.show) { continue; }
+        var widget_xy = widget.get_absolute_xy();
+        min_x.push(widget_xy[0]);
+        min_y.push(widget_xy[1]);
+        max_x.push(widget_xy[0] + widget.wh[0]);
+        max_y.push(widget_xy[1] + widget.wh[1]);
+    }
+    min_x.sort(function(a, b){return a-b});
+    min_y.sort(function(a, b){return a-b});
+    max_x.sort(function(a, b){return b-a});
+    max_y.sort(function(a, b){return b-a});
+    return(uv[0] >= min_x[0] && uv[0] <= max_x[0] && uv[1] >= min_y[0] && uv[1] <= max_y[0]);
+}
+
 /** @param {string=} centering_mode */
 SPUI.Dialog.prototype.auto_center = function(centering_mode) {
     centering_mode = 'root'; // XXXXXX hack - might need to force this always (region_map_dialog being off-center etc.)
@@ -1262,6 +1314,8 @@ SPUI.DialogWidget = function(data) {
     /** @type {function(SPUI.DialogWidget)|null} optional function that is called right before dialog draws itself
         e.g. to update values in real time */
     this.ondraw = null;
+    /** @type {function(SPUI.DialogWidget)|null} optional function that is called when a mousewheel scroll is detected */
+    this.on_mousewheel_function = null;
 };
 goog.inherits(SPUI.DialogWidget, SPUI.Element);
 
