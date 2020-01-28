@@ -36,6 +36,10 @@ MountedWeaponDialog.invoke = function(mounting_obj) {
         building_context = 'ui_name_building_context_townhall_weapon';
         crafting_category = 'townhall_weapons';
         slot_type = 'townhall_weapon';
+    } else if (mounting_obj.is_security_node()) {
+        building_context = 'ui_name_building_context_security_node';
+        crafting_category = 'security_nodes';
+        slot_type = 'security_node';
     }
     dialog.user_data['dialog'] = 'mounted_weapon_dialog';
     dialog.user_data['emplacement'] = mounting_obj;
@@ -124,6 +128,8 @@ MountedWeaponDialog.ondraw = function(dialog) {
                 mounted = obj.building_weapon_item() || obj.building_weapon_inprogress_item();
             } else if (dialog.user_data['crafting_category'] === 'townhall_weapons' && obj.is_armed_townhall()) {
                 mounted = obj.townhall_weapon_item() || obj.townhall_weapon_inprogress_item();
+            } else if (dialog.user_data['crafting_category'] === 'security_nodes' && obj.is_security_node()) {
+                mounted = obj.node_item() || obj.security_node_inprogress_item();
             }
             if(mounted) {
                 var mounted_spec = ItemDisplay.get_inventory_item_spec(mounted['spec']);
@@ -137,7 +143,9 @@ MountedWeaponDialog.ondraw = function(dialog) {
                         count_attached[key] = (count_attached[key] || 0) + 1;
                     } else if (dialog.user_data['crafting_category'] === 'townhall_weapons' && mounted === obj.townhall_weapon_item()) {
                         count_attached[key] = (count_attached[key] || 0) + 1;
-                    }  else {
+                    } else if (dialog.user_data['crafting_category'] === 'security_nodes' && mounted === obj.node_item()) {
+                        count_attached[key] = (count_attached[key] || 0) + 1;
+                    } else {
                         count_attaching[key] = (count_attaching[key] || 0) + 1;
                     }
                 }
@@ -314,6 +322,8 @@ MountedWeaponDialog.ondraw = function(dialog) {
         current_item = mounting_obj.building_weapon_item();
     } else if (mounting_obj.is_armed_townhall()) {
         current_item = mounting_obj.townhall_weapon_item();
+    } else if (mounting_obj.is_security_node()) {
+        current_item = mounting_obj.security_node_item();
     }
 
     dialog.widgets['no_current'].show = !current_item;
