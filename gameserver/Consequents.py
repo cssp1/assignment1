@@ -274,26 +274,25 @@ class TakeItemsConsequent(Consequent):
         to_take = self.stack
         if self.affect_equipment:
             for obj in player.home_base_iter():
-                if not self.equipment: continue
+                if not obj.equipment: continue
                 to_destroy = []
                 for addr, item in Equipment.equip_enumerate(self.equipment):
-                    if item['spec'] in gamedata['items']:
-                        spec = gamedata['items'][item['spec']]
-                        if spec['name'] == data['item_name']:
-                            to_destroy.append((addr, item))
+                    if item['spec'] == data['item_name']:
+                        to_destroy.append((addr, item))
                 for addr, item in to_destroy:
+                    session.player.inventory_log_event('5131_item_trashed', item['spec'], -item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='TAKE_ITEMS')
                     Equipment.equip_remove(obj.equipment, addr, item['spec'])
 
         to_take_from_inventory = min(to_take, session.player.inventory_item_quantity(self.item_name))
         if to_take_from_inventory > 0:
             # remove from regular inventory
-            to_take -= session.player.inventory_remove_by_type(self.item_name, to_take_from_inventory, '5130_item_activated', reason='quest')
+            to_take -= session.player.inventory_remove_by_type('5131_item_trashed', self.item_name, to_take_from_inventory, reason='TAKE_ITEM')
             session.player.send_inventory_update(retmsg)
 
         to_take_from_loot_buffer = min(to_take, session.player.loot_buffer_item_quantity(self.item_name))
         if to_take_from_loot_buffer > 0:
             # must be in the loot buffer then
-            to_take -= session.player.loot_buffer_remove_by_type(self.item_name, to_take_from_loot_buffer, '5130_item_activated', reason='quest')
+            to_take -= session.player.loot_buffer_remove_by_type('5131_item_trashed', self.item_name, to_take_from_loot_buffer, reason='TAKE_ITEM')
             retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
 
         if to_take > 0:
