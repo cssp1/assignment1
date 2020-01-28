@@ -897,15 +897,20 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
 };
 
 RegionMap.RegionMap.prototype.on_mousewheel = function(uv, offset, delta) {
-    var hit = this.detect_hit(uv, offset);
-    if(!hit[0]) { return false; }
+    var regional_delta = (!!player.preferences['reverse_mousewheel_scroll'] ? delta * -1 : delta)
+    if(!this.detect_visible_hit(uv, offset)) { return false; }
 
-    if(delta != 0) {
-        this.set_zoom_linear(this.zoom_linear + 0.03*delta);
+    if(regional_delta != 0) {
+        this.set_zoom_linear(this.zoom_linear + 0.03*regional_delta);
         this.on_mousemove(uv, offset); // to update hovercell
     }
     return true;
 }
+
+// returns [in_bounds, new_selection_loc]
+RegionMap.RegionMap.prototype.detect_visible_hit = function(uv, offset) {
+    return (uv[0] >= this.get_absolute_xy()[0] && uv[0] < (this.get_absolute_xy()[0] + this.wh[0]) && uv[1] >= this.get_absolute_xy()[1] && uv[1] < (this.get_absolute_xy()[1] + this.wh[1]))
+};
 
 // return value is fed into "buttons" down below
 RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
