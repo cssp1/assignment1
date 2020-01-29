@@ -6646,8 +6646,8 @@
                           "highlight_text_color": [0.75,0.75,0.75,1], "text_color": [0.5, 0.5, 0.5, 1],
                           "mouseover_sound": 1, "array": [1,11], "array_offset": [0,28] },
 
-            "scroll_left": { "kind": "ActionButton", "xy": [202,104], "dimensions": [27,26], "bg_image": "small_scroll_up", "push_bg_image": 1 },
-            "scroll_right": { "kind": "ActionButton", "xy": [202,430], "dimensions": [27,26], "bg_image": "small_scroll_down", "push_bg_image": 1 },
+            "scroll_up": { "kind": "ActionButton", "xy": [202,104], "dimensions": [27,26], "bg_image": "small_scroll_up", "push_bg_image": 1, "dripper": {"rate": 4.0, "delay": 0} },
+            "scroll_down": { "kind": "ActionButton", "xy": [202,430], "dimensions": [27,26], "bg_image": "small_scroll_down", "push_bg_image": 1, "dripper": {"rate": 4.0, "delay": 0} },
             "scroll_text": { "kind": "TextField", "xy": [25,430], "dimensions": [176,19], "text_size": 13, "text_hjustify": "center", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1]}
         }
     },
@@ -6656,8 +6656,8 @@
         "widgets": {
             "ach": { "kind": "Dialog", "xy": [248,134], "dimensions": [438,74], "dialog": "achievement_widget",
                      "array": [1,4], "array_offset": [0,78] },
-            "scroll_up": { "kind": "ActionButton", "xy": [690,100], "dimensions": [27,26], "bg_image": "small_scroll_up", "state": "disabled", "push_bg_image": 1 },
-            "scroll_down": { "kind": "ActionButton", "xy": [690,410], "dimensions": [27,26], "bg_image": "small_scroll_down", "state": "disabled", "push_bg_image": 1 },
+            "scroll_up": { "kind": "ActionButton", "xy": [690,100], "dimensions": [27,26], "bg_image": "small_scroll_up", "state": "disabled", "push_bg_image": 1, "dripper": {"rate": 4.0, "delay": 0} },
+            "scroll_down": { "kind": "ActionButton", "xy": [690,410], "dimensions": [27,26], "bg_image": "small_scroll_down", "state": "disabled", "push_bg_image": 1, "dripper": {"rate": 4.0, "delay": 0} },
             "scroll_text": { "kind": "TextField", "xy": [249,443], "dimensions": [436,19], "text_size": 13, "text_hjustify": "right", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1]}
         }
     },
@@ -7313,11 +7313,9 @@
                              "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Apply" },
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "ui_tooltip": "<Esc> to close" },
             "scroll_up": { "kind": "ActionButton", "xy": [720,90], "dimensions": [27,30], "bg_image": "chat_scroll_up", "push_bg_image": 1,
-                           "bg_image_offset": [0,-5],
-                           "layout": { "hjustify": "right"} },
+                           "bg_image_offset": [0,-5], "layout": { "hjustify": "right"}, "dripper": {"rate": 4.0, "delay": 0} },
             "scroll_down": { "kind": "ActionButton", "xy": [720,358], "dimensions": [27,30], "bg_image": "chat_scroll_down", "push_bg_image": 1,
-                             "bg_image_offset": [0,-15],
-                             "layout": { "hjustify": "right"} }
+                             "bg_image_offset": [0,-15], "layout": { "hjustify": "right"}, "dripper": {"rate": 4.0, "delay": 0} }
         }
     },
 
@@ -10143,8 +10141,10 @@
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick", "text_hjustify": "left", "ui_name": "Bookmarks" },
             "close_button": { "kind": "ActionButton", "xy": [482,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "scroll_left": { "kind": "ActionButton", "xy": [10,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left", "dripper": {"rate": 4.0, "delay": 0} },
-            "scroll_right": { "kind": "ActionButton", "xy": [481,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right", "dripper": {"rate": 4.0, "delay": 0} },
+            "scroll_up": { "kind": "ActionButton", "xy": [478,55], "dimensions": [27,30], "bg_image": "chat_scroll_up", "push_bg_image": 1,
+                           "bg_image_offset": [0,-5], "layout": { "hjustify": "right"}, "dripper": {"rate": 4.0, "delay": 0} },
+            "scroll_down": { "kind": "ActionButton", "xy": [478,360], "dimensions": [27,30], "bg_image": "chat_scroll_down", "push_bg_image": 1,
+                             "bg_image_offset": [0,-15], "layout": { "hjustify": "right"}, "dripper": {"rate": 4.0, "delay": 0} },
             "scroll_text": { "kind": "TextField", "xy": [68,357], "dimensions": [600,19], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1]},
 
             "separator": {"kind": "Line", "xy": [50,87], "dimensions": [410,0], "color":  [0.063,0.176,0.36,0.5], "stroke_width": 1,
