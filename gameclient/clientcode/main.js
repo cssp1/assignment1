@@ -52518,20 +52518,16 @@ function do_on_mousewheel(e) {
     } else { // pixels
         delta = -e.deltaY/60; // arbitrary scale factor
     }
-    // check if player has reverse mousewheel scrolling checked
-    var reverse_mousewheel_scroll = !!player.preferences['reverse_mousewheel_scroll'];
-    var ui_delta = (reverse_mousewheel_scroll ? delta * -1 : delta)
-
-    if(SPUI.root.on_mousewheel(xy, [0,0], ui_delta)) {
+    // check if player has reverse mousewheel scrolling checked before passing to SPUI root
+    if(SPUI.root.on_mousewheel(xy, [0,0], (delta * (!!player.preferences['reverse_mousewheel_scroll'] ? -1 : 1)))) {
         if(e.preventDefault) { e.preventDefault(); }
         return;
     }
 
     // apply desktop zoom
     if(!selection.ui) {
-        var reverse_mousewheel_zoom = !!player.preferences['reverse_mousewheel_zoom'];
-        if(reverse_mousewheel_zoom) { delta = delta * -1; }
-        var new_zoom = view_zoom_linear + delta * gamedata['client']['view_zoom_mousewheel_increment']
+        // turn on reverse zoom if it's on. It applies to the desktop
+        var new_zoom = view_zoom_linear + delta * (!!player.preferences['reverse_mousewheel_zoom'] ? -1 : 1) * gamedata['client']['view_zoom_mousewheel_increment']
         set_view_zoom(new_zoom);
         if(e.preventDefault) { e.preventDefault(); }
         return;
