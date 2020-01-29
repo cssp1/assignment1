@@ -22893,75 +22893,84 @@ function invoke_building_context_menu(mouse_xy) {
 
             if((obj.is_emplacement() || obj.is_security_node() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) && (session.home_base || quarry_upgradable)) { // special case for mounted weapons
                 dialog_name = 'mounted_weapon_context_menu';
-                var cur_item = null;
+                var cur_items = [];
                 if (obj.is_emplacement()) {
-                    cur_item = obj.turret_head_item();
-                } else if (obj.is_security_node()) {
-                    cur_item = obj.security_node_item();
-                }  else if (obj.is_trapped_barrier()) {
-                    cur_item = obj.barrier_trap_item();
-                } else if (obj.is_armed_building()) {
-                    cur_item = obj.building_weapon_item();
-                } else if (obj.is_armed_townhall()) {
-                    cur_item = obj.townhall_weapon_item();
+                    cur_items.push(obj.turret_head_item());
                 }
-                var item_spec = (cur_item ? ItemDisplay.get_inventory_item_spec(cur_item['spec']) : null);
-                var under_leveled = false;
-                if(item_spec && item_spec['associated_tech']) {
-                    var tech_level = player.tech[item_spec['associated_tech']] || 0;
-                    var item_level = ItemDisplay.get_inventory_item_level(cur_item);
-                    if(tech_level > item_spec['level']) {
-                        under_leveled = true;
+                if (obj.is_trapped_barrier()) {
+                    cur_items.push(obj.barrier_trap_item());
+                }
+                if (obj.is_armed_building()) {
+                    cur_items.push(obj.building_weapon_item());
+                }
+                if (obj.is_armed_townhall()) {
+                    cur_items.push(obj.townhall_weapon_item());
+                }
+                if (obj.is_security_node()) {
+                   cur_items.push(obj.security_node_item());
+                }
+                var under_leveled_status = [];
+                var item_specs = [];
+                for(var i = 0; i <= cur_items.length - 1; i++) {
+                    var cur_item = cur_items[i];
+                    var item_spec = (cur_item ? ItemDisplay.get_inventory_item_spec(cur_item['spec']) : null);
+                    var under_leveled = false;
+                    if(item_spec && item_spec['associated_tech']) {
+                        var tech_level = player.tech[item_spec['associated_tech']] || 0;
+                        var item_level = ItemDisplay.get_inventory_item_level(cur_item);
+                        if(tech_level > item_spec['level']) {
+                            under_leveled = true;
 
-                        // but also check recipe predicate (quarries)
-                        if('associated_crafting_recipes' in item_spec) {
-                            var recipe = gamedata['crafting']['recipes'][item_spec['associated_crafting_recipes'][0]];
-                            goog.array.forEach(['show_if', 'requires'], function(pred) {
-                                if(pred in recipe && !read_predicate(recipe[pred]).is_satisfied(player, null)) {
-                                    under_leveled = false;
-                                }
-                            });
+                            // but also check recipe predicate (quarries)
+                            if('associated_crafting_recipes' in item_spec) {
+                                var recipe = gamedata['crafting']['recipes'][item_spec['associated_crafting_recipes'][0]];
+                                goog.array.forEach(['show_if', 'requires'], function(pred) {
+                                    if(pred in recipe && !read_predicate(recipe[pred]).is_satisfied(player, null)) {
+                                        under_leveled = false;
+                                    }
+                                });
+                            }
                         }
                     }
+                    under_leveled_status.push(under_leveled);
+                    item_specs.push(item_spec);
                 }
 
                 if(obj.time_until_finish() <= 0) {
                     var spell = gamedata['spells']['CRAFT_FOR_FREE'];
                     special_buttons['mounted'] = [];
-                    var this_ui_context = 'ui_name_building_context_emplacement';
-                    if (obj.is_trapped_barrier()) {
-                        this_ui_context = 'ui_name_building_context_barrier_trap';
-                    } else if (obj.is_armed_townhall()) {
-                        this_ui_context = 'ui_name_building_context_building_weapon';
-                    } else if (obj.is_armed_building()) {
-                        this_ui_context = 'ui_name_building_context_townhall_weapon';
-                    }
-                    special_buttons['mounted'].push(new ContextMenuButton({ui_name: spell[this_ui_context],
-                                                                           onclick: (function (_obj) { return function(w) { MountedWeaponDialog.invoke(_obj); }; })(obj),
-                                                                           asset: (cur_item && !under_leveled ? 'menu_button_resizable' : null) // yellow only if no mounted weapon is equipped, or weapon is under-leveled
-                                                                       }));
-                    if (obj.is_security_node()) { // armed townhalls and armed buildings may also have a security node, so this is not an else if situation
-                        this_ui_context = 'ui_name_building_context_security_node';
+                    var valid_ui_contexts = [];
+                    if (obj.is_emplacement()) { valid_ui_contexts.push('ui_name_building_context_emplacement'); }
+                    if (obj.is_trapped_barrier()) { valid_ui_contexts.push('ui_name_building_context_barrier_trap'); }
+                    if (obj.is_armed_townhall()) { valid_ui_contexts.push('ui_name_building_context_building_weapon'); }
+                    if (obj.is_armed_building()) { valid_ui_contexts.push('ui_name_building_context_townhall_weapon'); }
+                    if (obj.is_security_node()) { valid_ui_contexts.push('ui_name_building_context_security_node'); }
+                    for(var i = 0; i <= valid_ui_contexts.length - 1; i++) {
+                        var cur_item = cur_items[i];
+                        var this_ui_context = valid_ui_contexts[i];
+                        var this_under_leveled = under_leveled_status[i];
+                        var this_item_spec = item_specs[i];
                         special_buttons['mounted'].push(new ContextMenuButton({ui_name: spell[this_ui_context],
-                                                                               onclick: (function (_obj) { return function(w) { MountedWeaponDialog.invoke(_obj); }; })(obj),
-                                                                               asset: (cur_item && !under_leveled ? 'menu_button_resizable' : null) // yellow only if no mounted weapon is equipped, or weapon is under-leveled
+                                                                           onclick: (function (_obj) { return function(w) { MountedWeaponDialog.invoke(_obj); }; })(obj),
+                                                                           asset: (cur_item && !this_under_leveled ? 'menu_button_resizable' : null) // yellow only if no mounted weapon is equipped, or weapon is under-leveled
                                                                            }));
+                        // avoid showing "research" button outside home base
+                        if(session.home_base && cur_item) {
+                            upgrade_is_active = !under_leveled;
+                            var upgr_spell = gamedata['spells']['RESEARCH_FOR_FREE'];
+                            special_buttons['mounted'].push(new ContextMenuButton({ui_name: upgr_spell[this_ui_context],
+                                                                                   onclick: (function (_techname) { return function() {
+                                                                                   // hack (?) to work around issues with upgrade dialog
+                                                                                   // when looking at a weapon tech with selection.unit still set
+                                                                                   // (it incorrectly keys the level off the unit, not player.tech)
+                                                                                   change_selection_unit(null);
+                                                                                   invoke_upgrade_tech_dialog(_techname, null);
+                                                                               }; })(this_item_spec['associated_tech']), asset: (this_under_leveled ? 'menu_button_resizable' : 'action_button_resizable')}));
+                        }
                     }
                 }
 
-                // avoid showing "research" button outside home base
-                if(session.home_base && cur_item) {
-                    upgrade_is_active = !under_leveled;
-                    var upgr_spell = gamedata['spells']['RESEARCH_FOR_FREE'];
-                    special_buttons['mounted'].push(new ContextMenuButton({ui_name: upgr_spell[this_ui_context],
-                                                                           onclick: (function (_techname) { return function() {
-                                                                            // hack (?) to work around issues with upgrade dialog
-                                                                            // when looking at a weapon tech with selection.unit still set
-                                                                            // (it incorrectly keys the level off the unit, not player.tech)
-                                                                            change_selection_unit(null);
-                                                                            invoke_upgrade_tech_dialog(_techname, null);
-                                                                        }; })(item_spec['associated_tech']), asset: (under_leveled ? 'menu_button_resizable' : 'action_button_resizable')}));
-                }
+
             }
 
             // can building be upgraded further?

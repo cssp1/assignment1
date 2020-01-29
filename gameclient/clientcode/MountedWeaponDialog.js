@@ -129,7 +129,7 @@ MountedWeaponDialog.ondraw = function(dialog) {
             } else if (dialog.user_data['crafting_category'] === 'townhall_weapons' && obj.is_armed_townhall()) {
                 mounted = obj.townhall_weapon_item() || obj.townhall_weapon_inprogress_item();
             } else if (dialog.user_data['crafting_category'] === 'security_nodes' && obj.is_security_node()) {
-                mounted = obj.node_item() || obj.security_node_inprogress_item();
+                mounted = obj.security_node_item() || obj.security_node_inprogress_item();
             }
             if(mounted) {
                 var mounted_spec = ItemDisplay.get_inventory_item_spec(mounted['spec']);
@@ -143,7 +143,7 @@ MountedWeaponDialog.ondraw = function(dialog) {
                         count_attached[key] = (count_attached[key] || 0) + 1;
                     } else if (dialog.user_data['crafting_category'] === 'townhall_weapons' && mounted === obj.townhall_weapon_item()) {
                         count_attached[key] = (count_attached[key] || 0) + 1;
-                    } else if (dialog.user_data['crafting_category'] === 'security_nodes' && mounted === obj.node_item()) {
+                    } else if (dialog.user_data['crafting_category'] === 'security_nodes' && mounted === obj.security_node_item()) {
                         count_attached[key] = (count_attached[key] || 0) + 1;
                     } else {
                         count_attaching[key] = (count_attaching[key] || 0) + 1;
@@ -786,7 +786,7 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
 
     ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['frame'], item);
 
-    var spell = ItemDisplay.get_inventory_item_weapon_spell(spec);
+    var spell = (ItemDisplay.get_inventory_item_weapon_spellname(spec) ? ItemDisplay.get_inventory_item_weapon_spell(spec) : null);
     var relative_spell = (relative_to ? ItemDisplay.get_inventory_item_weapon_spell(relative_spec) : null);
 
     // fill in damage_vs icons
@@ -794,7 +794,7 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
                          spell);
 
     // set up stats display
-    var statlist = get_weapon_spell_features2(mounting_obj.spec, spell);
+    var statlist = (spell ? get_weapon_spell_features2(mounting_obj.spec, spell) : []);
 
     // create the UNION of the two stat lists
     if(relative_to) {
