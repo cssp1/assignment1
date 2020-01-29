@@ -52527,8 +52527,7 @@ function do_on_mousewheel(e) {
     // apply desktop zoom
     if(!selection.ui) {
         // turn on reverse zoom if it's on. It applies to the desktop
-        delta = delta * (!!player.preferences['reverse_mousewheel_zoom'] ? -1 : 1)
-        var new_zoom = view_zoom_linear + delta * gamedata['client']['view_zoom_mousewheel_increment']
+        var new_zoom = view_zoom_linear + delta * (!!player.preferences['reverse_mousewheel_zoom'] ? -1 : 1) * gamedata['client']['view_zoom_mousewheel_increment']
         set_view_zoom(new_zoom);
         if(e.preventDefault) { e.preventDefault(); }
         return;
