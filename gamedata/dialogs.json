@@ -10143,8 +10143,8 @@
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick", "text_hjustify": "left", "ui_name": "Bookmarks" },
             "close_button": { "kind": "ActionButton", "xy": [482,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "scroll_left": { "kind": "ActionButton", "xy": [10,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left" },
-            "scroll_right": { "kind": "ActionButton", "xy": [481,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right" },
+            "scroll_left": { "kind": "ActionButton", "xy": [10,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left", "dripper": {"rate": 4.0, "delay": 0} },
+            "scroll_right": { "kind": "ActionButton", "xy": [481,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right", "dripper": {"rate": 4.0, "delay": 0} },
             "scroll_text": { "kind": "TextField", "xy": [68,357], "dimensions": [600,19], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1]},
 
             "separator": {"kind": "Line", "xy": [50,87], "dimensions": [410,0], "color":  [0.063,0.176,0.36,0.5], "stroke_width": 1,
