@@ -897,11 +897,12 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
 };
 
 RegionMap.RegionMap.prototype.on_mousewheel = function(uv, offset, delta) {
-    var regional_delta = (!!player.preferences['reverse_mousewheel_scroll'] ? delta * -1 : delta)
     if(!this.detect_visible_hit(uv, offset)) { return false; }
 
-    if(regional_delta != 0) {
-        this.set_zoom_linear(this.zoom_linear + 0.03*regional_delta);
+    if(delta != 0) {
+        // disable reverse mousewheel scrolling if it's on, it doesn't apply to the regional map
+        // turn on reverse zoom if it's on, it applies to the regional map
+        this.set_zoom_linear(this.zoom_linear + 0.03 * (delta * (!!player.preferences['reverse_mousewheel_zoom'] ? -1 : 1) * (!!player.preferences['reverse_mousewheel_scroll'] ? -1 : 1)));
         this.on_mousemove(uv, offset); // to update hovercell
     }
     return true;
