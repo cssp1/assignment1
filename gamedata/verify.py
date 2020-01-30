@@ -114,44 +114,34 @@ def check_inert(specname, spec):
 
 def check_power_settings(specname, spec):
     error = 0
-    if 'proportionate_power_threshold' in spec:
-        if isinstance(spec['proportionate_power_threshold'], list):
-            for threshold in spec['proportionate_power_threshold']:
+    if 'power_shutdown_threshold' in spec:
+        if isinstance(spec['power_shutdown_threshold'], list):
+            last_threshold = 1.0
+            for i, threshold in enumerate(spec['power_shutdown_threshold']):
                 if not isinstance(threshold, float):
-                    error |= 1; print '%s proportionate_power_threshold list entries should all be float values' % (specname)
-            if 'half_power_threshold' in spec and not isinstance(spec['half_power_threshold'], list):
-                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)
-            elif 'half_power_threshold' in spec and isinstance(spec['half_power_threshold'], list):
-                for i, threshold in enumerate(spec['proportionate_power_threshold']):
-                    if spec['half_power_threshold'][i] >= spec['proportionate_power_threshold'][i]:
-                        error |= 1; print '%s proportionate_power_threshold entries should be greater than half_power_threshold entries' % (specname)
+                    error |= 1; print '%s power_shutdown_threshold list entries should all be float values' % (specname)
+                if threshold > last_threshold:
+                    error |= 1; print '%s power_shutdown_threshold value grows from L%d to L%d. They should reduce or stay the same' % (specname, i, i + 1)
+                last_threshold = threshold
         else:
-            if not isinstance(spec['proportionate_power_threshold'], float):
-                error |= 1; print '%s proportionate_power_threshold should be a float value or a list' % (specname)
-            if 'half_power_threshold' in spec and not isinstance(spec['half_power_threshold'], float):
-                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)
-            elif 'half_power_threshold' in spec and isinstance(spec['half_power_threshold'], float):
-                if spec['half_power_threshold'] >= spec['proportionate_power_threshold']:
-                    error |= 1; print '%s proportionate_power_threshold should be greater than half_power_threshold' % (specname)
-    if 'half_power_threshold' in spec:
-        if isinstance(spec['half_power_threshold'], list):
-            for threshold in spec['half_power_threshold']:
+            if not isinstance(spec['power_shutdown_threshold'], float):
+                error |= 1; print '%s power_shutdown_threshold should be a float value or a list' % (specname)
+            if spec['power_shutdown_threshold'] >= 1.0:
+                error |= 1; print '%s power_shutdown_threshold should be less than 1.0, value is %d' % (specname, spec['power_shutdown_threshold'])
+    if 'damaged_power_output' in spec:
+        if isinstance(spec['damaged_power_output'], list):
+            last_output = 0.01
+            for i, output in enumerate(spec['damaged_power_output']):
                 if not isinstance(threshold, float):
-                    error |= 1; print '%s half_power_threshold list entries should all be float values' % (specname)
-            if 'proportionate_power_threshold' in spec and not isinstance(spec['proportionate_power_threshold'], list):
-                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)
-            elif 'proportionate_power_threshold' in spec and isinstance(spec['proportionate_power_threshold'], list):
-                for i, threshold in enumerate(spec['half_power_threshold']):
-                    if spec['half_power_threshold'][i] >= spec['proportionate_power_threshold'][i]:
-                        error |= 1; print '%s proportionate_power_threshold entries should be greater than half_power_threshold entries' % (specname)
+                    error |= 1; print '%s damaged_power_output list entries should all be float values' % (specname)
+                if output < last_threshold:
+                    error |= 1; print '%s damaged_power_output value shrinks from L%d to L%d. They should increase or stay the same' % (specname, i, i + 1)
+                last_output = output
         else:
-            if not isinstance(spec['half_power_threshold'], float):
-                error |= 1; print '%s half_power_threshold should be a float value or a list' % (specname)
-            if 'proportionate_power_threshold' in spec and not isinstance(spec['proportionate_power_threshold'], float):
-                error |= 1; print '%s proportionate_power_threshold and half_power_threshold should both be lists or both be float values' % (specname)
-            elif 'proportionate_power_threshold' in spec and isinstance(spec['proportionate_power_threshold'], float):
-                if spec['half_power_threshold'] >= spec['proportionate_power_threshold']:
-                    error |= 1; print '%s proportionate_power_threshold should be greater than half_power_threshold' % (specname)
+            if not isinstance(spec['damaged_power_output'], float):
+                error |= 1; print '%s damaged_power_output should be a float value or a list' % (specname)
+            if spec['damaged_power_output'] <= 0.0:
+                error |= 1; print '%s damaged_power_output should be greater than 0.0, value is %d' % (specname, spec['damaged_power_output'])
     return error
 
 def check_mandatory_fields(specname, spec, kind):

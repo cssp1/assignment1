@@ -5526,9 +5526,9 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
     }
 };
 Building.prototype.provides_power = function() { return !!this.spec['provides_power']; };
-Building.prototype.provides_proportionate_power_threshold = function() { return !!this.spec['proportionate_power_threshold']; };
+Building.prototype.provides_power_shutdown = function() { return !!this.spec['power_shutdown_threshold']; };
 Building.prototype.provides_half_power_threshold = function() { return !!this.spec['half_power_threshold']; };
-Building.prototype.needs_power_ping = function() { return (this.provides_power() && (this.provides_proportionate_power_threshold() || this.provides_half_power_threshold())) }
+Building.prototype.needs_power_ping = function() { return (this.provides_power() && (this.provides_power_shutdown() || this.provides_half_power_threshold())) }
 Building.prototype.is_townhall = function() { return this.spec['name'] === gamedata['townhall']; };
 Building.prototype.is_turret = function() { return this.spec['history_category'] === 'turrets'; };
 Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
@@ -45057,8 +45057,7 @@ function update_upgrade_dialog(dialog) {
             if(('vault_'+resname) in unit.spec) { feature_list.push('vault_'+resname); }
         });
         if('provides_power' in unit.spec) { feature_list.push('provides_power'); }
-        if('proportionate_power_threshold' in unit.spec) { feature_list.push('proportionate_power_threshold'); }
-        if('half_power_threshold' in unit.spec) { feature_list.push('half_power_threshold'); }
+        if('power_shutdown_threshold' in unit.spec) { feature_list.push('power_shutdown_threshold'); }
         if('provides_foremen' in unit.spec) { feature_list.push('provides_foremen'); }
 
         // detect enhanceable stats

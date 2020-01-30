@@ -6785,8 +6785,8 @@ class GameObjectSpec(Spec):
         ["exclusion_zone", [0,0]],
         ["ignore_perimeter", 0],
         ["provides_power", 0],
-        ["proportionate_power_threshold", 0],
-        ["half_power_threshold", 0],
+        ["power_shutdown_threshold", 1.0],
+        ["damaged_power_output", -1],
         ["consumes_power", 0],
         ["consumes_power_while_building", 0],
         ["provides_space", 0],
@@ -8550,15 +8550,12 @@ class Base(object):
                             cur_health = float(obj.hp)
                             max_health = float(obj.max_hp)
                             hp_proportion = float(cur_health / max_health)
-                            proportionate_power_threshold = obj.get_leveled_quantity(obj.spec.proportionate_power_threshold)
-                            if proportionate_power_threshold == 0: proportionate_power_threshold = 1.0
-                            half_power_threshold = obj.get_leveled_quantity(obj.spec.half_power_threshold)
-                            if half_power_threshold == 0: half_power_threshold = proportionate_power_threshold - 0.0001
-                            assert proportionate_power_threshold > half_power_threshold # verify.py should ensure this
-                            if hp_proportion >= proportionate_power_threshold:
-                                provides_power = provides_power * hp_proportion
-                            elif hp_proportion >= half_power_threshold:
-                                provides_power = provides_power * 0.5
+                            power_shutdown_threshold = obj.get_leveled_quantity(obj.spec.power_shutdown_threshold)
+                            if hp_proportion >= power_shutdown_threshold: # defaults to 100%, so if gamedata has no value, the generator shuts down if damaged
+                                power_proportion = obj.get_leveled_quantity(obj.spec.damaged_power_output)
+                                if power_proportion < 0: # defaults to -1, so if gamedata has no value, the generator provides power proportionate to remaining health
+                                    power_proportion = hp_proportion
+                                provides_power = provides_power * power_proportion
                             else:
                                 provides_power = 0
                         power[0] += provides_power
@@ -22642,8 +22639,8 @@ class GAMEAPI(resource.Resource):
                     power_factor = compute_power_factor(base.get_power_state())
                     object.update_production(object.owner, base.base_type, base.base_region, power_factor)
                     object.update_all(undamaged_time, power_factor = power_factor)
-                elif object.get_leveled_quantity(object.spec.proportionate_power_threshold) > 0 or object.get_leveled_quantity(object.spec.half_power_threshold) > 0:
-                    # handles pings from power generators that use proportionate_power_threshold or half_power_threshold
+                elif object.get_leveled_quantity(object.spec.power_shutdown_threshold) > 0:
+                    # handles pings from power generators that use power_shutdown_threshold
                     object.update_repair_hp_only()
                     session.deferred_power_change = True
 
