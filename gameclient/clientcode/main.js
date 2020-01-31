@@ -28453,10 +28453,10 @@ function scroll_battle_history(dialog, delta){
     var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
     var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
     var chapter_pages = Math.floor((chapter_battles + rows_per_page - 1) / rows_per_page);
-    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages-1): (chapter_pages-2));
-    if (delta > 0 && page != 0) {
+    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages - 1) : (chapter_pages - 2));
+    if (delta < 0 && page != 0) {
         battle_history_change_page(dialog, page - 1);
-    } else if (delta < 0 && page < last_showable_page) {
+    } else if (delta > 0 && page < last_showable_page) {
         battle_history_change_page(dialog, page + 1);
     }
 }
@@ -28954,20 +28954,20 @@ function battle_history_change_page(dialog, page) {
 
     // set clickability of scroll arrows
     if(page != 0) {
-        dialog.widgets['scroll_left'].state = 'normal';
+        dialog.widgets['scroll_up'].state = 'normal';
     } else {
-        dialog.widgets['scroll_left'].state = 'disabled';
+        dialog.widgets['scroll_up'].state = 'disabled';
     }
 
     var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages-1): (chapter_pages-2));
     if(page < last_showable_page) { // || (dialog.user_data['sumlist'] !== null && !dialog.user_data['sumlist_is_final'])) {
-        dialog.widgets['scroll_right'].state = 'normal';
+        dialog.widgets['scroll_down'].state = 'normal';
     } else {
-        dialog.widgets['scroll_right'].state = 'disabled';
+        dialog.widgets['scroll_down'].state = 'disabled';
     }
 
-    dialog.widgets['scroll_left'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page']-1); };
-    dialog.widgets['scroll_right'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page']+1); };
+    dialog.widgets['scroll_up'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page'] - 1); };
+    dialog.widgets['scroll_down'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page'] + 1); };
 
     return dialog;
 };
@@ -29088,12 +29088,12 @@ function scroll_battle_log(dialog, delta){
     // error catching to prevent attempting to scroll if not receiving a dialog or a delta
     if (!dialog || !delta) { return; }
     if(dialog.user_data['log']) {
-        if (delta > 0 && dialog.widgets['log'].can_scroll_up()) {
+        if (delta < 0 && dialog.widgets['log'].can_scroll_up()) {
             dialog.widgets['log'].scroll_up();
-            battle_log_change_page(dialog, dialog.user_data['page']-1);
-        } else if (delta < 0 && dialog.widgets['log'].can_scroll_down()) {
+            battle_log_change_page(dialog, dialog.user_data['page'] - 1);
+        } else if (delta > 0 && dialog.widgets['log'].can_scroll_down()) {
             dialog.widgets['log'].scroll_down();
-            battle_log_change_page(dialog, dialog.user_data['page']+1);
+            battle_log_change_page(dialog, dialog.user_data['page'] + 1);
         }
     }
 }
@@ -29213,8 +29213,8 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
         dialog.widgets['battle_duration'].str = null;
     }
 
-    dialog.widgets['scroll_left'].state = 'disabled';
-    dialog.widgets['scroll_right'].state = 'disabled';
+    dialog.widgets['scroll_up'].state = 'disabled';
+    dialog.widgets['scroll_down'].state = 'disabled';
 
     battle_log_change_page(dialog, 0);
 
@@ -29491,26 +29491,26 @@ function battle_log_change_page(dialog, page) {
     // set clickability of scroll arrows
     if(dialog.user_data['log']) {
         if(dialog.widgets['log'].can_scroll_up()) {
-            dialog.widgets['scroll_left'].state = 'normal';
+            dialog.widgets['scroll_up'].state = 'normal';
         } else {
-            dialog.widgets['scroll_left'].state = 'disabled';
+            dialog.widgets['scroll_up'].state = 'disabled';
         }
 
         if(dialog.widgets['log'].can_scroll_down()) {
-            dialog.widgets['scroll_right'].state = 'normal';
+            dialog.widgets['scroll_down'].state = 'normal';
         } else {
-            dialog.widgets['scroll_right'].state = 'disabled';
+            dialog.widgets['scroll_down'].state = 'disabled';
         }
 
-        dialog.widgets['scroll_left'].onclick = function(w) {
+        dialog.widgets['scroll_up'].onclick = function(w) {
             var _dialog = w.parent;
             _dialog.widgets['log'].scroll_up();
-            battle_log_change_page(_dialog, _dialog.user_data['page']-1);
+            battle_log_change_page(_dialog, _dialog.user_data['page'] - 1);
         };
-        dialog.widgets['scroll_right'].onclick = function(w) {
+        dialog.widgets['scroll_down'].onclick = function(w) {
             var _dialog = w.parent;
             _dialog.widgets['log'].scroll_down();
-            battle_log_change_page(_dialog, _dialog.user_data['page']+1);
+            battle_log_change_page(_dialog, _dialog.user_data['page'] + 1);
         };
     }
 
