@@ -282,7 +282,7 @@ class TakeItemsConsequent(Consequent):
                     if item['spec'] == self.item_name:
                         to_destroy.append((addr, item))
                 for addr, item in to_destroy:
-                    session.player.inventory_log_event(self.log_event, item['spec'], -item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='TAKE_ITEMS')
+                    session.player.inventory_log_event(self.log_event, item['spec'], -item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='TAKE_ITEM')
                     removed = Equipment.equip_remove(obj.equipment, addr, item['spec'])
                     if len(obj.equipment) < 1:
                         obj.equipment = None
