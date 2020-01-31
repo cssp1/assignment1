@@ -8,6 +8,7 @@
 import Predicates
 import time, random, bisect, copy
 import SpinConfig
+from Equipment import Equipment
 
 # also depends on Player and GameObjects from server.py
 
@@ -269,19 +270,35 @@ class TakeItemsConsequent(Consequent):
         Consequent.__init__(self, data)
         self.item_name = data['item_name']
         self.stack = data.get('stack',1)
+        self.log_event = data.get('log_event', '5131_item_trashed')
+        self.affect_equipment = data.get('affect_equipment',False)
     def execute(self, session, player, retmsg, context=None):
         to_take = self.stack
+        if self.affect_equipment:
+            for obj in player.home_base_iter():
+                if not obj.equipment: continue
+                to_destroy = []
+                for addr, item in Equipment.equip_enumerate(obj.equipment):
+                    if item['spec'] == self.item_name:
+                        to_destroy.append((addr, item))
+                for addr, item in to_destroy:
+                    session.player.inventory_log_event(self.log_event, item['spec'], -item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='TAKE_ITEM')
+                    removed = Equipment.equip_remove(obj.equipment, addr, item['spec'])
+                    if len(obj.equipment) < 1:
+                        obj.equipment = None
+                    assert removed
+                    to_take -= 1
 
         to_take_from_inventory = min(to_take, session.player.inventory_item_quantity(self.item_name))
         if to_take_from_inventory > 0:
             # remove from regular inventory
-            to_take -= session.player.inventory_remove_by_type(self.item_name, to_take_from_inventory, '5130_item_activated', reason='quest')
+            to_take -= session.player.inventory_remove_by_type(self.item_name, to_take_from_inventory, self.log_event, reason='TAKE_ITEM')
             session.player.send_inventory_update(retmsg)
 
         to_take_from_loot_buffer = min(to_take, session.player.loot_buffer_item_quantity(self.item_name))
         if to_take_from_loot_buffer > 0:
             # must be in the loot buffer then
-            to_take -= session.player.loot_buffer_remove_by_type(self.item_name, to_take_from_loot_buffer, '5130_item_activated', reason='quest')
+            to_take -= session.player.loot_buffer_remove_by_type(self.item_name, to_take_from_loot_buffer, self.log_event, reason='TAKE_ITEM')
             retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
 
         if to_take > 0:
