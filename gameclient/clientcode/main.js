@@ -1222,13 +1222,10 @@ Aura.prototype.apply = function(world, obj) {
                     // apply_aura represents the "roll" against the chance of failing detection, only calculates if aura_strength isn't 1 (100%)
                     var apply_aura = (aura_strength < 1) ? Math.random() : 1;
                     var avoided_detection = false;
-                    for(var i = 0; i < o2.auras.length; i++) {
-                        var a = o2.auras[i];
-                        if(a.spec['name'] === 'avoided_detection') {
-                            avoided_detection = true; // invisible objects that avoided detection stay undetected
-                        } else if(a.spec['name'] === code.replace('detector', 'detected')) {
-                            apply_aura = aura_strength;  // invisible objects that were detected stay detected
-                        }
+                    if(o2.combat_stats.avoided_detection) {
+                        avoided_detection = true; // invisible objects that avoided detection stay undetected
+                    } else if(o2.combat_stats.detected) {
+                        apply_aura = aura_strength;  // invisible objects that were detected stay detected
                     }
                     if((apply_aura <= aura_strength) && !avoided_detection) { // apply the aura if the random roll succeeded and the object didn't already avoid detection
                         o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), this.strength, new GameTypes.TickCount(1), 0);
@@ -1241,6 +1238,7 @@ Aura.prototype.apply = function(world, obj) {
             obj.combat_stats.detected = 1;
         } else if(code === 'avoided_detection') {
             obj.combat_stats.detected = 0;
+            obj.combat_stats.avoided_detection = 1;
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
         } else if(code === 'disarmed') {
@@ -1779,6 +1777,7 @@ function CombatStats() {
     this.art_asset = null;
     this.invisible = 0;
     this.detected = 0;
+    this.avoided_detection = 0;
     this.weapon_facing_fudge = 0;
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
@@ -1815,6 +1814,7 @@ CombatStats.prototype.clear = function() {
     this.art_asset = null;
     this.invisible = 0;
     this.detected = 0;
+    this.avoided_detection = 0;
     this.weapon_facing_fudge = 0;
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
@@ -1851,6 +1851,7 @@ CombatStats.prototype.serialize = function() {
     if(this.art_asset) { ret['art_asset'] = this.art_asset; }
     if(this.invisible) { ret['invisible'] = this.invisible; }
     if(this.detected) { ret['detected'] = this.detected; }
+    if(this.avoided_detection) { ret['avoided_detection'] = this.avoided_detection; }
     if(this.weapon_facing_fudge) { ret['weapon_facing_fudge'] = this.weapon_facing_fudge; }
     if(this.muzzle_offset) { ret['muzzle_offset'] = this.muzzle_offset; }
     if(this.muzzle_height) { ret['muzzle_height'] = this.muzzle_height; }
@@ -1884,6 +1885,7 @@ CombatStats.prototype.apply_snapshot = function(snap) {
     if('art_asset' in snap) { this.art_asset = snap['art_asset']; }
     if('invisible' in snap) { this.invisible = snap['invisible']; }
     if('detected' in snap) { this.detected = snap['detected']; }
+    if('avoided_detection' in snap) { this.avoided_detection = snap['avoided_detection']; }
 };
 
 // "merge" together two damage_vs tables, returning a table that has
@@ -28488,10 +28490,10 @@ function scroll_battle_history(dialog, delta){
     var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
     var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
     var chapter_pages = Math.floor((chapter_battles + rows_per_page - 1) / rows_per_page);
-    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages-1): (chapter_pages-2));
-    if (delta > 0 && page != 0) {
+    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages - 1) : (chapter_pages - 2));
+    if (delta < 0 && page != 0) {
         battle_history_change_page(dialog, page - 1);
-    } else if (delta < 0 && page < last_showable_page) {
+    } else if (delta > 0 && page < last_showable_page) {
         battle_history_change_page(dialog, page + 1);
     }
 }
@@ -28691,7 +28693,7 @@ function battle_history_change_page(dialog, page) {
     var row = 0;
     var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
     var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
-    var chapter_pages = Math.floor((chapter_battles+rows_per_page-1)/rows_per_page);
+    var chapter_pages = Math.floor(chapter_battles - rows_per_page + 1);
 
     // note: currently, AI battles do not record involved_alliances, so cannot be looked up for alliancemates.
     dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && !dialog.user_data['alliancemate_flag'] && (dialog.user_data['from_id'] >= 0);
@@ -28717,11 +28719,11 @@ function battle_history_change_page(dialog, page) {
 
     if(chapter_battles > 0) {
         // show battles!
-        var first_on_page = dialog.user_data['first_on_page'] = page * rows_per_page;
-        var last_on_page = (page+1)*rows_per_page - 1;
-        last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles-1));
+        var first_on_page = dialog.user_data['first_on_page'] = page;
+        var last_on_page = page + rows_per_page - 1;
+        last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles - 1));
         dialog.widgets['scroll_text'].show = true;
-        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_battles.toString() + (dialog.user_data['sumlist_is_final'] ? '' : '+'));
+        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page + 1).toString()).replace('%d2',(last_on_page + 1).toString()).replace('%d3',chapter_battles.toString() + (dialog.user_data['sumlist_is_final'] ? '' : '+'));
 
         for(var i = first_on_page; i <= last_on_page; i++) {
             var summary = dialog.user_data['sumlist'][i];
@@ -28989,20 +28991,20 @@ function battle_history_change_page(dialog, page) {
 
     // set clickability of scroll arrows
     if(page != 0) {
-        dialog.widgets['scroll_left'].state = 'normal';
+        dialog.widgets['scroll_up'].state = 'normal';
     } else {
-        dialog.widgets['scroll_left'].state = 'disabled';
+        dialog.widgets['scroll_up'].state = 'disabled';
     }
 
     var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages-1): (chapter_pages-2));
     if(page < last_showable_page) { // || (dialog.user_data['sumlist'] !== null && !dialog.user_data['sumlist_is_final'])) {
-        dialog.widgets['scroll_right'].state = 'normal';
+        dialog.widgets['scroll_down'].state = 'normal';
     } else {
-        dialog.widgets['scroll_right'].state = 'disabled';
+        dialog.widgets['scroll_down'].state = 'disabled';
     }
 
-    dialog.widgets['scroll_left'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page']-1); };
-    dialog.widgets['scroll_right'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page']+1); };
+    dialog.widgets['scroll_up'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page'] - 1); };
+    dialog.widgets['scroll_down'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page'] + 1); };
 
     return dialog;
 };
@@ -29123,12 +29125,12 @@ function scroll_battle_log(dialog, delta){
     // error catching to prevent attempting to scroll if not receiving a dialog or a delta
     if (!dialog || !delta) { return; }
     if(dialog.user_data['log']) {
-        if (delta > 0 && dialog.widgets['log'].can_scroll_up()) {
+        if (delta < 0 && dialog.widgets['log'].can_scroll_up()) {
             dialog.widgets['log'].scroll_up();
-            battle_log_change_page(dialog, dialog.user_data['page']-1);
-        } else if (delta < 0 && dialog.widgets['log'].can_scroll_down()) {
+            battle_log_change_page(dialog, dialog.user_data['page'] - 1);
+        } else if (delta > 0 && dialog.widgets['log'].can_scroll_down()) {
             dialog.widgets['log'].scroll_down();
-            battle_log_change_page(dialog, dialog.user_data['page']+1);
+            battle_log_change_page(dialog, dialog.user_data['page'] + 1);
         }
     }
 }
@@ -29248,8 +29250,8 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
         dialog.widgets['battle_duration'].str = null;
     }
 
-    dialog.widgets['scroll_left'].state = 'disabled';
-    dialog.widgets['scroll_right'].state = 'disabled';
+    dialog.widgets['scroll_up'].state = 'disabled';
+    dialog.widgets['scroll_down'].state = 'disabled';
 
     battle_log_change_page(dialog, 0);
 
@@ -29526,26 +29528,26 @@ function battle_log_change_page(dialog, page) {
     // set clickability of scroll arrows
     if(dialog.user_data['log']) {
         if(dialog.widgets['log'].can_scroll_up()) {
-            dialog.widgets['scroll_left'].state = 'normal';
+            dialog.widgets['scroll_up'].state = 'normal';
         } else {
-            dialog.widgets['scroll_left'].state = 'disabled';
+            dialog.widgets['scroll_up'].state = 'disabled';
         }
 
         if(dialog.widgets['log'].can_scroll_down()) {
-            dialog.widgets['scroll_right'].state = 'normal';
+            dialog.widgets['scroll_down'].state = 'normal';
         } else {
-            dialog.widgets['scroll_right'].state = 'disabled';
+            dialog.widgets['scroll_down'].state = 'disabled';
         }
 
-        dialog.widgets['scroll_left'].onclick = function(w) {
+        dialog.widgets['scroll_up'].onclick = function(w) {
             var _dialog = w.parent;
             _dialog.widgets['log'].scroll_up();
-            battle_log_change_page(_dialog, _dialog.user_data['page']-1);
+            battle_log_change_page(_dialog, _dialog.user_data['page'] - 1);
         };
-        dialog.widgets['scroll_right'].onclick = function(w) {
+        dialog.widgets['scroll_down'].onclick = function(w) {
             var _dialog = w.parent;
             _dialog.widgets['log'].scroll_down();
-            battle_log_change_page(_dialog, _dialog.user_data['page']+1);
+            battle_log_change_page(_dialog, _dialog.user_data['page'] + 1);
         };
     }
 
