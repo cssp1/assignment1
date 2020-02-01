@@ -28656,7 +28656,7 @@ function battle_history_change_page(dialog, page) {
     var row = 0;
     var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
     var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
-    var chapter_pages = Math.floor((chapter_battles+rows_per_page-1)/rows_per_page);
+    var chapter_pages = Math.floor(chapter_battles - rows_per_page + 1);
 
     // note: currently, AI battles do not record involved_alliances, so cannot be looked up for alliancemates.
     dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && !dialog.user_data['alliancemate_flag'] && (dialog.user_data['from_id'] >= 0);
@@ -28682,11 +28682,11 @@ function battle_history_change_page(dialog, page) {
 
     if(chapter_battles > 0) {
         // show battles!
-        var first_on_page = dialog.user_data['first_on_page'] = page * rows_per_page;
-        var last_on_page = (page+1)*rows_per_page - 1;
-        last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles-1));
+        var first_on_page = dialog.user_data['first_on_page'] = page;
+        var last_on_page = page + rows_per_page - 1;
+        last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles - 1));
         dialog.widgets['scroll_text'].show = true;
-        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_battles.toString() + (dialog.user_data['sumlist_is_final'] ? '' : '+'));
+        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page + 1).toString()).replace('%d2',(last_on_page + 1).toString()).replace('%d3',chapter_battles.toString() + (dialog.user_data['sumlist_is_final'] ? '' : '+'));
 
         for(var i = first_on_page; i <= last_on_page; i++) {
             var summary = dialog.user_data['sumlist'][i];
