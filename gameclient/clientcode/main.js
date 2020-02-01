@@ -28454,11 +28454,15 @@ function scroll_battle_history(dialog, delta){
     var page = dialog.user_data['page'];
     var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
     var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
-    var chapter_pages = Math.floor((chapter_battles + rows_per_page - 1) / rows_per_page);
+    var chapter_pages = Math.floor(chapter_battles - rows_per_page + 1);
+    var last_on_page = page + rows_per_page - 1;
+    last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles - 1));
+    var after_page = last_on_page + 1;
+    var can_scroll_to_next = (!!dialog.user_data['sumlist'] && !!dialog.user_data['sumlist'][after_page]);
     var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages - 1) : (chapter_pages - 2));
     if (delta < 0 && page != 0) {
         battle_history_change_page(dialog, page - 1);
-    } else if (delta > 0 && page < last_showable_page) {
+    } else if (delta > 0 && page < last_showable_page && can_scroll_to_next) {
         battle_history_change_page(dialog, page + 1);
     }
 }
@@ -28672,7 +28676,7 @@ function battle_history_change_page(dialog, page) {
 
     // need to get more from server?
     // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
-    if(chapter_pages > 0 && page >= (chapter_pages-2) &&
+    if(chapter_pages > 0 && page >= (chapter_pages - 2) &&
        dialog.user_data['sumlist'] !== null &&
        !dialog.user_data['sumlist_is_final'] &&
        !dialog.user_data['sumlist_is_error'] &&
@@ -28687,6 +28691,7 @@ function battle_history_change_page(dialog, page) {
         var first_on_page = dialog.user_data['first_on_page'] = page;
         var last_on_page = page + rows_per_page - 1;
         last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles - 1));
+        var after_page = last_on_page + 1;
         dialog.widgets['scroll_text'].show = true;
         dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page + 1).toString()).replace('%d2',(last_on_page + 1).toString()).replace('%d3',chapter_battles.toString() + (dialog.user_data['sumlist_is_final'] ? '' : '+'));
 
@@ -28961,8 +28966,9 @@ function battle_history_change_page(dialog, page) {
         dialog.widgets['scroll_up'].state = 'disabled';
     }
 
-    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages-1): (chapter_pages-2));
-    if(page < last_showable_page) { // || (dialog.user_data['sumlist'] !== null && !dialog.user_data['sumlist_is_final'])) {
+    var can_scroll_to_next = (!!dialog.user_data['sumlist'] && !!dialog.user_data['sumlist'][after_page]);
+    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages - 1) : (chapter_pages - 2));
+    if((page < last_showable_page) && can_scroll_to_next) { // || (dialog.user_data['sumlist'] !== null && !dialog.user_data['sumlist_is_final'])) {
         dialog.widgets['scroll_down'].state = 'normal';
     } else {
         dialog.widgets['scroll_down'].state = 'disabled';
