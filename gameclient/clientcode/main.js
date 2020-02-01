@@ -1222,13 +1222,10 @@ Aura.prototype.apply = function(world, obj) {
                     // apply_aura represents the "roll" against the chance of failing detection, only calculates if aura_strength isn't 1 (100%)
                     var apply_aura = (aura_strength < 1) ? Math.random() : 1;
                     var avoided_detection = false;
-                    for(var i = 0; i < o2.auras.length; i++) {
-                        var a = o2.auras[i];
-                        if(a.spec['name'] === 'avoided_detection') {
-                            avoided_detection = true; // invisible objects that avoided detection stay undetected
-                        } else if(a.spec['name'] === code.replace('detector', 'detected')) {
-                            apply_aura = aura_strength;  // invisible objects that were detected stay detected
-                        }
+                    if(o2.combat_stats.avoided_detection) {
+                        avoided_detection = true; // invisible objects that avoided detection stay undetected
+                    } else if(o2.combat_stats.detected) {
+                        apply_aura = aura_strength;  // invisible objects that were detected stay detected
                     }
                     if((apply_aura <= aura_strength) && !avoided_detection) { // apply the aura if the random roll succeeded and the object didn't already avoid detection
                         o2.create_aura(world, obj.id, obj.team, code.replace('detector', 'detected'), this.strength, new GameTypes.TickCount(1), 0);
@@ -1241,6 +1238,7 @@ Aura.prototype.apply = function(world, obj) {
             obj.combat_stats.detected = 1;
         } else if(code === 'avoided_detection') {
             obj.combat_stats.detected = 0;
+            obj.combat_stats.avoided_detection = 1;
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
         } else if(code === 'disarmed') {
@@ -1779,6 +1777,7 @@ function CombatStats() {
     this.art_asset = null;
     this.invisible = 0;
     this.detected = 0;
+    this.avoided_detection = 0;
     this.weapon_facing_fudge = 0;
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
@@ -1815,6 +1814,7 @@ CombatStats.prototype.clear = function() {
     this.art_asset = null;
     this.invisible = 0;
     this.detected = 0;
+    this.avoided_detection = 0;
     this.weapon_facing_fudge = 0;
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
@@ -1851,6 +1851,7 @@ CombatStats.prototype.serialize = function() {
     if(this.art_asset) { ret['art_asset'] = this.art_asset; }
     if(this.invisible) { ret['invisible'] = this.invisible; }
     if(this.detected) { ret['detected'] = this.detected; }
+    if(this.avoided_detection) { ret['avoided_detection'] = this.avoided_detection; }
     if(this.weapon_facing_fudge) { ret['weapon_facing_fudge'] = this.weapon_facing_fudge; }
     if(this.muzzle_offset) { ret['muzzle_offset'] = this.muzzle_offset; }
     if(this.muzzle_height) { ret['muzzle_height'] = this.muzzle_height; }
@@ -1884,6 +1885,7 @@ CombatStats.prototype.apply_snapshot = function(snap) {
     if('art_asset' in snap) { this.art_asset = snap['art_asset']; }
     if('invisible' in snap) { this.invisible = snap['invisible']; }
     if('detected' in snap) { this.detected = snap['detected']; }
+    if('avoided_detection' in snap) { this.avoided_detection = snap['avoided_detection']; }
 };
 
 // "merge" together two damage_vs tables, returning a table that has
