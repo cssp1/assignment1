@@ -731,3 +731,6 @@ var GearsHttpRequest;
 
 /** @typedef {Blob} */
 var GearsBlob;
+
+// Avoid possible name collision with someone's browser plugin (or malware?) that re-declares el
+var el = {};
