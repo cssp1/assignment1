@@ -28676,8 +28676,7 @@ function battle_history_change_page(dialog, page) {
 
     // need to get more from server?
     // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
-    if(chapter_pages > 0 && page >= (chapter_pages - 2) &&
-       dialog.user_data['sumlist'] !== null &&
+    if(dialog.user_data['sumlist'] !== null &&
        !dialog.user_data['sumlist_is_final'] &&
        !dialog.user_data['sumlist_is_error'] &&
        !dialog.user_data['pending']) {
@@ -28697,6 +28696,11 @@ function battle_history_change_page(dialog, page) {
 
         for(var i = first_on_page; i <= last_on_page; i++) {
             var summary = dialog.user_data['sumlist'][i];
+            if(!summary) {
+                // extra error catching for fast-scrolling
+                // if summary isn't ready, reload the page
+                battle_history_change_page(dialog, page);
+            }
             var signature = dialog.user_data['siglist'][i];
 
             var myrole, opprole;
