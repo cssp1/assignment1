@@ -28676,7 +28676,7 @@ function battle_history_change_page(dialog, page) {
 
     // need to get more from server?
     // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
-    if(dialog.user_data['sumlist'] !== null &&
+    if(dialog.user_data['sumlist'] !== null && (page + 75 >= dialog.user_data['sumlist'].length) &&
        !dialog.user_data['sumlist_is_final'] &&
        !dialog.user_data['sumlist_is_error'] &&
        !dialog.user_data['pending']) {
