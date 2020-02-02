@@ -370,11 +370,12 @@ ModChain.display_value = function(value, display_mode, context, ui_mod_level) {
                     if(context != 'widget') {
                         var ui_pct = '';
                         // XXX somehow this needs to cascade back to the outer parse code
-                        if('aura_strength' in data) {
-                            if(typeof(data['aura_strength'] === 'number')) {
-                                ui_pct = (100*data['aura_strength']).toFixed(parsed.precision);
-                                ui_aura += ' '+ui_pct+'%';
-                            }
+                        if('display_strength' in data && typeof(data['display_strength'] === 'number')) {
+                            ui_pct = (100 * data['display_strength']).toFixed(parsed.precision).toString() + '%';
+                            ui_aura += ' ' + ui_pct;
+                        } else if('aura_strength' in data && typeof(data['aura_strength'] === 'number')) {
+                            ui_pct = (100 * data['aura_strength']).toFixed(parsed.precision).toString() + '%';
+                            ui_aura += ' ' + ui_pct;
                         }
                         ui_aura += '\n'+spec['ui_description'].replace('%pct', ui_pct);
                     }
