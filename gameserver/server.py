@@ -21518,6 +21518,10 @@ class GAMEAPI(resource.Resource):
                                                                        time_range = cold_time_range,
                                                                        reason = 'query_battle_history(cold)')
 
+                # args we sent to battles_get_async, for debugging purposes
+                cold_d_args = 'user_id %d source %r target %r alliance_A %r alliance_B %r limit %r ai_or_human %r time_range %r' % \
+                              (session.user.user_id, source, target, alliance_A, alliance_B, cold_limit, ai_or_human, cold_time_range)
+
                 # reformat results from raw summary list to (summaries, is_final, is_error)
                 cold_d.addCallback(lambda cold_summaries, cold_limit=cold_limit: (cold_summaries, len(cold_summaries) < cold_limit, None))
 
@@ -21530,6 +21534,14 @@ class GAMEAPI(resource.Resource):
                 cold_d.addCallback(merge_hot_and_cold, hot_summaries, hot_is_final)
 
                 # if cold query fails, just return the hot results as if the cold query never happened
+                def filter_timeout_exception(e, hot_summaries, hot_is_final, cold_d_args):
+                    if isinstance(e, failure.Failure) and e.type is SpinSQLBattles.TimeoutException:
+                        gamesite.exception_log.event(server_time, 'SpinSQLBattles %s: %s' % (e.value, cold_d_args))
+                        return (hot_summaries, hot_is_final, 'partial')
+                    else:
+                        raise e # continue down failure chain
+
+                cold_d.addErrback(filter_timeout_exception, hot_summaries, hot_is_final, cold_d_args)
                 cold_d.addErrback(report_and_reraise_deferred_failure, session)
                 cold_d.addErrback(lambda _, hot_summaries=hot_summaries, hot_is_final=hot_is_final: (hot_summaries, hot_is_final, 'partial'))
 
@@ -33157,7 +33169,7 @@ class GameSite(server.Site):
                 pg = AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_battles'),
                                                  verbosity = 0,
                                                  log_exception_func = self.log_exception_func)
-            self.sql_battles_client = SpinSQLBattles.SQLBattlesClient(pg)
+            self.sql_battles_client = SpinSQLBattles.SQLBattlesClient(pg, timeout = SpinConfig.config['pgsql_servers'][game_id+'_battles'].get('timeout', 10))
 
     def sql_shutdown(self):
         self.sql_scores2_client = None

@@ -14,11 +14,23 @@
 
 import SpinSQLUtil
 import SpinJSON
+from twisted.internet.defer import CancelledError
+from twisted.python.failure import Failure
+
+class TimeoutException(Exception):
+    def __init__(self, duration):
+        Exception.__init__(self)
+        self.duration = duration
+    def __repr__(self):
+        return 'SQL query cancelled because it took longer than %r seconds' % self.duration
+    def __str__(self):
+        return self.__repr__()
 
 class SQLBattlesClient(object):
-    def __init__(self, sql_client):
+    def __init__(self, sql_client, timeout = None):
         self.sql_client = sql_client # AsyncPostgres instance
         self.util = SpinSQLUtil.PostgreSQLUtil()
+        self.timeout = timeout
 
     # async API
     BATTLES_ALL = 0
@@ -46,9 +58,25 @@ class SQLBattlesClient(object):
             where_conditions.append('is_ai = FALSE')
         if time_range:
             where_conditions.append('time >= %d AND time < %d' % tuple(time_range))
-        query = self.sql_client.runQuery('SELECT summary from '+self.util.sym(tbl)+' WHERE '+(' AND '.join(where_conditions))+\
-                                         ' ORDER BY time DESC'+\
-                                         ((' LIMIT %d' % limit) if limit > 0 else ''))
+
+        qs = 'SELECT summary from '+self.util.sym(tbl)+' WHERE '+(' AND '.join(where_conditions))+\
+             ' ORDER BY time DESC'+\
+             ((' LIMIT %d' % limit) if limit > 0 else '')
+
+        #qs = 'select pg_sleep(10)';
+
+        if self.timeout:
+            qs = 'SET LOCAL statement_timeout = \'%ds\'; %s' % (self.timeout, qs)
+
+        query = self.sql_client.runQuery(qs)
+
+        # query timeouts result in a CancelledError. Translate this into our own exception type.
+        def interpret_failure(f, self):
+            if isinstance(f, Failure) and f.type is CancelledError:
+                raise TimeoutException(self.timeout)
+            raise f
+
+        query.addErrback(interpret_failure, self)
 
         # extract raw list of summary columns
         query.addCallback(lambda result, self=self: [self.decode_summary(row['summary']) for row in result])
@@ -78,15 +106,17 @@ if __name__ == '__main__':
     client = SQLBattlesClient(req)
 
     def my_query(client):
+        print 'CLIENT sending...'
         d = client.battles_get_async(1112, -1, -1, -1, limit = 1)
         if d is None:
             print 'CLIENT abort'
             return
         def my_success(result):
+            print 'RESULT', len(result), 'rows'
             for row in result:
                 print 'ROW', row
         def my_error(f):
-            print 'CLIENT error', f.value
+            print 'CLIENT error', repr(f)
         d.addCallbacks(my_success, my_error)
 
     task.LoopingCall(my_query, client).start(2)

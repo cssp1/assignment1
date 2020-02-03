@@ -28517,7 +28517,6 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.user_data['from_id'] = from_id;
     dialog.user_data['user_id'] = user_id;
     dialog.user_data['from_alliance'] = from_alliance;
-    dialog.on_mousewheel_function = scroll_battle_history;
 
     if(from_id < 0 && from_alliance < 0) {
         throw Error('at least one of from_id or from_alliance must be >=0');
@@ -28697,7 +28696,7 @@ function battle_history_change_page(dialog, page) {
     var row = 0;
     var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
     var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
-    var chapter_pages = Math.floor(chapter_battles - rows_per_page + 1);
+    var chapter_pages = Math.floor((chapter_battles+rows_per_page-1)/rows_per_page);
 
     // note: currently, AI battles do not record involved_alliances, so cannot be looked up for alliancemates.
     dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && !dialog.user_data['alliancemate_flag'] && (dialog.user_data['from_id'] >= 0);
@@ -28711,7 +28710,8 @@ function battle_history_change_page(dialog, page) {
 
     // need to get more from server?
     // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
-    if(dialog.user_data['sumlist'] !== null &&
+    if(chapter_pages > 0 && page >= (chapter_pages-2) &&
+       dialog.user_data['sumlist'] !== null &&
        !dialog.user_data['sumlist_is_final'] &&
        !dialog.user_data['sumlist_is_error'] &&
        !dialog.user_data['pending']) {
@@ -28722,20 +28722,14 @@ function battle_history_change_page(dialog, page) {
 
     if(chapter_battles > 0) {
         // show battles!
-        var first_on_page = dialog.user_data['first_on_page'] = page;
-        var last_on_page = page + rows_per_page - 1;
-        last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles - 1));
-        var after_page = last_on_page + 1;
+        var first_on_page = dialog.user_data['first_on_page'] = page * rows_per_page;
+        var last_on_page = (page+1)*rows_per_page - 1;
+        last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles-1));
         dialog.widgets['scroll_text'].show = true;
-        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page + 1).toString()).replace('%d2',(last_on_page + 1).toString()).replace('%d3',chapter_battles.toString() + (dialog.user_data['sumlist_is_final'] ? '' : '+'));
+        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_battles.toString() + (dialog.user_data['sumlist_is_final'] ? '' : '+'));
 
         for(var i = first_on_page; i <= last_on_page; i++) {
             var summary = dialog.user_data['sumlist'][i];
-            if(!summary) {
-                // extra error catching for fast-scrolling
-                // if summary isn't ready, reload the page
-                battle_history_change_page(dialog, page);
-            }
             var signature = dialog.user_data['siglist'][i];
 
             var myrole, opprole;
@@ -29005,16 +28999,15 @@ function battle_history_change_page(dialog, page) {
         dialog.widgets['scroll_up'].state = 'disabled';
     }
 
-    var can_scroll_to_next = (!!dialog.user_data['sumlist'] && !!dialog.user_data['sumlist'][after_page]);
-    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages - 1) : (chapter_pages - 2));
-    if((page < last_showable_page) && can_scroll_to_next) { // || (dialog.user_data['sumlist'] !== null && !dialog.user_data['sumlist_is_final'])) {
+    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages-1): (chapter_pages-2));
+    if(page < last_showable_page) { // || (dialog.user_data['sumlist'] !== null && !dialog.user_data['sumlist_is_final'])) {
         dialog.widgets['scroll_down'].state = 'normal';
     } else {
         dialog.widgets['scroll_down'].state = 'disabled';
     }
 
-    dialog.widgets['scroll_up'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page'] - 1); };
-    dialog.widgets['scroll_down'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page'] + 1); };
+    dialog.widgets['scroll_up'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page']-1); };
+    dialog.widgets['scroll_down'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page']+1); };
 
     return dialog;
 };
