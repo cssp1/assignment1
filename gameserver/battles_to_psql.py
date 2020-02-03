@@ -53,6 +53,8 @@ def battles_schema(sql_util):
                           'by_battle_id': {'keys': [('battle_id','ASC')], 'unique': True},
                           'by_player0_time': {'keys': [('involved_player0','ASC'),('time','ASC')], 'where': 'involved_player0 IS NOT NULL'},
                           'by_player1_time': {'keys': [('involved_player1','ASC'),('time','ASC')], 'where': 'involved_player1 IS NOT NULL'},
+                          'by_player0_time_pvp': {'keys': [('involved_player0','ASC'),('time','ASC')], 'where': 'involved_player0 IS NOT NULL AND is_ai = FALSE'},
+                          'by_player1_time_pvp': {'keys': [('involved_player1','ASC'),('time','ASC')], 'where': 'involved_player1 IS NOT NULL AND is_ai = FALSE'},
                           'by_alliance0_time': {'keys': [('involved_alliance0','ASC'),('time','ASC')], 'where': 'involved_alliance0 IS NOT NULL'},
                           'by_alliance1_time': {'keys': [('involved_alliance1','ASC'),('time','ASC')], 'where': 'involved_alliance1 IS NOT NULL'},
                           }
