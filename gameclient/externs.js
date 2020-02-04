@@ -37,6 +37,7 @@ var /** string */ spin_server_http_port;
 var /** string */ spin_server_ssl_port;
 var /** string */ spin_game_server_host;
 var /** string */ spin_game_server_snam;
+var /** string */ spin_game_server_name;
 var /** string */ spin_game_server_http_port;
 var /** string */ spin_game_server_ssl_port;
 var /** string */ spin_game_server_ws_port;
