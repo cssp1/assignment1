@@ -18,7 +18,7 @@ DETAIL_LEN = 64 # truncate long "method" and "reason" args
 client_trouble_schema = {
     'fields': [('time', 'INT8 NOT NULL'),
                ('event_name', 'VARCHAR(128) NOT NULL'),
-               ('server_name', 'VARCHAR(128) NOT NULL'),
+               ('server_name', 'VARCHAR(128)'),
                ('user_id', 'INT4'),
                ('frame_platform', 'CHAR(2)'),
                ('country', 'VARCHAR(2)'),
