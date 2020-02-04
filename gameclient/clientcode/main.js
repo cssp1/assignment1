@@ -44639,7 +44639,7 @@ function get_weapon_spell_features2(spec, spell) {
             var is_dot = false;
             goog.array.forEach(effects, function(effect) { if('code' in effect && effect['code'] == 'on_fire') { is_dot = true; } });
             if(is_dot) { return; }
-            ret.push('impact_auras,' + name);
+            ret.push('impact_auras:' + name);
         });
     }
     return ret;

@@ -34,7 +34,7 @@ ModChain.get_base_value = function(stat, spec, level) {
             return null;
         }
     } else if(stat.indexOf('impact_auras') === 0) {
-        var impact_aura = stat.split(',')[1];
+        var impact_aura = stat.split(':')[1];
         stat = 'impact_auras';
         var spell = get_auto_spell_raw(spec);
         if(!spell) { return null; }
@@ -414,10 +414,10 @@ ModChain.display_value = function(value, display_mode, context, ui_mod_level) {
                 if(context != 'widget') {
                     var ui_duration = '';
                     var ui_pct = '';
-                    if('strength' in value && typeof(value['strength'] === 'number')) {
+                    if('strength' in value && typeof(value['strength']) === 'number') {
                         ui_pct = (100 * value['strength']).toFixed(parsed.precision).toString() + '%';
                     }
-                    if('duration' in value && typeof(value['duration'] === 'number')) {
+                    if('duration' in value && typeof(value['duration']) === 'number') {
                         ui_duration = (value['duration']).toFixed(parsed.precision).toString() + ' seconds';
                     }
                     ui_aura += '\n' + spec['ui_description'].replace('%pct', ui_pct).replace('%dur', ui_duration);
