@@ -11115,7 +11115,8 @@ function log_exception(e, where) {
                                                             'since_pageload': client_time - spin_pageload_begin,
                                                             'server_message_history': debug_server_message_history.join(','),
                                                             'gameclient_build_date':(typeof gameclient_build_date === 'undefined' ? 'unknown' : gameclient_build_date),
-                                                            'gamedata_build_info':gamedata['gamedata_build_info']}));
+                                                            'gamedata_build_info':gamedata['gamedata_build_info'],
+                                                            'server_name':spin_game_server_name}));
 }
 
 function do_unsupported_browser_redirect(url) {

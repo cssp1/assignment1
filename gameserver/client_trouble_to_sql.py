@@ -18,6 +18,7 @@ DETAIL_LEN = 64 # truncate long "method" and "reason" args
 client_trouble_schema = {
     'fields': [('time', 'INT8 NOT NULL'),
                ('event_name', 'VARCHAR(128) NOT NULL'),
+               ('server_name', 'VARCHAR(128)'),
                ('user_id', 'INT4'),
                ('frame_platform', 'CHAR(2)'),
                ('country', 'VARCHAR(2)'),
@@ -128,7 +129,7 @@ if __name__ == '__main__':
                             v = v[0:DETAIL_LEN-3]+'...'
                         keyvals.append((DETAIL,v))
 
-                for FIELD in ('user_id', 'frame_platform', 'ip', 'browser_name', 'browser_OS', 'browser_version', 'connection',
+                for FIELD in ('user_id', 'server_name', 'frame_platform', 'ip', 'browser_name', 'browser_OS', 'browser_version', 'connection',
                               'serial', 'len', 'elapsed', 'since_connect', 'since_pageload'):
                     if FIELD in row:
                         keyvals.append((FIELD.lower(), row[FIELD])) # NOTE: browser_OS->browser_os
