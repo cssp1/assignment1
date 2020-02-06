@@ -24769,6 +24769,7 @@ function invoke_map_bookmark_rename_dialog(bookmarks_dialog, bookmark) {
 
 function scrollable_dialog_change_page(dialog, page) {
     var scroll_by_row = dialog.user_data['scroll_by_row'] || false;
+    var rowdata_incomplete = dialog.user_data['rowdata_incomplete'] || false;
     var rows_per_page = dialog.user_data['rows_per_page'];
     var cols_per_page = dialog.user_data['cols_per_page'] || 1;
     var rowfunc = dialog.user_data['rowfunc'];
@@ -24793,6 +24794,9 @@ function scrollable_dialog_change_page(dialog, page) {
         last_on_page = Math.max(0, Math.min(last_on_page, chapter_items-1));
         if('scroll_text' in dialog.widgets) {
             dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_items.toString());
+            if(rowdata_incomplete) {
+                dialog.widgets['scroll_text'].str = dialog.widgets['scroll_text'].str + '+';
+            }
         }
         for(var i = first_on_page; i <= last_on_page; i++) {
             var coord = (cols_per_page == 1 ? row : [col,row]);
@@ -28445,29 +28449,6 @@ function update_abtest_dialog(dialog) {
     }
 };
 
-/** scrolls battle log by the amount and direction of delta
-    @param {SPUI.Dialog|null} dialog
-    @param {number} delta
-*/
-function scroll_battle_history(dialog, delta){
-    // error catching to prevent attempting to scroll if not receiving a dialog or a delta
-    if (!dialog || !delta) { return; }
-    var page = dialog.user_data['page'];
-    var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
-    var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
-    var chapter_pages = Math.floor(chapter_battles - rows_per_page + 1);
-    var last_on_page = page + rows_per_page - 1;
-    last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles - 1));
-    var after_page = last_on_page + 1;
-    var can_scroll_to_next = (!!dialog.user_data['sumlist'] && !!dialog.user_data['sumlist'][after_page]);
-    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages - 1) : (chapter_pages - 2));
-    if (delta < 0 && page != 0) {
-        battle_history_change_page(dialog, page - 1);
-    } else if (delta > 0 && page < last_showable_page && can_scroll_to_next) {
-        battle_history_change_page(dialog, page + 1);
-    }
-}
-
 /** @param {number} from_id
     @param {number} user_id
     @param {number} from_alliance
@@ -28483,6 +28464,13 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.user_data['from_id'] = from_id;
     dialog.user_data['user_id'] = user_id;
     dialog.user_data['from_alliance'] = from_alliance;
+    dialog.user_data['scroll_by_row'] = true;
+    dialog.user_data['page'] = -1;
+    dialog.user_data['rows_per_page'] = dialog.data['widgets']['row_name']['array'][1];
+    dialog.user_data['rowdata'] = [];
+    dialog.user_data['rowfunc'] = battle_history_setup_row;
+    dialog.user_data['rowdata_incomplete'] = true;
+    dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
 
     if(from_id < 0 && from_alliance < 0) {
         throw Error('at least one of from_id or from_alliance must be >=0');
@@ -28544,6 +28532,8 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     return dialog;
 };
 
+/** @param {SPUI.Dialog} dialog
+    @param {string} chapter */
 function battle_history_change_chapter(dialog, chapter) {
     if(dialog.user_data['chapter'] === chapter) { return; }
 
@@ -28561,6 +28551,8 @@ function battle_history_change_chapter(dialog, chapter) {
     dialog.user_data['sumlist_is_final'] = true;
     dialog.user_data['sumlist_is_error'] = null;
     dialog.user_data['first_on_page'] = -1;
+    dialog.user_data['rowdata'] = [];
+    dialog.user_data['rowdata_incomplete'] = true;
 
     // if player is on the map, query the map so that feature status is accurate
     if(session.region.map_enabled()) {
@@ -28573,7 +28565,7 @@ function battle_history_change_chapter(dialog, chapter) {
     } else {
         send_battle_history_query(dialog);
     }
-    battle_history_change_page(dialog, 0);
+    scrollable_dialog_change_page(dialog, 0);
 }
 
 /** Return timestamp of oldest battle summary in the dialog's sumlist, or -1 if no summaries exist */
@@ -28650,333 +28642,323 @@ function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist,
     if(dialog.user_data['sumlist'] !== null) {
         dialog.user_data['sumlist'] = dialog.user_data['sumlist'].concat(sumlist);
         dialog.user_data['siglist'] = dialog.user_data['siglist'].concat(siglist);
-        battle_history_change_page(dialog, dialog.user_data['page']);
+        scrollable_dialog_change_page(dialog, dialog.user_data['page']);
     } else {
         dialog.user_data['sumlist'] = sumlist;
         dialog.user_data['siglist'] = siglist;
-        battle_history_change_page(dialog, 0);
+        scrollable_dialog_change_page(dialog, 0);
     }
 };
 
-function battle_history_change_page(dialog, page) {
-    var row = 0;
-    var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
-    var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
-    var chapter_pages = Math.floor((chapter_battles+rows_per_page-1)/rows_per_page);
+/** @param {SPUI.Dialog} dialog
+    @param {number} row
+    @param {Object} rowdata */
+function battle_history_setup_row(dialog, row, rowdata) {
+    dialog.widgets['row_prot'+row].show =
+        dialog.widgets['row_cooldown'+row].show =
+        dialog.widgets['row_portrait'+row].show =
+        dialog.widgets['row_portrait_outline'+row].show =
+        dialog.widgets['row_portrait2'+row].show =
+        dialog.widgets['row_portrait2_outline'+row].show =
+        dialog.widgets['row_name'+row].show =
+        dialog.widgets['row_role'+row].show =
+        dialog.widgets['row_location'+row].show =
+        dialog.widgets['row_outcome'+row].show =
+        dialog.widgets['row_loot'+row].show =
+        dialog.widgets['row_time'+row].show =
+        dialog.widgets['row_log_button'+row].show =
+        dialog.widgets['row_revenge_button'+row].show = false;
 
-    // note: currently, AI battles do not record involved_alliances, so cannot be looked up for alliancemates.
-    dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && !dialog.user_data['alliancemate_flag'] && (dialog.user_data['from_id'] >= 0);
+    if (!dialog.user_data['siglist'] || row > dialog.user_data['siglist'].length || !rowdata) { return; }
+    var signature = dialog.user_data['siglist'][row];
+    var myrole, opprole;
+    if(rowdata['attacker_id'] == dialog.user_data['from_id']) {
+        myrole = 'attacker';
+        opprole = 'defender';
+    } else if(rowdata['defender_id'] == dialog.user_data['from_id']) {
+        myrole = 'defender';
+        opprole = 'attacker';
+    } else if(dialog.user_data['from_alliance'] >= 0 && rowdata['attacker_alliance_id'] == dialog.user_data['from_alliance']) {
+        myrole = 'attacker';
+        opprole = 'defender';
+    } else if(dialog.user_data['from_alliance'] >= 0 && rowdata['defender_alliance_id'] == dialog.user_data['from_alliance']) {
+        myrole = 'defender';
+        opprole = 'attacker';
+    } else {
+        console.log('battle history does not match from_id! att '+rowdata['attacker_id']+' def '+rowdata['defender_id']+' from '+dialog.user_data['from_id']); myrole = 'defender'; opprole = 'attacker';
+    }
+    var at_quarry = (rowdata['base_type'] == 'quarry');
+    var at_hive = (rowdata['base_type'] == 'hive');
+    var at_squad = (rowdata['base_type'] == 'squad');
+    var at_raid = (rowdata['base_type'].indexOf('raid') === 0);
+    var at_my_home = (rowdata['base_type'] == 'home' && rowdata['base_id'] == ('h'+session.user_id.toString()));
+    var ladder_state = rowdata['ladder_state'] || null;
+    var user_id = rowdata[opprole+'_id'];
+    var time_ago = server_time - rowdata['time'];
 
-    dialog.widgets['multiplayer_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_id'] >= 0);
-    dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0 || dialog.user_data['from_id'] === session.user_id) && (dialog.user_data['from_id'] >= 0);
-    if(dialog.widgets['alliance_button'].show && dialog.user_data['from_alliance'] < 0) {
-        // for the player, who is not in an alliance
-        dialog.widgets['alliance_button'].tooltip.str = dialog.data['widgets']['alliance_button']['ui_tooltip_no_alliance'];
+    // portrait
+    dialog.widgets['row_portrait'+row].show = true;
+    dialog.widgets['row_portrait_outline'+row].show = (user_id === session.user_id || user_id === rowdata[myrole+'_id']);
+    dialog.widgets['row_portrait'+row].set_user(user_id);
+
+    dialog.widgets['row_portrait'+row].onclick =
+        dialog.widgets['row_name'+row].onclick = (function (_uid) { return function() {
+            if(!is_ai_user_id_range(_uid)) { PlayerInfoDialog.invoke(_uid); }
+        }; })(user_id);
+    dialog.widgets['row_portrait'+row].tooltip.str = rowdata[opprole+'_name'] + (rowdata[opprole+'_alliance_chat_tag'] ? ' ['+rowdata[opprole+'_alliance_chat_tag']+']' : '')+ ' (L'+rowdata[opprole+'_level'].toString()+')';
+
+    // second portrait (for alliancemates)
+    dialog.widgets['row_portrait2'+row].show = (dialog.user_data['chapter'] === 'alliance');
+    dialog.widgets['row_portrait2_outline'+row].show = dialog.widgets['row_portrait2'+row].show;
+
+    if(dialog.widgets['row_portrait2'+row].show) {
+        dialog.widgets['row_portrait2'+row].set_user(rowdata[myrole+'_id']);
+        dialog.widgets['row_portrait2'+row].onclick = (function (_uid) { return function() {
+            if(!is_ai_user_id_range(_uid)) { PlayerInfoDialog.invoke(_uid); }
+        }; })(rowdata[myrole+'_id']);
+        dialog.widgets['row_portrait2'+row].tooltip.str = rowdata[myrole+'_name'] + (rowdata[myrole+'_alliance_chat_tag'] ? ' ['+rowdata[myrole+'_alliance_chat_tag']+']' : '') + ' (L'+rowdata[myrole+'_level'].toString()+')';
     }
 
-    // need to get more from server?
-    // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
-    if(chapter_pages > 0 && page >= (chapter_pages-2) &&
-       dialog.user_data['sumlist'] !== null &&
-       !dialog.user_data['sumlist_is_final'] &&
-       !dialog.user_data['sumlist_is_error'] &&
-       !dialog.user_data['pending']) {
-        send_battle_history_query(dialog);
+    // shift name/role to accommodate second portrait
+    goog.array.forEach(['row_portrait', 'row_name', 'row_role'], function(wname) {
+        dialog.widgets[wname+row].xy = vec_add(vec_add(dialog.data['widgets'][wname]['xy'],
+                                               vec_scale(row, dialog.data['widgets'][wname]['array_offset'])),
+                                               (dialog.widgets['row_portrait2'+row].show ? [dialog.data['widgets']['row_portrait2']['dimensions'][0], 0] : [0,0]));
+    });
+
+    // name/level
+    dialog.widgets['row_name'+row].show = true;
+    var clip_to = dialog.data['widgets']['row_name'][(dialog.user_data['chapter'] === 'alliance') ? 'clip_to_alliance' : 'clip_to'];
+    dialog.widgets['row_name'+row].clip_to = [clip_to[0], clip_to[1] + row * dialog.data['widgets']['row_name']['array_offset'][1], clip_to[2], clip_to[3]];
+
+    var name_str = rowdata[opprole+'_name'];
+    var max_len = dialog.data['widgets']['row_name'][(dialog.user_data['chapter'] === 'alliance') ? 'max_len_alliance' : 'max_len'];
+    if(name_str.length >= max_len) {
+        name_str = name_str.slice(0, max_len)+'...';
+    }
+    if(rowdata[opprole+'_alliance_chat_tag']) {
+        name_str += ' ['+rowdata[opprole+'_alliance_chat_tag']+']';
+    }
+    name_str += ' (L'+rowdata[opprole+'_level']+')';
+    dialog.widgets['row_name'+row].str = name_str;
+
+    dialog.widgets['row_role'+row].show = true;
+
+    var ui_role = dialog.data['widgets']['row_role']['ui_name_'+(opprole == 'defender' ? 'defender' : 'attacker')];
+    var role_color = dialog.data['widgets']['row_role']['text_color'];
+
+    // if no time column, the time goes into the "role" string
+    if(!gamedata['client']['battle_history_time_column']) {
+        ui_role = dialog.data['widgets']['row_role']['ui_name_time'].replace('%s', ui_role).replace('%d', pretty_print_time_very_brief(time_ago));
+    } else {
+        // if time column, color the role
+        role_color = dialog.data['widgets']['row_role']['text_color_'+opprole];
     }
 
-    dialog.user_data['page'] = page = (chapter_battles == 0 ? 0 : clamp(page, 0, chapter_pages-1));
+    dialog.widgets['row_role'+row].str = ui_role;
+    dialog.widgets['row_role'+row].text_color = SPUI.make_colorv(role_color);
 
-    if(chapter_battles > 0) {
-        // show battles!
-        var first_on_page = dialog.user_data['first_on_page'] = page * rows_per_page;
-        var last_on_page = (page+1)*rows_per_page - 1;
-        last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles-1));
-        dialog.widgets['scroll_text'].show = true;
-        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_battles.toString() + (dialog.user_data['sumlist_is_final'] ? '' : '+'));
+    var trophy_field = ((rowdata['loot'] && ('trophies_pve' in rowdata['loot'])) ? 'trophies_pve' : (opprole == 'defender' ? 'trophies_pvp' : 'viewing_trophies_pvp'));
 
-        for(var i = first_on_page; i <= last_on_page; i++) {
-            var summary = dialog.user_data['sumlist'][i];
-            var signature = dialog.user_data['siglist'][i];
+    dialog.widgets['row_location'+row].show = !!gamedata['client']['battle_history_location_column'];
+    dialog.widgets['row_outcome'+row].show = !gamedata['client']['battle_history_location_column'];
 
-            var myrole, opprole;
-            if(summary['attacker_id'] == dialog.user_data['from_id']) {
-                myrole = 'attacker';
-                opprole = 'defender';
-            } else if(summary['defender_id'] == dialog.user_data['from_id']) {
-                myrole = 'defender';
-                opprole = 'attacker';
-            } else if(dialog.user_data['from_alliance'] >= 0 && summary['attacker_alliance_id'] == dialog.user_data['from_alliance']) {
-                myrole = 'attacker';
-                opprole = 'defender';
-            } else if(dialog.user_data['from_alliance'] >= 0 && summary['defender_alliance_id'] == dialog.user_data['from_alliance']) {
-                myrole = 'defender';
-                opprole = 'attacker';
-            } else {
-                console.log('battle history does not match from_id! att '+summary['attacker_id']+' def '+summary['defender_id']+' from '+dialog.user_data['from_id']); myrole = 'defender'; opprole = 'attacker';
-            }
-            var at_quarry = (summary['base_type'] == 'quarry');
-            var at_hive = (summary['base_type'] == 'hive');
-            var at_squad = (summary['base_type'] == 'squad');
-            var at_raid = (summary['base_type'].indexOf('raid') === 0);
-            var at_my_home = (summary['base_type'] == 'home' && summary['base_id'] == ('h'+session.user_id.toString()));
-            var ladder_state = summary['ladder_state'] || null;
-            var user_id = summary[opprole+'_id'];
-            var time_ago = server_time - summary['time'];
+    if(dialog.widgets['row_location'+row].show) {
+        dialog.widgets['row_location'+row].onclick = null;
 
-            // portrait
-            dialog.widgets['row_portrait'+row].show = true;
-            dialog.widgets['row_portrait_outline'+row].show = (user_id === session.user_id || user_id === summary[myrole+'_id']);
-            dialog.widgets['row_portrait'+row].set_user(user_id);
-
-            dialog.widgets['row_portrait'+row].onclick =
-                dialog.widgets['row_name'+row].onclick =
-                (function (_uid) { return function() {
-                    if(!is_ai_user_id_range(_uid)) { PlayerInfoDialog.invoke(_uid); }
-                }; })(user_id);
-            dialog.widgets['row_portrait'+row].tooltip.str = summary[opprole+'_name'] + (summary[opprole+'_alliance_chat_tag'] ? ' ['+summary[opprole+'_alliance_chat_tag']+']' : '')+ ' (L'+summary[opprole+'_level'].toString()+')';
-
-            // second portrait (for alliancemates)
-            dialog.widgets['row_portrait2'+row].show = (dialog.user_data['chapter'] === 'alliance');
-            dialog.widgets['row_portrait2_outline'+row].show = dialog.widgets['row_portrait2'+row].show;
-
-            if(dialog.widgets['row_portrait2'+row].show) {
-                dialog.widgets['row_portrait2'+row].set_user(summary[myrole+'_id']);
-                dialog.widgets['row_portrait2'+row].onclick = (function (_uid) { return function() {
-                    if(!is_ai_user_id_range(_uid)) { PlayerInfoDialog.invoke(_uid); }
-                }; })(summary[myrole+'_id']);
-                dialog.widgets['row_portrait2'+row].tooltip.str = summary[myrole+'_name'] + (summary[myrole+'_alliance_chat_tag'] ? ' ['+summary[myrole+'_alliance_chat_tag']+']' : '') + ' (L'+summary[myrole+'_level'].toString()+')';
-            }
-
-            // shift name/role to accommodate second portrait
-            goog.array.forEach(['row_portrait', 'row_name', 'row_role'], function(wname) {
-                dialog.widgets[wname+row].xy = vec_add(vec_add(dialog.data['widgets'][wname]['xy'], vec_scale(row, dialog.data['widgets'][wname]['array_offset'])),
-                                                       (dialog.widgets['row_portrait2'+row].show ? [dialog.data['widgets']['row_portrait2']['dimensions'][0], 0] : [0,0]));
-            });
-
-            // name/level
-            dialog.widgets['row_name'+row].show = true;
-            var clip_to = dialog.data['widgets']['row_name'][(dialog.user_data['chapter'] === 'alliance') ? 'clip_to_alliance' : 'clip_to'];
-            dialog.widgets['row_name'+row].clip_to = [clip_to[0], clip_to[1] + row * dialog.data['widgets']['row_name']['array_offset'][1], clip_to[2], clip_to[3]];
-
-            var name_str = summary[opprole+'_name'];
-            var max_len = dialog.data['widgets']['row_name'][(dialog.user_data['chapter'] === 'alliance') ? 'max_len_alliance' : 'max_len'];
-            if(name_str.length >= max_len) {
-                name_str = name_str.slice(0, max_len)+'...';
-            }
-            if(summary[opprole+'_alliance_chat_tag']) {
-                name_str += ' ['+summary[opprole+'_alliance_chat_tag']+']';
-            }
-            name_str += ' (L'+summary[opprole+'_level']+')';
-            dialog.widgets['row_name'+row].str = name_str;
-
-            dialog.widgets['row_role'+row].show = true;
-
-            var ui_role = dialog.data['widgets']['row_role']['ui_name_'+(opprole == 'defender' ? 'defender' : 'attacker')];
-            var role_color = dialog.data['widgets']['row_role']['text_color'];
-
-            // if no time column, the time goes into the "role" string
-            if(!gamedata['client']['battle_history_time_column']) {
-                ui_role = dialog.data['widgets']['row_role']['ui_name_time'].replace('%s', ui_role).replace('%d', pretty_print_time_very_brief(time_ago));
-            } else {
-                // if time column, color the role
-                role_color = dialog.data['widgets']['row_role']['text_color_'+opprole];
-            }
-
-            dialog.widgets['row_role'+row].str = ui_role;
-            dialog.widgets['row_role'+row].text_color = SPUI.make_colorv(role_color);
-
-            var trophy_field = ((summary['loot'] && ('trophies_pve' in summary['loot'])) ? 'trophies_pve' : (opprole == 'defender' ? 'trophies_pvp' : 'viewing_trophies_pvp'));
-
-            dialog.widgets['row_location'+row].show = !!gamedata['client']['battle_history_location_column'];
-            dialog.widgets['row_outcome'+row].show = !gamedata['client']['battle_history_location_column'];
-
-            if(dialog.widgets['row_location'+row].show) {
-                dialog.widgets['row_location'+row].onclick = null;
-
-                var base_ui_name = summary['base_ui_name'];
-                if(base_ui_name) {
-                    if(at_squad) { base_ui_name = gamedata['strings']['squads']['squad']+' '+base_ui_name; }
-                    if(at_quarry || at_hive || at_squad || at_raid) {
-                        if(summary['base_map_loc']) {
-                            if((at_quarry || at_hive || at_raid) && (!('base_id' in summary) || (session.region.data && !session.region.feature_exists_at(summary['base_id'], summary['base_ui_name'], summary['base_map_loc'])))) {
-                                base_ui_name += '\n'+dialog.data['widgets']['row_location']['ui_name_'+(at_raid ? 'raid_depleted': (at_quarry ? 'quarry_depleted' : 'hive_destroyed'))];
-                            } else {
-                                base_ui_name += '\n('+summary['base_map_loc'][0].toString()+','+summary['base_map_loc'][1].toString()+')';
-                                dialog.widgets['row_location'+row].onclick = (function (_loc) { return function() {
-                                    invoke_region_map(_loc);
-                                }; })(summary['base_map_loc']);
-                            }
-                        }
-                    }
-                } else {
-                    if(!at_quarry) {
-                        base_ui_name = dialog.data['widgets']['row_location']['ui_name'];
+        var base_ui_name = rowdata['base_ui_name'];
+        if(base_ui_name) {
+            if(at_squad) { base_ui_name = gamedata['strings']['squads']['squad']+' '+base_ui_name; }
+            if(at_quarry || at_hive || at_squad || at_raid) {
+                if(rowdata['base_map_loc']) {
+                    if((at_quarry || at_hive || at_raid) && (!('base_id' in rowdata) || (session.region.data && !session.region.feature_exists_at(rowdata['base_id'], rowdata['base_ui_name'], rowdata['base_map_loc'])))) {
+                        base_ui_name += '\n'+dialog.data['widgets']['row_location']['ui_name_'+(at_raid ? 'raid_depleted': (at_quarry ? 'quarry_depleted' : 'hive_destroyed'))];
                     } else {
-                        base_ui_name = "?";
+                        base_ui_name += '\n('+rowdata['base_map_loc'][0].toString()+','+rowdata['base_map_loc'][1].toString()+')';
+                        dialog.widgets['row_location'+row].onclick = (function (_loc) { return function() {
+                            invoke_region_map(_loc);
+                        }; })(rowdata['base_map_loc']);
                     }
                 }
-                // add PvP point delta below location
-                if(summary['loot'] && summary['loot'][trophy_field]) {
-                    var count = summary['loot'][trophy_field];
-                    base_ui_name += '\n'+dialog.data['widgets']['row_location']['ui_name_points'].replace('%d', (count > 0 ? '+' : '-')+pretty_print_number(Math.abs(count)));
-                }
-
-                dialog.widgets['row_location'+row].set_text_with_linebreaking(base_ui_name);
             }
-
-            var myout = summary[myrole+'_outcome'];
-            var outcome_type;
-            if(ladder_state) {
-                outcome_type = 'ladder';
-            } else if(summary['raid_mode']) {
-                outcome_type = 'raid_'+summary['raid_mode'];
-            } else if(at_squad) {
-                outcome_type = 'squad';
-            } else if(at_quarry) {
-                outcome_type = 'quarry';
+        } else {
+            if(!at_quarry) {
+                base_ui_name = dialog.data['widgets']['row_location']['ui_name'];
             } else {
-                outcome_type = 'away';
+                base_ui_name = "?";
             }
-            var ui_outcome = gamedata['strings']['battle_end'][outcome_type][myout]['log_outcome'][myrole];
-
-            // the "outcome" displayed here is the basic You Won/You Lost PLUS battle stars and PvP point delta
-            if(dialog.widgets['row_outcome'+row].show) {
-                var full_outcome = ui_outcome;
-                if(summary['attacker_outcome'] == 'victory' && summary['loot'] && ('battle_stars' in summary['loot'])) {
-                    var star_count = goog.object.getCount(summary['loot']['battle_stars']);
-                    full_outcome += ' ('+gamedata['strings']['battle_end']['ladder'][(star_count == 1 ? 'stars_singular' : 'stars_plural')].replace('%s', star_count.toString())+')';
-                }
-
-                // add PvP point delta
-                if(summary['loot'] && summary['loot'][trophy_field]) {
-                    var count = summary['loot'][trophy_field];
-                    full_outcome += '\n'+dialog.data['widgets']['row_outcome']['ui_name_points'].replace('%d', (count > 0 ? '+' : '-')+pretty_print_number(Math.abs(count)));
-                }
-                dialog.widgets['row_outcome'+row].str = full_outcome;
-                dialog.widgets['row_outcome'+row].text_color = SPUI.make_colorv(dialog.data['widgets']['row_outcome']['text_color_'+(myout == 'victory' ? 'good' : 'bad')]);
-            }
-
-
-            summary['ui_outcome'] = ui_outcome; // save for later
-            summary['at_quarry'] = at_quarry;
-            summary['at_squad'] = at_squad;
-            summary['at_raid'] = at_raid;
-
-
-            dialog.widgets['row_loot'+row].show = true;
-            if(at_quarry || at_squad || summary['raid_mode'] === 'scout') {
-                // show status instead of loot here
-                dialog.widgets['row_loot'+row].str = ui_outcome;
-                dialog.widgets['row_loot'+row].text_color = (myout === 'defeat' ? new SPUI.Color(1,0,0,1) : new SPUI.Color(0,0.8,0,1));
-            } else {
-                dialog.widgets['row_loot'+row].text_color = SPUI.default_text_color;
-                var is_lost = false;
-                if(session.user_id == summary['defender_id']) {
-                    for(var res in gamedata['resources']) {
-                        if(summary['loot'] && (res+'_lost' in summary['loot'])) {
-                            is_lost = true;
-                        }
-                    }
-                }
-                var s_list = [];
-
-                for(var res in gamedata['resources']) {
-                    var amount;
-                    if(summary['loot']) {
-                        if(is_lost) {
-                            amount = summary['loot'][res+'_lost']||0;
-                        } else {
-                            if(gamedata['show_uncapped_loot']) {
-                                amount = summary['loot']['looted_uncapped_'+res] || 0;
-                            } else {
-                                amount = summary['loot'][res] || 0;
-                            }
-                        }
-                    } else {
-                        amount = 0;
-                    }
-
-                    if(amount != 0) {
-                        // Note, we add the minus sign here for lost amounts.
-                        s_list.push(((is_lost && amount > 0) ? '-' : '') + pretty_print_qty_brief(amount) + ' ' + gamedata['resources'][res]['ui_name']);
-                    }
-                }
-                dialog.widgets['row_loot'+row].str = s_list.join('\n');
-            }
-
-            if(gamedata['client']['battle_history_time_column']) {
-                dialog.widgets['row_time'+row].show = true;
-                dialog.widgets['row_time'+row].str = dialog.data['widgets']['row_time']['ui_name'].replace('%s', pretty_print_time_brief(time_ago));
-            }
-
-            // View Log button (opprole is for Facebook messaging only)
-            var friendly_id = -1;
-            if(summary['attacker_id'] == session.user_id) {
-                friendly_id = summary['attacker_id'];
-            } else if(summary['defender_id'] == session.user_id) {
-                friendly_id = summary['defender_id'];
-            } else if(summary['attacker_alliance_id'] > 0 && summary['attacker_alliance_id'] == session.alliance_id) {
-                friendly_id = summary['attacker_id'];
-            } else if(summary['defender_alliance_id'] > 0 && summary['defender_alliance_id'] == session.alliance_id) {
-                friendly_id = summary['defender_id'];
-            } else { // third-party log
-                friendly_id = dialog.user_data['from_id'];
-            }
-
-            var callback = (function (_summary, _signature, _friendly_id) { return function() {
-                player.record_feature_use('battle_log');
-                invoke_battle_log_dialog(_summary, _signature, _friendly_id);
-            }; })(summary, signature, friendly_id);
-
-            dialog.widgets['row_log_button'+row].show = (player.is_developer() || player.get_any_abtest_value('enable_battle_logs',true));
-            dialog.widgets['row_log_button'+row].state = 'normal';
-            dialog.widgets['row_log_button'+row].onclick = callback;
-
-            row += 1;
+        }
+        // add PvP point delta below location
+        if(rowdata['loot'] && rowdata['loot'][trophy_field]) {
+            var count = rowdata['loot'][trophy_field];
+            base_ui_name += '\n'+dialog.data['widgets']['row_location']['ui_name_points'].replace('%d', (count > 0 ? '+' : '-')+pretty_print_number(Math.abs(count)));
         }
 
+        dialog.widgets['row_location'+row].set_text_with_linebreaking(base_ui_name);
+    }
+
+    var myout = rowdata[myrole+'_outcome'];
+    var outcome_type;
+    if(ladder_state) {
+        outcome_type = 'ladder';
+    } else if(rowdata['raid_mode']) {
+        outcome_type = 'raid_'+rowdata['raid_mode'];
+    } else if(at_squad) {
+        outcome_type = 'squad';
+    } else if(at_quarry) {
+        outcome_type = 'quarry';
     } else {
-        // no battles to show - loading or empty
-        dialog.user_data['first_on_page'] = -1;
-        dialog.widgets['scroll_text'].show = false;
+        outcome_type = 'away';
+    }
+    var ui_outcome = gamedata['strings']['battle_end'][outcome_type][myout]['log_outcome'][myrole];
+
+    // the "outcome" displayed here is the basic You Won/You Lost PLUS battle stars and PvP point delta
+    if(dialog.widgets['row_outcome'+row].show) {
+        var full_outcome = ui_outcome;
+        if(rowdata['attacker_outcome'] == 'victory' && rowdata['loot'] && ('battle_stars' in rowdata['loot'])) {
+            var star_count = goog.object.getCount(rowdata['loot']['battle_stars']);
+            full_outcome += ' ('+gamedata['strings']['battle_end']['ladder'][(star_count == 1 ? 'stars_singular' : 'stars_plural')].replace('%s', star_count.toString())+')';
+        }
+
+        // add PvP point delta
+        if(rowdata['loot'] && rowdata['loot'][trophy_field]) {
+            var count = rowdata['loot'][trophy_field];
+            full_outcome += '\n'+dialog.data['widgets']['row_outcome']['ui_name_points'].replace('%d', (count > 0 ? '+' : '-')+pretty_print_number(Math.abs(count)));
+        }
+        dialog.widgets['row_outcome'+row].str = full_outcome;
+        dialog.widgets['row_outcome'+row].text_color = SPUI.make_colorv(dialog.data['widgets']['row_outcome']['text_color_'+(myout == 'victory' ? 'good' : 'bad')]);
     }
 
-    // clear out empty rows
-    while(row < rows_per_page) {
-        dialog.widgets['row_portrait'+row].show =
-            dialog.widgets['row_portrait_outline'+row].show =
-            dialog.widgets['row_portrait2'+row].show =
-            dialog.widgets['row_portrait2_outline'+row].show =
-            dialog.widgets['row_name'+row].show =
-            dialog.widgets['row_role'+row].show =
-            dialog.widgets['row_outcome'+row].show =
-            dialog.widgets['row_location'+row].show =
-            dialog.widgets['row_loot'+row].show =
-            dialog.widgets['row_time'+row].show =
-            dialog.widgets['row_revenge_button'+row].show =
-            dialog.widgets['row_log_button'+row].show = false;
-        row += 1;
-    }
 
-    // set clickability of scroll arrows
-    if(page != 0) {
-        dialog.widgets['scroll_up'].state = 'normal';
+    rowdata['ui_outcome'] = ui_outcome; // save for later
+    rowdata['at_quarry'] = at_quarry;
+    rowdata['at_squad'] = at_squad;
+    rowdata['at_raid'] = at_raid;
+
+
+    dialog.widgets['row_loot'+row].show = true;
+    if(at_quarry || at_squad || rowdata['raid_mode'] === 'scout') {
+        // show status instead of loot here
+        dialog.widgets['row_loot'+row].str = ui_outcome;
+        dialog.widgets['row_loot'+row].text_color = (myout === 'defeat' ? new SPUI.Color(1,0,0,1) : new SPUI.Color(0,0.8,0,1));
     } else {
-        dialog.widgets['scroll_up'].state = 'disabled';
+        dialog.widgets['row_loot'+row].text_color = SPUI.default_text_color;
+        var is_lost = false;
+        if(session.user_id == rowdata['defender_id']) {
+            for(var res in gamedata['resources']) {
+                if(rowdata['loot'] && (res+'_lost' in rowdata['loot'])) {
+                    is_lost = true;
+                }
+            }
+        }
+        var s_list = [];
+
+        for(var res in gamedata['resources']) {
+            var amount;
+            if(rowdata['loot']) {
+                if(is_lost) {
+                    amount = rowdata['loot'][res+'_lost']||0;
+                } else {
+                    if(gamedata['show_uncapped_loot']) {
+                        amount = rowdata['loot']['looted_uncapped_'+res] || 0;
+                    } else {
+                        amount = rowdata['loot'][res] || 0;
+                    }
+                }
+            } else {
+                amount = 0;
+            }
+
+            if(amount != 0) {
+                // Note, we add the minus sign here for lost amounts.
+                s_list.push(((is_lost && amount > 0) ? '-' : '') + pretty_print_qty_brief(amount) + ' ' + gamedata['resources'][res]['ui_name']);
+            }
+        }
+        dialog.widgets['row_loot'+row].str = s_list.join('\n');
     }
 
-    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages-1): (chapter_pages-2));
-    if(page < last_showable_page) { // || (dialog.user_data['sumlist'] !== null && !dialog.user_data['sumlist_is_final'])) {
-        dialog.widgets['scroll_down'].state = 'normal';
+    if(gamedata['client']['battle_history_time_column']) {
+        dialog.widgets['row_time'+row].show = true;
+        dialog.widgets['row_time'+row].str = dialog.data['widgets']['row_time']['ui_name'].replace('%s', pretty_print_time_brief(time_ago));
+    }
+
+    // View Log button (opprole is for Facebook messaging only)
+    var friendly_id = -1;
+    if(rowdata['attacker_id'] == session.user_id) {
+        friendly_id = rowdata['attacker_id'];
+    } else if(rowdata['defender_id'] == session.user_id) {
+        friendly_id = rowdata['defender_id'];
+    } else if(rowdata['attacker_alliance_id'] > 0 && rowdata['attacker_alliance_id'] == session.alliance_id) {
+        friendly_id = rowdata['attacker_id'];
+    } else if(rowdata['defender_alliance_id'] > 0 && rowdata['defender_alliance_id'] == session.alliance_id) {
+        friendly_id = rowdata['defender_id'];
+    } else { // third-party log
+        friendly_id = dialog.user_data['from_id'];
+    }
+
+    var callback = (function (_rowdata, _signature, _friendly_id) { return function() {
+        player.record_feature_use('battle_log');
+        invoke_battle_log_dialog(_rowdata, _signature, _friendly_id);
+    }; })(rowdata, signature, friendly_id);
+
+    dialog.widgets['row_log_button'+row].show = (player.is_developer() || player.get_any_abtest_value('enable_battle_logs',true));
+    dialog.widgets['row_log_button'+row].state = 'normal';
+    dialog.widgets['row_log_button'+row].onclick = callback;
+
+    var info = PlayerCache.query_sync(user_id) || {};
+    var prot_end_time = (info && ('protection_end_time' in info) ? info['protection_end_time'] : -1);
+    var is_protected = (prot_end_time == 1 || prot_end_time > server_time);
+    var is_logged_in = (info && info['LOCK_STATE'] == 1);
+    var on_cooldown = ('attack_cooldown_expire' in rowdata && rowdata['attack_cooldown_expire'] > server_time);
+
+    if(gamedata['client']['battle_history_show_attackability'] && (dialog.user_data['chapter'] !== 'alliance')) {
+        dialog.widgets['row_prot'+row].show = (is_protected || (!player.raids_enabled() && is_logged_in));
+        if(dialog.widgets['row_prot'+row].show) {
+            dialog.widgets['row_prot'+row].str = dialog.data['widgets']['row_prot'][(player.raids_enabled() ? 'ui_name_prot' : 'ui_name')];
+        }
+        dialog.widgets['row_cooldown'+row].show = (!is_protected && !is_logged_in && on_cooldown);
+        if(dialog.widgets['row_cooldown'+row].show) {
+            dialog.widgets['row_cooldown'+row].str = dialog.data['widgets']['row_cooldown']['ui_name'].replace('%s', pretty_print_time_brief(rowdata['attack_cooldown_expire'] - server_time));
+        }
     } else {
-        dialog.widgets['scroll_down'].state = 'disabled';
+        dialog.widgets['row_prot'+row].show = dialog.widgets['row_cooldown'+row].show = false;
     }
 
-    dialog.widgets['scroll_up'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page']-1); };
-    dialog.widgets['scroll_down'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page']+1); };
+    // Revenge button
+    if(!user_id || is_ai_user_id_range(user_id)) {
+        dialog.widgets['row_revenge_button'+row].show = false;
+    } else if(session.region && session.region.data && session.region.data['storage'] == 'nosql' && session.region.map_enabled()) {
+        dialog.widgets['row_revenge_button'+row].show = false;
+        if(info && info['home_region'] == session.region.data['id'] && info['home_base_loc']) {
+            dialog.widgets['row_revenge_button'+row].show = true;
+            dialog.widgets['row_revenge_button'+row].state = 'normal';
+            dialog.widgets['row_revenge_button'+row].str = dialog.data['widgets']['row_revenge_button']['ui_name_find_on_map'];
+            dialog.widgets['row_revenge_button'+row].onclick = (function (_loc) { return function(w) {
+                change_selection_ui(null);
+                invoke_region_map(_loc);
+            }; })(info['home_base_loc']);
+        }
+    } else {
+        // only say "Revenge" if we can actually do a revenge attack
+        var can_revenge = (player.cooldown_active('revenge_defender:'+user_id.toString()) &&
+                           !is_protected && !is_logged_in && !on_cooldown &&
+                           !(session.is_in_alliance() && session.alliance_id === info['alliance_id']));
+        if(can_revenge) {
+            dialog.widgets['row_revenge_button'+row].show = true;
+            dialog.widgets['row_revenge_button'+row].bg_image = dialog.data['widgets']['row_revenge_button']['bg_image'+(can_revenge?'':'_spy')];
+            dialog.widgets['row_revenge_button'+row].str = dialog.data['widgets']['row_revenge_button']['ui_name'+(can_revenge?'':'_spy')];
+            dialog.widgets['row_revenge_button'+row].state = (can_revenge ? 'attack' : 'normal');
 
-    return dialog;
-};
+            dialog.widgets['row_revenge_button'+row].onclick = (function (_uid) { return function(w) {
+                change_selection(null);
+                visit_base(_uid);
+            }; })(user_id);
+        } else {
+            dialog.widgets['row_revenge_button'+row].show = false;
+        }
+    }
+}
+
 
 /** @param {SPUI.Dialog} dialog */
 function update_battle_history_dialog(dialog) {
@@ -29001,89 +28983,50 @@ function update_battle_history_dialog(dialog) {
             dialog.widgets['loading_spinner'].show =
             dialog.widgets['loading_text'].show = false;
     }
+    if(dialog.user_data['sumlist'] !== null && dialog.user_data['sumlist'].length > 0) {
+        dialog.user_data['rowdata'] = dialog.user_data['sumlist'];
+    }
     dialog.widgets['partial_error'].show = (dialog.user_data['sumlist_is_error'] === 'partial');
 
-    var row;
-    for(row = 0; row < dialog.data['widgets']['row_name']['array'][1]; row++) {
-        var index = dialog.user_data['first_on_page'] + row;
-        if(index < 0 || !dialog.user_data['sumlist'] || index >= dialog.user_data['sumlist'].length) {
-            break;
-        }
-        var summary = dialog.user_data['sumlist'][index];
+    // note: currently, AI battles do not record involved_alliances, so cannot be looked up for alliancemates.
+    dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && !dialog.user_data['alliancemate_flag'] && (dialog.user_data['from_id'] >= 0);
 
-        var opprole;
-        if((summary['attacker_id'] == dialog.user_data['from_id']) ||
-           (dialog.user_data['from_alliance'] >= 0 && summary['attacker_alliance_id'] == dialog.user_data['from_alliance'])) {
-            opprole = 'defender';
-        } else {
-            opprole = 'attacker';
-        }
-        var user_id = summary[opprole+'_id'];
-
-        var info = PlayerCache.query_sync(user_id) || {};
-        var prot_end_time = (info && ('protection_end_time' in info) ? info['protection_end_time'] : -1);
-        var is_protected = (prot_end_time == 1 || prot_end_time > server_time);
-        var is_logged_in = (info && info['LOCK_STATE'] == 1);
-        var on_cooldown = ('attack_cooldown_expire' in summary && summary['attack_cooldown_expire'] > server_time);
-
-        if(gamedata['client']['battle_history_show_attackability'] && (dialog.user_data['chapter'] !== 'alliance')) {
-            dialog.widgets['row_prot'+row].show = (is_protected || (!player.raids_enabled() && is_logged_in));
-            if(dialog.widgets['row_prot'+row].show) {
-                dialog.widgets['row_prot'+row].str = dialog.data['widgets']['row_prot'][(player.raids_enabled() ? 'ui_name_prot' : 'ui_name')];
-            }
-            dialog.widgets['row_cooldown'+row].show = (!is_protected && !is_logged_in && on_cooldown);
-            if(dialog.widgets['row_cooldown'+row].show) {
-                dialog.widgets['row_cooldown'+row].str = dialog.data['widgets']['row_cooldown']['ui_name'].replace('%s', pretty_print_time_brief(summary['attack_cooldown_expire'] - server_time));
-            }
-        } else {
-            dialog.widgets['row_prot'+row].show = dialog.widgets['row_cooldown'+row].show = false;
-        }
-
-        // Revenge button
-        if(!user_id || is_ai_user_id_range(user_id)) {
-            dialog.widgets['row_revenge_button'+row].show = false;
-        } else if(session.region && session.region.data && session.region.data['storage'] == 'nosql' && session.region.map_enabled()) {
-            dialog.widgets['row_revenge_button'+row].show = false;
-            if(info && info['home_region'] == session.region.data['id'] && info['home_base_loc']) {
-                dialog.widgets['row_revenge_button'+row].show = true;
-                dialog.widgets['row_revenge_button'+row].state = 'normal';
-                dialog.widgets['row_revenge_button'+row].str = dialog.data['widgets']['row_revenge_button']['ui_name_find_on_map'];
-                dialog.widgets['row_revenge_button'+row].onclick = (function (_loc) { return function(w) {
-                    change_selection_ui(null);
-                    invoke_region_map(_loc);
-                }; })(info['home_base_loc']);
-            }
-        } else {
-
-            // only say "Revenge" if we can actually do a revenge attack
-            var can_revenge = (player.cooldown_active('revenge_defender:'+user_id.toString()) &&
-                               !is_protected && !is_logged_in && !on_cooldown &&
-                               !(session.is_in_alliance() && session.alliance_id === info['alliance_id']));
-            if(can_revenge) {
-                dialog.widgets['row_revenge_button'+row].show = true;
-                dialog.widgets['row_revenge_button'+row].bg_image = dialog.data['widgets']['row_revenge_button']['bg_image'+(can_revenge?'':'_spy')];
-                dialog.widgets['row_revenge_button'+row].str = dialog.data['widgets']['row_revenge_button']['ui_name'+(can_revenge?'':'_spy')];
-                dialog.widgets['row_revenge_button'+row].state = (can_revenge ? 'attack' : 'normal');
-
-                dialog.widgets['row_revenge_button'+row].onclick = (function (_uid) { return function(w) {
-                    change_selection(null);
-                    visit_base(_uid);
-                }; })(user_id);
-            } else {
-                dialog.widgets['row_revenge_button'+row].show = false;
-            }
-        }
-    }
-
-    while(row < 5) {
-        dialog.widgets['row_prot'+row].show =
-            dialog.widgets['row_cooldown'+row].show =
-            dialog.widgets['row_revenge_button'+row].show = false;
-        row += 1;
+    dialog.widgets['multiplayer_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_id'] >= 0);
+    dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0 || dialog.user_data['from_id'] === session.user_id) && (dialog.user_data['from_id'] >= 0);
+    if(dialog.widgets['alliance_button'].show && dialog.user_data['from_alliance'] < 0) {
+        // for the player, who is not in an alliance
+        dialog.widgets['alliance_button'].tooltip.str = dialog.data['widgets']['alliance_button']['ui_tooltip_no_alliance'];
     }
 
     // zoom effect
     animate_dialog_zoom_effect(dialog, dialog.user_data['zoom_from_widget']);
+
+    var page = dialog.user_data['page'];
+    var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
+    var rows_per_page = dialog.user_data['rows_per_page'];
+    var chapter_pages = Math.floor(chapter_battles + rows_per_page - 1);
+    var query_threshold = rows_per_page * 5;
+    if(chapter_battles > 0) {
+        dialog.widgets['scroll_text'].show = true;
+    }
+
+    // need to get more from server?
+    // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
+    if(chapter_pages > 0 && page > 0 && page >= (chapter_pages - query_threshold) &&
+       dialog.user_data['sumlist'] !== null &&
+       !dialog.user_data['sumlist_is_final'] &&
+       !dialog.user_data['sumlist_is_error'] &&
+       !dialog.user_data['pending']) {
+        send_battle_history_query(dialog);
+    }
+
+    if(dialog.user_data['sumlist_is_final'] && !dialog.user_data['sumlist_is_error']) {
+        dialog.user_data['rowdata_incomplete'] = false;
+    }
+    if(chapter_pages > 0 && dialog.user_data['sumlist'] !== null) {
+        dialog.user_data['rowdata'] = dialog.user_data['sumlist'];
+    }
+    scrollable_dialog_change_page(dialog, page)
 };
 
 /** scrolls battle log by the amount and direction of delta
@@ -29104,9 +29047,12 @@ function scroll_battle_log(dialog, delta){
     }
 }
 
-/** @param {!Object} summary
+/** @param {Object} summary
     @param {number} friendly_id - the "good guy" in this battle - not necessarily the viewing player */
 function invoke_battle_log_dialog(summary, signature, friendly_id) {
+    if(!summary) {
+        throw Error ('Battle log called with without summary');
+    }
     var dialog = new SPUI.Dialog(gamedata['dialogs']['battle_log_dialog']);
     dialog.user_data['dialog'] = 'battle_log_dialog';
     dialog.user_data['friendly_id'] = friendly_id;
