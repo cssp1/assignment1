@@ -33,6 +33,26 @@ ModChain.get_base_value = function(stat, spec, level) {
         } else {
             return null;
         }
+    } else if(stat.indexOf('impact_auras') === 0) {
+        var impact_aura = stat.split(':')[1];
+        stat = 'impact_auras';
+        var spell = get_auto_spell_raw(spec);
+        if(!spell) { return null; }
+        var ret = null;
+        if(stat in spell) {
+            goog.array.forEach(spell['impact_auras'], function(aura) {
+                if(aura['spec'] === impact_aura) {
+                    ret = {'spec': aura['spec']};
+                    if('duration' in aura) {
+                        ret['duration'] = get_leveled_quantity(aura['duration'], level);
+                    }
+                    if('strength' in aura) {
+                        ret['strength'] = get_leveled_quantity(aura['strength'], level);
+                    }
+                };
+            });
+        }
+        return ret;
     } else if(stat in spec) {
         return get_leveled_quantity(spec[stat], level);
     } else if(stat == 'armor') { // annoying special cases
@@ -384,6 +404,26 @@ ModChain.display_value = function(value, display_mode, context, ui_mod_level) {
                 });
                 ui_value = ui_list.join(', ');
             }
+        } else if (parsed.mode == 'auraname') {
+            if(value === null) {
+                ui_value = '';
+            } else {
+                var spec = gamedata['auras'][value['spec']];
+                var ui_aura = (context == 'widget' && ('ui_name_short' in spec)) ? spec['ui_name_short'] : spec['ui_name'];
+                // add strength and duration info
+                if(context != 'widget') {
+                    var ui_duration = '';
+                    var ui_pct = '';
+                    if('strength' in value && typeof(value['strength']) === 'number') {
+                        ui_pct = (100 * value['strength']).toFixed(parsed.precision).toString() + '%';
+                    }
+                    if('duration' in value && typeof(value['duration']) === 'number') {
+                        ui_duration = (value['duration']).toFixed(parsed.precision).toString() + ' seconds';
+                    }
+                    ui_aura += '\n' + spec['ui_description'].replace('%pct', ui_pct).replace('%dur', ui_duration);
+                }
+                ui_value = ui_aura;
+            }
         } else if(parsed.mode == 'on_destroy' || parsed.mode == 'on_damage' || parsed.mode == 'on_approach') {
             return ModChain.display_value_secteam(parsed.mode, value, context, ui_mod_level);
         } else if(parsed.mode == 'literal') {
@@ -596,6 +636,9 @@ ModChain.display_label_widget = function(widget, stat, auto_spell, enable_toolti
             // flip over to a different variant for point-blank AoE weapons
             stat = 'weapon_range_pbaoe'; // this is the trigger range, not the harmful radius
         }
+    } else if (stat.indexOf('impact_auras') === 0) {
+        // switch to impact_auras if it's an impact aura
+        stat = 'impact_auras';
     }
 
     var ui_data = gamedata['strings']['modstats']['stats'][stat];
@@ -698,6 +741,10 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
                                                         level);
     } else if(stat == 'weapon') {
         show_base = true;
+    } else if (stat.indexOf('impact_auras') === 0) {
+        // weapon impact auras pass the aura name as part of the stat, which needs to be stripped out for the correct ui_data
+        ui_data = gamedata['strings']['modstats']['stats']['impact_auras'];
+        ui_data['ui_tooltip'] = ModChain.display_value(modchain['val'], ui_data['display'], 'tooltip');
     }
 
     ModChain.check_chain(modchain);

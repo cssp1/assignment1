@@ -44569,6 +44569,17 @@ function get_weapon_spell_features2(spec, spell) {
     if('ui_priority_vs' in spell || 'ui_priority_vs' in spec) {
         ret.push('ui_priority_vs');
     }
+    if('impact_auras' in spell){
+        goog.array.forEach(spell['impact_auras'], function(aura) {
+            var name = aura['spec'];
+            var spec = gamedata['auras'][name];
+            var effects = spec['effects'];
+            var is_dot = false;
+            goog.array.forEach(effects, function(effect) { if('code' in effect && effect['code'] == 'on_fire') { is_dot = true; } });
+            if(is_dot) { return; }
+            ret.push('impact_auras:' + name);
+        });
+    }
     return ret;
 };
 
