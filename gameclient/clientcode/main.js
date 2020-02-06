@@ -24769,6 +24769,7 @@ function invoke_map_bookmark_rename_dialog(bookmarks_dialog, bookmark) {
 
 function scrollable_dialog_change_page(dialog, page) {
     var scroll_by_row = dialog.user_data['scroll_by_row'] || false;
+    var rowdata_incomplete = dialog.user_data['rowdata_incomplete'] || false;
     var rows_per_page = dialog.user_data['rows_per_page'];
     var cols_per_page = dialog.user_data['cols_per_page'] || 1;
     var rowfunc = dialog.user_data['rowfunc'];
@@ -24793,6 +24794,9 @@ function scrollable_dialog_change_page(dialog, page) {
         last_on_page = Math.max(0, Math.min(last_on_page, chapter_items-1));
         if('scroll_text' in dialog.widgets) {
             dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_items.toString());
+            if(rowdata_incomplete) {
+                dialog.widgets['scroll_text'].str = dialog.widgets['scroll_text'].str + '+';
+            }
         }
         for(var i = first_on_page; i <= last_on_page; i++) {
             var coord = (cols_per_page == 1 ? row : [col,row]);
@@ -28465,6 +28469,7 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.user_data['rows_per_page'] = dialog.data['widgets']['row_name']['array'][1];
     dialog.user_data['rowdata'] = [];
     dialog.user_data['rowfunc'] = battle_history_setup_row;
+    dialog.user_data['rowdata_incomplete'] = true;
     dialog.on_mousewheel_function = scrollable_dialog_mousewheel;
 
     if(from_id < 0 && from_alliance < 0) {
@@ -28547,6 +28552,7 @@ function battle_history_change_chapter(dialog, chapter) {
     dialog.user_data['sumlist_is_error'] = null;
     dialog.user_data['first_on_page'] = -1;
     dialog.user_data['rowdata'] = [];
+    dialog.user_data['rowdata_incomplete'] = true;
 
     // if player is on the map, query the map so that feature status is accurate
     if(session.region.map_enabled()) {
@@ -29001,21 +29007,21 @@ function update_battle_history_dialog(dialog) {
     var chapter_pages = Math.floor(chapter_battles + rows_per_page - 1);
     var query_threshold = rows_per_page * 5;
     if(chapter_battles > 0) {
-        var first_on_page = dialog.user_data['first_on_page'] = page;
-        var last_on_page = page + rows_per_page - 1;
-        last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles - 1));
-        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page + 1).toString()).replace('%d2',(last_on_page + 1).toString()).replace('%d3',(chapter_battles.toString() + (dialog.user_data['sumlist_is_final'] ? '' : '+')));
         dialog.widgets['scroll_text'].show = true;
     }
 
     // need to get more from server?
     // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
-    if(chapter_pages > 0 && page >= (chapter_pages - query_threshold) &&
+    if(chapter_pages > 0 && page > 0 && page >= (chapter_pages - query_threshold) &&
        dialog.user_data['sumlist'] !== null &&
        !dialog.user_data['sumlist_is_final'] &&
        !dialog.user_data['sumlist_is_error'] &&
        !dialog.user_data['pending']) {
         send_battle_history_query(dialog);
+    }
+
+    if(dialog.user_data['sumlist_is_final'] && !dialog.user_data['sumlist_is_error']) {
+        dialog.user_data['rowdata_incomplete'] = false;
     }
     if(chapter_pages > 0 && dialog.user_data['sumlist'] !== null) {
         dialog.user_data['rowdata'] = dialog.user_data['sumlist'];
@@ -29041,10 +29047,12 @@ function scroll_battle_log(dialog, delta){
     }
 }
 
-/** @param {!Object|null} summary - has to be !Object|null due to the scrollable dialog typing
+/** @param {Object} summary
     @param {number} friendly_id - the "good guy" in this battle - not necessarily the viewing player */
 function invoke_battle_log_dialog(summary, signature, friendly_id) {
-    if(!summary) { return; } // safeguard against call with null
+    if(!summary) {
+        throw Error ('Battle log called with without summary');
+    }
     var dialog = new SPUI.Dialog(gamedata['dialogs']['battle_log_dialog']);
     dialog.user_data['dialog'] = 'battle_log_dialog';
     dialog.user_data['friendly_id'] = friendly_id;
