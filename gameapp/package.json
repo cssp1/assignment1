@@ -1,0 +1,17 @@
+{
+  "name": "gameapp",
+  "version": "0.0.1",
+  "description": "Battlehouse Electron App Prototype",
+  "main": "index.js",
+  "start": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electro": "^2.1.1",
+    "electron": "^8.0.0"
+  }
+}
