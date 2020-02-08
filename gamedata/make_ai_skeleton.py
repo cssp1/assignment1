@@ -1263,6 +1263,26 @@ if __name__ == '__main__':
                 if extra_activation_pred:
                     act_pred['subpredicates'] += extra_activation_pred
 
+                # optional extra show_if predicate on bases
+                # this can be either a list of AND'ed predicates, which applies to L1 only for each difficulty
+                # or a list of list of AND'ed predicates, one per level
+                extra_show_if_pred = None
+                if 'extra_show_if_predicates' in data:
+                    assert diff in data['extra_show_if_predicates']
+                    if type(data['extra_show_if_predicates'][diff][0]) is dict:
+                        # predicate applies to the first level only
+                        if is_first_base:
+                            extra_show_if_pred = data['extra_show_if_predicates'][diff]
+                    else:
+                        # one predicate per base
+                        extra_show_if_pred = data['extra_show_if_predicates'][diff][i]
+
+                # make sure we got either None, or a list of predicates to be AND'ed
+                assert (extra_show_if_pred is None) or ((type(extra_show_if_pred) is list) and (type(extra_show_if_pred[0]) is dict))
+
+                if extra_show_if_pred:
+                    show_pred['subpredicates'] += extra_show_if_pred
+
                 if show_pred == act_pred:
                     # skip show_if if it is identical to activation
                     show_pred = None
