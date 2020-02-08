@@ -1278,7 +1278,7 @@ if __name__ == '__main__':
                         extra_show_if_pred = data['extra_show_if_predicates'][diff][i]
 
                 # make sure we got either None, or a list of predicates to be AND'ed
-                assert (extra_show_if_pred is None) or ((type(extra_show_if_pred) is list) and (type(extra_show_if_pred[0]) is dict))
+                assert (extra_show_if_pred is None) or (isinstance(extra_show_if_pred, list) and isinstance(extra_show_if_pred[0], dict))
 
                 if extra_show_if_pred:
                     show_pred['subpredicates'] += extra_show_if_pred
