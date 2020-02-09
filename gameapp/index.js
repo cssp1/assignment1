@@ -14,7 +14,6 @@ function createWindow () {
   })
 
   // and load the index.html of the app.
-  //win.loadURL(Auth.getAuthenticationUrl('https://www.battlehouse.com/play/firestrike'), {userAgent: 'Chrome'})
   win.loadURL('https://www.battlehouse.com/play/firestrike/', {userAgent: 'Chrome'})
   //win.loadURL('http://localhost:9091/')
   win.once('ready-to-show', () => {
@@ -23,4 +22,3 @@ function createWindow () {
 }
 
 app.whenReady().then(createWindow)
-//app.userAgentFallback = app.userAgentFallback.replace('Electron/' + process.versions.electron, '');
