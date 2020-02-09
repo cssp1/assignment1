@@ -9071,16 +9071,29 @@ function get_unit_stat(stattab, specname, stat, default_value) {
 // to be used when getting stats for a new building you have not built
 // yet, or a unit you have not unlocked.
 function get_auto_spell_raw(spec) {
+    var ret = null;
     if(('spells' in spec) && (spec['spells'].length > 0)) {
         var spellname = spec['spells'][0];
         if(spellname) {
             var auto_spell = gamedata['spells'][spellname];
             if(auto_spell['activation'] === 'auto') {
-                return auto_spell;
+                ret = auto_spell;
             }
         }
+    } else if ('equip' in spec && 'effects' in spec['equip']) {
+        var effects = spec['equip']['effects'];
+        var mod_spellname = '';
+        goog.array.forEach(effects, function(effect) {
+            if('code' in effect && effect['code'] === 'modstat' && 'stat' in effect && effect['stat'] === 'weapon' && 'strength' in effect) {
+                mod_spellname = effect['strength'];
+            };
+        });
+        var mod_auto_spell = gamedata['spells'][mod_spellname];
+        if(mod_auto_spell['activation'] === 'auto') {
+            ret = mod_auto_spell;
+        }
     }
-    return null;
+    return ret;
 }
 
 // includes player or enemy modstats
