@@ -842,6 +842,9 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
                 var delta_sign = (detail.value - relative_detail.value >= 0 ? 1 : -1);
                 var is_worse = (detail.value < relative_detail.value);
                 var ui_stat = gamedata['strings']['modstats']['stats'][stat];
+                if(stat.indexOf('impact_auras') === 0) {
+                    ui_stat = gamedata['strings']['modstats']['stats']['impact_auras'];
+                }
                 if((ui_stat['better']||1) < 0) {
                     is_worse = !is_worse; // flip sign of better vs. worse
                 }
