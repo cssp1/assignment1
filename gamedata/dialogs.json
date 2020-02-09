@@ -6889,9 +6889,9 @@
                                     "text_hjustify": "left", "ui_name": "Time" },
 
             "scroll_up": { "kind": "ActionButton", "xy": [700,90], "dimensions": [27,30], "bg_image": "chat_scroll_up", "push_bg_image": 1,
-                           "bg_image_offset": [0,-5], "layout": { "hjustify": "right"} },
+                           "bg_image_offset": [0,-5], "layout": { "hjustify": "right"}, "dripper": {"rate": 4.0, "delay": 0} },
             "scroll_down": { "kind": "ActionButton", "xy": [700,367], "dimensions": [27,30], "bg_image": "chat_scroll_down", "push_bg_image": 1,
-                             "bg_image_offset": [0,-15], "layout": { "hjustify": "right"} },
+                             "bg_image_offset": [0,-15], "layout": { "hjustify": "right"}, "dripper": {"rate": 4.0, "delay": 0} },
             "scroll_text": { "show": 0, "kind": "TextField", "xy": [56,383], "dimensions": [181,19], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1]},
 
             "alliancemate_note": { "kind": "TextField", "xy": [56,383], "dimensions": [625,19], "text_size": 13, "text_hjustify": "right", "ui_name": "* Only showing battles that occurred while this player was in your Alliance.", "text_color": [0.5,0.5,0.5,1]},
