@@ -639,6 +639,7 @@ ModChain.display_label_widget = function(widget, stat, auto_spell, enable_toolti
     } else if (stat.indexOf('impact_auras') === 0) {
         // switch to impact_auras if it's an impact aura
         stat = 'impact_auras';
+        enable_tooltip = false;
     }
 
     var ui_data = gamedata['strings']['modstats']['stats'][stat];
