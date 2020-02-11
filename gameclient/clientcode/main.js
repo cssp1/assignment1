@@ -28682,6 +28682,8 @@ function battle_history_setup_row(dialog, row, rowdata) {
         dialog.widgets['row_log_button'+row].show =
         dialog.widgets['row_revenge_button'+row].show = false;
 
+
+    if(!rowdata) { return; }
     var signature = rowdata['signature'];
     var myrole, opprole;
     if(rowdata['attacker_id'] == dialog.user_data['from_id']) {
