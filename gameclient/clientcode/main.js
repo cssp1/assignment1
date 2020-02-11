@@ -29001,7 +29001,7 @@ function update_battle_history_dialog(dialog) {
             var new_sum = null;
             new_sum = dialog.user_data['sumlist'][i];
             new_sum['signature'] = dialog.user_data['siglist'][i];
-            dialog.user_data['rowdata'].push(new_sum)
+            dialog.user_data['rowdata'].push(new_sum);
         }
     }
     dialog.widgets['partial_error'].show = (dialog.user_data['sumlist_is_error'] === 'partial');
@@ -29047,7 +29047,7 @@ function update_battle_history_dialog(dialog) {
             var new_sum = null;
             new_sum = dialog.user_data['sumlist'][i];
             new_sum['signature'] = dialog.user_data['siglist'][i];
-            dialog.user_data['rowdata'].push(new_sum)
+            dialog.user_data['rowdata'].push(new_sum);
         }
     }
     scrollable_dialog_change_page(dialog, page)
