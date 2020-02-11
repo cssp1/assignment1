@@ -28683,7 +28683,7 @@ function battle_history_setup_row(dialog, row, rowdata) {
         dialog.widgets['row_revenge_button'+row].show = false;
 
     if (!dialog.user_data['siglist'] || row > dialog.user_data['siglist'].length || !rowdata) { return; }
-    var signature = dialog.user_data['siglist'][row];
+    var signature = rowdata['signature'];
     var myrole, opprole;
     if(rowdata['attacker_id'] == dialog.user_data['from_id']) {
         myrole = 'attacker';
@@ -28997,7 +28997,13 @@ function update_battle_history_dialog(dialog) {
             dialog.widgets['loading_text'].show = false;
     }
     if(dialog.user_data['sumlist'] !== null && dialog.user_data['sumlist'].length > 0) {
-        dialog.user_data['rowdata'] = dialog.user_data['sumlist'];
+        dialog.user_data['rowdata'] = [];
+        for(var i = 0; i < dialog.user_data['sumlist'].length; i++) {
+            var new_sum = null;
+            new_sum = dialog.user_data['sumlist'][i];
+            new_sum['signature'] = dialog.user_data['siglist'][i];
+            dialog.user_data['rowdata'].push(new_sum)
+        }
     }
     dialog.widgets['partial_error'].show = (dialog.user_data['sumlist_is_error'] === 'partial');
 
@@ -29037,7 +29043,13 @@ function update_battle_history_dialog(dialog) {
         dialog.user_data['rowdata_incomplete'] = false;
     }
     if(chapter_pages > 0 && dialog.user_data['sumlist'] !== null) {
-        dialog.user_data['rowdata'] = dialog.user_data['sumlist'];
+        dialog.user_data['rowdata'] = [];
+        for(var i = 0; i < dialog.user_data['sumlist'].length; i++) {
+            var new_sum = null;
+            new_sum = dialog.user_data['sumlist'][i];
+            new_sum['signature'] = dialog.user_data['siglist'][i];
+            dialog.user_data['rowdata'].push(new_sum)
+        }
     }
     scrollable_dialog_change_page(dialog, page)
 };
@@ -29061,6 +29073,7 @@ function scroll_battle_log(dialog, delta){
 }
 
 /** @param {Object} summary
+    @param {Object} signature
     @param {number} friendly_id - the "good guy" in this battle - not necessarily the viewing player */
 function invoke_battle_log_dialog(summary, signature, friendly_id) {
     if(!summary) {
@@ -29196,6 +29209,12 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
 };
 
 var battle_log_receivers = {};
+/** @param {number} battle_time
+    @param {number} attacker_id
+    @param {number} defender_id
+    @param {string|null} base_id
+    @param {Object} signature
+    @param {function()=} cb */
 function get_battle_log(battle_time, attacker_id, defender_id, base_id, signature, cb) {
     last_query_tag += 1;
     var tag = 'gbl'+last_query_tag.toString();
@@ -29267,6 +29286,8 @@ function set_up_replay_sharing_button(dialog, battle_summary, replay_signature, 
     });
 }
 
+/** @param {!SPUI.Dialog} dialog
+    @param {Object|null} ret */
 function receive_battle_log_result(dialog, ret) {
     var log, replay_exists;
     if(!ret) {
