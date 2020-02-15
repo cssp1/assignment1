@@ -22928,8 +22928,8 @@ function invoke_building_context_menu(mouse_xy) {
                     var item_level = ItemDisplay.get_inventory_item_level(cur_item);
                     if(tech_level > item_spec['level']) {
                         under_leveled = true;
-                        // but also check recipe predicate (quarries)
 
+                        // but also check recipe predicate (quarries)
                         if('associated_crafting_recipes' in item_spec) {
                             var recipe = gamedata['crafting']['recipes'][item_spec['associated_crafting_recipes'][0]];
                             goog.array.forEach(['show_if', 'requires'], function(pred) {
@@ -22957,7 +22957,7 @@ function invoke_building_context_menu(mouse_xy) {
                     special_buttons['mounted'].push(new ContextMenuButton({ui_name: spell[this_ui_context],
                                                                            onclick: (function (_obj) { return function(w) { MountedWeaponDialog.invoke(_obj); }; })(obj),
                                                                            asset: (cur_item && !under_leveled ? 'menu_button_resizable' : null) // yellow only if no mounted weapon is equipped, or weapon is under-leveled
-                                                                          }));
+                                                                       }));
                 }
 
                 // avoid showing "research" button outside home base
@@ -22976,6 +22976,7 @@ function invoke_building_context_menu(mouse_xy) {
             }
 
             // can building be upgraded further?
+
             if(obj.time_until_finish() > 0) {
                 // object is busy with something, cannot upgrade
             } else if((session.home_base || quarry_upgradable || quarry_stats_viewable) &&
