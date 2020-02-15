@@ -30,6 +30,20 @@ ModChain.get_base_value = function(stat, spec, level) {
             } else {
                 return val;
             }
+        } else if('equip' in spec && 'effects' in spec['equip']) {
+            var ret = null;
+            goog.array.forEach(spec['equip']['effects'], function(effect) {
+                if(!('code' in effect && effect['code'] === 'modstat')) { return; }
+                if(effect['stat'] === stat) {
+                    var val = get_leveled_quantity(effect['strength'], level);
+                    if(Array.isArray(val) && val.length >= 1 && (Array.isArray(val[0]) || val[0] === null)) {
+                        ret = get_leveled_quantity(val, level);
+                    } else {
+                        ret = val;
+                    }
+                }
+            });
+            return ret;
         } else {
             return null;
         }

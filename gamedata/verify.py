@@ -1336,6 +1336,10 @@ def check_item(itemname, spec):
         error |= 1
         print '%s:name mismatch' % itemname
 
+    if 'ui_name' not in spec:
+        error |= 1
+        print '%s: does not have a ui_name. Many client functions are hard-coded to check this' % (itemname)
+
     if 'max_level' in spec:
         max_level = spec['max_level']
         if 'icon' in spec and isinstance(spec['icon'], list):

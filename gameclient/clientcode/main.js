@@ -45053,6 +45053,14 @@ function update_upgrade_dialog(dialog) {
             if(auto_spell) {
                 feature_list = feature_list.concat(get_weapon_spell_features2(item_spec, auto_spell));
             }
+            if('equip' in item_spec && 'effects' in item_spec['equip']) {
+                goog.array.forEach(item_spec['equip']['effects'], function(effect) {
+                    if(!('code' in effect && effect['code'] === 'modstat')) { return; }
+                    if(effect['stat'] === 'permanent_auras') {
+                        feature_list.push('permanent_auras');
+                    }
+                });
+            }
         } else if('associated_building' in tech) {
             feature_list.push('limit:'+tech['associated_building']);
         } else if('affects_unit' in tech && tech['effects']) { // mod techs

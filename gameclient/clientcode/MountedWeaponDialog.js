@@ -760,6 +760,46 @@ MountedWeaponDialog._remove_turret_head_anti_missile_mod = function(modchain) {
     return modchain;
 };
 
+/** Does this item apply any anti_missile modstats?
+    @param {!Object} item_spec
+    @private */
+MountedWeaponDialog._has_permanent_auras = function(item_spec) {
+    var has_it = false;
+    goog.array.forEach(item_spec['equip']['effects'], function(effect) {
+        if(effect['stat'] == 'permanent_auras') {
+            has_it = true;
+        }
+    });
+    return has_it;
+};
+/** Create a new modchain with the item's anti-missile stats appended
+    @param {!ModChain.ModChain} modchain
+    @param {!Object} item_spec
+    @return {!ModChain.ModChain}
+    @private */
+MountedWeaponDialog._add_permanent_auras_mod = function(modchain, item_spec, item_level) {
+    goog.array.forEach(item_spec['equip']['effects'], function(effect) {
+        if(effect['stat'] == 'permanent_auras') {
+            modchain = ModChain.clone(modchain);
+            modchain = ModChain.add_mod(modchain, effect['method'], get_leveled_quantity(effect['strength'], item_level), 'equipment', item_spec['name']);
+        }
+    });
+    return modchain;
+};
+
+/** Strip off a permanent auras modchain mod that comes from another security node
+    @param {!ModChain.ModChain} modchain
+    @return {!ModChain.ModChain}
+    @private */
+MountedWeaponDialog._remove_security_node_permanent_auras_mod = function(modchain) {
+    goog.array.forEach(modchain['mods'], function(mod, i) {
+        if(mod['kind'] == 'equipment' && mod['source'] in gamedata['items'] && gamedata['items'][mod['source']]['equip']['slot_type'] == 'security_node') {
+            modchain = ModChain.recompute_without_mod(modchain, i);
+        }
+    });
+    return modchain;
+};
+
 // operates on mounted_weapon_dialog_stats
 /** @param {SPUI.Dialog} dialog
     @param {GameObject} mounting_obj it will go onto
@@ -813,6 +853,11 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
            statlist.push('anti_missile');
     }
 
+    if(MountedWeaponDialog._has_permanent_auras(spec) ||
+       (relative_spec && MountedWeaponDialog._has_permanent_auras(relative_spec))) {
+           statlist.push('permanent_auras');
+    }
+
     for(var i = 0; i < dialog.data['widgets']['descriptionL']['array'][1]; i++) {
         var left = dialog.widgets['descriptionL'+i.toString()], right = dialog.widgets['descriptionR'+i.toString()];
         if(i < statlist.length) {
@@ -833,6 +878,14 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
                 if(relative_modchain && relative_spec) {
                     relative_modchain = MountedWeaponDialog._remove_turret_head_anti_missile_mod(relative_modchain);
                     relative_modchain = MountedWeaponDialog._add_anti_missile_mod(relative_modchain, relative_spec, relative_level);
+                }
+            } else if(stat == 'permanent_auras') { // needs special handling because it is a stat of the building, not the weapon spell
+                // strip off anti-missile mods from any other turret head (but leave alone mods from leader items etc)
+                modchain = MountedWeaponDialog._remove_security_node_permanent_auras_mod(modchain);
+                modchain = MountedWeaponDialog._add_permanent_auras_mod(modchain, spec, level);
+                if(relative_modchain && relative_spec) {
+                    relative_modchain = MountedWeaponDialog._remove_security_node_permanent_auras_mod(relative_modchain);
+                    relative_modchain = MountedWeaponDialog._add_permanent_auras_mod(relative_modchain, relative_spec, relative_level);
                 }
             }
 
