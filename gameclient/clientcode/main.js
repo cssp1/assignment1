@@ -24721,10 +24721,16 @@ function map_bookmarks_dialog_setup_row(dialog, row, rowdata) {
         dialog.widgets['go_button'+row].show = (rowdata !== null);
 
     if(rowdata !== null) {
-        dialog.widgets['name'+row].str = rowdata['ui_name'];
+        var ui_name_prefix = '';
+        var show_prefix = !!player.preferences['map_bookmark_show_prefix'];
+        var show_time = ('time' in rowdata && !!player.preferences['map_bookmark_show_time']);
+        if(show_prefix) {
+            ui_name_prefix = (dialog.user_data['page'] + row + 1).toString() + ': '
+        }
+        dialog.widgets['name'+row].str = ui_name_prefix + rowdata['ui_name'];
         dialog.widgets['coords'+row].str = dialog.data['widgets']['coords']['ui_name'].replace('%x', rowdata['coords'][0].toString()).replace('%y', rowdata['coords'][1].toString());
-        dialog.widgets['time'+row].show = ('time' in rowdata);
-        if('time' in rowdata) {
+        dialog.widgets['time'+row].show = (show_time);
+        if(show_time) {
             dialog.widgets['time'+row].str = dialog.data['widgets']['time']['ui_name'].replace('%s', pretty_print_time_brief(server_time - rowdata['time']));
         }
 
