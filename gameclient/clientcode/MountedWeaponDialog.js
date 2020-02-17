@@ -760,7 +760,7 @@ MountedWeaponDialog._remove_turret_head_anti_missile_mod = function(modchain) {
     return modchain;
 };
 
-/** Does this item apply any anti_missile modstats?
+/** Does this item apply any permanent_auras modstats?
     @param {!Object} item_spec
     @private */
 MountedWeaponDialog._has_permanent_auras = function(item_spec) {
@@ -772,7 +772,7 @@ MountedWeaponDialog._has_permanent_auras = function(item_spec) {
     });
     return has_it;
 };
-/** Create a new modchain with the item's anti-missile stats appended
+/** Create a new modchain with the item's permanent_auras stats appended
     @param {!ModChain.ModChain} modchain
     @param {!Object} item_spec
     @return {!ModChain.ModChain}
