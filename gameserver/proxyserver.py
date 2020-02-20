@@ -395,6 +395,7 @@ class Visitor(object):
         self.last_active_time = 0
         self.first_hit_uri = None
         self.game_container = None
+        self.spin_client_platform = None
 
         self.server_protocol = None
         self.server_host = None
@@ -408,6 +409,7 @@ class Visitor(object):
         self.demographics['User-Agent'] = SpinHTTP.get_twisted_header(request, 'user-agent') or 'unknown'
         self.demographics['ip'] = SpinHTTP.get_twisted_client_ip(request) or 'unknown'
         self.browser_info = BrowserDetect.get_browser(self.demographics['User-Agent'])
+        self.spin_client_platform = self.browser_info['browser_name']
 
         # canonical protocol/host/port for game server (in case browser needs to reload it)
         self.server_protocol, self.server_host, self.server_port = \
@@ -2552,6 +2554,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$BATTLEHOUSE_ENABLED$': 'true' if SpinConfig.config.get('enable_battlehouse',0) else 'false',
             '$MATTERMOST_ENABLED$': 'true' if SpinConfig.config.get('enable_mattermost',0) else 'false',
             '$FRAME_PLATFORM$': visitor.frame_platform,
+            '$SPIN_CLIENT_PLATFORM$': visitor.spin_client_platform,
             '$SOCIAL_ID$': visitor.social_id,
             '$FACEBOOK_ID$': "'"+visitor.facebook_id+"'" if isinstance(visitor, FBVisitor) else 'null',
             '$ARMORGAMES_ID$': "'"+visitor.armorgames_id+"'" if isinstance(visitor, AGVisitor) else 'null',
