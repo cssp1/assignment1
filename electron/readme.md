@@ -1,11 +1,11 @@
 Initial setup:
 
-Install npm for your dev environment.
+Install yarn for your dev environment.
 
-Initialize npm in the electron folder with the command `npm install --save-dev electron`
+Initialize yarn in the electron folder with the command `yarn add electron -dev`
 
-Run the test build with `npm start`
+Run the test build with `yarn start`
 
-To compile, install electron-packager with `npm install -g electron-packager --save-dev`
+To compile, install electron-packager with `yarn global add electron-packager --dev`
 
 Compile command: `electron-packager ./ --platform=win32 --arch=x64`
