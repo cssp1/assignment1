@@ -14,9 +14,8 @@ function createWindow () {
   })
 
   // and load the index.html of the app.
-  //win.loadURL('https://www.battlehouse.com/play/firestrike/', {userAgent: 'bh_electron_windows'})
-  win.loadURL('http://localhost:9091', {userAgent: 'bh_electron_windows'})
-  //win.loadURL('http://localhost:9091/')
+  win.loadURL('https://www.battlehouse.com/play/firestrike/', {userAgent: 'bh_electron_windows'})
+  //win.loadURL('http://localhost:9091', {userAgent: 'bh_electron_windows'})
   win.once('ready-to-show', () => {
     win.show()
   })
