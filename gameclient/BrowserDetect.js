@@ -140,9 +140,9 @@ var BrowserDetect = {
                 },
                 {               // for installed Electron client
                         string: navigator.userAgent,
-                        subString: " electron/",
-                        identity: "Electron",
-                        versionSearch: "Electron"
+                        subString: "bh_electron_windows",
+                        identity: "electron_windows",
+                        versionSearch: "electron_windows"
                 }
         ],
         dataOS : [

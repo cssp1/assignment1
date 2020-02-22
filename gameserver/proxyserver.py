@@ -409,7 +409,10 @@ class Visitor(object):
         self.demographics['User-Agent'] = SpinHTTP.get_twisted_header(request, 'user-agent') or 'unknown'
         self.demographics['ip'] = SpinHTTP.get_twisted_client_ip(request) or 'unknown'
         self.browser_info = BrowserDetect.get_browser(self.demographics['User-Agent'])
-        self.spin_client_platform = self.browser_info['browser_name']
+        if 'name' in self.browser_info and 'electron_' in self.browser_info['name']:
+            self.spin_client_platform = self.browser_info['name']
+        else:
+            self.spin_client_platform = 'web'
 
         # canonical protocol/host/port for game server (in case browser needs to reload it)
         self.server_protocol, self.server_host, self.server_port = \
