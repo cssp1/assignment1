@@ -1105,6 +1105,7 @@ class UserTable:
               ('privacy_consent_reason', str),
               ('birthday', None),
               ('browser_name', coerce_to_str),
+              ('client_platform', coerce_to_str),
               ('browser_version', int),
               ('browser_os', coerce_to_str),
               ('browser_hardware', str),
@@ -1333,6 +1334,9 @@ class User:
         self.browser_hardware = None
         self.browser_caps = {}
         self.browser_user_agent = None
+
+        # client platform, used to report if player is using an Electron-based client
+        self.client_platform = None
 
         # last result sent by SProbe.js
         self.last_sprobe_result = None
@@ -13700,6 +13704,7 @@ class LivePlayer(Player):
         # set during the login process.
         # necessary for evaluating predicates that depend on them
         self.browser_name = 'unknown'
+        self.client_platform = 'unknown'
         self.browser_os = 'unknown'
         self.browser_version = 'unknown'
         self.browser_hardware = 'unknown'
@@ -13727,6 +13732,7 @@ class LivePlayer(Player):
         self.browser_hardware = user.browser_hardware
         self.browser_caps = user.browser_caps
         self.user_facebook_likes = user.facebook_likes
+        self.client_platform = user.client_platform
 
     def ai_instance_generation_put(self, ai_id, gen, base_expiration_time):
         gen_expiration_time = server_time + gamedata['server'].get('ai_instance_generation_duration', 60)
@@ -27222,6 +27228,7 @@ class GAMEAPI(resource.Resource):
                                                                              'browser_name': session.user.browser_name,
                                                                              'browser_version': session.user.browser_version,
                                                                              'browser_hardware': session.user.browser_hardware,
+                                                                             'client_platform': session.user.client_platform,
                                                                              'country': session.user.country })
             http_request.setHeader('Connection', 'close') # stop keepalive
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]})
@@ -27476,6 +27483,7 @@ class GAMEAPI(resource.Resource):
                                                                                  'browser_name': session.user.browser_name,
                                                                                  'browser_version': session.user.browser_version,
                                                                                  'browser_hardware': session.user.browser_hardware,
+                                                                                 'client_platform': session.user.client_platform,
                                                                                  'country': session.user.country })
                     reactor.callLater(0, self.log_out_async, session, 'timeout')
                 request.setHeader('Connection', 'close') # stop keepalive
@@ -28158,6 +28166,7 @@ class GAMEAPI(resource.Resource):
                            'browser_OS':user.browser_os,
                            'browser_name':user.browser_name,
                            'browser_version':user.browser_version,
+                           'client_platform':user.client_platform,
                            'browser_hardware':user.browser_hardware}
 
         if client_permissions: acq_event_props['scope'] = client_permissions
