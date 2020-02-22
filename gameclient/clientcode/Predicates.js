@@ -2315,7 +2315,7 @@ goog.inherits(ClientPlatformPredicate, Predicate);
 ClientPlatformPredicate.prototype.is_satisfied = function(player, qdata) {
     var ret = false;
     goog.array.forEach(this.platforms, function(platform) {
-        if(platform === client_platform) {
+        if(platform === spin_client_platform) {
             ret = true;
         }
     });
