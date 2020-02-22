@@ -27855,6 +27855,14 @@ class GAMEAPI(resource.Resource):
             user.canvas_width, user.canvas_height = map(int, user_demographics[6].split('x'))
             # note: canvas_oversample is not determined until after receiving SERVER_HELLO
             user.devicePixelratio = parse_canvas_oversample(user_demographics[7])
+        if len(user_demographics) >= 9:
+            client_platform = user_demographics[8]
+            # only accept values we expect, in case the client lies to us
+            if isinstance(client_platform, basestring) and (client_platform == 'web' or client_platform.startswith('electron_')):
+                user.spin_client_platform = client_platform
+            else:
+                # default to web if there is no valid data
+                user.spin_client_platform = 'web'
 
         for cap in gamedata['browser_caps']:
             if cap in client_browser_caps:
