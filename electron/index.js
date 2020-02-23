@@ -9,6 +9,7 @@ function createWindow () {
       nodeIntegration: true
     }
   })
+  win.setFullScreen(true);
   win.on('closed', () => {
     win = null
   })
