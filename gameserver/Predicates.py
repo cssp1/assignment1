@@ -39,11 +39,9 @@ class ClimatePredicate(Predicate):
 class ClientPlatformPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
-        if player.spin_client_platform:
-            for platform in data['platforms']:
-                if platform == player.spin_client_platform:
-                    return True
-        return False
+        self.platforms = data['platforms']
+    def is_satisfied(self, player, qdata):
+        return player.spin_client_platform in self.platforms
 
 class RandomPredicate(Predicate):
     def __init__(self, data):
@@ -1186,7 +1184,7 @@ def read_predicate(data):
         return PrivacyConsentPredicate(data)
     elif kind == 'CLIMATE':
         return ClimatePredicate(data)
-    elif kind == 'CLIENT_PLATFORM'
+    elif kind == 'CLIENT_PLATFORM':
         return ClientPlatformPredicate(data)
     raise Exception('unknown predicate %s' % repr(data))
 
