@@ -36,6 +36,13 @@ class ClimatePredicate(Predicate):
     def is_satisfied2(self, session, player, qdata, override_time = None):
         return session.viewing_base.base_climate in self.climates
 
+class ClientPlatformPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.platforms = data['platforms']
+    def is_satisfied(self, player, qdata):
+        return player.spin_client_platform in self.platforms
+
 class RandomPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1177,6 +1184,8 @@ def read_predicate(data):
         return PrivacyConsentPredicate(data)
     elif kind == 'CLIMATE':
         return ClimatePredicate(data)
+    elif kind == 'CLIENT_PLATFORM':
+        return ClientPlatformPredicate(data)
     raise Exception('unknown predicate %s' % repr(data))
 
 # evaluate a "cond" expression in the form of [[pred1,val1], [pred2,val2], ...]

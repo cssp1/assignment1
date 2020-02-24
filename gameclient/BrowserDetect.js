@@ -137,6 +137,12 @@ var BrowserDetect = {
                         subString: "Mozilla",
                         identity: "Netscape",
                         versionSearch: "Mozilla"
+                },
+                {               // for installed Electron client
+                        string: navigator.userAgent,
+                        subString: "bh_electron_windows",
+                        identity: "electron_windows",
+                        versionSearch: "electron_windows"
                 }
         ],
         dataOS : [
