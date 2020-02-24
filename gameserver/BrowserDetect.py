@@ -96,6 +96,9 @@ def get_browser(ag):
     elif ('Opera' in ag):
         name = 'Opera'
         ver = get_version(ag, 'Version')
+    elif ('electron_windows' in ag):
+        name = 'electron_windows'
+        ver = get_version(ag, 'Version')
 
     if os is None:
         if 'Android' in ag:

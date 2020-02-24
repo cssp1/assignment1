@@ -411,7 +411,11 @@ ModChain.display_value = function(value, display_mode, context, ui_mod_level) {
                             ui_pct = (100 * data['aura_strength']).toFixed(parsed.precision).toString() + '%';
                             ui_aura += ' ' + ui_pct;
                         }
-                        ui_aura += '\n'+spec['ui_description'].replace('%pct', ui_pct);
+                        if('ui_description' in data) {
+                            ui_aura += '\n'+data['ui_description'].replace('%pct', ui_pct);
+                        } else {
+                            ui_aura += '\n'+spec['ui_description'].replace('%pct', ui_pct);
+                        }
                     }
 
                     ui_list.push(ui_aura);

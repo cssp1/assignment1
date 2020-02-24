@@ -2305,6 +2305,23 @@ QueryStringPredicate.prototype.is_satisfied = function(player, qdata) {
     return get_query_string(this.key) === this.value;
 };
 
+/** @constructor @struct
+  * @extends Predicate */
+function ClientPlatformPredicate(data) {
+    goog.base(this, data);
+    this.platforms = data['platforms'];
+}
+goog.inherits(ClientPlatformPredicate, Predicate);
+ClientPlatformPredicate.prototype.is_satisfied = function(player, qdata) {
+    var ret = false;
+    goog.array.forEach(this.platforms, function(platform) {
+        if(platform === spin_client_platform) {
+            ret = true;
+        }
+    });
+    return ret;
+};
+
 /** @param {!Object} data
     @return {!Predicate} */
 function read_predicate(data) {
@@ -2468,6 +2485,8 @@ function read_predicate(data) {
         return new ViewingBaseObjectDestroyedPredicate(data);
     } else if(kind === 'QUERY_STRING') {
         return new QueryStringPredicate(data);
+    } else if (kind === 'CLIENT_PLATFORM') {
+        return new ClientPlatformPredicate(data);
     } else {
         throw Error('unknown predicate '+JSON.stringify(data));
     }

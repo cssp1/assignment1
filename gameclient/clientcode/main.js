@@ -11535,7 +11535,8 @@ SPINPUNCHGAME.init = function() {
                              spin_demographics['browser_hardware'] || 'unknown',
                              (screen.width.toString() + 'x' + screen.height.toString()),
                              (canvas_width.toString() + 'x' + canvas_height.toString()),
-                             window['devicePixelRatio'] || 1
+                             window['devicePixelRatio'] || 1,
+                             spin_client_platform
                             ];
 
     // send browser caps metric
