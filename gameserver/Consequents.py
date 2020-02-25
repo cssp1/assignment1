@@ -324,17 +324,33 @@ class GiveLootConsequent(Consequent):
         self.item_expire_at = data.get('item_expire_at', -1)
         self.force_send_by_mail = data.get('force_send_by_mail', False)
         self.show_items_discovered = data.get('show_items_discovered', False)
+        self.inventory_limit_override = data.get('inventory_limit_override', False)
     def execute(self, session, player, retmsg, context=None):
         reason = context.get('loot_reason', self.reason) if context else self.reason
         assert reason
         reason_id = context.get('loot_reason_id', self.reason_id) if context else self.reason_id
         mail_template = context.get('loot_mail_template', self.mail_template) if context else self.mail_template
-        session.give_loot(player, retmsg, self.loot, reason,
-                          reason_id = reason_id,
-                          mail_template = mail_template,
-                          item_duration = self.item_duration, item_expire_at = self.item_expire_at,
-                          force_send_by_mail = self.force_send_by_mail,
-                          show_items_discovered = self.show_items_discovered)
+        if self.inventory_limit_override: # goes directly into inventory if override flag is on
+            items = []
+            items += session.get_loot_items(session.player, self.loot, self.item_duration, self.item_expire_at)
+            # BEFORE adding to inventory, make a copy of the items array (because the inventory operations will mutate it)
+            loggable_items = copy.deepcopy(items)
+            for item in items:
+                session.player.inventory_add_item(item, -1)
+                spec = gamedata['items'].get(item['spec'])
+                if spec and spec.get('fungible') and spec['resource'] == 'lottery_scans':
+                    session.deferred_player_auras_update = True
+            # then after adding to inventory:
+            if loggable_items:
+                retmsg.append(["ITEMS_DISCOVERED", loggable_items, -1, 'inventory'])
+            session.player.send_inventory_update(retmsg)
+        else:
+            session.give_loot(player, retmsg, self.loot, reason,
+                              reason_id = reason_id,
+                              mail_template = mail_template,
+                              item_duration = self.item_duration, item_expire_at = self.item_expire_at,
+                              force_send_by_mail = self.force_send_by_mail,
+                              show_items_discovered = self.show_items_discovered)
 
 class GiveTrophiesConsequent(Consequent):
     def __init__(self, data):
