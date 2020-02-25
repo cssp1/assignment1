@@ -337,7 +337,7 @@ class GiveLootConsequent(Consequent):
             loggable_items = copy.deepcopy(items)
             for item in items:
                 session.player.inventory_add_item(item, -1)
-                spec = gamedata['items'].get(item['spec'])
+                spec = gamesite.get_gamedata()['items'].get(item['spec'])
                 if spec and spec.get('fungible') and spec['resource'] == 'lottery_scans':
                     session.deferred_player_auras_update = True
             # then after adding to inventory:
