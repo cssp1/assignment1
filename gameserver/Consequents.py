@@ -333,12 +333,17 @@ class GiveLootConsequent(Consequent):
         if self.inventory_limit_override: # goes directly into inventory if override flag is on
             items = []
             items += session.get_loot_items(session.player, self.loot, self.item_duration, self.item_expire_at)
+            # BEFORE adding to inventory, make a copy of the items array (because the inventory operations will mutate it)
+            loggable_items = copy.deepcopy(items)
             for item in items:
                 session.player.inventory_add_item(item, -1)
                 spec = gamedata['items'].get(item['spec'])
                 if spec and spec.get('fungible') and spec['resource'] == 'lottery_scans':
                     session.deferred_player_auras_update = True
             session.player.send_inventory_update(retmsg)
+            # then after adding to inventory:
+            if loggable_items:
+                retmsg.append(["ITEMS_DISCOVERED", loggable_items, -1, 'inventory'])
         else:
             session.give_loot(player, retmsg, self.loot, reason,
                               reason_id = reason_id,
