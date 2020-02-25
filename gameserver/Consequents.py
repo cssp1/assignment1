@@ -340,10 +340,10 @@ class GiveLootConsequent(Consequent):
                 spec = gamedata['items'].get(item['spec'])
                 if spec and spec.get('fungible') and spec['resource'] == 'lottery_scans':
                     session.deferred_player_auras_update = True
-            session.player.send_inventory_update(retmsg)
             # then after adding to inventory:
             if loggable_items:
                 retmsg.append(["ITEMS_DISCOVERED", loggable_items, -1, 'inventory'])
+            session.player.send_inventory_update(retmsg)
         else:
             session.give_loot(player, retmsg, self.loot, reason,
                               reason_id = reason_id,
