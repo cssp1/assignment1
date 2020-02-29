@@ -10360,17 +10360,22 @@ function invoke_playfield_controls_bar() {
     dialog.user_data['dialog'] = 'playfield_controls_bar_'+orient;
     dialog.transparent_to_mouse = true;
 
+    var always_fullscreen = eval_cond_or_literal(gamedata['client']['always_fullscreen'], player, null);
+    if(always_fullscreen && !canvas_is_fullscreen) {
+        toggle_true_fullscreen();
+    }
+
     // true FS support
-    if(has_true_fullscreen()) {
+    if(has_true_fullscreen() && !always_fullscreen) {
         dialog.widgets['fullscreen_button'].show = true;
-    } else if(is_browser_standalone_mode()) {
+    } else if(is_browser_standalone_mode() || always_fullscreen) {
         // no need for this button (?)
         dialog.widgets['fullscreen_button'].show = false;
     } else {
         // fake FS dialog - breaks tutorial and has no useful info for non-Windows/Mac browsers
         dialog.widgets['fullscreen_button'].show = ((player.tutorial_state == "COMPLETE") &&
                                                     (spin_demographics['browser_OS'] === "Mac" ||
-                                                     spin_demographics['browser_OS'] === "Windows"));
+                                                     spin_demographics['browser_OS'] === "Windows") && !always_fullscreen);
     }
     dialog.widgets['fullscreen_button'].onclick = function() {
         if(has_true_fullscreen()) {
@@ -10445,6 +10450,9 @@ function update_playfield_controls_bar(dialog) {
                 dialog.xy = vec_add(dialog.data['spacing_right'], top.get_absolute_xy());
             }
         }
+        if(!dialog.widgets['fullscreen_button'].show) {
+            dialog.widgets['settings_button'].xy = dialog.data['widgets']['fullscreen_button']['xy'];
+        }
     } else {
         // attach to right side of desktop
         dialog.xy = vec_add(dialog.data['spacing'], [canvas_width-dialog.wh[0], Math.floor(canvas_height/2 - dialog.wh[1])]);
@@ -10456,6 +10464,11 @@ function update_playfield_controls_bar(dialog) {
         } else {
             dialog.widgets['controls_bg'].xy = dialog.data['widgets']['controls_bg']['xy'];
             dialog.widgets['controls_bg'].wh =dialog.data['widgets']['controls_bg']['dimensions'];
+        }
+        if(!dialog.widgets['fullscreen_button'].show) {
+            dialog.widgets['settings_button'].xy = dialog.data['widgets']['fullscreen_button']['xy'];
+            var delta = dialog.data['widgets']['settings_button']['xy'][1] - dialog.data['widgets']['fullscreen_button']['xy'][1];
+            dialog.widgets['controls_bg'].wh[1] = dialog.widgets['controls_bg'].wh[1] - delta;
         }
     }
     dialog.widgets['settings_button'].show = session.enable_combat_resource_bars && ((player.tutorial_state == "COMPLETE") ||
@@ -18530,6 +18543,7 @@ function post_screenshot_enabled() {
     if(spin_demographics['browser_name'] == "Chrome" && spin_demographics['browser_version'] < 17) { return false; }
     if(spin_demographics['browser_name'] == "Explorer" && spin_demographics['browser_version'] < 10) { return false; }
     if(spin_demographics['browser_name'] == "Firefox" && spin_demographics['browser_version'] < 9) { return false; }
+    if(spin_frame_platform.indexOf('electron_') === 0) { return false; } // Electron clients never post screenshots
 
     return player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot']) &&
         (player.tutorial_state == 'COMPLETE') &&
