@@ -39,8 +39,11 @@ class ClimatePredicate(Predicate):
 class ClientPlatformPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
-        self.platforms = data['platforms']
+        self.platforms = data.get('platforms',[])
+        self.any_electron = data.get.get('any_electron',False)
     def is_satisfied(self, player, qdata):
+        if self.any_electron:
+            return 'electron_' in player.spin_client_platform
         return player.spin_client_platform in self.platforms
 
 class RandomPredicate(Predicate):
