@@ -2310,7 +2310,7 @@ QueryStringPredicate.prototype.is_satisfied = function(player, qdata) {
 function ClientPlatformPredicate(data) {
     goog.base(this, data);
     this.platforms = data['platforms'];
-    this.any_electron = data['platforms'];
+    this.any_electron = data['any_electron'];
 }
 goog.inherits(ClientPlatformPredicate, Predicate);
 ClientPlatformPredicate.prototype.is_satisfied = function(player, qdata) {

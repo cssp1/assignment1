@@ -43,7 +43,7 @@ class ClientPlatformPredicate(Predicate):
         self.any_electron = data.get.get('any_electron',False)
     def is_satisfied(self, player, qdata):
         if self.any_electron:
-            return 'electron_' in player.spin_client_platform
+            return player.spin_client_platform.startswith('electron_')
         return player.spin_client_platform in self.platforms
 
 class RandomPredicate(Predicate):
