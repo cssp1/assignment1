@@ -2126,11 +2126,12 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if pred.get('team') not in ('player', 'enemy'):
             error |= 1; print '%s: %s predicate must have "team": "player" or "enemy"' % (reason, pred['predicate'])
     elif pred['predicate'] == 'CLIENT_PLATFORM':
-        if not isinstance(pred.get('platforms'), list):
-            error |= 1; print '%s: %s predicate must have "platforms" as list of valid platforms' % (reason, pred['predicate'])
-        for platform in pred.get('platforms'):
-            if not isinstance(platform, basestring) or not (platform == 'web' or platform.startswith('electron_')):
-                error |= 1; print '%s: %s valid "platforms" entries must be either "web" or start with "electron_". Entry %s is not valid' % (reason, pred['predicate'], str(platform))
+        if not isinstance(pred.get('platforms'), list) and 'any_electron' not in pred:
+            error |= 1; print '%s: %s predicate must have "platforms" as list of valid platforms or have "any_electron" set to 1' % (reason, pred['predicate'])
+        elif 'any_electron' not in pred:
+            for platform in pred.get('platforms'):
+                if not isinstance(platform, basestring) or not (platform == 'web' or platform.startswith('electron_')):
+                    error |= 1; print '%s: %s valid "platforms" entries must be either "web" or start with "electron_". Entry %s is not valid' % (reason, pred['predicate'], str(platform))
     return error
 
 # check old-style "logic" blocks which are if/then/else compositions of predicates and consequents (used for quest tips)
