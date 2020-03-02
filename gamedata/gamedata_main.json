@@ -34,7 +34,7 @@
 
         "always_fullscreen": [
             [{"predicate": "CLIENT_PLATFORM", "platforms": ["web"]}, 0],
-            [{"predicate": "CLIENT_PLATFORM", "platforms": ["electron_windows"]}, 1] // add other Electron distributions as they are released
+            [{"predicate": "CLIENT_PLATFORM", "any_electron": 1}, 1] // turns on always fullscreen for any electron build
         ],
 
         // true if the HTML5 fullscreen API is available
