@@ -10361,9 +10361,6 @@ function invoke_playfield_controls_bar() {
     dialog.transparent_to_mouse = true;
 
     var always_fullscreen = eval_cond_or_literal(gamedata['client']['always_fullscreen'], player, null);
-    if(always_fullscreen && !canvas_is_fullscreen) {
-        toggle_true_fullscreen();
-    }
 
     // true FS support
     if(has_true_fullscreen() && !always_fullscreen) {
@@ -10452,6 +10449,8 @@ function update_playfield_controls_bar(dialog) {
         }
         if(!dialog.widgets['fullscreen_button'].show) {
             dialog.widgets['settings_button'].xy = dialog.data['widgets']['fullscreen_button']['xy'];
+        } else {
+            dialog.widgets['settings_button'].xy = dialog.data['widgets']['settings_button']['xy'];
         }
     } else {
         // attach to right side of desktop
@@ -10469,6 +10468,14 @@ function update_playfield_controls_bar(dialog) {
             dialog.widgets['settings_button'].xy = dialog.data['widgets']['fullscreen_button']['xy'];
             var delta = dialog.data['widgets']['settings_button']['xy'][1] - dialog.data['widgets']['fullscreen_button']['xy'][1];
             dialog.widgets['controls_bg'].wh[1] = dialog.widgets['controls_bg'].wh[1] - delta;
+        } else {
+            dialog.widgets['settings_button'].xy = dialog.data['widgets']['settings_button']['xy'];
+            var delta = 0;
+            if(!dialog.widgets['screenshot_button'].show) {
+                delta = dialog.data['widgets']['sound_button']['xy'][1] - dialog.data['widgets']['screenshot_button']['xy'][1];
+            }
+            dialog.widgets['controls_bg'].xy = vec_add(dialog.data['widgets']['controls_bg']['xy'], [0,delta]);
+            dialog.widgets['controls_bg'].wh = vec_add(dialog.data['widgets']['controls_bg']['dimensions'], [0,-delta]);
         }
     }
     dialog.widgets['settings_button'].show = session.enable_combat_resource_bars && ((player.tutorial_state == "COMPLETE") ||
@@ -49053,6 +49060,11 @@ function handle_server_message(data) {
                 var s = document.getElementsByTagName('script')[0];
                 s.parentNode.insertBefore(pa, s);
             })();
+        }
+
+        var always_fullscreen = eval_cond_or_literal(gamedata['client']['always_fullscreen'], player, null);
+        if(always_fullscreen && !canvas_is_fullscreen) {
+            toggle_true_fullscreen();
         }
 
     } else if(msg == "SQUADS_UPDATE") {
