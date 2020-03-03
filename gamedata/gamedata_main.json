@@ -44,10 +44,13 @@
         ]},
 
         // true if app is able to to send out social platform friend invitations
-        "friend_invites_enabled": {"predicate": "OR", "subpredicates": [
-            {"predicate": "FRAME_PLATFORM", "platform":"fb"},
-            {"predicate": "FRAME_PLATFORM", "platform":"bh"}
-        ]},
+        "friend_invites_enabled": {"predicate": "AND", "subpredicates":[
+            {"predicate": "OR", "subpredicates": [
+                {"predicate": "FRAME_PLATFORM", "platform":"fb"},
+                {"predicate": "FRAME_PLATFORM", "platform":"bh"}
+                ]},
+            {"predicate": "NOT", "subpredicates": [{"predicate": "CLIENT_PLATFORM", "any_electron": 1}]}
+            ]},
 
         // on bh.com, don't show close button on daily invite/gift prompts
         "invite_prompt_closeable": {"predicate": "NOT", "subpredicates": [
@@ -67,9 +70,12 @@
         "bh_web_push_prompt_lock_gui": 1,
 
         // true if friend bar should be shown at bottom of screen
-        "friend_bar_enabled": {"predicate": "OR", "subpredicates" :[
-            {"predicate": "FRAME_PLATFORM", "platform":"fb"},
-            {"predicate": "FRAME_PLATFORM", "platform":"bh"}
+        "friend_bar_enabled": {"predicate": "AND", "subpredicates":[
+            {"predicate": "OR", "subpredicates": [
+                {"predicate": "FRAME_PLATFORM", "platform":"fb"},
+                {"predicate": "FRAME_PLATFORM", "platform":"bh"}
+                ]},
+            {"predicate": "NOT", "subpredicates": [{"predicate": "CLIENT_PLATFORM", "any_electron": 1}]}
         ]},
 
         "startup_div_fade_time": 0.5, // when using "div" spin_loading_screen_mode, fade away the startup div over this many seconds
@@ -281,7 +287,7 @@
         "show_alliance_mate_last_played_time": 1, // show "Last Played: X days ago" for members of your own alliance
         "show_alliance_mate_online_status": 1, // show online/offline status for members of your own alliance
 
-        // for UI purposes only, treat tournament "togo" intervals shortert than this many seconds as infinite (so don't show expiry timer)
+        // for UI purposes only, treat tournament "togo" intervals shorter than this many seconds as infinite (so don't show expiry timer)
         "infinite_trophy_togo": 2592000,
 
         "enable_trophy_backend": 1, // enable server-side code for PvP/PvE player/alliance trophy system
