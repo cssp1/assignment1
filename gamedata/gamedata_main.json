@@ -32,6 +32,11 @@
         "armorgames_iframe_margins": [50, 195], // pixels to shrink the iframe relative to the maximum window size, for safety
         "armorgames_iframe_footer_peek": 30, // same as Facebook
 
+        "always_fullscreen": [
+            [{"predicate": "CLIENT_PLATFORM", "platforms": ["web"]}, 0],
+            [{"predicate": "CLIENT_PLATFORM", "any_electron": 1}, 1] // turns on always fullscreen for any electron build
+        ],
+
         // true if the HTML5 fullscreen API is available
         "truefullscreen": {"predicate": "OR", "subpredicates": [
             {"predicate": "FRAME_PLATFORM", "platform":"fb"},
