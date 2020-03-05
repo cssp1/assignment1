@@ -10441,6 +10441,11 @@ function update_playfield_controls_bar(dialog) {
                                                  (dialog.user_data['dialog'] == 'playfield_controls_bar_vertical' || (session.home_base && !session.has_attacked)) &&
                                                  post_screenshot_enabled()));
 
+    var always_fullscreen = eval_cond_or_literal(gamedata['client']['always_fullscreen'], player, null);
+    if(always_fullscreen && has_true_fullscreen() && !canvas_is_fullscreen) {
+        toggle_true_fullscreen();
+    }
+
     if(dialog.user_data['dialog'] == 'playfield_controls_bar_horizontal') {
         var top = desktop_dialogs['desktop_top'];
         if(!top) {
