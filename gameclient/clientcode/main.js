@@ -2315,20 +2315,6 @@ GameObject.prototype.has_permanent_auras = function() {
     return(this.spec['permanent_auras'] || this.modstats['permanent_auras']);
 };
 
-/** @return {boolean} */
-GameObject.prototype.has_permanent_auras_range = function() {
-    var ret = false;
-    var val = this.spec['permanent_auras'] || this.modstats['permanent_auras'];
-    var check_val = null;
-    if(Array.isArray(val) && val.length >= 1 && (Array.isArray(val[0]) || val[0] === null)) {
-        check_val = get_leveled_quantity(val, this.level);
-    } else {
-        check_val = val;
-    }
-    goog.array.forEach(check_val, function(aura) { if('aura_range' in aura) { ret = true; }});
-    return ret
-};
-
 /** @return {Array<Object<string,?>>|null} */
 GameObject.prototype.get_permanent_auras_range = function() {
     var range = -1;
@@ -2341,13 +2327,13 @@ GameObject.prototype.get_permanent_auras_range = function() {
     }
     goog.array.forEach(check_val, function(aura) {
         if('aura_range' in aura) {
-            if(aura['aura_range'] > range) {
-                range = aura['aura_range'];
+            if(aura['aura_range'] * gamedata['map']['range_conversion'] > range) {
+                range = aura['aura_range'] * gamedata['map']['range_conversion'];
             }
         };
     });
 
-    return [check_val, (range * gamedata['map']['range_conversion']), false, -1, -1]; // returns in the same format as get_weapon_range()
+    return [check_val, range, false, -1, -1]; // returns in the same format as get_weapon_range()
 };
 
 function get_max_level(spec) {
@@ -15644,9 +15630,9 @@ BuildUICursor.prototype.draw = function(offset) {
         spell_range_aoe = this.obj.weapon_range();
     } else if(selection.spellkind && (selection.spellkind in gamedata['buildings'])) {
         spell_range_aoe = get_weapon_range(null, 1, get_auto_spell_raw(gamedata['buildings'][selection.spellkind])); // assume level 1 spell for newly-constructed buildings
-    } else if(this.obj && this.obj.is_building() && this.obj.has_permanent_auras() && this.obj.has_permanent_auras_range()) {
+    } else if(this.obj && this.obj.is_building() && this.obj.has_permanent_auras()) {
         spell_range_aoe = this.obj.get_permanent_auras_range();
-        new SPUI.Color(0.3, 0.85, 0.24);
+        color = new SPUI.Color(0.3, 0.85, 0.24);
     }
     var spell = spell_range_aoe[0], range = (spell_range_aoe[3] > 0 ? spell_range_aoe[3] : spell_range_aoe[1]), aoe = spell_range_aoe[2], min_range = spell_range_aoe[4];
     if(range > 0 || (this.obj && this.obj.is_building() && (this.obj.is_minefield() || this.obj.is_ambush() || this.obj.is_security_node()))) {
@@ -45132,7 +45118,7 @@ function update_upgrade_dialog(dialog) {
             if('equip' in item_spec && 'effects' in item_spec['equip']) {
                 goog.array.forEach(item_spec['equip']['effects'], function(effect) {
                     if(!('code' in effect && effect['code'] === 'modstat')) { return; }
-                    if(effect['stat'] === 'permanent_auras') {
+                    if(effect['stat'] === 'permanent_auras' && feature_list.indexOf('permanent_auras') === -1)) {
                         feature_list.push('permanent_auras');
                     }
                 });
