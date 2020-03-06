@@ -45118,7 +45118,7 @@ function update_upgrade_dialog(dialog) {
             if('equip' in item_spec && 'effects' in item_spec['equip']) {
                 goog.array.forEach(item_spec['equip']['effects'], function(effect) {
                     if(!('code' in effect && effect['code'] === 'modstat')) { return; }
-                    if(effect['stat'] === 'permanent_auras' && feature_list.indexOf('permanent_auras') === -1)) {
+                    if(effect['stat'] === 'permanent_auras' && feature_list.indexOf('permanent_auras') === -1) {
                         feature_list.push('permanent_auras');
                     }
                 });
