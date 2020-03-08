@@ -2318,7 +2318,12 @@ GameObject.prototype.has_permanent_auras = function() {
 /** @return {Array<Object<string,?>>|null} */
 GameObject.prototype.get_permanent_auras_range = function() {
     var range = -1;
-    var val = this.spec['permanent_auras'] || this.modstats['permanent_auras'];
+    var val = []
+    if(this.modstats['permanent_auras'] && this.modstats['permanent_auras']['val'] && this.modstats['permanent_auras']['val'].length >= 1) {
+        val = this.modstats['permanent_auras']['val']
+    } else if(this.spec['permanent_auras'] && this.spec['permanent_auras'].length >= 1) {
+        val = this.spec['permanent_auras']
+    }
     var check_val = null;
     if(Array.isArray(val) && val.length >= 1 && (Array.isArray(val[0]) || val[0] === null)) {
         check_val = get_leveled_quantity(val, this.level);
@@ -15557,6 +15562,14 @@ function draw_turret_ranges(world, ignore_obj) {
             if(range > 0) {
                 var pos = obj.interpolate_pos(world);
                 draw_weapon_range(ortho_to_draw(pos), range, obj.team === 'player', aoe, min_range, null);
+            } else if(obj.has_permanent_auras()) {
+                ran = obj.get_permanent_auras_range();
+                spell = ran[0], range = (ran[3] > 0 ? ran[3] : ran[1]), aoe = ran[2], min_range = ran[4];
+                if(range > 0) {
+                    var pos = obj.interpolate_pos(world);
+                    var color = new SPUI.Color(0.3, 0.85, 0.24);
+                    draw_weapon_range(ortho_to_draw(pos), range, obj.team === 'player', aoe, min_range, color);
+                }
             }
         }
     });
