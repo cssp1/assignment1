@@ -38,7 +38,7 @@ MountedWeaponDialog.invoke = function(mounting_obj) {
         slot_type = 'townhall_weapon';
     } else if (mounting_obj.is_security_node()) {
         building_context = 'ui_name_building_context_security_node';
-        crafting_category = 'security_nodes';
+        crafting_category = 'security_nodes_' + mounting_obj.spec.name; // security node hack - have to use a per-building category change to get nodes to work in multiple building types
         slot_type = 'security_node';
     }
     dialog.user_data['dialog'] = 'mounted_weapon_dialog';
@@ -827,7 +827,7 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
     ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['frame'], item);
 
     var spell = (ItemDisplay.get_inventory_item_weapon_spellname(spec) ? ItemDisplay.get_inventory_item_weapon_spell(spec) : null);
-    var relative_spell = (relative_to ? ItemDisplay.get_inventory_item_weapon_spell(relative_spec) : null);
+    var relative_spell = ((relative_to && ItemDisplay.get_inventory_item_weapon_spellname(relative_spec)) ? ItemDisplay.get_inventory_item_weapon_spell(relative_spec) : null);
 
     // fill in damage_vs icons
     init_damage_vs_icons(dialog, {'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
@@ -838,7 +838,7 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
 
     // create the UNION of the two stat lists
     if(relative_to) {
-        var relative_statlist = get_weapon_spell_features2(mounting_obj.spec, relative_spell);
+        var relative_statlist = (relative_spell ? get_weapon_spell_features2(mounting_obj.spec, relative_spell) : []);
         goog.array.forEach(relative_statlist, function(rstat) {
             // when switching from a ranged weapon to a PBAOE weapon, don't show range dropping to zero
             if(rstat == 'weapon_range') { return; }
