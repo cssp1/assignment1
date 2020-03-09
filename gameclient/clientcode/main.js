@@ -2318,7 +2318,12 @@ GameObject.prototype.has_permanent_auras = function() {
 /** @return {Array<Object<string,?>>|null} */
 GameObject.prototype.get_permanent_auras_range = function() {
     var range = -1;
-    var val = this.spec['permanent_auras'] || this.modstats['permanent_auras'];
+    var val = [];
+    if(this.modstats['permanent_auras'] && this.modstats['permanent_auras']['val'] && this.modstats['permanent_auras']['val'].length >= 1) {
+        val = this.modstats['permanent_auras']['val'];
+    } else if(this.spec['permanent_auras'] && this.spec['permanent_auras'].length >= 1) {
+        val = this.spec['permanent_auras'];
+    }
     var check_val = null;
     if(Array.isArray(val) && val.length >= 1 && (Array.isArray(val[0]) || val[0] === null)) {
         check_val = get_leveled_quantity(val, this.level);
@@ -5561,6 +5566,16 @@ Building.prototype.is_townhall = function() { return this.spec['name'] === gamed
 Building.prototype.is_turret = function() { return this.spec['history_category'] === 'turrets'; };
 Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
 Building.prototype.is_security_node = function() { return this.spec['equip_slots'] && ('security_node' in this.spec['equip_slots']); };
+Building.prototype.is_security_node_only = function() {
+    if(!this.is_security_node()) { return false; }
+    var ret = true;
+    goog.object.forEach(this.spec['crafting_categories'], function(cat) {
+        if(cat.indexOf("security_nodes_") == -1) {
+            ret = false;
+        };
+    });
+    return ret;
+};
 Building.prototype.is_barrier = function() { return this.spec['name'] === 'barrier'; };
 Building.prototype.is_trapped_barrier = function() { return this.spec['equip_slots'] && ('barrier_trap' in this.spec['equip_slots']); };
 Building.prototype.is_armed_building = function() { return this.spec['equip_slots'] && ('building_weapon' in this.spec['equip_slots']); };
@@ -15557,6 +15572,14 @@ function draw_turret_ranges(world, ignore_obj) {
             if(range > 0) {
                 var pos = obj.interpolate_pos(world);
                 draw_weapon_range(ortho_to_draw(pos), range, obj.team === 'player', aoe, min_range, null);
+            } else if(obj.has_permanent_auras()) {
+                ran = obj.get_permanent_auras_range();
+                spell = ran[0], range = (ran[3] > 0 ? ran[3] : ran[1]), aoe = ran[2], min_range = ran[4];
+                if(range > 0) {
+                    var pos = obj.interpolate_pos(world);
+                    var color = new SPUI.Color(0.3, 0.85, 0.24);
+                    draw_weapon_range(ortho_to_draw(pos), range, obj.team === 'player', aoe, min_range, color);
+                }
             }
         }
     });
@@ -22896,7 +22919,7 @@ function invoke_building_context_menu(mouse_xy) {
                     throw Error('Missing crafting_categories for crafter: ' + obj.spec['ui_name']);
                 }
 
-                if(!obj.is_emplacement() && !obj.is_security_node() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall()) { // mounted weapons have special case, see below
+                if(!obj.is_emplacement() && !obj.is_security_node_only() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall()) { // mounted weapons have special case, see below
                     buttons.push(new ContextMenuButton({ui_name: cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
                                                         asset: 'action_button_resizable',
                                                         onclick: (function (_cat) { return function() {
@@ -22913,7 +22936,7 @@ function invoke_building_context_menu(mouse_xy) {
                 if(obj.is_crafting()) {
                     // for turret emplacements, add the speedup/cancel buttons above the divider
                     var which_buttons;
-                    if(obj.is_emplacement() || obj.is_security_node() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) {
+                    if(obj.is_emplacement() || obj.is_security_node_only() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) {
                         if(!('mounted' in special_buttons)) { special_buttons['mounted'] = []; }
                         which_buttons = special_buttons['mounted'];
                     } else {
@@ -45118,6 +45141,7 @@ function update_upgrade_dialog(dialog) {
             if('equip' in item_spec && 'effects' in item_spec['equip']) {
                 goog.array.forEach(item_spec['equip']['effects'], function(effect) {
                     if(!('code' in effect && effect['code'] === 'modstat')) { return; }
+
                     if(effect['stat'] === 'permanent_auras' && feature_list.indexOf('permanent_auras') === -1) {
                         feature_list.push('permanent_auras');
                     }

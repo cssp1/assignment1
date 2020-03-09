@@ -36,6 +36,10 @@ MountedWeaponDialog.invoke = function(mounting_obj) {
         building_context = 'ui_name_building_context_townhall_weapon';
         crafting_category = 'townhall_weapons';
         slot_type = 'townhall_weapon';
+    } else if (mounting_obj.is_security_node()) {
+        building_context = 'ui_name_building_context_security_node';
+        crafting_category = 'security_nodes_' + mounting_obj.spec.name; // security node hack - have to use a per-building category change to get nodes to work in multiple building types
+        slot_type = 'security_node';
     }
     dialog.user_data['dialog'] = 'mounted_weapon_dialog';
     dialog.user_data['emplacement'] = mounting_obj;
@@ -124,6 +128,8 @@ MountedWeaponDialog.ondraw = function(dialog) {
                 mounted = obj.building_weapon_item() || obj.building_weapon_inprogress_item();
             } else if (dialog.user_data['crafting_category'] === 'townhall_weapons' && obj.is_armed_townhall()) {
                 mounted = obj.townhall_weapon_item() || obj.townhall_weapon_inprogress_item();
+            } else if (dialog.user_data['crafting_category'] === 'security_nodes' && obj.is_security_node()) {
+                mounted = obj.security_node_item() || obj.security_node_inprogress_item();
             }
             if(mounted) {
                 var mounted_spec = ItemDisplay.get_inventory_item_spec(mounted['spec']);
@@ -137,7 +143,9 @@ MountedWeaponDialog.ondraw = function(dialog) {
                         count_attached[key] = (count_attached[key] || 0) + 1;
                     } else if (dialog.user_data['crafting_category'] === 'townhall_weapons' && mounted === obj.townhall_weapon_item()) {
                         count_attached[key] = (count_attached[key] || 0) + 1;
-                    }  else {
+                    } else if (dialog.user_data['crafting_category'] === 'security_nodes' && mounted === obj.security_node_item()) {
+                        count_attached[key] = (count_attached[key] || 0) + 1;
+                    } else {
                         count_attaching[key] = (count_attaching[key] || 0) + 1;
                     }
                 }
@@ -314,6 +322,8 @@ MountedWeaponDialog.ondraw = function(dialog) {
         current_item = mounting_obj.building_weapon_item();
     } else if (mounting_obj.is_armed_townhall()) {
         current_item = mounting_obj.townhall_weapon_item();
+    } else if (mounting_obj.is_security_node()) {
+        current_item = mounting_obj.security_node_item();
     }
 
     dialog.widgets['no_current'].show = !current_item;
@@ -750,6 +760,46 @@ MountedWeaponDialog._remove_turret_head_anti_missile_mod = function(modchain) {
     return modchain;
 };
 
+/** Does this item apply any permanent_auras modstats?
+    @param {!Object} item_spec
+    @private */
+MountedWeaponDialog._has_permanent_auras = function(item_spec) {
+    var has_it = false;
+    goog.array.forEach(item_spec['equip']['effects'], function(effect) {
+        if(effect['stat'] == 'permanent_auras') {
+            has_it = true;
+        }
+    });
+    return has_it;
+};
+/** Create a new modchain with the item's permanent_auras stats appended
+    @param {!ModChain.ModChain} modchain
+    @param {!Object} item_spec
+    @return {!ModChain.ModChain}
+    @private */
+MountedWeaponDialog._add_permanent_auras_mod = function(modchain, item_spec, item_level) {
+    goog.array.forEach(item_spec['equip']['effects'], function(effect) {
+        if(effect['stat'] == 'permanent_auras') {
+            modchain = ModChain.clone(modchain);
+            modchain = ModChain.add_mod(modchain, effect['method'], get_leveled_quantity(effect['strength'], item_level), 'equipment', item_spec['name']);
+        }
+    });
+    return modchain;
+};
+
+/** Strip off a permanent auras modchain mod that comes from another security node
+    @param {!ModChain.ModChain} modchain
+    @return {!ModChain.ModChain}
+    @private */
+MountedWeaponDialog._remove_security_node_permanent_auras_mod = function(modchain) {
+    goog.array.forEach(modchain['mods'], function(mod, i) {
+        if(mod['kind'] == 'equipment' && mod['source'] in gamedata['items'] && gamedata['items'][mod['source']]['equip']['slot_type'] == 'security_node') {
+            modchain = ModChain.recompute_without_mod(modchain, i);
+        }
+    });
+    return modchain;
+};
+
 // operates on mounted_weapon_dialog_stats
 /** @param {SPUI.Dialog} dialog
     @param {GameObject} mounting_obj it will go onto
@@ -776,19 +826,19 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
 
     ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['frame'], item);
 
-    var spell = ItemDisplay.get_inventory_item_weapon_spell(spec);
-    var relative_spell = (relative_to ? ItemDisplay.get_inventory_item_weapon_spell(relative_spec) : null);
+    var spell = (ItemDisplay.get_inventory_item_weapon_spellname(spec) ? ItemDisplay.get_inventory_item_weapon_spell(spec) : null);
+    var relative_spell = ((relative_to && ItemDisplay.get_inventory_item_weapon_spellname(relative_spec)) ? ItemDisplay.get_inventory_item_weapon_spell(relative_spec) : null);
 
     // fill in damage_vs icons
     init_damage_vs_icons(dialog, {'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
                          spell);
 
     // set up stats display
-    var statlist = get_weapon_spell_features2(mounting_obj.spec, spell);
+    var statlist = (spell ? get_weapon_spell_features2(mounting_obj.spec, spell) : []);
 
     // create the UNION of the two stat lists
     if(relative_to) {
-        var relative_statlist = get_weapon_spell_features2(mounting_obj.spec, relative_spell);
+        var relative_statlist = (relative_spell ? get_weapon_spell_features2(mounting_obj.spec, relative_spell) : []);
         goog.array.forEach(relative_statlist, function(rstat) {
             // when switching from a ranged weapon to a PBAOE weapon, don't show range dropping to zero
             if(rstat == 'weapon_range') { return; }
@@ -801,6 +851,11 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
     if(MountedWeaponDialog._has_anti_missile(spec) ||
        (relative_spec && MountedWeaponDialog._has_anti_missile(relative_spec))) {
            statlist.push('anti_missile');
+    }
+
+    if(MountedWeaponDialog._has_permanent_auras(spec) ||
+       (relative_spec && MountedWeaponDialog._has_permanent_auras(relative_spec))) {
+           statlist.push('permanent_auras');
     }
 
     for(var i = 0; i < dialog.data['widgets']['descriptionL']['array'][1]; i++) {
@@ -823,6 +878,14 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
                 if(relative_modchain && relative_spec) {
                     relative_modchain = MountedWeaponDialog._remove_turret_head_anti_missile_mod(relative_modchain);
                     relative_modchain = MountedWeaponDialog._add_anti_missile_mod(relative_modchain, relative_spec, relative_level);
+                }
+            } else if(stat == 'permanent_auras') { // needs special handling because it is a stat of the building, not the weapon spell
+                // strip off anti-missile mods from any other turret head (but leave alone mods from leader items etc)
+                modchain = MountedWeaponDialog._remove_security_node_permanent_auras_mod(modchain);
+                modchain = MountedWeaponDialog._add_permanent_auras_mod(modchain, spec, level);
+                if(relative_modchain && relative_spec) {
+                    relative_modchain = MountedWeaponDialog._remove_security_node_permanent_auras_mod(relative_modchain);
+                    relative_modchain = MountedWeaponDialog._add_permanent_auras_mod(relative_modchain, relative_spec, relative_level);
                 }
             }
 

@@ -387,11 +387,19 @@ def check_mandatory_fields(specname, spec, kind):
                 error |= check_consequent(c, reason = specname+':upgrade_completion', context='building')
 
     if 'equip_slots' in spec:
+        mounted_weapons = ('townhall_weapon', 'turret_head', 'security_node', 'barrier_trap', 'building_weapon')
         slot_dict_list = spec['equip_slots'] if type(spec['equip_slots']) is list else [spec['equip_slots'],]
         for slot_dict in slot_dict_list:
             for slot_name, qty in slot_dict.iteritems():
                 if slot_name not in gamedata['strings']['equip_slots']:
                     error |= 1; print '%s: equip_slot type %s not found in strings.json' % (specname, slot_name)
+                if slot_name in mounted_weapons:
+                    for weapon in mounted_weapons:
+                        if weapon != slot_name:
+                            for other_slot in slot_dict_list:
+                                for other_slot_name, other_slot_num in other_slot.iteritems():
+                                    if other_slot_name in mounted_weapons and other_slot_name != slot_name:
+                                        error |= 1; print '%s: has both equip_slot type %s and equip_slot type %s, but can only have one of these' % (specname, slot_name, other_slot_name)
     return error
 
 def check_object_spells(specname, spec, maxlevel):
@@ -1224,7 +1232,7 @@ def check_crafting_recipe(recname, spec):
         if 'consumes_power' not in spec:
             error |= 1; print '%s: missing consumes_power (while crafting)' % (recname,)
 
-    if spec['crafting_category'] in ('mines','turret_heads','barrier_traps','building_weapons') and '_L' not in spec['name']:
+    if spec['crafting_category'] in ('mines','turret_heads','barrier_traps','building_weapons','security_nodes') and '_L' not in spec['name']:
         if 'max_level' not in spec:
             error |= 1; print '%s: missing max_level (required for leveled %s recipes)' % (recname,spec['crafting_category'],)
         if 'associated_tech' not in spec:
@@ -1327,6 +1335,10 @@ def check_item(itemname, spec):
     if spec['name'] != itemname.split(':')[1]:
         error |= 1
         print '%s:name mismatch' % itemname
+
+    if 'ui_name' not in spec:
+        error |= 1
+        print '%s: does not have a ui_name. Many client functions are hard-coded to check this' % (itemname)
 
     if 'max_level' in spec:
         max_level = spec['max_level']
