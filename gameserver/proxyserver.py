@@ -512,6 +512,7 @@ class KGVisitor(Visitor):
         self.kongregate_auth_token = None
         self.kongregate_game_url = None
         self.kongregate_game_id = None
+        self.kgpath = '/KGROOT'
 
     def set_kongregate_id(self, kgid):
         self.kongregate_id = str(kgid)
@@ -529,7 +530,7 @@ class KGVisitor(Visitor):
             self.game_container = SpinConfig.config['proxyserver'].get('fallback_landing', '//www.kongregate.com/') # punt :(
 
     def canvas_url(self):
-        return self.server_protocol + self.server_host + ':' + self.server_port + '/KGROOT' + q_clean_qs(self.first_hit_uri,
+        return self.server_protocol + self.server_host + ':' + self.server_port + self.kgpath + q_clean_qs(self.first_hit_uri,
                                                                                                          {'kongregate_username':[self.kongregate_username,],
                                                                                                           'kongregate_user_id': [self.kongregate_id,],
                                                                                                           'kongregate_game_auth_token': [self.kongregate_auth_token,],
@@ -539,7 +540,7 @@ class KGVisitor(Visitor):
     def canvas_url_no_auth(self):
         # send the browser the URL to redirect to after authorizing
         assert self.kongregate_game_id and self.kongregate_game_url
-        return self.server_protocol + self.server_host + ':' + self.server_port + '/KGROOT' + q_clean_qs(self.first_hit_uri,
+        return self.server_protocol + self.server_host + ':' + self.server_port + self.kgpath + q_clean_qs(self.first_hit_uri,
                                                                                                          {'kongregate_username':['__KONGREGATE_USERNAME__',],
                                                                                                           'kongregate_user_id': ['__KONGREGATE_USER_ID__',],
                                                                                                           'kongregate_game_auth_token': ['__KONGREGATE_GAME_AUTH_TOKEN__',],
@@ -550,6 +551,13 @@ class KGVisitor(Visitor):
         if SpinConfig.config.get('enable_kongregate',0):
             return 'http://*.kongregate.com https://*.kongregate.com'
         return None
+
+class K2Visitor(KGVisitor):
+    def __init__(self, *args, **kwargs):
+        KGVisitor.__init__(self, *args, **kwargs)
+        # override to use frame_platform 'kg2'
+        self.frame_platform = self.demographics['frame_platform'] = 'k2'
+        self.kgpath = '/KGROOT2'
 
 class AGVisitor(Visitor):
     def __init__(self, *args, **kwargs):
@@ -1158,6 +1166,7 @@ class GameProxy(proxy.ReverseProxyResource):
         if anon_id not in visitor_table:
             visitor_table[anon_id] = visitor = {'fb': FBVisitor,
                                                 'kg': KGVisitor,
+                                                'k2': K2Visitor,
                                                 'ag': AGVisitor,
                                                 'bh': BHVisitor,
                                                 'mm': MMVisitor,
@@ -1174,6 +1183,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
         return {'fb': self.index_visit_fb,
                 'kg': self.index_visit_kg,
+                'k2': self.index_visit_kg,
                 'ag': self.index_visit_ag,
                 'bh': self.index_visit_bh,
                 'mm': self.index_visit_mm,
@@ -2980,6 +2990,8 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'fb')
             elif self.path == '/KGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'kg')
+            elif self.path == '/KGROOT2':
+                ret = self.render_ROOT(request, frame_platform = 'k2')
             elif self.path == '/AGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'ag')
             elif self.path == '/BHROOT':

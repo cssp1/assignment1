@@ -1460,7 +1460,7 @@ class User:
 
     def get_trust_level(self):
         # any login from KG, AG, or FB counts as "verified"
-        if self.frame_platform in ('fb','kg','ag'):
+        if self.frame_platform in ('fb','kg','k2','ag'):
             return 10 # loginserver.py TRUST_VERIFIED
 
         elif self.frame_platform == 'bh':
@@ -27675,7 +27675,7 @@ class GAMEAPI(resource.Resource):
             return False
 
         frame_platform = client_social_id[0:2]
-        assert frame_platform in ('fb','kg','ag','bh','mm')
+        assert frame_platform in ('fb','kg','k2','ag','bh','mm')
 
         # check gamedata against server version
         client_gamedata_date = client_gamedata_build_info.get('date','nodate') if client_gamedata_build_info else 'none'
@@ -27809,7 +27809,7 @@ class GAMEAPI(resource.Resource):
             if not user.facebook_first_name:
                 user.facebook_first_name = 'unknown'
 
-        elif frame_platform == 'kg':
+        elif frame_platform in ('kg','k2'):
             user.kg_auth_token = auth_token
             user.kg_id = social_id[2:]
             if not user.kg_username:
@@ -28127,7 +28127,7 @@ class GAMEAPI(resource.Resource):
 
             # check status of any unhandled inflight payments
             user.ping_fbpayments(session, retmsg, [data['request_id'] for key, data in player.fbpayments_inflight.items()])
-        elif session.user.frame_platform == 'kg':
+        elif session.user.frame_platform in ('kg','k2'):
             user.retrieve_kg_info(session, retmsg)
         elif session.user.frame_platform == 'ag':
             user.retrieve_ag_info(session, retmsg)
