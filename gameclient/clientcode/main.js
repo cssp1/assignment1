@@ -5576,6 +5576,21 @@ Building.prototype.is_security_node_only = function() {
     });
     return ret;
 };
+Building.prototype.is_security_node_crafting = function() {
+    if(!this.is_security_node()) { return false; }
+    var craft_queue = this.get_crafting_queue();
+    var ret = false;
+    if(craft_queue && craft_queue.length > 0) {
+        goog.object.forEach(craft_queue, function(craft) {
+            var recipe = craft['craft']['recipe'];
+            var category = gamedata['crafting']['recipes'][recipe]['crafting_category'];
+            if(category.indexOf("security_nodes_") == 0) {
+                ret = true;
+            };
+        });
+    }
+    return ret;
+};
 Building.prototype.is_barrier = function() { return this.spec['name'] === 'barrier'; };
 Building.prototype.is_trapped_barrier = function() { return this.spec['equip_slots'] && ('barrier_trap' in this.spec['equip_slots']); };
 Building.prototype.is_armed_building = function() { return this.spec['equip_slots'] && ('building_weapon' in this.spec['equip_slots']); };
@@ -22936,8 +22951,8 @@ function invoke_building_context_menu(mouse_xy) {
                 if(obj.is_crafting()) {
                     // for turret emplacements, add the speedup/cancel buttons above the divider
                     var which_buttons;
-                    if(obj.is_emplacement() || obj.is_security_node_only() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) {
-                        if(!('mounted' in special_buttons)) { special_buttons['mounted'] = []; }
+                    if(obj.is_emplacement() || obj.is_security_node_crafting() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) {
+                        if(!special_buttons['mounted']) {special_buttons['mounted'] = [];}
                         which_buttons = special_buttons['mounted'];
                     } else {
                         which_buttons = buttons;
@@ -23020,10 +23035,10 @@ function invoke_building_context_menu(mouse_xy) {
                     }
                 }
 
-                if(obj.time_until_finish() <= 0) {
+                if(obj.time_until_finish() <= 0 || (obj.is_security_node() && ! obj.is_security_node_crafting())) {
                     var spell = gamedata['spells']['CRAFT_FOR_FREE'];
-                    special_buttons['mounted'] = [];
                     var this_ui_context = 'ui_name_building_context_emplacement';
+                    if(!special_buttons['mounted']) {special_buttons['mounted'] = [];}
                     if (obj.is_trapped_barrier()) {
                         this_ui_context = 'ui_name_building_context_barrier_trap';
                     } else if (obj.is_armed_townhall()) {
@@ -23043,6 +23058,7 @@ function invoke_building_context_menu(mouse_xy) {
                 if(session.home_base && cur_item) {
                     upgrade_is_active = !under_leveled;
                     var upgr_spell = gamedata['spells']['RESEARCH_FOR_FREE'];
+                    if(!special_buttons['mounted']) {special_buttons['mounted'] = [];}
                     special_buttons['mounted'].push(new ContextMenuButton({ui_name: upgr_spell[this_ui_context],
                                                                            onclick: (function (_techname) { return function() {
                                                                             // hack (?) to work around issues with upgrade dialog
@@ -23184,7 +23200,11 @@ function invoke_building_context_menu(mouse_xy) {
         if (obj.is_emplacement()) {
             cur_item = obj.turret_head_item() || obj.turret_head_inprogress_item();
         } else if (obj.is_security_node()) {
-            cur_item = obj.security_node_item() || obj.security_node_inprogress_item();
+            if(obj.is_security_node_crafting()) {
+                cur_item = obj.security_node_inprogress_item();
+            } else {
+                cur_item = obj.security_node_item();
+            }
         }  else if (obj.is_trapped_barrier()) {
             cur_item = obj.barrier_trap_item() || obj.barrier_trap_inprogress_item();
         } else if (obj.is_armed_building()) {
