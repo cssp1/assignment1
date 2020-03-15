@@ -15592,7 +15592,7 @@ function draw_turret_ranges(world, ignore_obj) {
                 spell = ran[0], range = (ran[3] > 0 ? ran[3] : ran[1]), aoe = ran[2], min_range = ran[4];
                 if(range > 0) {
                     var pos = obj.interpolate_pos(world);
-                    var color = new SPUI.Color(0.3, 0.85, 0.24);
+                    var color = new SPUI.Color(1.0, 0.5, 0.0);
                     draw_weapon_range(ortho_to_draw(pos), range, obj.team === 'player', aoe, min_range, color);
                 }
             }
