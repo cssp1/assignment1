@@ -4210,6 +4210,15 @@ def main(args):
         if checkable in gamedata['store'] and type(gamedata['store'][checkable]) is list:
             error |= check_cond_chain(gamedata['store'][checkable], reason = 'store.'+checkable)
 
+    if 'payments_api' in gamedata['store'] and type(gamedata['store']['payments_api']) is list:
+        for platform in ('fb','kg','k2','ag','bh'):
+            found_platform = False
+            for predicate in gamedata['store']['payments_api']:
+                if predicate[0]['platform'] == platform:
+                    found_platform = True
+            if not found_platform:
+                error |= 1; print 'gamedata["store"]["payments_api"] requires an entry for each frame platform type. Missing %s.' % (platform)
+
     for name, data in gamedata['strings']['idle_buildings'].iteritems():
         if data.get('icon',None):
             error |= require_art_asset(data['icon'], 'strings:idle_buildings:'+name+':icon')
