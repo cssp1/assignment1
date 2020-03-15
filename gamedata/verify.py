@@ -2074,7 +2074,7 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if 'chance' not in pred:
             error |= 1; print '%s: RANDOM predicate needs a "chance" 0-1' % (reason)
     elif pred['predicate'] == 'FRAME_PLATFORM':
-        VALID_PLATFORMS = ('fb','kg','ag','bh')
+        VALID_PLATFORMS = ('fb','kg','k2','ag','bh')
         if pred.get('platform',None) not in VALID_PLATFORMS:
             error |= 1; print '%s: FRAME_PLATFORM predicate needs a "platform" in %r' % (reason, VALID_PLATFORMS)
     elif pred['predicate'] == 'GAMEDATA_VAR':

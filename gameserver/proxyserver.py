@@ -220,6 +220,7 @@ def reload_static_includes():
     STATIC_INCLUDE_FILES = ['proxy_index.html',
                             'index_body_fb.html', 'index_body_fb.css',
                             'index_body_kg.html', 'index_body_kg.css',
+                            'index_body_k2.html', 'index_body_k2.css',
                             'index_body_ag.html', 'index_body_ag.css',
                             'index_body_bh.html', 'index_body_bh.css',
                             'index_body_mm.html', 'index_body_mm.css',
@@ -555,7 +556,7 @@ class KGVisitor(Visitor):
 class K2Visitor(KGVisitor):
     def __init__(self, *args, **kwargs):
         KGVisitor.__init__(self, *args, **kwargs)
-        # override to use frame_platform 'kg2'
+        # override to use frame_platform 'k2'
         self.frame_platform = self.demographics['frame_platform'] = 'k2'
         self.kgpath = '/KGROOT2'
 
@@ -2590,7 +2591,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$ONLOAD$': string.join(onload,' '),
 
             '$FACEBOOK_SDK$': facebook_sdk,
-            '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if (visitor.frame_platform == 'kg' and SpinConfig.config.get('enable_kongregate',0)) else '',
+            '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if ((visitor.frame_platform == 'kg' or visitor.frame_platform == 'k2') and SpinConfig.config.get('enable_kongregate',0)) else '',
             '$ARMORGAMES_SDK$': get_static_include('ArmorGamesSDK.js') if (visitor.frame_platform == 'ag' and SpinConfig.config.get('enable_armorgames',0)) else '',
             '$CASTLE_SDK$': get_static_include('CastleSDK.js').replace('$CASTLE_APP_ID$',SpinConfig.config['castle_app_id']) if SpinConfig.config.get('enable_castle',0) else '',
             '$GOOGLE_ANALYTICS_SDK$': get_static_include('GoogleAnalyticsSDK.js').replace('$GOOGLE_ANALYTICS_TRACKING_CODE$',SpinConfig.config['google_analytics_tracking_code']) if SpinConfig.config.get('google_analytics_tracking_code') else '',
@@ -3416,7 +3417,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'STATSAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING', 'GAME_HEALTH'):
+        for chnam in ('', 'KGROOT', 'KGROOT2', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'STATSAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING', 'GAME_HEALTH'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)

@@ -20557,7 +20557,7 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
             client_height = window.innerHeight;
         }
 
-        if(spin_frame_platform == 'kg' && dialog.user_data['scroll_down_hack']) {
+        if((spin_frame_platform == 'kg' || spin_frame_platform == 'k2') && dialog.user_data['scroll_down_hack']) {
             // KG leaves us with no choice to figure out if the arrow is off screen, so use this ugly hack
             dialog.widgets['arrow'].show = true;
             dialog.widgets['scroll'].show = dialog.widgets['scroll_bg'].show = false;
