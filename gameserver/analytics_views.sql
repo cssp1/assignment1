@@ -96,7 +96,7 @@ DELIMITER $$
 CREATE FUNCTION classify_acquisition_campaign (frame_platform VARCHAR(2), camp VARCHAR(128))
 RETURNS VARCHAR(128) DETERMINISTIC
 BEGIN
-        IF frame_platform = 'kg' THEN
+        IF frame_platform = 'kg' or frame_platform = 'k2' THEN
            RETURN 'Kongregate';
         ELSEIF frame_platform = 'ag' THEN
            RETURN 'Armor Games';
