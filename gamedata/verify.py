@@ -4210,7 +4210,8 @@ def main(args):
         if checkable in gamedata['store'] and type(gamedata['store'][checkable]) is list:
             error |= check_cond_chain(gamedata['store'][checkable], reason = 'store.'+checkable)
 
-    if 'payments_api' in gamedata['store'] and type(gamedata['store']['payments_api']) is list:
+    # note: checks payment API to allow for Electron and second Kongregate release. Only TR is planned for now, but add games if they get ported
+    if 'payments_api' in gamedata['store'] and type(gamedata['store']['payments_api']) is list and gamedata['game_id'] in ('tr','eg'):
         for platform in ('fb','kg','k2','ag','bh'):
             found_platform = False
             for predicate in gamedata['store']['payments_api']:
