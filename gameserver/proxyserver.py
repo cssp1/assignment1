@@ -2541,8 +2541,8 @@ class GameProxy(proxy.ReverseProxyResource):
             facebook_sdk = get_static_include('FacebookSDK_Battlehouse.js')
 
         replacements = self.get_fb_global_variables(request, visitor)
-        replacements_frame_platform = visitor.frame_platform
-        if replacements_frame_platform == 'k2': replacements_frame_platform = 'kg'
+        index_body_platform = visitor.frame_platform
+        if index_body_platform == 'k2': index_body_platform = 'kg'
         replacements.update({
             '$SERVER_HTTP_PORT$': str(SpinConfig.config['proxyserver']['external_http_port']),
             '$SERVER_SSL_PORT$': str(SpinConfig.config['proxyserver'].get('external_ssl_port',-1)),
@@ -2603,8 +2603,8 @@ class GameProxy(proxy.ReverseProxyResource):
             '$XSOLLA_SDK$': get_static_include('XsollaSDK.min.js') if (SpinConfig.config.get('enable_xsolla',0) and visitor.frame_platform in ('ag','bh','mm')) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
             '$LOADING_SCREEN_DATA$': SpinJSON.dumps(screen_data),
-            '$INDEX_CSS$': get_static_include('index_body_%s.css' % replacements_frame_platform),
-            '$INDEX_BODY$': get_static_include('index_body_%s.html' % replacements_frame_platform).replace('$GAME_COPYRIGHT_INFO$', SpinConfig.config.get('game_copyright_info', '$YEAR$ Example copyright info').replace('$YEAR$', repr(time.gmtime(proxy_time).tm_year))),
+            '$INDEX_CSS$': get_static_include('index_body_%s.css' % index_body_platform),
+            '$INDEX_BODY$': get_static_include('index_body_%s.html' % index_body_platform).replace('$GAME_COPYRIGHT_INFO$', SpinConfig.config.get('game_copyright_info', '$YEAR$ Example copyright info').replace('$YEAR$', repr(time.gmtime(proxy_time).tm_year))),
             })
 
         expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
