@@ -512,6 +512,7 @@ class KGVisitor(Visitor):
         self.kongregate_auth_token = None
         self.kongregate_game_url = None
         self.kongregate_game_id = None
+        self.kgpath = '/KGROOT'
 
     def set_kongregate_id(self, kgid):
         self.kongregate_id = str(kgid)
@@ -529,7 +530,7 @@ class KGVisitor(Visitor):
             self.game_container = SpinConfig.config['proxyserver'].get('fallback_landing', '//www.kongregate.com/') # punt :(
 
     def canvas_url(self):
-        return self.server_protocol + self.server_host + ':' + self.server_port + '/KGROOT' + q_clean_qs(self.first_hit_uri,
+        return self.server_protocol + self.server_host + ':' + self.server_port + self.kgpath + q_clean_qs(self.first_hit_uri,
                                                                                                          {'kongregate_username':[self.kongregate_username,],
                                                                                                           'kongregate_user_id': [self.kongregate_id,],
                                                                                                           'kongregate_game_auth_token': [self.kongregate_auth_token,],
@@ -539,7 +540,7 @@ class KGVisitor(Visitor):
     def canvas_url_no_auth(self):
         # send the browser the URL to redirect to after authorizing
         assert self.kongregate_game_id and self.kongregate_game_url
-        return self.server_protocol + self.server_host + ':' + self.server_port + '/KGROOT' + q_clean_qs(self.first_hit_uri,
+        return self.server_protocol + self.server_host + ':' + self.server_port + self.kgpath + q_clean_qs(self.first_hit_uri,
                                                                                                          {'kongregate_username':['__KONGREGATE_USERNAME__',],
                                                                                                           'kongregate_user_id': ['__KONGREGATE_USER_ID__',],
                                                                                                           'kongregate_game_auth_token': ['__KONGREGATE_GAME_AUTH_TOKEN__',],
@@ -550,6 +551,13 @@ class KGVisitor(Visitor):
         if SpinConfig.config.get('enable_kongregate',0):
             return 'http://*.kongregate.com https://*.kongregate.com'
         return None
+
+class K2Visitor(KGVisitor):
+    def __init__(self, *args, **kwargs):
+        KGVisitor.__init__(self, *args, **kwargs)
+        # override to use frame_platform 'k2'
+        self.frame_platform = self.demographics['frame_platform'] = 'k2'
+        self.kgpath = '/KGROOT2'
 
 class AGVisitor(Visitor):
     def __init__(self, *args, **kwargs):
@@ -1158,6 +1166,7 @@ class GameProxy(proxy.ReverseProxyResource):
         if anon_id not in visitor_table:
             visitor_table[anon_id] = visitor = {'fb': FBVisitor,
                                                 'kg': KGVisitor,
+                                                'k2': K2Visitor,
                                                 'ag': AGVisitor,
                                                 'bh': BHVisitor,
                                                 'mm': MMVisitor,
@@ -1174,6 +1183,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
         return {'fb': self.index_visit_fb,
                 'kg': self.index_visit_kg,
+                'k2': self.index_visit_kg,
                 'ag': self.index_visit_ag,
                 'bh': self.index_visit_bh,
                 'mm': self.index_visit_mm,
@@ -2531,6 +2541,8 @@ class GameProxy(proxy.ReverseProxyResource):
             facebook_sdk = get_static_include('FacebookSDK_Battlehouse.js')
 
         replacements = self.get_fb_global_variables(request, visitor)
+        index_body_platform = visitor.frame_platform
+        if index_body_platform == 'k2': index_body_platform = 'kg'
         replacements.update({
             '$SERVER_HTTP_PORT$': str(SpinConfig.config['proxyserver']['external_http_port']),
             '$SERVER_SSL_PORT$': str(SpinConfig.config['proxyserver'].get('external_ssl_port',-1)),
@@ -2580,7 +2592,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$ONLOAD$': string.join(onload,' '),
 
             '$FACEBOOK_SDK$': facebook_sdk,
-            '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if (visitor.frame_platform == 'kg' and SpinConfig.config.get('enable_kongregate',0)) else '',
+            '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if ((visitor.frame_platform == 'kg' or visitor.frame_platform == 'k2') and SpinConfig.config.get('enable_kongregate',0)) else '',
             '$ARMORGAMES_SDK$': get_static_include('ArmorGamesSDK.js') if (visitor.frame_platform == 'ag' and SpinConfig.config.get('enable_armorgames',0)) else '',
             '$CASTLE_SDK$': get_static_include('CastleSDK.js').replace('$CASTLE_APP_ID$',SpinConfig.config['castle_app_id']) if SpinConfig.config.get('enable_castle',0) else '',
             '$GOOGLE_ANALYTICS_SDK$': get_static_include('GoogleAnalyticsSDK.js').replace('$GOOGLE_ANALYTICS_TRACKING_CODE$',SpinConfig.config['google_analytics_tracking_code']) if SpinConfig.config.get('google_analytics_tracking_code') else '',
@@ -2591,8 +2603,8 @@ class GameProxy(proxy.ReverseProxyResource):
             '$XSOLLA_SDK$': get_static_include('XsollaSDK.min.js') if (SpinConfig.config.get('enable_xsolla',0) and visitor.frame_platform in ('ag','bh','mm')) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
             '$LOADING_SCREEN_DATA$': SpinJSON.dumps(screen_data),
-            '$INDEX_CSS$': get_static_include('index_body_%s.css' % visitor.frame_platform),
-            '$INDEX_BODY$': get_static_include('index_body_%s.html' % visitor.frame_platform).replace('$GAME_COPYRIGHT_INFO$', SpinConfig.config.get('game_copyright_info', '$YEAR$ Example copyright info').replace('$YEAR$', repr(time.gmtime(proxy_time).tm_year))),
+            '$INDEX_CSS$': get_static_include('index_body_%s.css' % index_body_platform),
+            '$INDEX_BODY$': get_static_include('index_body_%s.html' % index_body_platform).replace('$GAME_COPYRIGHT_INFO$', SpinConfig.config.get('game_copyright_info', '$YEAR$ Example copyright info').replace('$YEAR$', repr(time.gmtime(proxy_time).tm_year))),
             })
 
         expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
@@ -2980,6 +2992,8 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'fb')
             elif self.path == '/KGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'kg')
+            elif self.path == '/KGROOT2':
+                ret = self.render_ROOT(request, frame_platform = 'k2')
             elif self.path == '/AGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'ag')
             elif self.path == '/BHROOT':
@@ -3404,7 +3418,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'STATSAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING', 'GAME_HEALTH'):
+        for chnam in ('', 'KGROOT', 'KGROOT2', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'STATSAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING', 'GAME_HEALTH'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)

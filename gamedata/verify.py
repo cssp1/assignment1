@@ -2074,7 +2074,7 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if 'chance' not in pred:
             error |= 1; print '%s: RANDOM predicate needs a "chance" 0-1' % (reason)
     elif pred['predicate'] == 'FRAME_PLATFORM':
-        VALID_PLATFORMS = ('fb','kg','ag','bh')
+        VALID_PLATFORMS = ('fb','kg','k2','ag','bh')
         if pred.get('platform',None) not in VALID_PLATFORMS:
             error |= 1; print '%s: FRAME_PLATFORM predicate needs a "platform" in %r' % (reason, VALID_PLATFORMS)
     elif pred['predicate'] == 'GAMEDATA_VAR':
@@ -4209,6 +4209,16 @@ def main(args):
     for checkable in ('payments_api', 'buy_gamebucks_sku_kind', 'buy_gamebucks_sku_currency', 'ui_buy_gamebucks_warning', 'buy_gamebucks_dialog_look'):
         if checkable in gamedata['store'] and type(gamedata['store'][checkable]) is list:
             error |= check_cond_chain(gamedata['store'][checkable], reason = 'store.'+checkable)
+
+    # note: checks payment API to allow for Electron and second Kongregate release. Only TR is planned for now, but add games if they get ported
+    if 'payments_api' in gamedata['store'] and type(gamedata['store']['payments_api']) is list and gamedata['game_id'] in ('tr','eg'):
+        for platform in ('fb','kg','k2','ag','bh'):
+            found_platform = False
+            for predicate in gamedata['store']['payments_api']:
+                if predicate[0]['platform'] == platform:
+                    found_platform = True
+            if not found_platform:
+                error |= 1; print 'gamedata["store"]["payments_api"] requires an entry for each frame platform type. Missing %s.' % (platform)
 
     for name, data in gamedata['strings']['idle_buildings'].iteritems():
         if data.get('icon',None):

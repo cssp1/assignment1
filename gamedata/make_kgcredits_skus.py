@@ -142,7 +142,10 @@ if __name__ == '__main__':
                 sku['ui_bonus'] = '\n'.join(ui_bonus_list)
 
             pred = {'predicate': 'AND', 'subpredicates':[
-                       {'predicate': 'FRAME_PLATFORM', 'platform': 'kg'},
+                       {'predicate': 'OR', 'subpredicates':[
+                            {'predicate': 'FRAME_PLATFORM', 'platform': 'kg'},
+                            {'predicate': 'FRAME_PLATFORM', 'platform': 'k2'}
+                       ] },
                        {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_kind', 'value': val.get('kind','UNUSED')},
                        ] }
 
