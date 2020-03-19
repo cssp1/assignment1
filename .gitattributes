@@ -19,3 +19,5 @@ Makefile*        text eol=lf
 *.yml            text eol=lf
 *.pot            text eol=lf
 *.po             text eol=lf
+*.css            text eol=lf
+*.html           text eol=lf
