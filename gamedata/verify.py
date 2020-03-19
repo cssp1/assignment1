@@ -393,6 +393,15 @@ def check_mandatory_fields(specname, spec, kind):
             for slot_name, qty in slot_dict.iteritems():
                 if slot_name not in gamedata['strings']['equip_slots']:
                     error |= 1; print '%s: equip_slot type %s not found in strings.json' % (specname, slot_name)
+                if slot_name == 'security_node':
+                    if 'crafting_categories' not in spec:
+                        error |= 1; print '%s: has security_node equip_slot type but no crafting_categories' % (specname)
+                    found_node = False
+                    for category in spec['crafting_categories']:
+                        if 'security_nodes_' in category:
+                            found_node = True
+                    if not found_node:
+                        error |= 1; print '%s: has security_node equip_slot type but no "security_nodes_" entry in crafting_categories' % (specname)
                 if slot_name in mounted_weapons:
                     for weapon in mounted_weapons:
                         if weapon != slot_name:
