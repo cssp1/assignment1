@@ -5568,7 +5568,6 @@ Building.prototype.is_emplacement = function() { return this.spec['equip_slots']
 Building.prototype.is_security_node = function() { return this.spec['equip_slots'] && ('security_node' in this.spec['equip_slots']); };
 Building.prototype.is_security_node_only = function() {
     if(!this.is_security_node()) { return false; }
-    if(!this.spec['crafting_categories']) { return false; }
     var ret = true;
     goog.object.forEach(this.spec['crafting_categories'], function(cat) {
         if(cat && typeof(cat) === 'string' && cat.indexOf("security_nodes_") == -1) {
