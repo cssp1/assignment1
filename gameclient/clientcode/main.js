@@ -5570,7 +5570,7 @@ Building.prototype.is_security_node_only = function() {
     if(!this.is_security_node()) { return false; }
     var ret = true;
     goog.object.forEach(this.spec['crafting_categories'], function(cat) {
-        if(cat.indexOf("security_nodes_") == -1) {
+        if(cat && typeof(cat) === 'string' && cat.indexOf("security_nodes_") == -1) {
             ret = false;
         };
     });
