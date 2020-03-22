@@ -32398,10 +32398,18 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
-                    if (not session.player.unit_donation_enabled()) or \
-                       object.is_damaged() or object.is_busy():
-                        error_reason = "REQUIREMENTS_NOT_SATISFIED"
+                    if (not session.player.unit_donation_enabled()):
+                        error_reason = "CANNOT_DONATE_NOT_ENABLED"
                         success = False
+                    elif object.is_damaged():
+                        error_reason = "CANNOT_DONATE_BUILDING_DAMAGED"
+                        success = False
+                    elif object.is_busy():
+                        success = False
+                        if object.is_crafting():
+                            error_reason = "CANNOT_DONATE_BUILDING_CRAFTING"
+                        else:
+                            error_reason = "CANNOT_DONATE_BUILDING_BUSY"
 
                 if success:
                     alliance_id = session.get_alliance_id()
