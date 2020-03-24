@@ -474,15 +474,15 @@ MountedWeaponDialog.set_recipe_display = function(dialog, mounting_obj, recipe_n
 
     // POWER requirement
     if(1) {
-        if(!current_spec['equip']['consumes_power']) {
+        if(current_spec && !current_spec['equip']['consumes_power']) {
             throw Error('Crafting error: ' + current_spec['ui_name'] + ' is missing equip power consumption for ' + mounting_obj.spec['ui_name']);
         }
         var old_power = (current_spec ? get_leveled_quantity(current_spec['equip']['consumes_power'], current_level) : 0);
-        if(!recipe_spec['consumes_power']) {
+        if(recipe_spec && !recipe_spec['consumes_power']) {
             throw Error('Crafting error: ' + recipe_spec['name'] + ' is missing crafting power consumption for ' + mounting_obj.spec['ui_name']);
         }
         var during_power = get_leveled_quantity(recipe_spec['consumes_power'] || 0, recipe_level);
-        if(!product_spec['equip']['consumes_power']) {
+        if(product_spec && !product_spec['equip']['consumes_power']) {
             throw Error('Crafting error: ' + product_spec['ui_name'] + ' is missing equip power consumption for ' + mounting_obj.spec['ui_name']);
         }
         var new_power = get_leveled_quantity(product_spec['equip']['consumes_power'] || 0, product_level);
