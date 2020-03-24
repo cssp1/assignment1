@@ -1358,7 +1358,7 @@ def check_item(itemname, spec):
         if 'equip' in spec:
             if 'consumes_power' in spec['equip']:
                 if isinstance(spec['equip']['consumes_power'], list):
-                    if len(spec['icon']) != max_level:
+                    if len(spec['equip']['consumes_power']) != max_level:
                         error |= 1
                         print '%s: has max_level value of %d, but "consumes_power" length is %d' % (itemname, max_level, len(spec['equip']['consumes_power']))
             if 'effects' in spec:
