@@ -438,6 +438,9 @@ MountedWeaponDialog.set_recipe_display = function(dialog, mounting_obj, recipe_n
     // RESOURCE requirement
     for(var res in gamedata['resources']) {
         var resdata = gamedata['resources'][res];
+        if(!recipe_spec['cost']) {
+            throw Error('Crafting error: ' + recipe_name + ' is missing cost for ' + mounting_obj.spec['ui_name']);
+        }
         var cost = get_leveled_quantity(get_leveled_quantity(recipe_spec['cost'], recipe_level)[res]||0, recipe_level);
 
         if(!player.is_cheater && cost > 0 && ('allow_instant' in resdata) && !resdata['allow_instant']) {
@@ -471,8 +474,17 @@ MountedWeaponDialog.set_recipe_display = function(dialog, mounting_obj, recipe_n
 
     // POWER requirement
     if(1) {
+        if(!current_spec['equip']['consumes_power']) {
+            throw Error('Crafting error: ' + current_spec['ui_name'] + ' is missing equip power consumption for ' + mounting_obj.spec['ui_name']);
+        }
         var old_power = (current_spec ? get_leveled_quantity(current_spec['equip']['consumes_power'], current_level) : 0);
+        if(!recipe_spec['consumes_power']) {
+            throw Error('Crafting error: ' + recipe_spec['name'] + ' is missing crafting power consumption for ' + mounting_obj.spec['ui_name']);
+        }
         var during_power = get_leveled_quantity(recipe_spec['consumes_power'] || 0, recipe_level);
+        if(!product_spec['equip']['consumes_power']) {
+            throw Error('Crafting error: ' + product_spec['ui_name'] + ' is missing equip power consumption for ' + mounting_obj.spec['ui_name']);
+        }
         var new_power = get_leveled_quantity(product_spec['equip']['consumes_power'] || 0, product_level);
         dialog.widgets['cost_power'].show =
             dialog.widgets['resource_power_icon'].show = (new_power > 0 || old_power > 0);
@@ -504,12 +516,18 @@ MountedWeaponDialog.set_recipe_display = function(dialog, mounting_obj, recipe_n
         parent.widgets['cost_time'].show = !current_item || !ItemDisplay.same_item(current_item, product_item);
     if(parent.widgets['cost_time'].show) {
         var speed = mounting_obj.get_stat('crafting_speed', mounting_obj.get_leveled_quantity(mounting_obj.spec['crafting_speed'] || 1.0));
+        if(!recipe_spec['craft_time']) {
+            throw Error('Crafting error: ' + recipe_spec['name'] + ' is missing crafting time for ' + mounting_obj.spec['ui_name']);
+        }
         var cost_time = Math.max(1, Math.floor(get_leveled_quantity(recipe_spec['craft_time'], recipe_level) / speed));
         parent.widgets['cost_time'].str = pretty_print_time(cost_time);
     }
 
     // PREDICATE requirement
     if(!player.is_cheater && ('requires' in recipe_spec)) {
+        if(!recipe_spec['requires']) {
+            throw Error('Crafting error: ' + recipe_spec['name'] + ' is missing crafting requirements for ' + mounting_obj.spec['ui_name']);
+        }
         var pred = read_predicate(get_leveled_quantity(recipe_spec['requires'], recipe_level));
         var text = pred.ui_describe(player);
         if(text) {
@@ -549,6 +567,9 @@ MountedWeaponDialog.set_recipe_display = function(dialog, mounting_obj, recipe_n
 
     // DESCRIPTION
     if(1) {
+        if(!product_spec['ui_description']) {
+            throw Error('Crafting error: ' + product_spec['name'] + ' is missing crafting description for ' + mounting_obj.spec['ui_name']);
+        }
         var descr_nlines = SPUI.break_lines(get_leveled_quantity(product_spec['ui_description'], product_level),
                                             dialog.widgets['description'].font, dialog.widgets['description'].wh);
 
