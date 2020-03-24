@@ -40,7 +40,7 @@ class ClientPlatformPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
         self.platforms = data.get('platforms',[])
-        self.any_electron = data.get.get('any_electron',False)
+        self.any_electron = data.get('any_electron',False)
     def is_satisfied(self, player, qdata):
         if self.any_electron:
             return player.spin_client_platform.startswith('electron_')
