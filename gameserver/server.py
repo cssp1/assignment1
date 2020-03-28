@@ -19268,7 +19268,7 @@ class KGAPI(resource.Resource):
     def __init__(self, gameapi):
         resource.Resource.__init__(self)
         self.gameapi = gameapi
-        self.kg_api_key = SpinConfig.config['kongregate_api_key']
+        self.kg_api_key = SpinConfig.config.get('kongregate_api_key', 'unknown')
         self.kg_api_url = 'KGAPI'
     def render_GET(self, request):
         return self.render_POST(request)
@@ -19281,7 +19281,6 @@ class KGAPI(resource.Resource):
         return ret
 
     @admin_stats.measure_latency('KGAPI')
-    @admin_stats.measure_latency('K2API')
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
 
@@ -19333,7 +19332,7 @@ class KGAPI(resource.Resource):
 class K2API(KGAPI):
     def __init__(self, *args, **kwargs):
         KGAPI.__init__(self, *args, **kwargs)
-        self.kg_api_key = SpinConfig.config['kongregate2_api_key']
+        self.kg_api_key = SpinConfig.config.get('kongregate2_api_key', 'unknown')
         self.kg_api_url = 'K2API'
 
 # TrialPay API endpoint - see http://help.trialpay.com/facebook/offer-wall/
