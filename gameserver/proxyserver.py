@@ -1288,7 +1288,7 @@ class GameProxy(proxy.ReverseProxyResource):
         kg_async_http.queue_request(proxy_time,
                                     'https://www.kongregate.com/api/authenticate.json?'+urllib.urlencode({'user_id':visitor.kongregate_id,
                                                                                                           'game_auth_token':visitor.kongregate_auth_token,
-                                                                                                          'api_key':self.kg_api_key}),
+                                                                                                          'api_key':visitor.kg_api_key}),
                                     vc.on_response, error_callback = vc.on_error)
         return twisted.web.server.NOT_DONE_YET
 
@@ -2995,7 +2995,6 @@ class GameProxy(proxy.ReverseProxyResource):
             elif self.path == '/KGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'kg')
             elif self.path == '/KGROOT2':
-                #request.setHeader(b'X-Frame-Options', b'GOFORIT')
                 ret = self.render_ROOT(request, frame_platform = 'k2')
             elif self.path == '/AGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'ag')
