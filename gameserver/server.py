@@ -5792,9 +5792,7 @@ class Session(object):
                 params[context_key] = context
 
         kongregate_api_key_key = gamedata['adnetworks'][api].get('kongregate_api_key_key', None)
-        kg_api_key = 'kongregate_api_key'
-        if self.user.frame_platform == 'k2':
-            kg_api_key = 'kongregate2_api_key'
+        kg_api_key = {'kg': 'kongregate_api_key','k2': 'kongregate2_api_key'}.get(self.user.frame_platform, None)
         if kongregate_api_key_key:
             params[kongregate_api_key_key] = SpinConfig.config.get(kg_api_key, 'unknown')
 

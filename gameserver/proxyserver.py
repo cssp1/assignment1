@@ -2684,11 +2684,12 @@ class GameProxy(proxy.ReverseProxyResource):
 
         elif self.path == '/KGAPI' or self.path == '/K2API':
             #exception_log.event(proxy_time, 'KGAPI call: '+repr(request.args))
-            kg_api_key = SpinConfig.config['kongregate_api_key']
-            kg_prefix = 'KGAPI'
             if self.path == '/K2API':
                 kg_api_key = SpinConfig.config['kongregate2_api_key']
                 kg_prefix = 'K2API'
+            else:
+                kg_api_key = SpinConfig.config['kongregate_api_key']
+                kg_prefix = 'KGAPI'
             request_data = SpinKongregate.parse_signed_request(request.args['signed_request'][-1], kg_api_key)
             if not request_data: raise Exception(kg_prefix + ' call with invalid signed_request: ' + log_request(request))
 
