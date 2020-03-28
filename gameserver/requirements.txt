@@ -30,8 +30,8 @@ PyMySQL==0.9.3 # pure-Python implementation
 Pillow==6.2.2
 psycopg2-binary==2.8.4
 py-vapid==1.7.0
-pyasn1>=0.4.2
-pyasn1-modules>=0.2.1
+pyasn1>=0.4.8
+pyasn1-modules>=0.2.8
 pyflakes==2.1.1
 pymongo>=3.6.0
 pyOpenSSL>=17.5.0
@@ -53,7 +53,10 @@ git+git://github.com/spinpunch/spin-py-libs.git@v0.1.0#egg=spinlibs==0.1.0
 # note: the version string on the end only tells pip to skip this
 # intall if the currently installed version matches that version. It
 # does NOT enforce which version is pulled from Git.
-git+git://github.com/spinpunch/twisted.git@spinpunch-19.2.1dev0#egg=Twisted==19.2.1.dev0
+git+git://github.com/spinpunch/twisted.git@spinpunch-20.3.0dev1#egg=Twisted==20.3.0.dev1
+
+# note: this might require running pip with the --no-use-pep517 flag
+# to avoid errors about "__legacy__"
 
 # ujson MUST be this customized version, which adds extra options like
 # buffer size hints and adjusts whitespace handling
