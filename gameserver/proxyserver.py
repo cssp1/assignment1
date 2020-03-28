@@ -2682,10 +2682,16 @@ class GameProxy(proxy.ReverseProxyResource):
             d.addBoth(SpinHTTP.complete_deferred_request_safe, request)
             return twisted.web.server.NOT_DONE_YET
 
-        elif self.path == '/KGAPI':
+        elif self.path == '/KGAPI' or self.path == '/K2API':
             #exception_log.event(proxy_time, 'KGAPI call: '+repr(request.args))
-            request_data = SpinKongregate.parse_signed_request(request.args['signed_request'][-1], SpinConfig.config['kongregate_api_key'])
-            if not request_data: raise Exception('KGAPI call with invalid signed_request: '+log_request(request))
+            if self.path == '/K2API':
+                kg_api_key = SpinConfig.config['kongregate2_api_key']
+                kg_prefix = 'K2API'
+            else:
+                kg_api_key = SpinConfig.config['kongregate_api_key']
+                kg_prefix = 'KGAPI'
+            request_data = SpinKongregate.parse_signed_request(request.args['signed_request'][-1], kg_api_key)
+            if not request_data: raise Exception(kg_prefix + ' call with invalid signed_request: ' + log_request(request))
 
             session = None
 
@@ -2693,9 +2699,9 @@ class GameProxy(proxy.ReverseProxyResource):
                 kongregate_id = str(request_data['buyer_id'])
                 session = ProxySession.emulate(db_client.session_get_by_social_id('kg'+kongregate_id, reason=self.path))
             else:
-                raise Exception('KGAPI call with invalid "event": '+log_request(request))
+                raise Exception(kg_prefix + ' call with invalid "event": '+log_request(request))
 
-            if not session: raise Exception('cannot find session for KGAPI call: '+repr(request_data))
+            if not session: raise Exception('cannot find session for ' + kg_prefix + ' call: '+repr(request_data))
             return self.render_via_proxy(session.gameserver_fwd, request)
 
         elif self.path == '/XSAPI':
@@ -3002,7 +3008,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'bh')
             elif self.path == '/MMROOT':
                 ret = self.render_ROOT(request, frame_platform = 'mm')
-            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/XSAPI', '/CONTROLAPI', '/STATSAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/GAME_HEALTH', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
+            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/K2API', '/XSAPI', '/CONTROLAPI', '/STATSAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/GAME_HEALTH', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
                 ret = self.render_API(request)
             else:
                 ret = str('error')
