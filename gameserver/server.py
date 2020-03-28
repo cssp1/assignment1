@@ -5792,8 +5792,11 @@ class Session(object):
                 params[context_key] = context
 
         kongregate_api_key_key = gamedata['adnetworks'][api].get('kongregate_api_key_key', None)
+        kg_api_key = 'kongregate_api_key'
+        if self.user.frame_platform == 'k2':
+            kg_api_key = 'kongregate2_api_key'
         if kongregate_api_key_key:
-            params[kongregate_api_key_key] = SpinConfig.config.get('kongregate_api_key', 'unknown')
+            params[kongregate_api_key_key] = SpinConfig.config.get(kg_api_key, 'unknown')
 
         facebook_id_key = data.get('facebook_id_key', gamedata['adnetworks'][api].get('facebook_id_key',None))
         if facebook_id_key and self.user.facebook_id:
@@ -19267,22 +19270,24 @@ class KGAPI(resource.Resource):
     def __init__(self, gameapi):
         resource.Resource.__init__(self)
         self.gameapi = gameapi
+        self.kg_api_key = SpinConfig.config['kongregate_api_key']
+        self.kg_api_url = 'KGAPI'
     def render_GET(self, request):
         return self.render_POST(request)
     def render_POST(self, request):
         SpinHTTP.set_access_control_headers(request)
-        ret = catch_all('KGAPI')(self.handle_request)(request)
+        ret = catch_all(self.kg_api_url)(self.handle_request)(request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
             ret = 'spinpunch error'
         return ret
 
-    @admin_stats.measure_latency('KGAPI')
+    @admin_stats.measure_latency(self.kg_api_url)
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
 
         signed_request = request.args['signed_request'][0]
-        request_data = SpinKongregate.parse_signed_request(signed_request, SpinConfig.config['kongregate_api_key'])
+        request_data = SpinKongregate.parse_signed_request(signed_request, self.kg_api_key)
         if not request_data:
             raise Exception('bad signature: checksum verification failed')
 
@@ -19317,12 +19322,20 @@ class KGAPI(resource.Resource):
                 request.write(SpinJSON.dumps(retmsg))
                 request.finish()
 
-            player_table.store_async(session.player, functools.partial(complete_settlement, request, session, retmsg), True, 'KGAPI')
+            player_table.store_async(session.player, functools.partial(complete_settlement, request, session, retmsg), True, self.kg_api_url)
             return server.NOT_DONE_YET
         else:
             raise Exception('unhandled "event" ' + request_data['event'])
 
         return SpinJSON.dumps(retmsg)
+
+# Kongregate API endpoint, mainly for payments
+
+class K2API(KGAPI):
+    def __init__(self, *args, **kwargs):
+        KGAPI.__init__(self, *args, **kwargs)
+        self.kg_api_key = SpinConfig.config['kongregate2_api_key']
+        self.kg_api_url = 'K2API'
 
 # TrialPay API endpoint - see http://help.trialpay.com/facebook/offer-wall/
 
@@ -34152,6 +34165,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
     root.putChild("TRIALPAYAPI",trialpayapi)
     root.putChild("XSAPI",xsapi)
     root.putChild("KGAPI",KGAPI(gameapi))
+    root.putChild("K2API",K2API(gameapi))
     root.putChild("CONTROLAPI",controlapi)
     root.putChild("STATSAPI",statsapi)
     root.putChild("OGPAPI",OGPAPI_instance)
