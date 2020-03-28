@@ -5565,7 +5565,7 @@ Building.prototype.needs_power_ping = function() { return (this.provides_power()
 Building.prototype.is_townhall = function() { return this.spec['name'] === gamedata['townhall']; };
 Building.prototype.is_turret = function() { return this.spec['history_category'] === 'turrets'; };
 Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
-Building.prototype.is_security_node = function() { return this.spec['equip_slots'] && ('security_node' in this.spec['equip_slots']); };
+Building.prototype.is_security_node = function() { return 'show_security_node_ui' in gamedata && read_predicate(gamedata['show_security_node_ui']).is_satisfied(player, null) && this.spec['equip_slots'] && ('security_node' in this.spec['equip_slots']); };
 Building.prototype.is_security_node_only = function() {
     if(!this.is_security_node()) { return false; }
     var ret = true;
