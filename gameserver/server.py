@@ -19280,7 +19280,8 @@ class KGAPI(resource.Resource):
             ret = 'spinpunch error'
         return ret
 
-    @admin_stats.measure_latency(self.kg_api_url)
+    @admin_stats.measure_latency('KGAPI')
+    @admin_stats.measure_latency('K2API')
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
 
