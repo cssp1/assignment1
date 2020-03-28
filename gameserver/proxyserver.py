@@ -513,6 +513,7 @@ class KGVisitor(Visitor):
         self.kongregate_game_url = None
         self.kongregate_game_id = None
         self.kgpath = '/KGROOT'
+        self.kg_api_key = SpinConfig.config['kongregate_api_key']
 
     def set_kongregate_id(self, kgid):
         self.kongregate_id = str(kgid)
@@ -558,6 +559,7 @@ class K2Visitor(KGVisitor):
         # override to use frame_platform 'k2'
         self.frame_platform = self.demographics['frame_platform'] = 'k2'
         self.kgpath = '/KGROOT2'
+        self.kg_api_key = SpinConfig.config['kongregate2_api_key']
 
 class AGVisitor(Visitor):
     def __init__(self, *args, **kwargs):
@@ -1286,7 +1288,7 @@ class GameProxy(proxy.ReverseProxyResource):
         kg_async_http.queue_request(proxy_time,
                                     'https://www.kongregate.com/api/authenticate.json?'+urllib.urlencode({'user_id':visitor.kongregate_id,
                                                                                                           'game_auth_token':visitor.kongregate_auth_token,
-                                                                                                          'api_key':SpinConfig.config['kongregate_api_key']}),
+                                                                                                          'api_key':self.kg_api_key}),
                                     vc.on_response, error_callback = vc.on_error)
         return twisted.web.server.NOT_DONE_YET
 
@@ -2993,6 +2995,7 @@ class GameProxy(proxy.ReverseProxyResource):
             elif self.path == '/KGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'kg')
             elif self.path == '/KGROOT2':
+                #request.setHeader(b'X-Frame-Options', b'GOFORIT')
                 ret = self.render_ROOT(request, frame_platform = 'k2')
             elif self.path == '/AGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'ag')
