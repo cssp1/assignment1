@@ -23035,7 +23035,7 @@ function invoke_building_context_menu(mouse_xy) {
                     }
                 }
 
-                if(obj.time_until_finish() <= 0 || (obj.is_security_node() && ! obj.is_security_node_crafting())) {
+                if(obj.time_until_finish() <= 0 || (obj.is_security_node() && !obj.is_security_node_crafting())) {
                     var spell = gamedata['spells']['CRAFT_FOR_FREE'];
                     var this_ui_context = 'ui_name_building_context_emplacement';
                     if(!special_buttons['mounted']) {special_buttons['mounted'] = [];}
@@ -23167,6 +23167,11 @@ function invoke_building_context_menu(mouse_xy) {
     if(buttons.length < 1) { return; }
 
     selection.unit.speak('click');
+
+    if(special_buttons['mounted'] && special_buttons['mounted'].length > gamedata['dialogs']['mounted_weapon_context_menu']['widgets']['mounted_button']['array'][1]) {
+        var mounted_error = spec['ui_name'] || spec['name'];
+        throw Error('Invalid number of mounted buttons from ' + mounted_error);
+    }
 
     var dialog = invoke_generic_context_menu(mouse_xy, buttons, dialog_name, special_buttons);
 
