@@ -3426,7 +3426,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'KGROOT2', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'STATSAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING', 'GAME_HEALTH'):
+        for chnam in ('', 'KGROOT', 'KGROOT2', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'K2API', 'XSAPI', 'CONTROLAPI', 'STATSAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING', 'GAME_HEALTH'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)
