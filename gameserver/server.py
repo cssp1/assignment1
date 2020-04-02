@@ -27820,7 +27820,7 @@ class GAMEAPI(resource.Resource):
             if not user.facebook_first_name:
                 user.facebook_first_name = 'unknown'
 
-        elif frame_platform in ('kg','k2'):
+        elif frame_platform in ('kg','k2' ):
             user.kg_auth_token = auth_token
             user.kg_id = social_id[2:]
             if not user.kg_username:
