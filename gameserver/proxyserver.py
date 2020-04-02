@@ -514,10 +514,11 @@ class KGVisitor(Visitor):
         self.kongregate_game_id = None
         self.kgpath = '/KGROOT'
         self.kg_api_key = SpinConfig.config['kongregate_api_key']
+        self.social_id_prefix = 'kg'
 
     def set_kongregate_id(self, kgid):
         self.kongregate_id = str(kgid)
-        self.demographics['social_id'] = self.social_id = 'kg'+self.kongregate_id
+        self.demographics['social_id'] = self.social_id = self.social_id_prefix + self.kongregate_id
 
     def auth_token(self): return self.kongregate_auth_token
     def immune_to_country_restrictions(self): return False
@@ -560,6 +561,7 @@ class K2Visitor(KGVisitor):
         self.frame_platform = self.demographics['frame_platform'] = 'k2'
         self.kgpath = '/KGROOT2'
         self.kg_api_key = SpinConfig.config['kongregate2_api_key']
+        self.social_id_prefix = 'k2'
 
 class AGVisitor(Visitor):
     def __init__(self, *args, **kwargs):
