@@ -521,7 +521,7 @@ if __name__ == '__main__':
             print fmt % ('Alias (Call Sign):', player['alias'])
 
         if user.get('frame_platform', None):
-            print fmt % ('Frame Platform:', {'fb':'Facebook','kg':'Kongregate','ag':'Armor Games','mm':'Mattermost','bh':'Battlehouse'}[user['frame_platform']])
+            print fmt % ('Frame Platform:', {'fb':'Facebook','kg':'Kongregate (legacy)','k2':'Kongregate (new)', 'ag':'Armor Games','mm':'Mattermost','bh':'Battlehouse'}[user['frame_platform']])
 
         if user.get('ag_id', None):
             print fmt % ('Armor Games ID:', '"'+str(user['ag_id'])+'"')
