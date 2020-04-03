@@ -4434,6 +4434,37 @@ def main(args):
         error |= check_consequent(cons, reason='consequent_library:'+name)
 
     matchmaking = gamedata['matchmaking']
+    first_season = None # oldest season have a start time of 0. Offsets need to be calculated from the first non-zero season
+    for season in matchmaking['season_starts']:
+        if not first_season and season > 0:
+             first_season = season
+    last_season = matchmaking['season_starts'][-1]
+    for i, season in enumerate(matchmaking['season_starts']):
+        # ignore legacy seasons with a time value of 0
+        if season > 0 and (season - first_season) % 604800 > 0:
+            error |= 1; print 'Season %d should start on a Thursday at 5:00PM UTC. Actual start time is %d' % (i, season)
+
+    for event_schedule in gamedata['event_schedule']:
+        if event_schedule['name'] == "challenge_pvp_ladder_with_prizes":
+            if event_schedule['end_time'] not in matchmaking['season_starts']:
+                error |= 1; print 'PvP tournament has an end time that does not coincide with the start of a PvP season. End time is %d. If this is the newest tournament, it should probably be %d' % (event_schedule['end_time'], last_season)
+            if event_schedule['end_time'] - event_schedule['start_time'] != 604800:
+                error |= 1; print 'PvP tournament starting on %d and ending on %d is not exactly one week long. Make sure it starts on a Thursday at 5:00PM UTC and ends exactly 604800 seconds later.' % (event_schedule['start_time'], event_schedule['end_time'])
+
+    daily_tips = gamedata['daily_tips']
+    for tip in daily_tips:
+        if '_season_' in tip['name'] and ('begins' in tip['name'] or 'ends' in tip['name']):
+            season_number = tip['name'].split('_')[2]
+            if 'show_if' in tip and tip['show_if']['predicate'] == 'AND':
+                for pred in tip['show_if']['subpredicates']:
+                    if pred['predicate'] == 'ABSOLUTE_TIME':
+                        if 'ends' in tip['name']:
+                            if pred['range'][1] not in matchmaking['season_starts'] and pred['range'][1] != -1:
+                                error |= 1; print 'PvP tournament daily tip %s has an end time that does not coincide with the start of a PvP season. End time is %d. If this is the newest tournament, it should probably be %d' % (tip['name'], pred['range'][1], last_season)
+                        elif 'begins' in tip['name']:
+                            if pred['range'][0] not in matchmaking['season_starts'] and pred['range'][0] != -1:
+                                error |= 1; print 'PvP tournament daily tip %s has a start time that does not coincide with the start of a PvP season. Start time is %d. If this is the newest tournament, it should probably be %d' % (tip['name'], pred['range'][0], last_season)
+
     for name in ('ladder_point_decay_if',):
         if name in matchmaking:
             error |= check_predicate(matchmaking[name], reason='matchmaking:'+name)
