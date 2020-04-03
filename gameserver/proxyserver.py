@@ -2689,9 +2689,11 @@ class GameProxy(proxy.ReverseProxyResource):
             if self.path == '/K2API':
                 kg_api_key = SpinConfig.config['kongregate2_api_key']
                 kg_prefix = 'K2API'
+                kg_abbrev = 'k2'
             else:
                 kg_api_key = SpinConfig.config['kongregate_api_key']
                 kg_prefix = 'KGAPI'
+                kg_abbrev = 'kg'
             request_data = SpinKongregate.parse_signed_request(request.args['signed_request'][-1], kg_api_key)
             if not request_data: raise Exception(kg_prefix + ' call with invalid signed_request: ' + log_request(request))
 
@@ -2699,7 +2701,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
             if request_data['event'] in ('item_order_request', 'item_order_placed'):
                 kongregate_id = str(request_data['buyer_id'])
-                session = ProxySession.emulate(db_client.session_get_by_social_id('kg'+kongregate_id, reason=self.path))
+                session = ProxySession.emulate(db_client.session_get_by_social_id(kg_abbrev+kongregate_id, reason=self.path))
             else:
                 raise Exception(kg_prefix + ' call with invalid "event": '+log_request(request))
 
