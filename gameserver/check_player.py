@@ -9,11 +9,13 @@
 import SpinUserDB
 import SpinNoSQL
 import SpinConfig
+import SpinIPReputation
 import SpinJSON
 import SpinS3
 import ControlAPI
 import BHAPI
 from spinlibs.SpinHTTP import private_ip_re
+import os
 
 def do_CONTROLAPI(args): return ControlAPI.CONTROLAPI(args, 'check_player.py')
 
@@ -242,6 +244,21 @@ def trace_bh_account_merges(db_client, bh_id):
     else:
         return 'not in game database'
 
+# look up a client IP address in the IP reputation database.
+# if it is a known suspicious IP, then return a description of it.
+
+def get_ip_reputation(ip):
+    if SpinConfig.config.get('ip_reputation_database') and \
+       os.path.exists(SpinConfig.config['ip_reputation_database']):
+        ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
+        result = ip_rep_checker.query(ip)
+        if result:
+            return repr(result)
+    else:
+        raise Exception('Missing ip_reputation_database')
+
+    return ''
+
 # main program
 if __name__ == '__main__':
     import codecs
@@ -255,6 +272,7 @@ if __name__ == '__main__':
                                                       'give-alloy=', 'give-protection-time=', 'give-item=', 'melt-hours=', 'item-stack=', 'item-log-reason=',
                                                       'give-item-subject=', 'give-item-body=',
                                                       'send-message', 'message-subject=', 'message-body=', 'message-sender=', 'message-expire-time=', 'message-expire-in=',
+                                                      'check-ip-reputation',
                                                        ])
 
 
@@ -287,6 +305,7 @@ if __name__ == '__main__':
     do_unmake_chat_mod = False
     do_isolate = False
     do_unisolate = False
+    do_check_ip_reputation = False
     give_item = None
     send_message = False
     message_sender = 'Customer Support'
@@ -381,6 +400,8 @@ if __name__ == '__main__':
             message_expire_time = time_now + int(val)
         elif key == '--send-message':
             send_message = True
+        elif key == '--check-ip-reputation':
+            do_check_ip_reputation = True
 
     if len(args) > 0:
         user_id = int(args[0])
@@ -605,8 +626,13 @@ if __name__ == '__main__':
             last_login_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(user['last_login_time']))
             print fmt % ('Last Login Time:', '%s (%s ago)' % (last_login_str, ago_str))
 
-        if 'last_login_ip' in user:
-            print fmt % ('Last IP:', user['last_login_ip'])
+        if user.get('last_login_ip'):
+            ui_last_login_ip = user['last_login_ip']
+            if do_check_ip_reputation:
+                ip_rep = get_ip_reputation(user['last_login_ip'])
+                if ip_rep:
+                    ui_last_login_ip += ' *** VPN risk *** ' + ip_rep
+            print fmt % ('Last IP:', ui_last_login_ip)
 
         if 'browser_os' in user and 'browser_name' in user and 'browser_version' in user:
             print fmt % ('Browser:', '%s %s (%s)' % (user['browser_name'], user['browser_version'], user['browser_os']))

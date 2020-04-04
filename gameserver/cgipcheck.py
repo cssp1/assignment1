@@ -596,7 +596,7 @@ def do_google_translate(from_language, to_language, text):
     return ret
 
 def do_lookup(args):
-    cmd_args = ['--live']
+    cmd_args = ['--live','--check-ip-reputation',]
     if 'user_id' in args:
         user_id = int(args['user_id'])
         cmd_args += [str(user_id)]
