@@ -4454,7 +4454,7 @@ def main(args):
             if event_schedule['end_time'] > last_tournament:
                 last_tournament = event_schedule['end_time']
 
-    if last_season > 0 and last_tournament != last_season:
+    if last_season > 0 and last_tournament != last_season and gamedata['game_id'] != 'fs':
         error |= 1; print 'No PvP tournament event for the last ladder season, %d. Add a "challenge_pvp_ladder_with_prizes" event with a start_time of %d and an end_time of %d.' % (last_season, last_season - 604800, last_season)
 
     daily_tips = gamedata['daily_tips']
