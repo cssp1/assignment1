@@ -4444,12 +4444,18 @@ def main(args):
         if season > 0 and (season - first_season) % 604800 > 0:
             error |= 1; print 'Season %d should start on a Thursday at 5:00PM UTC. Actual start time is %d' % (i, season)
 
+    last_tournament = 0
     for event_schedule in gamedata['event_schedule']:
         if event_schedule['name'] == "challenge_pvp_ladder_with_prizes":
             if event_schedule['end_time'] not in matchmaking['season_starts']:
                 error |= 1; print 'PvP tournament has an end time that does not coincide with the start of a PvP season. End time is %d. If this is the newest tournament, it should probably be %d' % (event_schedule['end_time'], last_season)
             if event_schedule['end_time'] - event_schedule['start_time'] != 604800:
                 error |= 1; print 'PvP tournament starting on %d and ending on %d is not exactly one week long. Make sure it starts on a Thursday at 5:00PM UTC and ends exactly 604800 seconds later.' % (event_schedule['start_time'], event_schedule['end_time'])
+            if event_schedule['end_time'] > last_tournament:
+                last_tournament = event_schedule['end_time']
+
+    if last_tournament != last_season:
+        error |= 1; print 'No PvP tournament event for the last ladder season, %d. Add a "challenge_pvp_ladder_with_prizes" event with a start_time of %d and an end_time of %d.' % (last_season, last_season - 604800, last_season)
 
     daily_tips = gamedata['daily_tips']
     for tip in daily_tips:
