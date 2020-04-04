@@ -247,11 +247,18 @@ def trace_bh_account_merges(db_client, bh_id):
 # look up a client IP address in the IP reputation database.
 # if it is a known suspicious IP, then return a description of it.
 
+ip_rep_checker = None
+
 def get_ip_reputation(ip):
+    global ip_rep_checker
+
     if SpinConfig.config.get('ip_reputation_database') and \
        os.path.exists(SpinConfig.config['ip_reputation_database']):
-        ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
+        if not ip_rep_checker:
+            ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
+
         result = ip_rep_checker.query(ip)
+
         if result:
             return repr(result)
     else:
@@ -756,9 +763,16 @@ if __name__ == '__main__':
                 elif 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and entry.get('logins',1) < 100:
                     # ignore logins more than 90d ago
                     continue
+                if entry.get('last_ip'):
+                    ui_last_ip = entry['last_ip']
+                    ip_rep = get_ip_reputation(entry['last_ip']) if do_check_ip_reputation else None
+                    if ip_rep:
+                        ui_last_ip += ' *** VPN risk *** ' + ip_rep
+                else:
+                    ui_last_ip = 'Unknown'
                 print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
                                                                                                 pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
-                                                                                                entry.get('last_ip','Unknown')))
+                                                                                                ui_last_ip))
 
         if 'customer_support' in player['history']:
             print fmt % ('Customer Support history', '')
