@@ -465,6 +465,9 @@ def get_localized_gamedata(path, locale):
 # cached ChatFilter instance - note: used for alliance name checking, not actually applied to chat (that's client side)
 chat_filter = None
 
+# global SpinIPReputation instance
+ip_rep_checker = None
+
 def reload_gamedata():
     global gamedata, gameclient_build_date, localized_gamedata_cache, chat_filter
     try:
@@ -490,7 +493,12 @@ def reload_gamedata():
         chat_filter = ChatFilter.ChatFilter(gamedata['client']['chat_filter'])
         # reinitialize the IP Reputation database
         global ip_rep_checker
-        ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config.get('ip_reputation_database'))
+        if SpinConfig.config.get('ip_reputation_database') and os.path.exists(SpinConfig.config['ip_reputation_database']):
+            ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
+        elif gamesite:
+            gamesite.exception_log.event(server_time, 'config.json "ip_reputation_database" file is missing, will skip IP reputation checks')
+        else: # on initial load, gamesite won't be initialized yet
+            sys.stderr.write('config.json "ip_reputation_database" file is missing, will skip IP reputation checks\n')
 
         # make sure config.json setting for min_user_id is correct
         if 'max_ai_user_id' in gamedata:

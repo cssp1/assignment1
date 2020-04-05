@@ -933,7 +933,7 @@ class PlayerVPNPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
     def is_satisfied(self, player, qdata):
-        return isinstance(player.vpn_status, basestring)
+        return bool(player.vpn_status)
 
 class NewBirthdayPredicate(Predicate):
     def __init__(self, data):
