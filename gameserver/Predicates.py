@@ -929,6 +929,12 @@ class PlayerLevelPredicate(Predicate):
     def is_satisfied(self, player, qdata):
         return player.level() >= self.level
 
+class PlayerVPNPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+    def is_satisfied(self, player, qdata):
+        return bool(player.vpn_status)
+
 class NewBirthdayPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1167,6 +1173,8 @@ def read_predicate(data):
         return HasMentorPredicate(data)
     elif kind == 'PLAYER_LEVEL':
         return PlayerLevelPredicate(data)
+    elif kind == 'PLAYER_VPN':
+        return PlayerVPNPredicate(data)
     elif kind == 'LADDER_PLAYER':
         return LadderPlayerPredicate(data)
     elif kind == 'IS_IN_ALLIANCE':

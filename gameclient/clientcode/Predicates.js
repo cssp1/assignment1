@@ -2195,6 +2195,20 @@ PlayerLevelPredicate.prototype.do_ui_describe = function(player) {
 /** @override */
 PlayerLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
+/** @constructor @struct
+  * @extends Predicate */
+function PlayerVPNPredicate(data) {
+    goog.base(this, data);
+}
+goog.inherits(PlayerVPNPredicate, Predicate);
+PlayerVPNPredicate.prototype.is_satisfied = function(player, qdata) {
+    return !!player.vpn_status;
+};
+PlayerVPNPredicate.prototype.do_ui_describe = function(player) {
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
+};
+/** @override */
+PlayerVPNPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor @struct
   * @extends Predicate */
@@ -2471,6 +2485,8 @@ function read_predicate(data) {
         return new UsingTitlePredicate(data);
     } else if(kind === 'PLAYER_LEVEL') {
         return new PlayerLevelPredicate(data);
+    } else if(kind === 'PLAYER_VPN') {
+        return new PlayerVPNPredicate(data);
     } else if(kind === 'BASE_SIZE') {
         return new BaseSizePredicate(data);
     } else if(kind === 'HOME_REGION') {

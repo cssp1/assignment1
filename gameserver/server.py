@@ -75,6 +75,7 @@ import SpinNoSQLLog
 import SpinNoSQLLockManager
 import SpinSQLBattles
 import SpinSQLAllianceEvents
+import SpinIPReputation
 import MalformedJSON
 import PlayerPortraits
 import Raid
@@ -464,6 +465,9 @@ def get_localized_gamedata(path, locale):
 # cached ChatFilter instance - note: used for alliance name checking, not actually applied to chat (that's client side)
 chat_filter = None
 
+# global SpinIPReputation instance
+ip_rep_checker = None
+
 def reload_gamedata():
     global gamedata, gameclient_build_date, localized_gamedata_cache, chat_filter
     try:
@@ -487,6 +491,14 @@ def reload_gamedata():
         localized_gamedata_cache = {}
 
         chat_filter = ChatFilter.ChatFilter(gamedata['client']['chat_filter'])
+        # reinitialize the IP Reputation database
+        global ip_rep_checker
+        if SpinConfig.config.get('ip_reputation_database') and os.path.exists(SpinConfig.config['ip_reputation_database']):
+            ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
+        elif gamesite:
+            gamesite.exception_log.event(server_time, 'config.json "ip_reputation_database" file is missing, will skip IP reputation checks')
+        else: # on initial load, gamesite won't be initialized yet
+            sys.stderr.write('config.json "ip_reputation_database" file is missing, will skip IP reputation checks\n')
 
         # make sure config.json setting for min_user_id is correct
         if 'max_ai_user_id' in gamedata:
@@ -1457,6 +1469,9 @@ class User:
         # necessary to preserve forwards-compatibility in case we load a file
         # that contains data from a future version of the server
         self.foreign_data = {}
+
+        # string if player is on a VPN, None if not
+        self.vpn_status = None
 
     def get_trust_level(self):
         # any login from KG, AG, or FB counts as "verified"
@@ -9481,6 +9496,8 @@ class Player(AbstractPlayer):
         self.mentor_player_id_cache = None
         self.trainee_player_ids_cache = None
 
+        self.vpn_status = None
+
         self.reset()
 
     def reset(self):
@@ -9681,6 +9698,7 @@ class Player(AbstractPlayer):
         self.trust_level = user.get_trust_level()
         self.mentor_player_id_cache = user.bh_mentor_player_id_cache
         self.trainee_player_ids_cache = user.bh_trainee_player_ids_cache
+        self.vpn_status = user.vpn_status
 
     # call this function right after tutorial_state becomes "COMPLETE" to set up post-tutorial state
     def set_post_tutorial_state(self):
@@ -27805,6 +27823,11 @@ class GAMEAPI(resource.Resource):
         user.social_id = social_id
         user.last_login_time = server_time
         user.last_login_ip = client_ip
+        user.vpn_status = None
+        if ip_rep_checker:
+            ip_rep_result = ip_rep_checker.query(client_ip)
+            if ip_rep_result:
+                user.vpn_status = repr(ip_rep_result) # this becomes a string that describes what is going on
         user.uninstalled = 0
         user.uninstalled_reason = None
 
@@ -28248,6 +28271,7 @@ class GAMEAPI(resource.Resource):
                        session.user.is_chat_mod(),
                        session.player.get_daily_banner(session, retmsg),
                        session.user.get_fb_likes_preload(),
+                       session.user.vpn_status
                        ])
         retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
         retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])

@@ -603,6 +603,7 @@
         "RESOURCES_HARVESTED_TOTAL": { "ui_name": "Collected %d %s (total)" },
         "RESOURCES_HARVESTED_AT_ONCE": { "ui_name": "Collected %d %s (at once)" },
         "PLAYER_HISTORY": { "ui_name": "%s %d" },
+        "PLAYER_VPN": { "ui_name": "You connect to the game through a VPN or other identity-hiding service."},
         "ACCOUNT_CREATION_TIME": { "ui_name": "Account creation time: %d1 - %d2" },
         "ABSOLUTE_TIME": { "ui_name": "Absolute time: %d1 - %d2" },
         "AI_BASE_SHOWN": { "ui_name": "AI base shown: %d" },
