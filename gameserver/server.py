@@ -27815,7 +27815,7 @@ class GAMEAPI(resource.Resource):
         user.social_id = social_id
         user.last_login_time = server_time
         user.last_login_ip = client_ip
-        ip_rep_result = ip_rep_checker(client_ip)
+        ip_rep_result = ip_rep_checker.query(client_ip)
         if ip_rep_result:
             user.vpn_status = repr(ip_rep_result) # this becomes a string that describes what is going on
         else:
