@@ -45,9 +45,11 @@ def master_account(a, b):
     return a
 
 def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
+def is_anti_vpn_region(region): return 'anti_vpn' in region.get('tags',[])
 def is_anti_refresh_region(region): return 'anti_refresh' in region.get('tags',[])
 
 anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
+anti_vpn_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_vpn_region(data)]
 anti_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_refresh_region(data)]
 allow_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if not is_anti_refresh_region(data)]
 
@@ -65,6 +67,106 @@ class Policy(object):
         self.msg_fd = msg_fd
         self.verbose = verbose
         self.policy_bot_log = open_log(self.db_client)
+
+class AntiVPNPolicy(Policy):
+
+    # cooldown that identifies a player as a repeat offender
+    REPEAT_OFFENDER_COOLDOWN_NAME = 'vpn_login_violation'
+
+    def check_player(self, user_id, player):
+
+        # temporarily ignore VPN for Days of Valor and Firestrike
+        if SpinConfig.game() in ('dv','fs'): return
+
+        # possible race condition after player cache lookup (?)
+        if player['home_region'] not in anti_vpn_region_names: return
+
+        # skip if the player isn't on a VPN
+        if not bool(player.vpn_status): return
+
+        try:
+            new_region_name = self.punish_player(user_id, player['home_region'], other_alt_region_names)
+
+            player['home_region'] = new_region_name
+            print >> self.msg_fd, 'moved to region %s' % (new_region_name)
+
+        except:
+            sys.stderr.write(('error punishing user %d: '%(player['user_id'])) + traceback.format_exc())
+
+    def punish_player(self, user_id, cur_region_name):
+
+        cur_region = gamedata['regions'][cur_region_name]
+        cur_continent_id = cur_region.get('continent_id',None)
+
+        # find pro- and anti-alt regions in the same continent
+        anti_vpn_regions = filter(lambda x: is_anti_vpn_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
+        pro_vpn_regions = filter(lambda x: not is_anti_vpn_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
+
+        assert len(anti_vpn_regions) >= 1 and len(pro_vpn_regions) >= 1
+        is_majority_anti_vpn_game = (len(anti_vpn_regions) > len(pro_vpn_regions))
+
+        # check repeat offender status via cooldown
+        togo = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_togo', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})
+        is_repeat_offender = (togo > 0)
+
+        # pick destination region
+        new_region = None
+
+        candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
+                                       (is_majority_anti_vpn_game or x.get('auto_join',1)) and \
+                                       x.get('open_join',1) and x.get('enable_map',1) and \
+                                       not x.get('developer_only',0),
+                                       pro_vpn_regions)
+        if self.verbose >= 2:
+            print >> self.msg_fd, 'continent %r candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
+
+        assert len(candidate_regions) >= 1
+        new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
+
+        if not self.test:
+            assert new_region['id'] != cur_region_name
+
+        if not self.dry_run:
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION}) == 'ok'
+
+            if is_repeat_offender:
+                # only repeat offenders get the banishment aura
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
+                                      'duration': self.REGION_BANISH_DURATION,
+                                      'data':SpinJSON.dumps({'tag':'anti_vpn'})}) == 'ok'
+
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
+
+
+        # player messages are slightly different depending on whether the game is majority anti-VPN (DV) or not (WSE,TR,etc).
+        if not is_repeat_offender:
+            if is_majority_anti_vpn_game:
+                message_body = 'We identified your connection method as a VPN and therefore relocated your base to %s. If we falsely identified your connection as a VPN, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-VPN policy will result in a permanent ban from map regions.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
+            else:
+                message_body = 'We identified your connection method as a VPN while using anti-VPN region %s and therefore relocated your base to %s. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-VPN policy will result in a permanent ban from anti-VPN maps.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
+        else: # repeat offender
+            if is_majority_anti_vpn_game:
+                message_body = 'We identified your connection method as a VPN and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our anti-VPN policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
+            else:
+                message_body = 'We identified your connection method as a VPN while using anti-VPN region %s and therefore relocated your base to %s. Moreover, your account has been locked from anti-VPN map regions due to repeated violations of our anti-VPN policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
+
+        if not self.dry_run:
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'send_message',
+                                  'message_body': message_body,
+                                  'message_subject': 'VPN Connection Policy',
+                                  }) == 'ok'
+
+        event_props = {'user_id': user_id, 'event_name': '7301_policy_bot_punished', 'code':7301,
+                       'old_region': cur_region_name, 'new_region': new_region['id'],
+                       'reason':'vpn_connection_violation', 'repeat_offender': is_repeat_offender,
+                       'other_vpn_region_names': list(other_vpn_region_names),
+                       'master_id': master_id}
+        if not self.dry_run:
+            self.policy_bot_log.event(time_now, event_props)
+        else:
+            print >> self.msg_fd, event_props
+
+        return new_region['id']
 
 class AntiRefreshPolicy(Policy):
     # cooldown that identifies a player as a repeat offender
@@ -574,6 +676,8 @@ POLICIES = []
 
 if anti_alt_region_names:
     POLICIES.append(AntiAltPolicy)
+if anti_vpn_region_names:
+    POLICIES.append(AntiVPNPolicy)
 if anti_refresh_region_names:
     POLICIES += [IdleCheckAntiRefreshPolicy, LoginPatternAntiRefreshPolicy]
 
