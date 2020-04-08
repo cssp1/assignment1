@@ -6578,6 +6578,7 @@ player.is_suspicious = false; // extra logging to track suspected hackers
 player.is_chat_mod = false; // whether player has chat moderation authority
 player.isolate_pvp = 0; // same as server's isolate_pvp flag
 player.vpn_status = null; // if not null, player is probably on a VPN, and this is a string that describes it in more detail
+player.vpn_status_ignored = false;
 player.acquisition_campaign = null; // acquisition_campaign field, from server
 player.home_base_id = null; // base_id of player's home
 player.home_base_loc = null; // base_map_loc of player's home
@@ -49044,6 +49045,22 @@ function handle_server_message(data) {
         var daily_banner = data[23];
         var fb_likes_preload = data[24];
         player.vpn_status = (data.length >= 26 ? data[25] : null);
+        if (player.vpn_status) {
+            var vpn_ignored = false;
+            for x in player['history'].get('customer_support',[]):
+            goog.array.forEach(player.history['customer_support'], function(support) {
+                if('method' in support && (support['method'] === 'ignore_vpn' || support['method'] === 'unignore_vpn')) {
+                    if(support['method'] === 'ignore_vpn') {
+                        vpn_ignored = true;
+                    } else if(support['method'] === 'unignore_vpn') {
+                        vpn_ignored = false;
+                    }
+                }
+            });
+            if (vpn_ignored) {
+                player.vpn_status_ignored = true;
+            }
+        }
 
         ChatFilter.init(gamedata['client']['chat_filter']);
 

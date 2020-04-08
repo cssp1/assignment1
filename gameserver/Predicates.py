@@ -933,7 +933,15 @@ class PlayerVPNPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
     def is_satisfied(self, player, qdata):
-        return bool(player.vpn_status)
+        ignored = False
+        for x in player['history'].get('customer_support',[]):
+            if x['method'] in ('ignore_vpn', 'unignore_vpn'):
+                if x['method'] == 'ignore_vpn':
+                    ignored = True
+                elif x['method'] == 'unignore_vpn':
+                    ignored = False
+        if ignored: return
+        return (bool(player.vpn_status) and not ignored)
 
 class NewBirthdayPredicate(Predicate):
     def __init__(self, data):
