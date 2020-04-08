@@ -49045,21 +49045,16 @@ function handle_server_message(data) {
         var daily_banner = data[23];
         var fb_likes_preload = data[24];
         player.vpn_status = (data.length >= 26 ? data[25] : null);
-        if (player.vpn_status) {
-            var vpn_ignored = false;
-            for x in player['history'].get('customer_support',[]):
+        if(player.vpn_status && 'customer_support' in player.history) {
             goog.array.forEach(player.history['customer_support'], function(support) {
-                if('method' in support && (support['method'] === 'ignore_vpn' || support['method'] === 'unignore_vpn')) {
+                if('method' in support) {
                     if(support['method'] === 'ignore_vpn') {
-                        vpn_ignored = true;
+                        player.vpn_status_ignored = true;
                     } else if(support['method'] === 'unignore_vpn') {
-                        vpn_ignored = false;
+                        player.vpn_status_ignored = false;
                     }
                 }
             });
-            if (vpn_ignored) {
-                player.vpn_status_ignored = true;
-            }
         }
 
         ChatFilter.init(gamedata['client']['chat_filter']);
