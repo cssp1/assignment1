@@ -84,6 +84,16 @@ class AntiVPNPolicy(Policy):
         # skip if the player isn't on a VPN
         if not bool(player.vpn_status): return
 
+        # skip if the player is flagged as ignored vpn by customer service
+        ignored = False
+        for x in player['history'].get('customer_support',[]):
+            if x['method'] in ('ignore_vpn', 'unignore_vpn'):
+                if x['method'] == 'ignore_vpn':
+                    ignored = True
+                elif x['method'] == 'unignore_vpn':
+                    ignored = False
+        if ignored: return
+
         try:
             new_region_name = self.punish_player(user_id, player['home_region'], other_alt_region_names)
 
