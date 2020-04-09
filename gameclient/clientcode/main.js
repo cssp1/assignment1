@@ -49045,7 +49045,7 @@ function handle_server_message(data) {
         var daily_banner = data[23];
         var fb_likes_preload = data[24];
         player.vpn_status = (data.length >= 26 ? data[25] : null);
-        if(player.vpn_status) && 'vpn_excused' in player.history && player.history['vpn_excused']) {
+        if(player.vpn_status && 'vpn_excused' in player.history && player.history['vpn_excused']) {
             player.vpn_excused = true;
         }
 
