@@ -73,6 +73,9 @@ class AntiVPNPolicy(Policy):
     # cooldown that identifies a player as a repeat offender
     REPEAT_OFFENDER_COOLDOWN_NAME = 'vpn_login_violation'
 
+    # ignore VPN logins that are more than one week old
+    IGNORE_AGE = 7*86400
+
     # query for candidate violators from player cache
     @classmethod
     def player_cache_query(cls, db_client, time_range, verbose = 0):
