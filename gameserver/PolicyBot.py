@@ -8,7 +8,7 @@
 
 import sys, time, getopt, traceback, random
 import SpinConfig, SpinJSON, SpinParallel
-import SpinNoSQL, SpinLog, SpinNoSQLLog
+import SpinNoSQL, SpinLog, SpinNoSQLLog, SpinIPReputation
 import SpinSingletonProcess
 import ControlAPI
 
@@ -73,29 +73,31 @@ class AntiVPNPolicy(Policy):
     # cooldown that identifies a player as a repeat offender
     REPEAT_OFFENDER_COOLDOWN_NAME = 'vpn_login_violation'
 
-    def check_player(self, user_id, player):
+    # query for candidate violators from player cache
+    @classmethod
+    def player_cache_query(cls, db_client, time_range, verbose = 0):
+        return db_client.player_cache_query_mtime_or_ctime_between([time_range], [],
+                                                                   townhall_name = gamedata['townhall'],
+                                                                   min_townhall_level = 2,
+                                                                   include_home_regions = anti_vpn_region_names)
 
-        # temporarily ignore VPN for Days of Valor and Firestrike
-        if SpinConfig.game() in ('dv','fs'): return
+    def check_player(self, user_id, player):
 
         # possible race condition after player cache lookup (?)
         if player['home_region'] not in anti_vpn_region_names: return
 
         # skip if the player isn't on a VPN
-        if not bool(player.vpn_status): return
+        last_login_ip = player['history'].get('last_login_ip', 0)
+        if not last_login_ip: return
+        ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
+        ip_rep_result = ip_rep_checker.query(last_login_ip)
+        if not bool(ip_rep_result): return
 
         # skip if the player is flagged as ignored vpn by customer service
-        ignored = False
-        for x in player['history'].get('customer_support',[]):
-            if x['method'] in ('ignore_vpn', 'unignore_vpn'):
-                if x['method'] == 'ignore_vpn':
-                    ignored = True
-                elif x['method'] == 'unignore_vpn':
-                    ignored = False
-        if ignored: return
+        if not player['history'].get('vpn_excused', 0): return
 
         try:
-            new_region_name = self.punish_player(user_id, player['home_region'], other_alt_region_names)
+            new_region_name = self.punish_player(user_id, player['home_region'])
 
             player['home_region'] = new_region_name
             print >> self.msg_fd, 'moved to region %s' % (new_region_name)
@@ -108,7 +110,7 @@ class AntiVPNPolicy(Policy):
         cur_region = gamedata['regions'][cur_region_name]
         cur_continent_id = cur_region.get('continent_id',None)
 
-        # find pro- and anti-alt regions in the same continent
+        # find pro- and anti-VPN regions in the same continent
         anti_vpn_regions = filter(lambda x: is_anti_vpn_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
         pro_vpn_regions = filter(lambda x: not is_anti_vpn_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
 
@@ -169,7 +171,6 @@ class AntiVPNPolicy(Policy):
         event_props = {'user_id': user_id, 'event_name': '7301_policy_bot_punished', 'code':7301,
                        'old_region': cur_region_name, 'new_region': new_region['id'],
                        'reason':'vpn_connection_violation', 'repeat_offender': is_repeat_offender,
-                       'other_vpn_region_names': list(other_vpn_region_names),
                        'master_id': master_id}
         if not self.dry_run:
             self.policy_bot_log.event(time_now, event_props)
