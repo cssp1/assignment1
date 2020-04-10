@@ -2202,7 +2202,7 @@ function PlayerVPNPredicate(data) {
 }
 goog.inherits(PlayerVPNPredicate, Predicate);
 PlayerVPNPredicate.prototype.is_satisfied = function(player, qdata) {
-    return !!player.vpn_status && !player.vpn_excused;
+    return !!player.vpn_status && !('vpn_excused' in player.history && player.history['vpn_excused']);
 };
 PlayerVPNPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
