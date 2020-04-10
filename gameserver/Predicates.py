@@ -933,7 +933,7 @@ class PlayerVPNPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
     def is_satisfied(self, player, qdata):
-        return bool(player.vpn_status)
+        return (bool(player.vpn_status) and not player['history'].get('vpn_excused', 0))
 
 class NewBirthdayPredicate(Predicate):
     def __init__(self, data):

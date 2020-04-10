@@ -9699,6 +9699,7 @@ class Player(AbstractPlayer):
         self.mentor_player_id_cache = user.bh_mentor_player_id_cache
         self.trainee_player_ids_cache = user.bh_trainee_player_ids_cache
         self.vpn_status = user.vpn_status
+        self.history['last_login_ip'] = self.last_login_ip # copies last login IP for PolicyBot VPN checks
 
     # call this function right after tutorial_state becomes "COMPLETE" to set up post-tutorial state
     def set_post_tutorial_state(self):
