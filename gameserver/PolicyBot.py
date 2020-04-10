@@ -97,7 +97,7 @@ class AntiVPNPolicy(Policy):
         if not bool(ip_rep_result): return
 
         # skip if the player is flagged as ignored vpn by customer service
-        if not player['history'].get('vpn_excused', 0): return
+        if player['history'].get('vpn_excused', 0): return
 
         try:
             new_region_name = self.punish_player(user_id, player['home_region'])
