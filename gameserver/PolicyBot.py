@@ -50,6 +50,7 @@ def is_anti_refresh_region(region): return 'anti_refresh' in region.get('tags',[
 
 anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
 anti_vpn_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_vpn_region(data)]
+ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
 anti_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_refresh_region(data)]
 allow_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if not is_anti_refresh_region(data)]
 
@@ -92,7 +93,6 @@ class AntiVPNPolicy(Policy):
         # skip if the player isn't on a VPN
         last_login_ip = player['history'].get('last_login_ip', 0)
         if not last_login_ip: return
-        ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
         ip_rep_result = ip_rep_checker.query(last_login_ip)
         if not bool(ip_rep_result): return
 
