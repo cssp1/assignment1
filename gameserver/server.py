@@ -5793,7 +5793,7 @@ class Session(object):
         else:
             return False
 
-    def do_send_adnetwork_event_serverside(self, retmsg, api, context, name, data, order_id = None, post_fbtax_dollars = None, currency = None):
+    def do_send_adnetwork_event_serverside(self, retmsg, api, context, name, data, order_id = None, post_fbtax_dollars = None, currency = None, extra_qs = {}):
         #gamesite.exception_log.event(server_time, "HERE SERVER %s %s" % (api, name))
         # construct query string
         params = {}
@@ -5823,6 +5823,10 @@ class Session(object):
             # inject preformatted key/value pairs (DAU-UP uses these)
             for key, val in data['qs'].iteritems():
                 params[key] = val
+
+        if extra_qs:
+            for key, val in extra_qs.iteritems():
+                 params[key] = val
 
         if api == 'adotomi':
             # special case, Adotomi has a feature to uniquify requests based on a string
@@ -28605,6 +28609,7 @@ class GAMEAPI(resource.Resource):
         session.send_adnetwork_events(None)
         self.send_fb_achievements(session)
         self.log_out_preflush_open_graph(session)
+        self.send_kg_score_update(session)
 
         alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'log_out_preflush')
         if alliance_id >= 0:
@@ -28653,6 +28658,13 @@ class GAMEAPI(resource.Resource):
                 player_data['fb_published'] = 1
             else:
                 gamesite.exception_log.event(server_time, 'Facebook disabled: send_fb_achievements(POST %s query %s)' % (url, query))
+
+    def send_kg_score_update(self, session):
+        my_points = session.player.ladder_points()
+        if my_points > 0:
+            for api, context in self.adnetworks():
+                if api not in ('kg','k2'): continue # only applies to KG network
+                self.do_send_adnetwork_event_serverside(None, 'kg', context, 'high_score_event', gamedata['adnetworks'][api]['high_score_event'], extra_qs = {"AllTimePvPPoints": my_points})
 
     def log_out_preflush_open_graph(self, session):
         # send FB open graph leaderboard update (throttle by time and level)
