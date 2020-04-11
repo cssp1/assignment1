@@ -28663,7 +28663,7 @@ class GAMEAPI(resource.Resource):
         my_points = session.player.ladder_points()
         if my_points > 0:
             for api, context in session.adnetworks():
-                if api not in ('kg','k2','kg_conversion_pixels'): continue # only applies to KG network
+                if api != 'kg': continue # only applies to KG network
                 session.do_send_adnetwork_event_serverside(None, 'kg', context, 'high_score_event', gamedata['adnetworks'][api]['high_score_event'], extra_qs = {"AllTimePvPPoints": my_points})
 
     def log_out_preflush_open_graph(self, session):
