@@ -5567,7 +5567,7 @@ Building.prototype.is_turret = function() { return this.spec['history_category']
 Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
 Building.prototype.is_security_node = function() { return 'show_security_node_ui' in gamedata && read_predicate(gamedata['show_security_node_ui']).is_satisfied(player, null) && this.spec['equip_slots'] && ('security_node' in this.spec['equip_slots']); };
 Building.prototype.is_security_node_only = function() {
-    if(!this.is_security_node()) { return false; }
+    if(!(this.spec['equip_slots'] && ('security_node' in this.spec['equip_slots']))) { return false; }
     var ret = true;
     goog.object.forEach(this.spec['crafting_categories'], function(cat) {
         if(cat && typeof(cat) === 'string' && cat.indexOf("security_nodes_") == -1) {
