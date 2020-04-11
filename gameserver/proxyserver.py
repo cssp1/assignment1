@@ -2531,7 +2531,7 @@ class GameProxy(proxy.ReverseProxyResource):
         else:
             extra_data = ''
 
-        screen_name, screen_data = get_loading_screen('game')
+        screen_name, screen_data = get_loading_screen('game', visitor.frame_platform)
 
         # temporary, to ensure sign_session() does not fail
         assert visitor.social_id is not None
@@ -3507,8 +3507,13 @@ def reconfig_loading_screens():
                         exception_log.event(proxy_time, 'proxyserver: loading_screen image not found: "%s"' % layer['image'])
     loading_screens = temp
 
-def get_loading_screen(kind):
-    data = loading_screens[kind]
+def get_loading_screen(kind, platform = None):
+    if platform and kind + '_' + platform in loading_screens:
+        load_kind = kind + '_' + platform
+    else:
+        load_kind = kind
+
+    data = loading_screens[load_kind]
     name = random.choice(data.keys())
     return name, data[name]
 
