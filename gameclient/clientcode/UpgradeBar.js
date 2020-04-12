@@ -38,6 +38,7 @@ UpgradeBar.invoke = function(parent, kind, specname, new_level, obj_id) {
     dialog.widgets['scroll_down'].onclick = function (w) { UpgradeBar.scroll(w.parent, 1); };
     dialog.widgets['output'].scroll_up_button = dialog.widgets['scroll_up'];
     dialog.widgets['output'].scroll_down_button = dialog.widgets['scroll_down'];
+    dialog.on_mousewheel_function = UpgradeBar.scroll;
     dialog.ondraw = UpgradeBar.ondraw;
     parent.widgets['upgrade_bar'] = dialog;
     parent.add(dialog);
@@ -45,21 +46,36 @@ UpgradeBar.invoke = function(parent, kind, specname, new_level, obj_id) {
     dialog.ondraw(dialog);
     return dialog;
 };
-UpgradeBar.scroll = function(dialog, incr) {
-    if(incr === -2) { // reset to top
+
+/** @param {SPUI.Dialog} dialog
+    @param {number} delta */
+UpgradeBar.scroll = function(dialog, delta) {
+    if(delta === -2) { // reset to top
         dialog.widgets['output'].scroll_to_top();
-    } else if(incr === 2) { // reset to bottom
+    } else if(delta === 2) { // reset to bottom
         dialog.widgets['output'].scroll_to_bottom();
-    } else if(incr < 0) {
+    } else if(delta < 0) {
         dialog.widgets['output'].scroll_up();
-    } else if(incr > 0) {
+    } else if(delta > 0) {
         dialog.widgets['output'].scroll_down();
     }
     dialog.user_data['scroll_pos'] = dialog.widgets['output'].get_scroll_pos_from_head_to_bot();
     var has_scrolling = dialog.widgets['output'].can_scroll_up() || dialog.widgets['output'].can_scroll_down();
     dialog.widgets['output'].scroll_up_button.show =
         dialog.widgets['output'].scroll_down_button.show = has_scrolling;
+    if(dialog.widgets['output'].can_scroll_up()) {
+        dialog.widgets['output'].scroll_up_button.state = 'normal';
+    } else {
+        dialog.widgets['output'].scroll_up_button.state = 'disabled';
+    }
+    if(dialog.widgets['output'].can_scroll_down()) {
+        dialog.widgets['output'].scroll_down_button.state = 'normal';
+    } else {
+        dialog.widgets['output'].scroll_down_button.state = 'disabled';
+    }
 };
+
+/** @param {SPUI.Dialog} dialog */
 UpgradeBar.ondraw = function(dialog) {
 
     // hide the bar if the parent dialog is not the front-most dialog being shown right now
@@ -91,14 +107,34 @@ UpgradeBar.ondraw = function(dialog) {
         dialog.widgets[wname].alpha = (is_hover ? 1 : dialog.data['widgets'][wname]['alpha_nonhover']);
     });
 };
-UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id) {
-    var prev_kind = dialog.user_data['kind'] || null; dialog.user_data['kind'] = kind;
-    var prev_specname = dialog.user_data['specname'] || null; dialog.user_data['specname'] = specname;
-    var prev_new_level = dialog.user_data['new_level'] || null; dialog.user_data['new_level'] = new_level;
-    var prev_obj_id = dialog.user_data['obj_id'] || null; dialog.user_data['obj_id'] = obj_id;
-    var prev_scroll_pos = dialog.user_data['scroll_pos'];
 
+/** @param {SPUI.Dialog} dialog
+    @param {string} kind
+    @param {string} specname
+    @param {number} new_level
+    @param {string} obj_id
+*/
+UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id) {
     if(kind === null || specname === null) { dialog.user_data['is_applicable'] = false; return; }
+    var any_change = false;
+    if(dialog.user_data['kind'] != kind) {
+        any_change = true;
+        dialog.user_data['kind'] = kind;
+    }
+    if(dialog.user_data['specname'] != specname) {
+        any_change = true;
+        dialog.user_data['specname'] = specname;
+    };
+    if(dialog.user_data['new_level'] != new_level) {
+        any_change = true;
+        dialog.user_data['new_level'] = new_level;
+    };
+    if(dialog.user_data['obj_id'] != obj_id) {
+        any_change = true;
+        dialog.user_data['obj_id'] = obj_id;
+    };
+    var prev_scroll_pos;
+    prev_scroll_pos = dialog.user_data['scroll_pos'];
     dialog.user_data['is_applicable'] = true;
 
     var spec;
@@ -118,7 +154,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
             invoke_upgrade_enhancement_dialog(session.get_real_world().objects.get_object(_obj_id), _specname);
         }; })(obj_id, specname);
     } else {
-        throw Error('unknown kind '+kind);
+        throw Error('Upgrade Bar encountered unknown kind: ' + kind);
     }
     if(new_level > get_max_level(spec)) { dialog.user_data['is_applicable'] = false; return; } // maxed out
     if(new_level > get_max_ui_level(spec)) { dialog.user_data['is_applicable'] = false; return; } // maxed out
@@ -271,7 +307,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     dialog.widgets['output'].append_text_with_linebreaking_bbcode(s, {}, click_handlers);
 
     // if contents changed, then reset scroll
-    if(kind != prev_kind || specname != prev_specname || new_level != prev_new_level || obj_id != prev_obj_id) {
+    if(any_change) {
         UpgradeBar.scroll(dialog, -2);
     } else {
         // otherwise, return to previous scroll position
