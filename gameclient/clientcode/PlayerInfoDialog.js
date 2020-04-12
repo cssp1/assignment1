@@ -169,7 +169,6 @@ PlayerInfoDialog.invoke_statistics_tab = function(parent, preselect) {
             default_loc = preselect['time'][1];
         }
     }
-
     PlayerInfoDialog.statistics_tab_select(dialog, default_loc);
     return dialog;
 };
@@ -186,6 +185,7 @@ PlayerInfoDialog.statistics_tab_select = function(dialog, new_loc) {
 
     dialog.user_data['time_displayed'] = new_loc;
 
+    dialog.widgets['selector'].clear_text();
     // update BBCode for time-loc selection bar
     var selector = [[]];
     selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_name'])[0]);
@@ -209,8 +209,17 @@ PlayerInfoDialog.statistics_tab_select = function(dialog, new_loc) {
                                                                                        PlayerInfoDialog.statistics_tab_select(_dialog, _dialog.user_data['time_cur']);
                                                                                    }; })(dialog)})[0]);
     // HISTORICAL LOCS
+    var col = dialog.data['widgets']['selector']['first_row_col'];
+    var col_limit = dialog.data['widgets']['selector']['col_limit'];
     for(var time_loc = dialog.user_data['time_cur'] - 1; time_loc >= dialog.user_data['time_limit']; time_loc -= 1) {
-        selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_separator'])[0]);
+        if(col === col_limit) {
+            col = 0;
+            dialog.widgets['selector'].append_text(selector);
+            selector = [[]];
+        }
+        if(col > 0) {
+            selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_separator'])[0]);
+        }
         var ui_prev = dialog.data['widgets']['selector']['ui_name_prev'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']).replace('%loc', (time_loc + (dialog.user_data['time_scope'] == 'season' ? (gamedata['matchmaking']['season_ui_offset']||0) : 0)).toFixed(0));
         is_selected = (dialog.user_data['time_displayed'] == time_loc);
         ui_prev = dialog.data['widgets']['selector'][(is_selected ? 'ui_format_selected' : 'ui_format_unselected')].replace('%thing', ui_prev);
@@ -218,10 +227,18 @@ PlayerInfoDialog.statistics_tab_select = function(dialog, new_loc) {
                                                                                     (function(_dialog, _time_loc) { return function() {
                                                                                         PlayerInfoDialog.statistics_tab_select(_dialog, _time_loc);
                                                                                     }; })(dialog, time_loc)})[0]);
+        col += 1;
     }
-
-    dialog.widgets['selector'].clear_text();
-    dialog.widgets['selector'].append_text(selector);
+    if(selector != [[]]) {
+        dialog.widgets['selector'].append_text(selector);
+    }
+    dialog.widgets['selector'].scroll_to_top();
+    var selector_can_scroll = dialog.widgets['selector'].can_scroll_up() || dialog.widgets['selector'].can_scroll_down();
+    dialog.widgets['selector_scroll_up'].show = dialog.widgets['selector_scroll_down'].show = selector_can_scroll;
+    dialog.widgets['selector_scroll_up'].state = (dialog.widgets['selector'].can_scroll_up() ? 'normal' : 'disabled');
+    dialog.widgets['selector_scroll_down'].state = (dialog.widgets['selector'].can_scroll_down() ? 'normal' : 'disabled');
+    dialog.widgets['selector_scroll_up'].onclick = function (w) { PlayerInfoDialog.statistics_selector_scroll(w.parent, -1); };
+    dialog.widgets['selector_scroll_down'].onclick = function (w) { PlayerInfoDialog.statistics_selector_scroll(w.parent, 1); };
 
     // perform the query
 
@@ -253,6 +270,7 @@ PlayerInfoDialog.statistics_tab_select = function(dialog, new_loc) {
     dialog.widgets['scroll_up'].onclick = function (w) { PlayerInfoDialog.statistics_tab_scroll(w.parent, -1); };
     dialog.widgets['scroll_down'].onclick = function (w) { PlayerInfoDialog.statistics_tab_scroll(w.parent, 1); };
     PlayerInfoDialog.statistics_tab_scroll(dialog, 0);
+    dialog.on_mousewheel_function = PlayerInfoDialog.statistics_tab_scroll;
     return dialog;
 };
 
@@ -268,6 +286,20 @@ PlayerInfoDialog.statistics_tab_scroll = function(dialog, incr) {
     // set clickability of scroll arrows
     dialog.widgets['scroll_up'].state = (dialog.widgets['output'].can_scroll_up() ? 'normal' : 'disabled');
     dialog.widgets['scroll_down'].state = (dialog.widgets['output'].can_scroll_down() ? 'normal' : 'disabled');
+};
+
+/** @param {!SPUI.Dialog} dialog
+    @param {number} incr */
+PlayerInfoDialog.statistics_selector_scroll = function(dialog, incr) {
+    if(incr < 0) {
+        dialog.widgets['selector'].scroll_up();
+    } else if(incr > 0) {
+        dialog.widgets['selector'].scroll_down();
+    }
+
+    // set clickability of scroll arrows
+    dialog.widgets['selector_scroll_up'].state = (dialog.widgets['selector'].can_scroll_up() ? 'normal' : 'disabled');
+    dialog.widgets['selector_scroll_down'].state = (dialog.widgets['selector'].can_scroll_down() ? 'normal' : 'disabled');
 };
 
 /** @param {!SPUI.Dialog} dialog
