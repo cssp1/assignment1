@@ -6568,11 +6568,13 @@
 
             "sunken2": {"kind": "StaticImage", "xy":[25,105], "dimensions":[686,352], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable":1 },
 
-            "selector": { "kind": "ScrollingTextField", "xy": [45,125], "dimensions": [646,312], "text_size": 15, "text_style": "normal",
-                          "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Show stats for: ",
+            "selector": { "kind": "ScrollingTextField", "xy": [45,125], "dimensions": [625,40], "text_size": 15, "text_style": "normal",
+                          "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Show stats for: ", "col_limit": 8, "first_row_col": 4,
                           "ui_format_selected": "%thing", "ui_format_unselected": "[u][color=#a0a0a0]%thing[/color][/u]",
                           "ui_name_current": "Current %scope", "ui_name_prev": "%scope %loc", "ui_name_alltime": "All time", "ui_separator": " | "},
-            "output": { "kind": "ScrollingTextField", "xy": [45,165], "dimensions": [630,245], "text_size": 15, "text_style": "normal",
+            "selector_scroll_up": { "kind": "ActionButton", "xy": [670,105], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
+            "selector_scroll_down": { "kind": "ActionButton", "xy": [670,140], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
+            "output": { "kind": "ScrollingTextField", "xy": [45,175], "dimensions": [630,235], "text_size": 15, "text_style": "normal",
                         "text_hjustify": "left", "text_vjustify": "top", "ui_tooltip": "", "tooltip_delay": 0,
                         "ui_group_header": "[b]%group[/b]",
                         "ui_stat": "%stat: [color=#1eff66]%val[/color]",
@@ -6585,8 +6587,8 @@
                         // historical stats can't be affected by players anymore, so don't show any warning
                         "ui_name_delay_history": ""
                       },
-            "scroll_up": { "kind": "ActionButton", "xy": [670,145], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
-            "scroll_down": { "kind": "ActionButton", "xy": [670,175], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
+            "scroll_up": { "kind": "ActionButton", "xy": [670,165], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
+            "scroll_down": { "kind": "ActionButton", "xy": [670,375], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
 
             "show_other_button": { "show": 0, "kind": "ActionButton", "xy": [186,410], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                    "bg_image": "menu_button_resizable", "bg_image_resizable":1, "ui_name": "Show other stats" },
