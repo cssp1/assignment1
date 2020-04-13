@@ -28664,7 +28664,7 @@ class GAMEAPI(resource.Resource):
         if my_points > 0:
             for api, context in session.adnetworks():
                 if api == 'kg_conversion_pixels' and 'high_score_event' in gamedata['adnetworks'][api]: # only applies to KG network
-                session.do_send_adnetwork_event_serverside(None, 'kg_conversion_pixels', context, 'high_score_event', gamedata['adnetworks'][api]['high_score_event'], extra_qs = {"AllTimePvPPoints": my_points})
+                    session.do_send_adnetwork_event_serverside(None, 'kg_conversion_pixels', context, 'high_score_event', gamedata['adnetworks'][api]['high_score_event'], extra_qs = {"AllTimePvPPoints": my_points})
 
     def log_out_preflush_open_graph(self, session):
         # send FB open graph leaderboard update (throttle by time and level)
