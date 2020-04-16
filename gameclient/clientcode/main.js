@@ -4037,6 +4037,7 @@ GameObject.prototype.update_strongest_attacker_id = function(world) {
             if(!obj.is_flying() && !auto_spell['targets_ground']) { return false; }
             return true;
         });
+    }
     if(ai_attacker_list.length > 0 ){
         var i = 0;
         var most_dangerous_index = 0;
