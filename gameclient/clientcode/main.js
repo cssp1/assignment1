@@ -1521,6 +1521,7 @@ function GameObject() {
     // NOTE! we do not make effort to track whether the referred-to object is actually still alive
     // so check the id field before using
     this.last_attacker = null;
+    this.strongest_attacker_id = null;
 
 
     this.last_speak_sound = null; // client-side state to prevent sound FX spam
@@ -3980,6 +3981,119 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
 
 
 /** @param {!World.World} world */
+GameObject.prototype.is_being_attacked = function(world) {
+    var my_id = this.id;
+    var ret = false;
+    var auto_spell = this.get_auto_spell();
+    if(!auto_spell) { return ret; } // ignore units that can't shoot
+    var auto_spell_level = this.get_auto_spell_level();
+    var auto_spell_range = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
+    if(auto_spell_range <= 0) { return ret; } // ignore units that have no range
+    if(!this.is_mobile()) { return ret; } // ignore turrets
+    var defense_radius = Math.sqrt(2)*Math.max(world.base.ncells()[0], world.base.ncells()[1]);
+    var enemy = ''; // currently only called if team is player, but this can support AI units later
+    if(this.team === 'enemy') {
+        enemy = 'player';
+    } else {
+        enemy = 'enemy';
+    }
+    var obj_list = world.query_objects_within_distance(this.raw_pos(), defense_radius, { only_team: enemy });
+    goog.array.forEach(obj_list, function(result) {
+        if (result.obj.ai_target && result.obj.ai_target.id && my_id.localeCompare(result.obj.ai_target.id) === 0) { ret = true; }
+    });
+    return ret;
+}
+
+/** @param {!World.World} world */
+GameObject.prototype.update_strongest_attacker_id = function(world) {
+    var my_id = this.id;
+    var auto_spell = this.get_auto_spell();
+    if(!auto_spell) { return; } // ignore unarmed
+    if(!this.is_mobile()) { return; } // ignore turrets
+    if(this.strongest_attacker_id) {
+        var attacker_obj = world.objects._get_object(this.strongest_attacker_id);
+        if(attacker_obj && !attacker_obj.is_destroyed()) {
+            return; // leave current strongest_attacker_id value if it's alive
+        }
+    }
+    var defense_radius = Math.sqrt(2)*Math.max(world.base.ncells()[0], world.base.ncells()[1]);
+    var enemy = ''; // currently only called if team is player, but include support for AI units
+    if(this.team === 'enemy') {
+        enemy = 'player';
+    } else {
+        enemy = 'enemy';
+    }
+    var ai_attacker_list = []; // reset attacker list when making an attacker check
+    var obj_list = world.query_objects_within_distance(this.raw_pos(), defense_radius, { only_team: enemy });
+    goog.array.forEach(obj_list, function(result) {
+        if (result.obj.ai_target && result.obj.ai_target.id && my_id.localeCompare(result.obj.ai_target.id) === 0) {
+            ai_attacker_list.push(result.obj.id)
+        }
+    });
+    if(ai_attacker_list.length > 0) {
+        ai_attacker_list = goog.array.filter(ai_attacker_list, function(a) {
+            var obj = world.objects._get_object(a);
+            if(obj.is_flying() && !(auto_spell['targets_air'] || this.combat_stats.anti_air)) { return false; }
+            if(!obj.is_flying() && !auto_spell['targets_ground']) { return false; }
+            return true;
+        });
+    if(ai_attacker_list.length > 0 ){
+        var i = 0;
+        var most_dangerous_index = 0;
+        var most_dangerous_damage = 0;
+        var my_defense_types = this.spec['defense_types'];
+        goog.array.forEach(ai_attacker_list, function(a) {
+                var attacker = world.objects._get_object(a);
+                var attacker_spell = attacker.get_auto_spell();
+                if(!attacker_spell) { return; }
+                var attacker_spell_level = attacker.get_auto_spell_level();
+                var attacker_damage = get_leveled_quantity(attacker_spell['damage'], attacker_spell_level);
+                var attacker_highest_damage = 0;
+                if('impact_auras' in attacker_spell) {
+                    goog.array.forEach(attacker_spell['impact_auras'], function(aura_data) {
+                        var aura = gamedata['auras'][aura_data['spec']];
+                        var is_dot = false;
+                        if('effects' in aura) {
+                            goog.array.forEach(aura['effects'], function(effect) {
+                                if(effect['code'] == 'on_fire') {
+                                    is_dot = true;
+                                }
+                            });
+                        }
+                        if(is_dot) {
+                            attacker_damage += Math.floor(get_leveled_quantity(1, attacker_spell_level) * get_leveled_quantity(aura_data['strength'] || 1, attacker_spell_level));
+                        }
+                    });
+                }
+                var attacker_damage_vs = get_leveled_quantity(attacker_spell['damage_vs'], attacker_spell_level);
+                goog.array.forEach(my_defense_types, function(d) {
+                    if(d in attacker_damage_vs) {
+                        var this_damage_vs = attacker_damage_vs[d] * attacker_damage;
+                        if(this_damage_vs > attacker_highest_damage) {
+                            attacker_highest_damage = this_damage_vs;
+                        }
+                    }
+                });
+                if(attacker_highest_damage > most_dangerous_damage) {
+                    most_dangerous_index = i;
+                }
+                i += 1;
+            });
+        this.strongest_attacker_id = ai_attacker_list[most_dangerous_index];
+    } else {
+        this.strongest_attacker_id = null;
+    }
+    return;
+}
+
+
+GameObject.prototype.is_attacking_attacker = function() {
+    var my_id = this.id;
+    if(!this.ai_target || !this.ai_target.id || !this.ai_target.ai_target || !this.ai_target.ai_target.id) { return false; }
+    return my_id.localeCompare(this.ai_target.ai_target.id) === 0;
+}
+
+/** @param {!World.World} world */
 GameObject.prototype.ai_threatlist_update = function(world) {
     if(!this.spec['enable_ai_threatlist']) { return; }
     if(this.ai_threatlist !== null && !this.ai_threatlist_dirty) { return; }
@@ -4780,8 +4894,13 @@ GameObject.prototype.run_ai = function(world) {
         }
         if(auto_spell_min_range > 0) { throw Error('AI_ATTACK_SPECIFIC not supported when spell has min_range'); } // needs code to back away if too close
 
-        // if the target is dead, switch to AI_ATTACK_ANY
-        if(this.ai_target === null || this.ai_target.is_destroyed()) {
+        // override target if player has selected "Unit Defends Self" option
+        if(this.team == 'player' && !!player.preferences['unit_defends_self'] && this.is_being_attacked(world) && !this.is_attacking_attacker()) {
+            this.update_strongest_attacker_id(world);
+            var retaliate_obj = world.objects.get_object(this.strongest_attacker_id);
+            var retaliate_pos = retaliate_obj.raw_pos();
+            this.ai_pursue_target(world, auto_spell, auto_spell_level, {target: retaliate_obj, pos: retaliate_pos, dist: Math.max(0, vec_distance(this.raw_pos(), retaliate_pos) - retaliate_obj.hit_radius()), path_end: null});
+        } else if(this.ai_target === null || this.ai_target.is_destroyed()) { // if the target is dead, switch to AI_ATTACK_ANY
             this.ai_target = null;
             this.next_ai_order(world);
         } else if(!(auto_spell['targets_air'] || this.combat_stats.anti_air) && this.ai_target.is_flying()) {
@@ -4874,6 +4993,7 @@ GameObject.prototype.run_ai = function(world) {
             // nonmobile, non-dangerous target, and we are being
             // attacked by something that we are able to shoot, then
             // retarget and either shoot or move towards the attacker
+            // ignores this last_attacker logic if unit_defends_self is on and it belongs to the player
             if(this.is_mobile() && shoot_range > 0 && !this.ai_target.is_mobile() && !this.ai_target.is_shooter() &&
                (!this.ai_target.is_building() || !this.ai_target.is_turret()) &&
                ((this.ai_state !== ai_states.AI_ATTACK_STATIONARY) || (this.team !== 'player')) &&
@@ -4881,11 +5001,16 @@ GameObject.prototype.run_ai = function(world) {
                ((auto_spell['targets_ground'] && !this.last_attacker.is_flying()) ||
                 ((auto_spell['targets_air'] || this.combat_stats.anti_air) && this.last_attacker.is_flying())) &&
                vec_distance(this.raw_pos(), this.last_attacker.raw_pos()) <= this.last_attacker.weapon_range()[1] &&
-               !(auto_spell['help'] || 0)) {
+               !(auto_spell['help'] || 0) && !(this.team == 'player' && !!player.preferences['unit_defends_self'])) {
                 //console.log('SPECIAL CASE: SWITCHING TARGET TO '+this.last_attacker.spec['name']);
 
                 var last_attacker_pos = this.last_attacker.raw_pos();
                 this.ai_pursue_target(world, auto_spell, auto_spell_level, {target:this.last_attacker, pos:last_attacker_pos, dist:vec_distance(this.raw_pos(), last_attacker_pos) - this.last_attacker.hit_radius()});
+            } else if (this.team == 'player' && !!player.preferences['unit_defends_self'] && this.is_being_attacked(world)) {
+                this.update_strongest_attacker_id(world);
+                var retaliate_obj = world.objects.get_object(this.strongest_attacker_id);
+                var retaliate_pos = retaliate_obj.raw_pos();
+                this.ai_pursue_target(world, auto_spell, auto_spell_level, {target: retaliate_obj, pos: retaliate_pos, dist: Math.max(0, vec_distance(this.raw_pos(), retaliate_pos) - retaliate_obj.hit_radius())});
             }
 
         } else {
