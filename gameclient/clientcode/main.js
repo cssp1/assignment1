@@ -1516,6 +1516,7 @@ function GameObject() {
     // it is just used as a way to cache the results of ai_pick_target() across ticks when there are no "map topology" changes
     this.ai_threatlist = null;
     this.ai_threatlist_dirty = true;
+    this.ai_attackers_list = null;
 
     // reference to last object that shot at us.
     // NOTE! we do not make effort to track whether the referred-to object is actually still alive
@@ -3982,8 +3983,12 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
 
 /** @param {!World.World} world */
 GameObject.prototype.is_being_attacked = function(world) {
+    return (this.ai_attackers_list && this.ai_attackers_list.length > 0);
+}
+
+/** @param {!World.World} world */
+GameObject.prototype.ai_attackers_update = function(world) {
     var my_id = this.id;
-    var ret = false;
     var auto_spell = this.get_auto_spell();
     if(!auto_spell) { return ret; } // ignore units that can't shoot
     var auto_spell_level = this.get_auto_spell_level();
@@ -3997,24 +4002,23 @@ GameObject.prototype.is_being_attacked = function(world) {
     } else {
         enemy = 'enemy';
     }
-    var ai_attacker_list = []; // reset attacker list when making an attacker check
+    var ai_attackers_list = []; // reset attacker list when making an attacker check
     var obj_list = world.query_objects_within_distance(this.raw_pos(), defense_radius, { only_team: enemy });
     goog.array.forEach(obj_list, function(result) {
         if (result.obj.ai_target && result.obj.ai_target.id && my_id.localeCompare(result.obj.ai_target.id) === 0) {
-            ai_attacker_list.push(result.obj.id)
+            ai_attackers_list.push(result.obj.id)
         }
     });
     // only counts units that the object can shoot back at, so filter
-    if(ai_attacker_list.length > 0) {
-        ai_attacker_list = goog.array.filter(ai_attacker_list, function(a) {
+    if(ai_attackers_list.length > 0) {
+        ai_attackers_list = goog.array.filter(ai_attackers_list, function(a) {
             var obj = world.objects._get_object(a);
             if(obj.is_flying() && !(auto_spell['targets_air'] || this.combat_stats.anti_air)) { return false; }
             if(!obj.is_flying() && !auto_spell['targets_ground']) { return false; }
             return true;
         });
     }
-    if(ai_attacker_list.length > 0) { ret = true; }
-    return ret;
+    if(ai_attackers_list.length > 0) { this.ai_attackers_list = ai_attackers_list; }
 }
 
 /** @param {!World.World} world */
@@ -4036,27 +4040,12 @@ GameObject.prototype.update_strongest_attacker_id = function(world) {
     } else {
         enemy = 'enemy';
     }
-    var ai_attacker_list = []; // reset attacker list when making an attacker check
-    var obj_list = world.query_objects_within_distance(this.raw_pos(), defense_radius, { only_team: enemy });
-    goog.array.forEach(obj_list, function(result) {
-        if (result.obj.ai_target && result.obj.ai_target.id && my_id.localeCompare(result.obj.ai_target.id) === 0) {
-            ai_attacker_list.push(result.obj.id)
-        }
-    });
-    if(ai_attacker_list.length > 0) {
-        ai_attacker_list = goog.array.filter(ai_attacker_list, function(a) {
-            var obj = world.objects._get_object(a);
-            if(obj.is_flying() && !(auto_spell['targets_air'] || this.combat_stats.anti_air)) { return false; }
-            if(!obj.is_flying() && !auto_spell['targets_ground']) { return false; }
-            return true;
-        });
-    }
-    if(ai_attacker_list.length > 0 ){
+    if(this.ai_attackers_list.length > 0 ){
         var i = 0;
         var most_dangerous_index = 0;
         var most_dangerous_damage = 0;
         var my_defense_types = this.spec['defense_types'];
-        goog.array.forEach(ai_attacker_list, function(a) {
+        goog.array.forEach(ai_attackers_list, function(a) {
                 var attacker = world.objects._get_object(a);
                 var attacker_spell = attacker.get_auto_spell();
                 if(!attacker_spell) { return; }
@@ -4093,7 +4082,7 @@ GameObject.prototype.update_strongest_attacker_id = function(world) {
                 }
                 i += 1;
             });
-        this.strongest_attacker_id = ai_attacker_list[most_dangerous_index];
+        this.strongest_attacker_id = this.ai_attackers_list[most_dangerous_index];
     } else {
         this.strongest_attacker_id = null;
     }
