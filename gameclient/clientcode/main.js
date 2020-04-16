@@ -3997,10 +3997,23 @@ GameObject.prototype.is_being_attacked = function(world) {
     } else {
         enemy = 'enemy';
     }
+    var ai_attacker_list = []; // reset attacker list when making an attacker check
     var obj_list = world.query_objects_within_distance(this.raw_pos(), defense_radius, { only_team: enemy });
     goog.array.forEach(obj_list, function(result) {
-        if (result.obj.ai_target && result.obj.ai_target.id && my_id.localeCompare(result.obj.ai_target.id) === 0) { ret = true; }
+        if (result.obj.ai_target && result.obj.ai_target.id && my_id.localeCompare(result.obj.ai_target.id) === 0) {
+            ai_attacker_list.push(result.obj.id)
+        }
     });
+    // only counts units that the object can shoot back at, so filter
+    if(ai_attacker_list.length > 0) {
+        ai_attacker_list = goog.array.filter(ai_attacker_list, function(a) {
+            var obj = world.objects._get_object(a);
+            if(obj.is_flying() && !(auto_spell['targets_air'] || this.combat_stats.anti_air)) { return false; }
+            if(!obj.is_flying() && !auto_spell['targets_ground']) { return false; }
+            return true;
+        });
+    }
+    if(ai_attacker_list.length > 0) { ret = true; }
     return ret;
 }
 
