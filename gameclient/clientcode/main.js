@@ -4045,7 +4045,7 @@ GameObject.prototype.update_strongest_attacker_id = function(world) {
         var most_dangerous_index = 0;
         var most_dangerous_damage = 0;
         var my_defense_types = this.spec['defense_types'];
-        goog.array.forEach(ai_attackers_list, function(a) {
+        goog.array.forEach(this.ai_attackers_list, function(a) {
                 var attacker = world.objects._get_object(a);
                 var attacker_spell = attacker.get_auto_spell();
                 if(!attacker_spell) { return; }
