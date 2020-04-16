@@ -3990,11 +3990,15 @@ GameObject.prototype.is_being_attacked = function(world) {
 GameObject.prototype.ai_attackers_update = function(world) {
     var my_id = this.id;
     var auto_spell = this.get_auto_spell();
-    if(!auto_spell) { return ret; } // ignore units that can't shoot
+    if(!auto_spell) { // ignore units that can't shoot
+        this.ai_attackers_list = null;
+        return;
+    }
     var auto_spell_level = this.get_auto_spell_level();
     var auto_spell_range = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
-    if(auto_spell_range <= 0) { return ret; } // ignore units that have no range
-    if(!this.is_mobile()) { return ret; } // ignore turrets
+    if(auto_spell_range <= 0 || !this.is_mobile()) { // ignore units that have no range and turrets
+        this.ai_attackers_list = null;
+        return; }
     var defense_radius = Math.sqrt(2)*Math.max(world.base.ncells()[0], world.base.ncells()[1]);
     var enemy = ''; // currently only called if team is player, but this can support AI units later
     if(this.team === 'enemy') {
@@ -4018,15 +4022,21 @@ GameObject.prototype.ai_attackers_update = function(world) {
             return true;
         });
     }
-    if(ai_attackers_list.length > 0) { this.ai_attackers_list = ai_attackers_list; }
+    if(ai_attackers_list.length > 0) {
+        this.ai_attackers_list = ai_attackers_list;
+    } else {
+        this.ai_attackers_list = null;
+    }
 }
 
 /** @param {!World.World} world */
 GameObject.prototype.update_strongest_attacker_id = function(world) {
     var my_id = this.id;
     var auto_spell = this.get_auto_spell();
-    if(!auto_spell) { return; } // ignore unarmed
-    if(!this.is_mobile()) { return; } // ignore turrets
+    if(!auto_spell || !this.is_mobile() || !this.ai_attackers_list) { // ignore unarmed and turrets, abort if this.ai_attackers_list is null
+        this.strongest_attacker_id = null;
+        return;
+    }
     if(this.strongest_attacker_id) {
         var attacker_obj = world.objects._get_object(this.strongest_attacker_id);
         if(attacker_obj && !attacker_obj.is_destroyed()) {
@@ -4040,7 +4050,7 @@ GameObject.prototype.update_strongest_attacker_id = function(world) {
     } else {
         enemy = 'enemy';
     }
-    if(this.ai_attackers_list.length > 0 ){
+    if(this.ai_attackers_list.length > 0){
         var i = 0;
         var most_dangerous_index = 0;
         var most_dangerous_damage = 0;
