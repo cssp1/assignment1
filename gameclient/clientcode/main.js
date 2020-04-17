@@ -4006,7 +4006,8 @@ GameObject.prototype.ai_attackers_list_update = function(world) {
     if(ai_attackers_list.length > 0) {
         ai_attackers_list = goog.array.filter(ai_attackers_list, function(a) {
             var obj = world.objects._get_object(a);
-            if(obj.is_flying() && !(auto_spell['targets_air'] || this.combat_stats.anti_air)) { return false; }
+            if(!obj) { return false; }
+            if(obj.is_flying() && !(auto_spell['targets_air'] || (this.combat_stats && this.combat_stats.anti_air))) { return false; }
             if(!obj.is_flying() && !auto_spell['targets_ground']) { return false; }
             return true;
         });
@@ -4168,7 +4169,9 @@ GameObject.prototype.ai_pick_target_by_threatlist = function(world, auto_spell, 
     if(this.ai_threatlist.length > 0) {
         var entry = this.ai_threatlist[0];
         var obj = world.objects.get_object(entry['obj_id']);
-        obj.next_ai_attackers_list.push(this.id);
+        if(obj){
+            obj.next_ai_attackers_list.push(this.id);
+        }
         var his_pos = obj.raw_pos();
         return {target: obj,
                 pos: his_pos,
@@ -4459,7 +4462,9 @@ GameObject.prototype.ai_pick_target_classic = function(world, auto_spell, auto_s
             ret_obj = obj;
         }
     }
-    ret_obj.next_ai_attackers_list.push(this.id);
+    if(ret_obj) {
+        ret_obj.next_ai_attackers_list.push(this.id);
+    }
 
     var ret = {target:ret_obj, pos:min_pos, dist:min_dist, /*priority:max_priority,*/ path_end:min_path_end};
     if(verbose) {
