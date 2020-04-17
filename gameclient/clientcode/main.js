@@ -5004,7 +5004,7 @@ GameObject.prototype.run_ai = function(world) {
                 var last_attacker_pos = this.last_attacker.raw_pos();
                 this.last_attacker.next_ai_attackers_list.push(this.id);
                 this.ai_pursue_target(world, auto_spell, auto_spell_level, {target:this.last_attacker, pos:last_attacker_pos, dist:vec_distance(this.raw_pos(), last_attacker_pos) - this.last_attacker.hit_radius()});
-            } else if (this.team == 'player' && !!player.preferences['unit_defends_self'] && this.is_being_attacked(world) && this.strongest_attacker_id) {
+            } else if (this.team == 'player' && !!player.preferences['unit_defends_self'] && this.is_being_attacked(world) && !this.is_attacking_attacker() && this.strongest_attacker_id) {
                 var retaliate_obj = world.objects.get_object(this.strongest_attacker_id);
                 var retaliate_pos = retaliate_obj.raw_pos();
                 retaliate_obj.next_ai_attackers_list.push(this.id);
