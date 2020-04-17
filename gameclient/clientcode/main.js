@@ -1516,7 +1516,8 @@ function GameObject() {
     // it is just used as a way to cache the results of ai_pick_target() across ticks when there are no "map topology" changes
     this.ai_threatlist = null;
     this.ai_threatlist_dirty = true;
-    this.ai_attackers_list = null;
+    this.ai_attackers_list = [];
+    this.next_ai_attackers_list = [];
 
     // reference to last object that shot at us.
     // NOTE! we do not make effort to track whether the referred-to object is actually still alive
@@ -3983,36 +3984,24 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
 
 /** @param {!World.World} world */
 GameObject.prototype.is_being_attacked = function(world) {
-    return (this.ai_attackers_list && this.ai_attackers_list.length > 0);
+    return (this.ai_attackers_list.length > 0);
 }
 
 /** @param {!World.World} world */
-GameObject.prototype.ai_attackers_update = function(world) {
+GameObject.prototype.ai_attackers_list_update = function(world) {
+    var ai_attackers_list;
+    ai_attackers_list = this.next_ai_attackers_list;
+    this.ai_attackers_list = [];
+    this.next_ai_attackers_list = [];
     var my_id = this.id;
     var auto_spell = this.get_auto_spell();
     if(!auto_spell) { // ignore units that can't shoot
-        this.ai_attackers_list = null;
         return;
     }
     var auto_spell_level = this.get_auto_spell_level();
     var auto_spell_range = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
     if(auto_spell_range <= 0 || !this.is_mobile()) { // ignore units that have no range and turrets
-        this.ai_attackers_list = null;
         return; }
-    var defense_radius = Math.sqrt(2)*Math.max(world.base.ncells()[0], world.base.ncells()[1]);
-    var enemy = ''; // currently only called if team is player, but this can support AI units later
-    if(this.team === 'enemy') {
-        enemy = 'player';
-    } else {
-        enemy = 'enemy';
-    }
-    var ai_attackers_list = []; // reset attacker list when making an attacker check
-    var obj_list = world.query_objects_within_distance(this.raw_pos(), defense_radius, { only_team: enemy });
-    goog.array.forEach(obj_list, function(result) {
-        if (result.obj.ai_target && result.obj.ai_target.id && my_id.localeCompare(result.obj.ai_target.id) === 0) {
-            ai_attackers_list.push(result.obj.id)
-        }
-    });
     // only counts units that the object can shoot back at, so filter
     if(ai_attackers_list.length > 0) {
         ai_attackers_list = goog.array.filter(ai_attackers_list, function(a) {
@@ -4024,8 +4013,6 @@ GameObject.prototype.ai_attackers_update = function(world) {
     }
     if(ai_attackers_list.length > 0) {
         this.ai_attackers_list = ai_attackers_list;
-    } else {
-        this.ai_attackers_list = null;
     }
 }
 
@@ -4033,7 +4020,7 @@ GameObject.prototype.ai_attackers_update = function(world) {
 GameObject.prototype.update_strongest_attacker_id = function(world) {
     var my_id = this.id;
     var auto_spell = this.get_auto_spell();
-    if(!auto_spell || !this.is_mobile() || !this.ai_attackers_list) { // ignore unarmed and turrets, abort if this.ai_attackers_list is null
+    if(!auto_spell || !this.is_mobile() || this.ai_attackers_list.length === 0) { // ignore unarmed and turrets, abort if no attackable attackers
         this.strongest_attacker_id = null;
         return;
     }
@@ -4043,60 +4030,48 @@ GameObject.prototype.update_strongest_attacker_id = function(world) {
             return; // leave current strongest_attacker_id value if it's alive
         }
     }
-    var defense_radius = Math.sqrt(2)*Math.max(world.base.ncells()[0], world.base.ncells()[1]);
-    var enemy = ''; // currently only called if team is player, but include support for AI units
-    if(this.team === 'enemy') {
-        enemy = 'player';
-    } else {
-        enemy = 'enemy';
-    }
-    if(this.ai_attackers_list.length > 0){
-        var i = 0;
-        var most_dangerous_index = 0;
-        var most_dangerous_damage = 0;
-        var my_defense_types = this.spec['defense_types'];
-        goog.array.forEach(this.ai_attackers_list, function(a) {
-                var attacker = world.objects._get_object(a);
-                var attacker_spell = attacker.get_auto_spell();
-                if(!attacker_spell) { return; }
-                var attacker_spell_level = attacker.get_auto_spell_level();
-                var attacker_damage = get_leveled_quantity(attacker_spell['damage'], attacker_spell_level);
-                var attacker_highest_damage = 0;
-                if('impact_auras' in attacker_spell) {
-                    goog.array.forEach(attacker_spell['impact_auras'], function(aura_data) {
-                        var aura = gamedata['auras'][aura_data['spec']];
-                        var is_dot = false;
-                        if('effects' in aura) {
-                            goog.array.forEach(aura['effects'], function(effect) {
-                                if(effect['code'] == 'on_fire') {
-                                    is_dot = true;
-                                }
-                            });
-                        }
-                        if(is_dot) {
-                            attacker_damage += Math.floor(get_leveled_quantity(1, attacker_spell_level) * get_leveled_quantity(aura_data['strength'] || 1, attacker_spell_level));
+    var i = 0;
+    var most_dangerous_index = 0;
+    var most_dangerous_damage = 0;
+    var my_defense_types = this.spec['defense_types'];
+    goog.array.forEach(this.ai_attackers_list, function(a) {
+        var attacker = world.objects._get_object(a);
+        var attacker_spell = attacker.get_auto_spell();
+        if(!attacker_spell) { return; }
+        var attacker_spell_level = attacker.get_auto_spell_level();
+        var attacker_damage = get_leveled_quantity(attacker_spell['damage'], attacker_spell_level);
+        var attacker_highest_damage = 0;
+        if('impact_auras' in attacker_spell) {
+            goog.array.forEach(attacker_spell['impact_auras'], function(aura_data) {
+                var aura = gamedata['auras'][aura_data['spec']];
+                var is_dot = false;
+                if('effects' in aura) {
+                    goog.array.forEach(aura['effects'], function(effect) {
+                        if(effect['code'] == 'on_fire') {
+                            is_dot = true;
                         }
                     });
                 }
-                var attacker_damage_vs = get_leveled_quantity(attacker_spell['damage_vs'], attacker_spell_level);
-                goog.array.forEach(my_defense_types, function(d) {
-                    if(d in attacker_damage_vs) {
-                        var this_damage_vs = attacker_damage_vs[d] * attacker_damage;
-                        if(this_damage_vs > attacker_highest_damage) {
-                            attacker_highest_damage = this_damage_vs;
-                        }
-                    }
-                });
-                if(attacker_highest_damage > most_dangerous_damage) {
-                    most_dangerous_index = i;
+                if(is_dot) {
+                    attacker_damage += Math.floor(get_leveled_quantity(1, attacker_spell_level) * get_leveled_quantity(aura_data['strength'] || 1, attacker_spell_level));
                 }
-                i += 1;
             });
-        this.strongest_attacker_id = this.ai_attackers_list[most_dangerous_index];
-    } else {
-        this.strongest_attacker_id = null;
-    }
-    return;
+        }
+        var attacker_damage_vs = get_leveled_quantity(attacker_spell['damage_vs'], attacker_spell_level);
+        goog.array.forEach(my_defense_types, function(d) {
+            if(d in attacker_damage_vs) {
+                var this_damage_vs = attacker_damage_vs[d] * attacker_damage;
+                if(this_damage_vs > attacker_highest_damage) {
+                    attacker_highest_damage = this_damage_vs;
+                }
+            }
+        });
+        if(attacker_highest_damage > most_dangerous_damage) {
+            most_dangerous_index = i;
+        }
+        i += 1;
+    });
+    this.strongest_attacker_id = this.ai_attackers_list[most_dangerous_index];
 }
 
 
@@ -4193,6 +4168,7 @@ GameObject.prototype.ai_pick_target_by_threatlist = function(world, auto_spell, 
     if(this.ai_threatlist.length > 0) {
         var entry = this.ai_threatlist[0];
         var obj = world.objects.get_object(entry['obj_id']);
+        obj.next_ai_attackers_list.push(this.id);
         var his_pos = obj.raw_pos();
         return {target: obj,
                 pos: his_pos,
@@ -4483,6 +4459,7 @@ GameObject.prototype.ai_pick_target_classic = function(world, auto_spell, auto_s
             ret_obj = obj;
         }
     }
+    ret_obj.next_ai_attackers_list.push(this.id);
 
     var ret = {target:ret_obj, pos:min_pos, dist:min_dist, /*priority:max_priority,*/ path_end:min_path_end};
     if(verbose) {
