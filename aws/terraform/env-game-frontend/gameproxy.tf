@@ -61,7 +61,7 @@ provider "cloudflare" {
 }
 
 module "aws_cloud_init" {
-  source              = "git@github.com:spinpunch/spin-tf-aws-cloud-init.git?ref=82d3f8cec71a3cf6e8c435abf245a4ab8ccc08a5"
+  source              = "git@github.com:spinpunch/spin-tf-aws-cloud-init.git?ref=208fa59625f52400a8db6c444270411f29f5e2d9"
   cron_mail_sns_topic = data.terraform_remote_state.corp.outputs.cron_mail_sns_topic
   region              = var.region
   sitename            = var.sitename
