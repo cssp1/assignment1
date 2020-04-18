@@ -428,6 +428,7 @@ World.World.prototype.run_unit_ticks = function() {
             }, this);
             // update AI behavior for all objects. It is OK to make use of the results of attackers_update() for any object because they have all been established by this point.
             goog.array.forEach(obj_list, function(obj) {
+                obj.update_strongest_attacker_id(this);
                 obj.ai_threatlist_update(this);
                 obj.run_behaviors(this);
                 obj.run_ai(this);
