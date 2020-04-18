@@ -4911,7 +4911,7 @@ GameObject.prototype.run_ai = function(world) {
         if(auto_spell_min_range > 0) { throw Error('AI_ATTACK_SPECIFIC not supported when spell has min_range'); } // needs code to back away if too close
 
         // override target if player has selected "Unit Defends Self" option
-        if(this.team == 'player' && !!player.preferences['unit_defends_self'] && this.is_being_attacked() && !this.is_attacking_attacker() && this.strongest_attacker_id && world.objects.has_object(this.strongest_attacker_id) && !world.objects.get_object(this.strongest_attacker_id).is_destroyed()) {
+        if(this.team == 'player' && !!player.preferences['unit_defends_self'] && !!player.preferences['self_defense_aggression'] && this.is_being_attacked() && !this.is_attacking_attacker() && this.strongest_attacker_id && world.objects.has_object(this.strongest_attacker_id) && !world.objects.get_object(this.strongest_attacker_id).is_destroyed()) {
             var retaliate_obj = world.objects.get_object(this.strongest_attacker_id);
             var retaliate_pos = retaliate_obj.raw_pos();
             this.ai_pursue_target(world, auto_spell, auto_spell_level, {target: retaliate_obj, pos: retaliate_pos, dist: Math.max(0, vec_distance(this.raw_pos(), retaliate_pos) - retaliate_obj.hit_radius()), path_end: null});
