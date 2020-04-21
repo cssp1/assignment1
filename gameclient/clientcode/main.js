@@ -10569,6 +10569,8 @@ function invoke_playfield_controls_bar() {
     var orient = (gamedata['client']['playfield_controls_bar_layout'] || 'vertical');
     var dialog = new SPUI.Dialog(gamedata['dialogs']['playfield_controls_bar_'+orient]);
     dialog.user_data['dialog'] = 'playfield_controls_bar_'+orient;
+    dialog.user_data['adjusting_music'] = false;
+    dialog.user_data['adjusting_sound'] = false;
     dialog.transparent_to_mouse = true;
 
     var always_fullscreen = eval_cond_or_literal(gamedata['client']['always_fullscreen'], player, null);
@@ -10607,33 +10609,93 @@ function invoke_playfield_controls_bar() {
     dialog.widgets['sound_button'].show = GameArt.enable_audio;
 
     if(GameArt.enable_audio) {
-        // sound/music toggle callbacks
-        var cbmaker = function(sound_or_music) { return function() {
-            if(sound_or_music === 'sound') {
-                GameArt.sound_volume = (GameArt.sound_volume > 0 ? 0 : 1);
+        dialog.widgets['music_button'].onclick = function(w) {
+            var dialog = w.parent;
+            dialog.user_data['adjusting_sound'] = false;
+            dialog.user_data['volume_type'] = 'music';
+            if(!!player.preferences['volume_control_enabled']) {
+                dialog.user_data['adjusting_music'] = !dialog.user_data['adjusting_music'];
             } else {
-                GameArt.music_volume = (GameArt.music_volume > 0 ? 0 : 1);
-                if(backdrop_music) {
-                    if(GameArt.music_volume > 0) {
-                        backdrop_music.loop();
-                        backdrop_music.play(client_time);
-                        backdrop_music.fadeIn(0.001);
-                    } else {
-                        backdrop_music.unloop();
-                        backdrop_music.stop(client_time);
-                    }
-                }
+                update_player_volume(dialog, 2); // update_player_volume will use legacy mute/unmute if receiving a delta value of 2
             }
-            player.preferences['sound_volume'] = GameArt.sound_volume;
-            player.preferences['music_volume'] = GameArt.music_volume;
-            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
-        }; };
-        dialog.widgets['music_button'].onclick = cbmaker('music');
-        dialog.widgets['sound_button'].onclick = cbmaker('sound');
+        }
+        dialog.widgets['sound_button'].onclick = function(w) {
+            var dialog = w.parent;
+            dialog.user_data['volume_type'] = 'sound';
+            dialog.user_data['adjusting_music'] = false;
+            if(!!player.preferences['volume_control_enabled']) {
+                dialog.user_data['adjusting_sound'] = !dialog.user_data['adjusting_sound'];
+            } else {
+                update_player_volume(dialog, 2); // update_player_volume will use legacy mute/unmute if receiving a delta value of 2
+            }
+        }
+        dialog.widgets['volume_down_button'].onclick = function(w) {
+            var dialog = w.parent;
+            update_player_volume(dialog, -1);
+         }
+        dialog.widgets['volume_up_button'].onclick = function(w) {
+            var dialog = w.parent;
+            update_player_volume(dialog, 1);
+        }
     }
     dialog.ondraw = update_playfield_controls_bar;
     return dialog;
 }
+
+/**
+    @param {SPUI.Dialog} dialog
+    @param {number} delta
+*/
+function update_player_volume(dialog, delta) {
+    var sound_or_music = dialog.user_data['volume_type'];
+    var last_music_volume, change, method;
+    last_music_volume = GameArt.music_volume;
+    if (delta === 2) { // passed by sound and music buttons if player preferences are set for legacy sound controls
+        method = 'legacy';
+    } else if (delta > 0) {
+        change = 0.01;
+    } else if (delta < 0) {
+        change = -0.01;
+    }
+    if(sound_or_music === 'sound') {
+        if (method && method === 'legacy') {
+            GameArt.sound_volume = (GameArt.sound_volume > 0 ? 0 : 1);
+        } else {
+            GameArt.sound_volume += change;
+        }
+        if(GameArt.sound_volume < 0) {
+            GameArt.sound_volume = 0;
+        } else if (GameArt.sound_volume > 1) {
+            GameArt.sound_volume = 1;
+        }
+    } else {
+        if (method && method === 'legacy') {
+            GameArt.music_volume = (GameArt.music_volume > 0 ? 0 : 1);
+        } else {
+            GameArt.music_volume += change;
+        }
+        if(GameArt.music_volume < 0) {
+            GameArt.music_volume = 0;
+        } else if (GameArt.music_volume > 1) {
+            GameArt.music_volume = 1;
+        }
+    }
+    if(backdrop_music) {
+        if(GameArt.music_volume > 0 && last_music_volume === 0) {
+            backdrop_music.loop();
+            backdrop_music.play(client_time);
+            backdrop_music.fadeIn(0.001);
+        } else if (GameArt.music_volume === 0) {
+            backdrop_music.unloop();
+            backdrop_music.stop(client_time);
+        }
+    }
+    player.preferences['sound_volume'] = GameArt.sound_volume;
+    player.preferences['music_volume'] = GameArt.music_volume;
+    send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+}
+
+/** @param {SPUI.Dialog} dialog */
 function update_playfield_controls_bar(dialog) {
     // on the old horizontal controls bar, there isn't enough space to show away from home or in battle.
     dialog.widgets['screenshot_button'].show = (session.enable_combat_resource_bars &&
@@ -10645,6 +10707,29 @@ function update_playfield_controls_bar(dialog) {
     if(always_fullscreen && has_true_fullscreen() && !canvas_is_fullscreen) {
         toggle_true_fullscreen();
     }
+
+    dialog.widgets['volume_down_button'].show = dialog.widgets['volume_up_button'].show = (dialog.user_data['adjusting_music'] || dialog.user_data['adjusting_sound']);
+    if (dialog.user_data['adjusting_music'] || dialog.user_data['adjusting_sound']) {
+        dialog.wh = dialog.data['volume_dimensions'];
+        dialog.xy = dialog.data['volume_xy'];
+        dialog.on_mousewheel_function = update_player_volume;
+    } else {
+        dialog.wh = dialog.data['dimensions'];
+        dialog.xy = dialog.data['xy'];
+        dialog.on_mousewheel_function = null;
+    }
+    goog.array.forEach(['', '_prog', '_amount'], function(w) {
+        if('volume_bar_sound'+w in dialog.widgets) {
+            dialog.widgets['volume_bar_sound'+w].show = dialog.user_data['adjusting_sound'];
+        }
+        if('volume_bar_music'+w in dialog.widgets) {
+            dialog.widgets['volume_bar_music'+w].show = dialog.user_data['adjusting_music'];
+        }
+    });
+    dialog.widgets['volume_bar_sound_prog'].progress = Math.min(1, GameArt.sound_volume);
+    dialog.widgets['volume_bar_music_prog'].progress = Math.min(1, GameArt.music_volume);
+    dialog.widgets['volume_bar_sound_amount'].str = dialog.data['widgets']['volume_bar_sound_amount']['ui_name'].replace('%pct', (GameArt.sound_volume*100.0).toFixed(0));
+    dialog.widgets['volume_bar_music_amount'].str = dialog.data['widgets']['volume_bar_music_amount']['ui_name'].replace('%pct', (GameArt.music_volume*100.0).toFixed(0));
 
     if(dialog.user_data['dialog'] == 'playfield_controls_bar_horizontal') {
         var top = desktop_dialogs['desktop_top'];
