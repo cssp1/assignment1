@@ -101,7 +101,7 @@ def api_version_string(feature):
     elif api_versions and ('default' in api_versions):
         sver = api_versions['default']
     else:
-        sver = 'v2.12' # fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
+        sver = 'v6.0' # fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
     return (sver + '/') if sver else ''
 
 def versioned_graph_endpoint(feature, path, protocol = 'https://', subdomain = 'graph'):
