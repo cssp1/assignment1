@@ -695,42 +695,107 @@
     // horizontal version of the controls bar
     "playfield_controls_bar_horizontal": {
         "xy": [0,180],
+        "volume_xy": [0,180],
         "dimensions": [131,23],
+        "volume_dimensions": [131,46],
         "spacing_under": [0,5], // used when docked just below the chicklet buttons at desktop_top
         "spacing_right": [207,5], // used when docked to the LEFT of the "attack" button (used to be to the RIGHT of player portrait)
         "widgets": {
             "sound_button": { "kind": "ActionButton", "xy": [0,0], "dimensions": [23,23], "bg_image": "audio_sound_button",
-                              "ui_tooltip": "Sound Effects On/Off", "tooltip_delay": 0, "fixed_tooltip_offset": [-55,31], "push_bg_image": 1 },
+                              "ui_tooltip": "Adjust Sound Effects Volume", "tooltip_delay": 0, "fixed_tooltip_offset": [-55,31], "push_bg_image": 1 },
             "music_button": { "kind": "ActionButton", "xy": [27,0], "dimensions": [23,23], "bg_image": "audio_music_button",
-                              "ui_tooltip": "Music On/Off", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 },
+                              "ui_tooltip": "Adjust Music Volume", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 },
             "fullscreen_button": { "kind": "ActionButton", "xy": [54,0], "dimensions": [23,23], "bg_image": "fullscreen_button",
                                    "ui_tooltip": "Fullscreen", "tooltip_delay": 0, "fixed_tooltip_offset": [33,31], "push_bg_image": 1 },
             "settings_button": { "kind": "ActionButton", "xy": [81,0], "dimensions": [23,23], "bg_image": "settings_button",
                                  "ui_tooltip": "Settings", "tooltip_delay": 0, "fixed_tooltip_offset": [64,31], "push_bg_image": 1 },
             "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[108,0], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
-                                  "ui_caption": "%PLAYER - Home Base", "ui_tooltip": "Post Screenshot", "fixed_tooltip_offset": [70,31], "tooltip_delay": 0}
+                                  "ui_caption": "%PLAYER - Home Base", "ui_tooltip": "Post Screenshot", "fixed_tooltip_offset": [70,31], "tooltip_delay": 0},
+            "volume_bar_sound": { "show":0, "kind": "StaticImage", "xy": [-1,25], "dimensions": [107,28], "asset": "dialog_sunken_resizable", "ui_tooltip": "Sound Effects Volume", "bg_image_resizable": 1 },
+            "volume_bar_sound_prog": { "show":0, "kind": "ProgressBar", "xy": [22,29], "dimensions": [64,18],
+                                        "flash_color": [1,1,1,1],
+                                        "empty_color": [0.015,0.015,0.015,1], "outline_width": 2,
+                                        "full_color": [1.0,1.0,0,1],
+                                        "outline_color": [0.015,0.015,0.015,1] },
+            "volume_bar_sound_amount": { "show":0, "kind": "TextField", "xy": [22,31], "dimensions": [64,15], "ui_name": "%pct%",
+                                          "text_size": 13, "drop_shadow": 1, "text_style": "thick" },
+            "volume_bar_music": { "show":0, "kind": "StaticImage", "xy": [-1,25], "dimensions": [107,28], "asset": "dialog_sunken_resizable", "ui_tooltip": "Music Volume", "bg_image_resizable": 1 },
+            "volume_bar_music_prog": { "show":0, "kind": "ProgressBar", "xy": [22,29], "dimensions": [64,18],
+                                       "flash_color": [1,1,1,1],
+                                       "empty_color": [0.015,0.015,0.015,1], "outline_width": 2,
+                                       "full_color": [1.0,1.0,0,1],
+                                       "outline_color": [0.015,0.015,0.015,1] },
+            "volume_bar_music_amount": { "show":0, "kind": "TextField", "xy": [22,31], "dimensions": [64,15], "ui_name": "%pct%",
+                                         "text_size": 13, "drop_shadow": 1, "text_style": "thick" },
+            "volume_down_button": { "kind": "ActionButton", "xy": [0,29], "dimensions": [22,20], "bg_image": "map_minus_button", "dripper": {"rate": 3.0, "delay": 0},
+                                    "ui_tooltip": "Volume Down", "tooltip_delay": 0, "fixed_tooltip_offset": [-55,31], "push_bg_image": 1 },
+            "volume_up_button": { "kind": "ActionButton", "xy": [82,29], "dimensions": [22,20], "bg_image": "map_plus_button", "dripper": {"rate": 3.0, "delay": 0},
+                                  "ui_tooltip": "Volume Up", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 }
         }
     },
 
     // vertical version of the controls bar, docked just above the zoom bar
     "playfield_controls_bar_vertical": {
         "xy": [0,180],
+        "volume_xy": [-110,180],
         "dimensions": [36,143], "spacing": [-5,-2],
+        "volume_dimensions": [146,143],
         "widgets": {
             "controls_bg": {"kind": "SolidRect", "xy":[3,-3], "dimensions":[33,146], "color":[0.066,0.066,0.066,0.86], "bevel":4 },
             "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[8,0], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
                                   "ui_caption": "%PLAYER - Home Base",
                                   "ui_tooltip": "Post Screenshot", "tooltip_delay": 0, "fixed_tooltip_offset": [-118,0] },
             "sound_button": { "kind": "ActionButton", "xy": [8,29], "dimensions": [23,23], "bg_image": "audio_sound_button",
-                              "ui_tooltip": "Sound Effects On/Off", "tooltip_delay": 0, "fixed_tooltip_offset": [-146,29], "push_bg_image": 1 },
+                              "ui_tooltip": "Adjust Music Volume", "tooltip_delay": 0, "fixed_tooltip_offset": [-146,29], "push_bg_image": 1 },
             "music_button": { "kind": "ActionButton", "xy": [8,58], "dimensions": [23,23], "bg_image": "audio_music_button",
                               "ui_tooltip": "Music On/Off", "tooltip_delay": 0, "fixed_tooltip_offset": [-95,58], "push_bg_image": 1 },
             "fullscreen_button": { "kind": "ActionButton", "xy": [8,87], "dimensions": [23,23], "bg_image": "fullscreen_button",
                                    "ui_tooltip": "Fullscreen", "tooltip_delay": 0, "fixed_tooltip_offset": [-80,87], "push_bg_image": 1 },
             "settings_button": { "kind": "ActionButton", "xy": [8,116], "dimensions": [23,23], "bg_image": "settings_button",
-                                 "ui_tooltip": "Settings", "tooltip_delay": 0, "fixed_tooltip_offset": [-65,116], "push_bg_image": 1 }
+                                 "ui_tooltip": "Settings", "tooltip_delay": 0, "fixed_tooltip_offset": [-65,116], "push_bg_image": 1 },
+            "volume_bar_sound": { "show":0, "kind": "StaticImage", "xy": [36,25], "dimensions": [107,28], "asset": "dialog_sunken_resizable", "ui_tooltip": "Sound Effects Volume", "bg_image_resizable": 1 },
+            "volume_bar_sound_prog": { "show":0, "kind": "ProgressBar", "xy": [57,29], "dimensions": [64,18],
+                                        "flash_color": [1,1,1,1],
+                                        "empty_color": [0.015,0.015,0.015,1], "outline_width": 2,
+                                        "full_color": [1.0,1.0,0,1],
+                                        "outline_color": [0.015,0.015,0.015,1] },
+            "volume_bar_sound_amount": { "show":0, "kind": "TextField", "xy": [57,31], "dimensions": [64,15], "ui_name": "%pct%",
+                                          "text_size": 13, "drop_shadow": 1, "text_style": "thick" },
+            "volume_bar_music": { "show":0, "kind": "StaticImage", "xy": [36,25], "dimensions": [107,28], "asset": "dialog_sunken_resizable", "ui_tooltip": "Music Volume", "bg_image_resizable": 1 },
+            "volume_bar_music_prog": { "show":0, "kind": "ProgressBar", "xy": [57,29], "dimensions": [64,18],
+                                       "flash_color": [1,1,1,1],
+                                       "empty_color": [0.015,0.015,0.015,1], "outline_width": 2,
+                                       "full_color": [1.0,1.0,0,1],
+                                       "outline_color": [0.015,0.015,0.015,1] },
+            "volume_bar_music_amount": { "show":0, "kind": "TextField", "xy": [57,31], "dimensions": [64,15], "ui_name": "%pct%",
+                                         "text_size": 13, "drop_shadow": 1, "text_style": "thick" },
+            "volume_down_button": { "kind": "ActionButton", "xy": [35,29], "dimensions": [22,20], "bg_image": "map_minus_button", "dripper": {"rate": 3.0, "delay": 0},
+                                    "ui_tooltip": "Volume Down", "tooltip_delay": 0, "fixed_tooltip_offset": [-55,31], "push_bg_image": 1 },
+            "volume_up_button": { "kind": "ActionButton", "xy": [117,29], "dimensions": [22,20], "bg_image": "map_plus_button", "dripper": {"rate": 3.0, "delay": 0},
+                                  "ui_tooltip": "Volume Up", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 }
         }
     },
+
+    "volume_controls_bar_vertical": {
+        "xy": [132,180],
+        "dimensions": [131,23],
+        "spacing_under": [0,5],
+        "spacing_right": [207,5],
+        "widgets": {
+            "controls_bg": {"kind": "SolidRect", "xy":[0,0], "dimensions":[131,23], "color":[0.066,0.066,0.066,0.86], "bevel":4 },
+            "volume_down_button": { "kind": "ActionButton", "xy": [0,0], "dimensions": [23,23], "bg_image": "audio_sound_button", "dripper": {"rate": 3.0, "delay": 0},
+                                    "ui_tooltip": "Volume Down", "tooltip_delay": 0, "fixed_tooltip_offset": [-55,31], "push_bg_image": 1 },
+            "volume_up_button": { "kind": "ActionButton", "xy": [81,0], "dimensions": [23,23], "bg_image": "audio_music_button", "dripper": {"rate": 3.0, "delay": 0},
+                                  "ui_tooltip": "Volume Up", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 },
+            "volume_min_bar_on": {"kind": "SolidRect", "xy": [54,0], "dimensions": [23,23], "color":[1.0,0.0,0.0,1.0] },
+            "volume_max_bar_on": { "kind": "SolidRect", "xy": [81,0], "dimensions": [23,23], "color":[1.0,0.0,0.0,1.0] },
+            "volume_min_bar_off": {"kind": "SolidRect", "xy": [54,0], "dimensions": [23,23], "color":[0.0,1.0,0.0,1.0] },
+            "volume_max_bar_off": { "kind": "SolidRect", "xy": [81,0], "dimensions": [23,23], "color":[0.0,1.0,0.0,1.0] },
+            "done_button": { "kind": "ActionButton", "xy": [81,0], "dimensions": [23,23], "bg_image": "action_button_resizable",
+                                  "ui_tooltip": "Save Volume", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 }
+        }
+    },
+
 
     "playfield_zoom_bar": {
         "xy": [0,180],
