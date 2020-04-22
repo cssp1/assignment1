@@ -13467,7 +13467,9 @@ function update_combat_resource_bars(dialog) {
 function update_aura_bar(dialog) {
     dialog.show = (session.enable_combat_resource_bars &&
                    (player.tutorial_state == "COMPLETE") &&
-                   desktop_dialogs['player_portrait_dialog'].show);
+                   desktop_dialogs['player_portrait_dialog'].show &&
+                   !desktop_dialogs['playfield_controls_bar'].user_data['adjusting_sound'] &&
+                   !desktop_dialogs['playfield_controls_bar'].user_data['adjusting_music']);
 
     // position relative to player
     dialog.xy = vec_add([desktop_dialogs['player_portrait_dialog'].xy[0], 0], [9,64]);
