@@ -4,6 +4,10 @@ goog.provide('CombatEngine');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 goog.require('GameTypes');
 goog.require('goog.array');
 
@@ -258,9 +262,9 @@ CombatEngine.CombatEngine.unserialize_damage_effect = function(snap) {
     @return {!CombatEngine.HealEffect} */
 CombatEngine.CombatEngine.unserialize_heal_effect = function(snap) {
     if(snap['kind'] === 'TargetedHealEffect') {
-        return new CombatEngine.TargetedDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['target_id'], snap['amount']);
+        return new CombatEngine.HealEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['target_id'], snap['amount']);
     } else if(snap['kind'] === 'FullHealEffect') {
-        return new CombatEngine.AreaDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['target_id'], snap['amount'], snap['team']);
+        return new CombatEngine.FullHealEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['target_id'], snap['amount'], snap['team']);
     } else {
         throw Error('unknown kind '+snap['kind']);
     }
@@ -453,11 +457,13 @@ CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
     @implements {GameTypes.ISerializable}
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for application
+    @param {GameObjectId|null} target
     @param {!GameTypes.Integer} amount
 */
-CombatEngine.HealEffect = function(tick, client_time_hack, amount) {
+CombatEngine.HealEffect = function(tick, client_time_hack, target, amount) {
     this.tick = tick;
     this.client_time_hack = client_time_hack;
+    this.target = target;
     this.amount = amount;
 }
 /** @param {!World.World} world */
@@ -469,44 +475,40 @@ CombatEngine.HealEffect.prototype.serialize = function() {
     var ret;
     ret = {'tick': this.tick.get(),
            'client_time_hack': this.client_time_hack,
+           'target': this.target,
            'amount': this.amount};
     return ret;
 };
 /** @override */
 CombatEngine.HealEffect.prototype.apply_snapshot = goog.abstractMethod; // immutable
 
-/** @param {!CombatEngine.HealEffect} effect */
-CombatEngine.CombatEngine.prototype.queue_heal_effect = function(effect) {
-    if(!this.accept_heal_effects) { return; }
-    this.heal_effect_queue.push(effect);
-};
-
 /** @constructor @struct
     @extends CombatEngine.HealEffect
+    @param {!GameTypes.TickCount} tick
+    @param {number} client_time_hack
+    @param {GameObjectId|null} target
     @param {!GameTypes.Integer} amount
+    @param {string} team
 */
-CombatEngine.FullHealEffect = function(team) {
-    goog.base(this, team);
+CombatEngine.FullHealEffect = function(tick, client_time_hack, target, amount, team) {
+    goog.base(this, tick, client_time_hack, target, amount);
+    this.team = team;
 }
+goog.inherits(CombatEngine.FullHealEffect, CombatEngine.HealEffect);
 
 CombatEngine.FullHealEffect.prototype.serialize = function() {
     var ret = goog.base(this, 'serialize');
     ret['kind'] = 'FullHealEffect';
+    ret['team'] = this.team;
     return ret;
 };
 
-/** @override */
+/** @param {!World.World} world */
 CombatEngine.FullHealEffect.prototype.apply = function(world) {
-    var obj_list = [];
-    for(var id in world.objects.objects) {
-        var obj = world.objects.objects[id];
-        if(obj.team !== this.team) { continue; }
-        if(!obj.is_mobile()) { continue; }
-        if(obj.is_destroyed()) { continue; } // destroyed objects will be restored by the server
-        obj_list.push(obj);
-    }
-    goog.array.forEach(obj_list, function(result) {
-        var obj = result.obj;
+    world.objects.for_each(function(obj) {
+        if(obj.team !== this.team) { return; }
+        if(!obj.is_mobile()) { return; }
+        if(obj.is_destroyed()) { return; } // destroyed objects will be restored by the server
         var amt = obj.max_hp - obj.hp;
         if(amt != 0) {
             world.heal_object(obj, amt);
