@@ -15714,7 +15714,7 @@ function update_combat_item_bar(dialog) {
                         var spell = gamedata['spells'][spec['use']['spellname']];
                         if(spell && 'code' in spell && spell['code'] === 'instant_combat_repair') {
                             var world = (session.has_world() ? session.get_real_world() : null);
-                            if(world){ world.combat_engine.queue_heal_effect(new CombatEngine.FullHealEffect(world.combat_engine.cur_tick, client_time, 'player')); }
+                            if(world){ world.combat_engine.queue_heal_effect(new CombatEngine.TeamHealEffect(world.combat_engine.cur_tick, client_time, 'player')); }
                         };
                     }
                     if(inventory_action(_item, _slot, "INVENTORY_USE", {trigger_gcd: true})) {

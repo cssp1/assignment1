@@ -261,8 +261,8 @@ CombatEngine.CombatEngine.unserialize_damage_effect = function(snap) {
 /** @param {!Object<string,?>} snap
     @return {!CombatEngine.HealEffect} */
 CombatEngine.CombatEngine.unserialize_heal_effect = function(snap) {
-    if(snap['kind'] === 'FullHealEffect') {
-        return new CombatEngine.FullHealEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['team']);
+    if(snap['kind'] === 'TeamHealEffect') {
+        return new CombatEngine.TeamHealEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['team']);
     } else {
         throw Error('unknown kind '+snap['kind']);
     }
@@ -480,21 +480,21 @@ CombatEngine.HealEffect.prototype.apply_snapshot = goog.abstractMethod; // immut
     @param {number} client_time_hack
     @param {string} team
 */
-CombatEngine.FullHealEffect = function(tick, client_time_hack, team) {
+CombatEngine.TeamHealEffect = function(tick, client_time_hack, team) {
     goog.base(this, tick, client_time_hack);
     this.team = team;
 }
-goog.inherits(CombatEngine.FullHealEffect, CombatEngine.HealEffect);
+goog.inherits(CombatEngine.TeamHealEffect, CombatEngine.HealEffect);
 
-CombatEngine.FullHealEffect.prototype.serialize = function() {
+CombatEngine.TeamHealEffect.prototype.serialize = function() {
     var ret = goog.base(this, 'serialize');
-    ret['kind'] = 'FullHealEffect';
+    ret['kind'] = 'TeamHealEffect';
     ret['team'] = this.team;
     return ret;
 };
 
 /** @param {!World.World} world */
-CombatEngine.FullHealEffect.prototype.apply = function(world) {
+CombatEngine.TeamHealEffect.prototype.apply = function(world) {
     world.objects.for_each(function(obj) {
         if(obj.team !== this.team) { return; }
         if(!obj.is_mobile()) { return; }
