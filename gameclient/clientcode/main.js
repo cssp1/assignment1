@@ -15706,25 +15706,22 @@ function update_combat_item_bar(dialog) {
                     invoke_inventory_context(w.parent, w, _slot, _item, false, {'position':'right'});
                 }; })(slot, item);
 
-                dialog.widgets['frame'+i].onclick = (function (_i, _slot, _item, _world) { return function(w) {
+                dialog.widgets['frame'+i].onclick = (function (_i, _slot, _item, _spec) { return function(w) {
                     // try to sync damage first, so repairs don't overlap
                     flush_dirty_objects({});
+                    // queue a full heal effect if this is a field repair kit or equivalent
+                    if(_spec && 'use' in spec && 'spellname' in _spec['use']) {
+                        var spell = gamedata['spells'][spec['use']['spellname']];
+                        if(spell && 'code' in spell && spell['code'] === 'instant_combat_repair') {
+                            var world = (session.has_world() ? session.get_real_world() : null);
+                            if(world){ world.combat_engine.queue_heal_effect(new CombatEngine.FullHealEffect(world.combat_engine.cur_tick, client_time, 'player')); }
+                        };
+                    }
                     if(inventory_action(_item, _slot, "INVENTORY_USE", {trigger_gcd: true})) {
-                        // queue an full heal effect if this is a field repair kit or equivalent
-                        if(_item && ItemDisplay.get_inventory_item_spec(_item['spec'])) {
-                            var _spec = ItemDisplay.get_inventory_item_spec(_item['spec']);
-                            if(_spec && 'use' in _spec && 'spellname' in _spec['use']) {
-                                var _spell = gamedata['spells'][_spec['use']['spellname']];
-                                if (_spell && 'code' in _spell && _spell['code'] === 'instant_combat_repair') {
-                                    var effect = new CombatEngine.FullHealEffect(_world.combat_engine.cur_tick, client_time, null, 0, 'player');
-                                    //_world.combat_engine.queue_heal_effect(effect);
-                                }
-                            }
-                        }
                         // clear the tooltip if activation succeeds
                         invoke_inventory_context(w.parent, w, -1, null, false);
                     }
-                }; })(i, slot, item, world);
+                }; })(i, slot, item, spec);
                 dialog.widgets['frame'+i].onleave_cb = (function (_slot, _item) { return function(w) {
                     var inv_dialog = w.parent;
                     if(inv_dialog.user_data['context'] &&

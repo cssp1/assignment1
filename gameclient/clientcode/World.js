@@ -470,6 +470,12 @@ World.World.prototype.run_unit_ticks = function() {
         this.combat_engine.apply_queued_damage_effects(this, COMBAT_ENGINE_USE_TICKS);
 
         this.notifier.dispatchEvent(new goog.events.Event('after_damage_effects', this));
+
+        this.notifier.dispatchEvent(new goog.events.Event('before_heal_effects', this));
+
+        this.combat_engine.apply_queued_heal_effects(this, COMBAT_ENGINE_USE_TICKS);
+
+        this.notifier.dispatchEvent(new goog.events.Event('after_heal_effects', this));
     }
 };
 

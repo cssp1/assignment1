@@ -261,10 +261,8 @@ CombatEngine.CombatEngine.unserialize_damage_effect = function(snap) {
 /** @param {!Object<string,?>} snap
     @return {!CombatEngine.HealEffect} */
 CombatEngine.CombatEngine.unserialize_heal_effect = function(snap) {
-    if(snap['kind'] === 'TargetedHealEffect') {
-        return new CombatEngine.HealEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['target_id'], snap['amount']);
-    } else if(snap['kind'] === 'FullHealEffect') {
-        return new CombatEngine.FullHealEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['target_id'], snap['amount'], snap['team']);
+    if(snap['kind'] === 'FullHealEffect') {
+        return new CombatEngine.FullHealEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['team']);
     } else {
         throw Error('unknown kind '+snap['kind']);
     }
@@ -456,15 +454,11 @@ CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
 /** @constructor @struct
     @implements {GameTypes.ISerializable}
     @param {!GameTypes.TickCount} tick
-    @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for application
-    @param {GameObjectId|null} target
-    @param {!GameTypes.Integer} amount
+    @param {number} client_time_hack
 */
-CombatEngine.HealEffect = function(tick, client_time_hack, target, amount) {
+CombatEngine.HealEffect = function(tick, client_time_hack) {
     this.tick = tick;
     this.client_time_hack = client_time_hack;
-    this.target = target;
-    this.amount = amount;
 }
 /** @param {!World.World} world */
 CombatEngine.HealEffect.prototype.apply = goog.abstractMethod;
@@ -474,9 +468,7 @@ CombatEngine.HealEffect.prototype.serialize = function() {
     /** @type {!Object<string,?>} */
     var ret;
     ret = {'tick': this.tick.get(),
-           'client_time_hack': this.client_time_hack,
-           'target': this.target,
-           'amount': this.amount};
+           'client_time_hack': this.client_time_hack};
     return ret;
 };
 /** @override */
@@ -486,12 +478,10 @@ CombatEngine.HealEffect.prototype.apply_snapshot = goog.abstractMethod; // immut
     @extends CombatEngine.HealEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
-    @param {GameObjectId|null} target
-    @param {!GameTypes.Integer} amount
     @param {string} team
 */
-CombatEngine.FullHealEffect = function(tick, client_time_hack, target, amount, team) {
-    goog.base(this, tick, client_time_hack, target, amount);
+CombatEngine.FullHealEffect = function(tick, client_time_hack, team) {
+    goog.base(this, tick, client_time_hack);
     this.team = team;
 }
 goog.inherits(CombatEngine.FullHealEffect, CombatEngine.HealEffect);
