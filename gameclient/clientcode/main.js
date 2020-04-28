@@ -15710,6 +15710,17 @@ function update_combat_item_bar(dialog) {
                     // try to sync damage first, so repairs don't overlap
                     flush_dirty_objects({});
                     if(inventory_action(_item, _slot, "INVENTORY_USE", {trigger_gcd: true})) {
+                        // queue an full heal effect if this is a field repair kit or equivalent
+                        if(_item && ItemDisplay.get_inventory_item_spec(_item['spec'])) {
+                            var _spec = ItemDisplay.get_inventory_item_spec(_item['spec']);
+                            if(_spec && 'use' in _spec && 'spellname' in _spec['use']) {
+                                var _spell = gamedata['spells'][_spec['use']['spellname']];
+                                if (_spell && 'code' in _spell && _spell['code'] === 'instant_combat_repair') {
+                                    var effect = new CombatEngine.FullHealEffect(world.combat_engine.cur_tick, client_time, 0, 'player');
+                                    world.combat_engine.queue_heal_effect(effect);
+                                }
+                            }
+                        }
                         // clear the tooltip if activation succeeds
                         invoke_inventory_context(w.parent, w, -1, null, false);
                     }

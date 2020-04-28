@@ -908,6 +908,35 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source, d
     this.attribute_damage(source || null, target, original_target_hp, target.hp);
 };
 
+/** @param {!GameObject} target
+    @param {number} healing_amount
+*/
+World.World.prototype.heal_object = function(target, healing_amount) {
+    var pos = target.interpolate_pos(this);
+
+    // offset time to de-synchronize visual effects
+    var time_offset = Math.random()*TICK_INTERVAL/combat_time_scale();
+
+    healing_amount = Math.floor(healing_amount);
+
+    if(COMBAT_DEBUG) {
+        // Damage text
+        this.fxworld.add(new SPFX.CombatText(pos,
+                                             target.is_flying() ? target.altitude : 0,
+                                             pretty_print_number(Math.abs(healing_amount)),
+                                             (healing_amount >= 0 ? [1, 1, 0.1, 1] : [0,1,0,1]),
+                                             (COMBAT_ENGINE_USE_TICKS ? new SPFX.When(null, this.combat_engine.cur_tick, time_offset) : new SPFX.When(client_time + time_offset, null)),
+                                             1.0, {drop_shadow:true}));
+    }
+
+    if(target.is_destroyed()) { return }; // dead objects can only be healed by the server
+
+    target.hp += healing_amount;
+    if(target.hp >= target.max_hp) { target.hp = target.max_hp; }
+    target.state_dirty |= obj_state_flags.HP;
+    target.serialization_dirty = true;
+};
+
 /** @private
     @param {GameObject|null} shooter
     @param {!GameObject} target
