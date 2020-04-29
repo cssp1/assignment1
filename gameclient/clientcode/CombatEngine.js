@@ -141,17 +141,11 @@ CombatEngine.CombatEngine = function() {
     // should be replaced by some kind of dataflow mechanism
     this.accept_damage_effects = true;
 
-    this.accept_heal_effects = true;
-
     // below fields should be private, but need to be accessed by BattleReplay as a "friend"
 
     /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
         @type {!CombatEngine.Queue<!CombatEngine.DamageEffect>} */
     this.damage_effect_queue = new CombatEngine.Queue(CombatEngine.CombatEngine.unserialize_damage_effect);
-
-    /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
-        @type {!CombatEngine.Queue<!CombatEngine.HealEffect>} */
-    this.heal_effect_queue = new CombatEngine.Queue(CombatEngine.CombatEngine.unserialize_heal_effect);
 
     /** list of not-unit-based (missile) projectiles that need to be evaluated for firing this tick (may not actually fire until a future tick)
         @type {!CombatEngine.Queue<!CombatEngine.ProjectileEffect>} */
@@ -171,7 +165,6 @@ CombatEngine.CombatEngine.prototype.serialize = function() {
     return {'cur_tick': this.cur_tick.get(),
             'cur_client_time': this.cur_client_time,
             'damage_effect_queue': this.damage_effect_queue.serialize(),
-            'heal_effect_queue': this.heal_effect_queue.serialize(),
             'projectile_queue': this.projectile_queue.serialize()};
 };
 /** @override
@@ -190,10 +183,6 @@ CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
     var dmg = this.damage_effect_queue.serialize_incremental();
     if(dmg) {
         ret['damage_effect_queue'] = dmg;
-    }
-    var heal = this.heal_effect_queue.serialize_incremental();
-    if(heal) {
-        ret['heal_effect_queue'] = heal;
     }
     var proj = this.projectile_queue.serialize_incremental();
     if(proj) {
@@ -215,9 +204,6 @@ CombatEngine.CombatEngine.prototype.apply_snapshot = function(snap) {
     this.cur_client_time = snap['cur_client_time'];
     if('damage_effect_queue' in snap) {
         this.damage_effect_queue.apply_snapshot(snap['damage_effect_queue']);
-    }
-    if('heal_effect_queue' in snap) {
-        this.heal_effect_queue.apply_snapshot(snap['heal_effect_queue']);
     }
     if('projectile_queue' in snap) {
         this.projectile_queue.apply_snapshot(snap['projectile_queue']);
@@ -253,16 +239,8 @@ CombatEngine.CombatEngine.unserialize_damage_effect = function(snap) {
         return new CombatEngine.AreaDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['falloff'], snap['amount'], snap['vs_table'], snap['allow_ff']);
     } else if(snap['kind'] === 'AreaAuraEffect') {
         return new CombatEngine.AreaAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['radius_rect'], snap['falloff'], snap['amount'], snap['aura_name'], new GameTypes.TickCount(snap['aura_duration']), snap['aura_range'], snap['vs_table'], snap['duration_vs_table'], snap['allow_ff']);
-    } else {
-        throw Error('unknown kind '+snap['kind']);
-    }
-};
-
-/** @param {!Object<string,?>} snap
-    @return {!CombatEngine.HealEffect} */
-CombatEngine.CombatEngine.unserialize_heal_effect = function(snap) {
-    if(snap['kind'] === 'TeamHealEffect') {
-        return new CombatEngine.TeamHealEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['team']);
+    } else if(snap['kind'] === 'TeamHealDamageEffect') {
+        return new CombatEngine.TeamHealDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['amount'], snap['vs_table'], snap['team']);
     } else {
         throw Error('unknown kind '+snap['kind']);
     }
@@ -452,65 +430,42 @@ CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
 };
 
 /** @constructor @struct
+    @extends CombatEngine.DamageEffect
     @implements {GameTypes.ISerializable}
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
-*/
-CombatEngine.HealEffect = function(tick, client_time_hack) {
-    this.tick = tick;
-    this.client_time_hack = client_time_hack;
-}
-/** @param {!World.World} world */
-CombatEngine.HealEffect.prototype.apply = goog.abstractMethod;
-
-/** @override */
-CombatEngine.HealEffect.prototype.serialize = function() {
-    /** @type {!Object<string,?>} */
-    var ret;
-    ret = {'tick': this.tick.get(),
-           'client_time_hack': this.client_time_hack};
-    return ret;
-};
-/** @override */
-CombatEngine.HealEffect.prototype.apply_snapshot = goog.abstractMethod; // immutable
-
-/** @constructor @struct
-    @extends CombatEngine.HealEffect
-    @param {!GameTypes.TickCount} tick
-    @param {number} client_time_hack
+    @param {GameObjectId|null} source_id
+    @param {string|null} source_team
+    @param {!GameTypes.Integer} amount
+    @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {string} team
 */
-CombatEngine.TeamHealEffect = function(tick, client_time_hack, team) {
-    goog.base(this, tick, client_time_hack);
+CombatEngine.TeamHealDamageEffect = function(tick, client_time_hack, source_id, source_team, amount, vs_table, team) {
+    goog.base(this, tick, client_time_hack, source_id, source_team, amount, vs_table);
     this.team = team;
 }
-goog.inherits(CombatEngine.TeamHealEffect, CombatEngine.HealEffect);
+goog.inherits(CombatEngine.TeamHealDamageEffect, CombatEngine.DamageEffect);
 
-CombatEngine.TeamHealEffect.prototype.serialize = function() {
+CombatEngine.TeamHealDamageEffect.prototype.serialize = function() {
     var ret = goog.base(this, 'serialize');
-    ret['kind'] = 'TeamHealEffect';
+    ret['kind'] = 'TeamHealDamageEffect';
     ret['team'] = this.team;
     return ret;
 };
 
 /** @param {!World.World} world */
-CombatEngine.TeamHealEffect.prototype.apply = function(world) {
+CombatEngine.TeamHealDamageEffect.prototype.apply = function(world) {
     world.objects.for_each(function(obj) {
         if(obj.team !== this.team) { return; }
         if(!obj.is_mobile()) { return; }
         if(obj.is_destroyed()) { return; } // destroyed objects will be restored by the server
-        var amt = obj.max_hp - obj.hp;
+        var amt = (obj.max_hp - obj.hp) * -1;
         if(amt != 0) {
-            world.heal_object(obj, amt);
+            world.hurt_object(obj, amt, {}, null, null);
         }
     }, this);
 };
 
-/** @param {!CombatEngine.HealEffect} effect */
-CombatEngine.CombatEngine.prototype.queue_heal_effect = function(effect) {
-    if(!this.accept_heal_effects) { return; }
-    this.heal_effect_queue.push(effect);
-};
 /** @param {!CombatEngine.ProjectileEffect} effect */
 CombatEngine.CombatEngine.prototype.queue_projectile = function(effect) {
     this.projectile_queue.push(effect);
@@ -557,37 +512,15 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world
     }
 };
 
-/** @param {!World.World} world
-    @param {boolean} use_ticks instead of client_time */
-CombatEngine.CombatEngine.prototype.apply_queued_heal_effects = function(world, use_ticks) {
-    this.heal_effect_queue.clear_dirty_added(); // just a convenient place to reset this
-
-    // only apply effects that were already queued right now
-    // take care not to apply effects that are appended from within apply() below.
-    var to_check = this.heal_effect_queue.length();
-
-    for(var i = 0, checked = 0; checked < to_check; i++, checked++) {
-        var effect = /** @type {!CombatEngine.HealEffect} */ (this.heal_effect_queue.peek_at(i));
-        var do_it = (use_ticks ? GameTypes.TickCount.gte(this.cur_tick, effect.tick) :
-                     (this.cur_client_time >= effect.client_time_hack));
-        if(do_it) {
-            this.heal_effect_queue.pop_at(i); i -= 1;
-            to_check -= 1;
-            effect.apply(world);
-        }
-    }
-};
-
 /** For use by replay code */
 CombatEngine.CombatEngine.prototype.clear_queued_effects = function() {
     this.damage_effect_queue.clear();
-    this.heal_effect_queue.clear();
     this.projectile_queue.clear();
 };
 
 /** @return {boolean} */
 CombatEngine.CombatEngine.prototype.has_queued_effects = function() {
-    return (!this.damage_effect_queue.empty()) || (!this.projectile_queue.empty()) || (!this.heal_effect_queue.empty());
+    return (!this.damage_effect_queue.empty()) || (!this.projectile_queue.empty());
 };
 
 
