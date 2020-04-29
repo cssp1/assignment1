@@ -239,8 +239,8 @@ CombatEngine.CombatEngine.unserialize_damage_effect = function(snap) {
         return new CombatEngine.AreaDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['falloff'], snap['amount'], snap['vs_table'], snap['allow_ff']);
     } else if(snap['kind'] === 'AreaAuraEffect') {
         return new CombatEngine.AreaAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['radius_rect'], snap['falloff'], snap['amount'], snap['aura_name'], new GameTypes.TickCount(snap['aura_duration']), snap['aura_range'], snap['vs_table'], snap['duration_vs_table'], snap['allow_ff']);
-    } else if(snap['kind'] === 'TeamHealDamageEffect') {
-        return new CombatEngine.TeamHealDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['amount'], snap['vs_table'], snap['team']);
+    } else if(snap['kind'] === 'HealAllTeamDamageEffect') {
+        return new CombatEngine.HealAllTeamDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['amount'], snap['vs_table'], snap['team']);
     } else {
         throw Error('unknown kind '+snap['kind']);
     }
@@ -440,21 +440,21 @@ CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {string} team
 */
-CombatEngine.TeamHealDamageEffect = function(tick, client_time_hack, source_id, source_team, amount, vs_table, team) {
+CombatEngine.HealAllTeamDamageEffect = function(tick, client_time_hack, source_id, source_team, amount, vs_table, team) {
     goog.base(this, tick, client_time_hack, source_id, source_team, amount, vs_table);
     this.team = team;
 }
-goog.inherits(CombatEngine.TeamHealDamageEffect, CombatEngine.DamageEffect);
+goog.inherits(CombatEngine.HealAllTeamDamageEffect, CombatEngine.DamageEffect);
 
-CombatEngine.TeamHealDamageEffect.prototype.serialize = function() {
+CombatEngine.HealAllTeamDamageEffect.prototype.serialize = function() {
     var ret = goog.base(this, 'serialize');
-    ret['kind'] = 'TeamHealDamageEffect';
+    ret['kind'] = 'HealAllTeamDamageEffect';
     ret['team'] = this.team;
     return ret;
 };
 
 /** @param {!World.World} world */
-CombatEngine.TeamHealDamageEffect.prototype.apply = function(world) {
+CombatEngine.HealAllTeamDamageEffect.prototype.apply = function(world) {
     world.objects.for_each(function(obj) {
         if(obj.team !== this.team) { return; }
         if(!obj.is_mobile()) { return; }
