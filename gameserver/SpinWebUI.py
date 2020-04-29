@@ -339,8 +339,8 @@ class JQueryUI (PageContent):
                       { boxLabel: 'Armor Games', name: 'frame_platform', inputValue: 'ag', labelWidth: 220, checked:false },
                       { boxLabel: 'Battlehouse', name: 'frame_platform', inputValue: 'bh', labelWidth: 220, checked:false },
                       { boxLabel: 'Facebook', name: 'frame_platform', inputValue: 'fb', labelWidth: 220, checked:false },
-                      { boxLabel: 'Kongregate', name: 'frame_platform', inputValue: 'kg', labelWidth: 220, checked:false },
-                      { boxLabel: 'Mattermost', name: 'frame_platform', inputValue: 'mm', labelWidth: 220, checked:false }
+                      { boxLabel: 'Kong (old)', name: 'frame_platform', inputValue: 'kg', labelWidth: 220, checked:false },
+                      { boxLabel: 'Kong (new)', name: 'frame_platform', inputValue: 'k2', labelWidth: 220, checked:false }
                       ] }
                     ] },
 
