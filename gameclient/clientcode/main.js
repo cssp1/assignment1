@@ -44664,7 +44664,7 @@ function get_requirements_help(kind, arg, options) {
     var open_function = null;
 
     if(verb in gamedata['resources']) {
-        if((('allow_instant' in gamedata['resources'][verb]) && !gamedata['resources'][verb]['allow_instant'])) {
+        if((('allow_instant' in gamedata['resources'][verb]) && !gamedata['resources'][verb]['allow_instant']) ) {
             // cannot be bought
         } else {
             if(gamedata['client']['log_insufficient_resources']) {
@@ -45242,7 +45242,7 @@ function update_upgrade_dialog(dialog) {
                 cost = get_leveled_quantity(unit.spec['build_cost_'+res] || 0, new_level);
             }
 
-            if(!player.is_cheater && cost > 0 && ('allow_instant' in resdata) && !resdata['allow_instant']) {
+            if(!player.is_cheater && cost > 0 && (('allow_instant' in resdata) && !resdata['allow_instant'] && (!('allow_instant_if' in resdata) || !read_predicate(resdata['allow_instant_if']).is_satisfied(player,null)))) {
                 instant_requirements_ok = false;
                 tooltip_req_instant.push(dialog.data['widgets']['instant_button']['ui_tooltip_rare_res'].replace('%s', resdata['ui_name']));
             }
@@ -47779,7 +47779,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             if(!player.is_cheater) {
                 for(var res in gamedata['resources']) {
                     var resdata = gamedata['resources'][res];
-                    if(('allow_instant' in resdata) && !resdata['allow_instant']) {
+                    if(('allow_instant' in resdata) && !resdata['allow_instant'] && (!('allow_instant_if' in resdata) || !read_predicate(resdata['allow_instant_if']).is_satisfied(player,null))) {
                         if(get_leveled_quantity(unit.spec['build_cost_'+res] || 0, unit.level+1) > 0) {
                             return [-1, p_currency]; // requires rare resource
                         }
@@ -47816,7 +47816,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             if(!player.is_cheater) {
                 for(var res in gamedata['resources']) {
                     var resdata = gamedata['resources'][res];
-                    if(('allow_instant' in resdata) && !resdata['allow_instant']) {
+                    if(('allow_instant' in resdata) && !resdata['allow_instant'] && (!('allow_instant_if' in resdata) || !read_predicate(resdata['allow_instant_if']).is_satisfied(player,null))) {
                         if((get_leveled_quantity(get_leveled_quantity(recipe['cost'], recipe_level)[res] || 0, recipe_level)) > 0) {
                             return [-1, p_currency]; // requires rare resource
                         }
@@ -47915,7 +47915,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             if(!player.is_cheater) {
                 for(var res in gamedata['resources']) {
                     var resdata = gamedata['resources'][res];
-                    if(('allow_instant' in resdata) && !resdata['allow_instant']) {
+                    if(('allow_instant' in resdata) && !resdata['allow_instant'] && (!('allow_instant_if' in resdata) || !read_predicate(resdata['allow_instant_if']).is_satisfied(player,null))) {
                         if(get_leveled_quantity(spec['cost_'+res] || 0, new_level) > 0) {
                             return [-1, p_currency]; // requires rare resource
                         }
@@ -47984,7 +47984,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             if(!player.is_cheater) {
                 for(var res in gamedata['resources']) {
                     var resdata = gamedata['resources'][res];
-                    if(('allow_instant' in resdata) && !resdata['allow_instant']) {
+                    if(('allow_instant' in resdata) && !resdata['allow_instant'] && (!('allow_instant_if' in resdata) || !read_predicate(resdata['allow_instant_if']).is_satisfied(player,null))) {
                         if(get_leveled_quantity(spec['cost_'+res] || 0, new_level) > 0) {
                             return [-1, p_currency]; // requires rare resource
                         }

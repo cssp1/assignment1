@@ -17712,7 +17712,7 @@ class Store(object):
 
                 if (not session.player.is_cheater):
                     for res, resdata in gamedata['resources'].iteritems():
-                        if (not resdata.get('allow_instant', True)) and \
+                        if (not resdata.get('allow_instant', True) and ('allow_instant_if' not in resdata or not Predicates.read_predicate(resdata['allow_instant_if']).is_satisfied2(session, session.player, {}))) and \
                            GameObjectSpec.get_leveled_quantity(getattr(unit.spec, 'build_cost_'+res, 0), unit.level+1) > 0:
                             error_reason.append('requires rare resource: %s' % resdata['name'])
                             return -1, p_currency
@@ -17742,7 +17742,7 @@ class Store(object):
 
                 if (not session.player.is_cheater):
                     for res, resdata in gamedata['resources'].iteritems():
-                        if (not resdata.get('allow_instant', True)) and ( \
+                        if (not resdata.get('allow_instant', True) and ('allow_instant_if' not in resdata or not Predicates.read_predicate(resdata['allow_instant_if']).is_satisfied2(session, session.player, {}))) and ( \
                         (isinstance(GameObjectSpec.get_leveled_quantity(recipe['cost'], arg.recipe_level), dict) and GameObjectSpec.get_leveled_quantity(recipe['cost'], arg.recipe_level).get(res,0) > 0) \
                         or (isinstance(GameObjectSpec.get_leveled_quantity(recipe['cost'], arg.recipe_level), list) and GameObjectSpec.get_leveled_quantity(recipe['cost'].get(res,0), arg.recipe_level) > 0)):
                             error_reason.append('requires rare resource: %s' % resdata['name'])
@@ -17796,7 +17796,7 @@ class Store(object):
                                 return -1, p_currency
 
                     for res, resdata in gamedata['resources'].iteritems():
-                        if (not resdata.get('allow_instant', True)) and \
+                        if (not resdata.get('allow_instant', True) and ('allow_instant_if' not in resdata or not Predicates.read_predicate(resdata['allow_instant_if']).is_satisfied2(session, session.player, {}))) and \
                            EnhancementSpec.get_leveled_quantity(getattr(spec, 'cost_'+res, 0), new_level) > 0:
                             error_reason.append('requires rare resource: %s' % resdata['name'])
                             return -1, p_currency
@@ -17858,7 +17858,7 @@ class Store(object):
 
                 if (not session.player.is_cheater):
                     for res, resdata in gamedata['resources'].iteritems():
-                        if (not resdata.get('allow_instant', True)) and \
+                        if (not resdata.get('allow_instant', True) and ('allow_instant_if' not in resdata or not Predicates.read_predicate(resdata['allow_instant_if']).is_satisfied2(session, session.player, {}))) and \
                            TechSpec.get_leveled_quantity(getattr(spec, 'cost_'+res, 0), new_level) > 0:
                             error_reason.append('requires rare resource: %s' % resdata['name'])
                             return -1, p_currency
