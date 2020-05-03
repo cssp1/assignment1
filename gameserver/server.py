@@ -4328,7 +4328,7 @@ class Session(object):
 
     def resource_allow_instant_upgrade(self, resdata):
         # allow if resource "allow_instant" setting is missing or True or if predicates are satisfied
-        return Predicates.eval_cond_or_literal(resdata.get('allow_instant', 1), self, self.player)
+        return Predicates.eval_pred_or_literal(resdata.get('allow_instant', 1), self, self.player)
 
     def async_ds_timeout(self):
         self.async_ds_watchdog = None

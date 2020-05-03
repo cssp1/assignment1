@@ -8774,7 +8774,7 @@ function ingredients_list_allows_instant(ingr_list) {
     @return {boolean} */
 function resource_allow_instant_upgrade(resdata,player) {
     if (!('allow_instant' in resdata)) { return true; }
-    return eval_cond_or_literal(resdata['allow_instant'], player, null);
+    return eval_pred_or_literal(resdata['allow_instant'], player, null);
 }
 
 /** @param {!Object} spec

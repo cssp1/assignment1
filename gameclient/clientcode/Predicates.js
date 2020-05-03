@@ -2554,3 +2554,18 @@ function eval_cond_or_literal(qty, player, qdata) {
         return qty;
     }
 }
+
+/** Evaluate a "cond" expression that might also be a literal value
+    @param {?} qty
+    @param {Object} player
+    @param {Object=} qdata */
+function eval_pred_or_literal(qty, player, qdata) {
+    if((typeof qty) == 'undefined') {
+        throw Error('eval_pred_or_literal of undefined');
+    }
+    if(qty && (typeof qty === 'object') && ('predicate' in qty)) {
+        return read_predicate(qty).is_satisfied(player, qdata);
+    } else {
+        return qty;
+    }
+}
