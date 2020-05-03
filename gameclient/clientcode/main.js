@@ -8768,6 +8768,21 @@ function ingredients_list_allows_instant(ingr_list) {
     return true;
 };
 
+/** Check if this resource is OK for instant speedups
+    @param {!Object} resdata
+    @param {!Object} player
+    @return {boolean} */
+function resource_allow_instant_upgrade(resdata,player) {
+    console.log('Checking for allow instant')
+    if (!('allow_instant' in resdata)) { return true; }
+    console.log('Allow instant in resdata')
+    if(eval_cond_or_literal(resdata['allow_instant'], player, null)) {
+        console.log('Evaluated true')
+    }
+    return eval_cond_or_literal(resdata['allow_instant'], player, null)
+
+}
+
 /** @param {!Object} spec
     @param {number=} level */
 function get_crafting_recipe_ui_name(spec, level) { // XXXXXX move to ItemDisplay.js
@@ -45242,7 +45257,7 @@ function update_upgrade_dialog(dialog) {
                 cost = get_leveled_quantity(unit.spec['build_cost_'+res] || 0, new_level);
             }
 
-            if(!player.is_cheater && cost > 0 && (('allow_instant' in resdata) && !resdata['allow_instant'] && (!('allow_instant_if' in resdata) || !read_predicate(resdata['allow_instant_if']).is_satisfied(player,null)))) {
+            if(!player.is_cheater && cost > 0 && !resource_allow_instant_upgrade(resdata,player)) {
                 instant_requirements_ok = false;
                 tooltip_req_instant.push(dialog.data['widgets']['instant_button']['ui_tooltip_rare_res'].replace('%s', resdata['ui_name']));
             }
@@ -47779,7 +47794,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             if(!player.is_cheater) {
                 for(var res in gamedata['resources']) {
                     var resdata = gamedata['resources'][res];
-                    if(('allow_instant' in resdata) && !resdata['allow_instant'] && (!('allow_instant_if' in resdata) || !read_predicate(resdata['allow_instant_if']).is_satisfied(player,null))) {
+                    if(!resource_allow_instant_upgrade(resdata,player)) {
                         if(get_leveled_quantity(unit.spec['build_cost_'+res] || 0, unit.level+1) > 0) {
                             return [-1, p_currency]; // requires rare resource
                         }
@@ -47816,7 +47831,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             if(!player.is_cheater) {
                 for(var res in gamedata['resources']) {
                     var resdata = gamedata['resources'][res];
-                    if(('allow_instant' in resdata) && !resdata['allow_instant'] && (!('allow_instant_if' in resdata) || !read_predicate(resdata['allow_instant_if']).is_satisfied(player,null))) {
+                    if(!resource_allow_instant_upgrade(resdata,player)) {
                         if((get_leveled_quantity(get_leveled_quantity(recipe['cost'], recipe_level)[res] || 0, recipe_level)) > 0) {
                             return [-1, p_currency]; // requires rare resource
                         }
@@ -47915,7 +47930,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             if(!player.is_cheater) {
                 for(var res in gamedata['resources']) {
                     var resdata = gamedata['resources'][res];
-                    if(('allow_instant' in resdata) && !resdata['allow_instant'] && (!('allow_instant_if' in resdata) || !read_predicate(resdata['allow_instant_if']).is_satisfied(player,null))) {
+                    if(!resource_allow_instant_upgrade(resdata,player)) {
                         if(get_leveled_quantity(spec['cost_'+res] || 0, new_level) > 0) {
                             return [-1, p_currency]; // requires rare resource
                         }
@@ -47984,7 +47999,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             if(!player.is_cheater) {
                 for(var res in gamedata['resources']) {
                     var resdata = gamedata['resources'][res];
-                    if(('allow_instant' in resdata) && !resdata['allow_instant'] && (!('allow_instant_if' in resdata) || !read_predicate(resdata['allow_instant_if']).is_satisfied(player,null))) {
+                    if(!resource_allow_instant_upgrade(resdata,player)) {
                         if(get_leveled_quantity(spec['cost_'+res] || 0, new_level) > 0) {
                             return [-1, p_currency]; // requires rare resource
                         }
