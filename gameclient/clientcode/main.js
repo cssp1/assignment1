@@ -8773,14 +8773,8 @@ function ingredients_list_allows_instant(ingr_list) {
     @param {!Object} player
     @return {boolean} */
 function resource_allow_instant_upgrade(resdata,player) {
-    console.log('Checking for allow instant')
     if (!('allow_instant' in resdata)) { return true; }
-    console.log('Allow instant in resdata')
-    if(eval_cond_or_literal(resdata['allow_instant'], player, null)) {
-        console.log('Evaluated true')
-    }
-    return eval_cond_or_literal(resdata['allow_instant'], player, null)
-
+    return eval_cond_or_literal(resdata['allow_instant'], player, null);
 }
 
 /** @param {!Object} spec
