@@ -1210,3 +1210,8 @@ def eval_cond_or_literal(chain, session, player, qdata = None, override_time = N
     if type(chain) is not list:
         return chain
     return eval_cond(chain, session, player, qdata, override_time = override_time)
+
+def eval_pred_or_literal(pred, session, player, qdata = None, override_time = None):
+    if not isinstance(pred, dict) or 'predicate' not in pred:
+        return pred
+    return read_predicate(pred).is_satisfied2(session, player, qdata, override_time = override_time)

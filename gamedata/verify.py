@@ -1538,7 +1538,9 @@ def check_item(itemname, spec):
                         error |= 1; print '%s: aura "%s" not in auras.json' % (itemname, spellarg[1])
                     aura = gamedata['auras'][spellarg[1]]
 
-                    for effect in aura['effects']:
+                    aura_effects = aura.get('effects', [])
+
+                    for effect in aura_effects:
                         # some items override the effect strength of the aura - check these here
                         if effect['code'] == 'modstat' and ('strength' not in effect):
                             temp = copy.copy(effect)
