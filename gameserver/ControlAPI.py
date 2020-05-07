@@ -64,7 +64,7 @@ def CONTROLAPI_raw(args, spin_user = None, host = None, http_port = None, ssl_po
             time.sleep(retry_delay)
 
         try:
-            response = requests.post(url + urllib.urlencode(args))
+            response = requests.post(url + '?' + urllib.urlencode(args))
 
             if response.status_code == 200:
                 # success!
