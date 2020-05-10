@@ -624,7 +624,7 @@ ItemDisplay.display_item_array = function(dialog, prefix, item_list, opts) {
 /** Attaches an item's tooltip to the provided widget so that it will appear on mouse over
    @param {SPUI.DialogWidget} widget
    @param {Object} item
-   @param {SPUI.Dialog|null=} context_parent
+   @param {SPUI.Dialog|SPUI.Element|null=} context_parent
  */
 ItemDisplay.attach_inventory_item_tooltip = function(widget, item, context_parent) {
     // we have to assume widget.parent is a dialog
@@ -679,7 +679,7 @@ ItemDisplay.remove_inventory_item_tooltip = function(widget) {
     @param {{glow:(boolean|undefined),
              hide_stack:(boolean|undefined),
              hide_tooltip:(boolean|undefined),
-             context_parent:(SPUI.Dialog|undefined)
+             context_parent:(SPUI.Dialog|SPUI.Element|undefined)
              }=} opts
  */
 ItemDisplay.display_item = function(item_display, item, opts) {

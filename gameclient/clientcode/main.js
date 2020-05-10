@@ -5829,6 +5829,15 @@ var find_any_player_minefield = function() {
     });
 };
 
+// search session for any player-owned ambush point building
+var find_any_player_ambush_point = function() {
+    return session.for_each_real_object(function(obj) {
+        if(obj.is_building() && obj.is_ambush() && obj.team === 'player') {
+            return obj;
+        }
+    });
+};
+
 Building.prototype.is_producer = function() {
     return ('production_capacity' in this.spec);
 };
@@ -26707,7 +26716,7 @@ var InventoryContextButton = function(props) {
     this.associated_recipe_level = props.associated_recipe_level || 1;
 }
 
-/** @param {SPUI.Dialog} inv_dialog
+/** @param {SPUI.Dialog|SPUI.Element} inv_dialog
     @param {SPUI.DialogWidget} parent_widget
     @param {?} slot
     @param {Object} item
@@ -35391,7 +35400,7 @@ function find_object_with_spell(spellname) {
     });
 }
 
-
+/** @param {string} category */
 function invoke_crafting_table_of_contents_dialog(category) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['crafting_table_of_contents_dialog']);
     change_selection_ui(dialog);
@@ -35466,6 +35475,10 @@ function invoke_crafting_table_of_contents_dialog(category) {
     dialog.user_data['cols_per_page'] = dialog.data['widgets']['subcategory']['array'][0];
     scrollable_dialog_change_page(dialog, 0);
 }
+
+/** @param {SPUI.Dialog} dialog
+    @param {number} row_col
+    @param {string} rowdata */
 function crafting_subcategory_setup_row(dialog, row_col, rowdata) {
     var wname = SPUI.get_array_widget_name('subcategory', dialog.data['widgets']['subcategory']['array'], row_col);
     dialog.widgets[wname].show = !!rowdata;
@@ -35570,8 +35583,8 @@ function crafting_dialog_change_category(dialog, category, page) {
     dialog.user_data['on_use_recipe'] = null;
     dialog.user_data['scrolled'] = false;
     dialog.user_data['open_time'] = client_time;
-    // special case for mines, there is only one column of recipes
-    dialog.user_data['recipe_columns'] = (category == 'mines' ? 1 : dialog.data['widgets']['recipe_icon']['array'][0]);
+    // special case for mines and ambushes, there is only one column of recipes
+    dialog.user_data['recipe_columns'] = ((category == 'mines' || category == 'ambushes') ? 1 : dialog.data['widgets']['recipe_icon']['array'][0]);
 
     // center scroll arrows relative to recipe icons
     goog.array.forEach(['scroll_left', 'scroll_right'], function(wname) {
@@ -35683,7 +35696,12 @@ function crafting_dialog_change_category(dialog, category, page) {
             dialog.remove(dialog.widgets[wname]);
             delete dialog.widgets[wname];
         }
-        var dialog_name = 'crafting_dialog_'+wname+'_'+category;
+        var dialog_name = 'crafting_dialog_'+wname+'_';
+        if(category == 'mines' || category == 'ambushes') {
+            dialog_name = dialog_name + 'grid_weapons';
+        } else {
+            dialog_name = dialog_name + category;
+        }
         if(!(dialog_name in gamedata['dialogs'])) {
             throw Error('missing dialog: '+dialog_name);
         }
@@ -35693,9 +35711,9 @@ function crafting_dialog_change_category(dialog, category, page) {
         dialog.widgets[wname] = w;
     });
 
-    if(category == 'mines') {
-        crafting_dialog_init_status_mines(dialog.widgets['status']);
-    } else if(category == 'leaders' || category == 'ambushes' || category == 'equips') {
+    if(category == 'mines' || category == 'ambushes') {
+        crafting_dialog_init_status_grid_weapons(dialog.widgets['status']);
+    } else if(category == 'leaders' || category == 'equips') {
         crafting_dialog_init_status_merge_items(dialog.widgets['status']);
     } else if(category == 'missiles') {
         crafting_dialog_init_status_missiles(dialog.widgets['status']);
@@ -35714,45 +35732,310 @@ function crafting_dialog_change_category(dialog, category, page) {
         crafting_dialog_select_recipe(dialog.widgets['recipe'], preselect);
     }
 }
-function get_max_minefields() {
-    if(!('minefield' in gamedata['buildings'])) { return 0; }
-    var spec = gamedata['buildings']['minefield'];
+
+/** @param {string} grid_type */
+function get_max_grid_weapons(grid_type) {
+    var building_name_map = {'mines':'minefield', 'ambushes':'ambush_point'};
+    var building_name = building_name_map[grid_type];
+    if(!(building_name in gamedata['buildings'])) { return 0; }
+    var spec = gamedata['buildings'][building_name];
     return spec['limit_requires'].length;
 }
 
+/** @param {string} grid_type */
+function get_current_grid_weapons(grid_type) {
+    var building_name_map = {'mines':'minefield', 'ambushes':'ambush_point'};
+    var building_name = building_name_map[grid_type];
+    if(!(building_name in gamedata['buildings'])) { return 0; }
+    var count = 0;
+    session.for_each_real_object(function(obj) {
+        if(obj.is_building()){
+            if(obj.is_minefield() && obj.team === 'player' && grid_type == 'mines') {
+                count += 1;
+            } else if (obj.is_ambush() && obj.team === 'player' && grid_type == 'ambushes') {
+                count += 1;
+            }
+        }
+    });
+    return count;
+}
+
 /** @param {SPUI.Dialog} dialog */
-function crafting_dialog_init_status_mines(dialog) {
-    var dims = dialog.data['widgets']['mine_slot']['array'];
-    var max_minefields = (dialog.parent.user_data['builder'] ? get_max_minefields() : 0);
-    for(var y = 0; y < dims[1]; y++) {
-        dialog.widgets['row_labels'+y.toString()].str = (1+y).toString();
-        dialog.widgets['row_labels'+y.toString()].show = (y*dims[0]) < max_minefields;
+function crafting_dialog_init_status_grid_weapons(dialog) {
+    dialog.user_data['category'] = dialog.parent.user_data['category'];
+    dialog.user_data['page'] = 0;
+    var max_grid_weapons = (dialog.parent.user_data['builder'] ? get_max_grid_weapons(dialog.user_data['category']) : 0);
+    var dims = dialog.data['widgets']['grid_slot']['array'];
+    for(var row = 0; row < dims[1]; row++) {
+        dialog.widgets['row_labels' + row.toString()].str = (1 + row).toString();
+        dialog.widgets['row_labels' + row.toString()].show = (row * dims[0]) < max_grid_weapons;
     }
-    for(var x = 0; x < dims[0]; x++) {
-        dialog.widgets['col_labels'+x.toString()].show = (max_minefields > x);
-        dialog.widgets['col_labels'+x.toString()].str = String.fromCharCode('A'.charCodeAt(0)+x);
+    for(var col = 0; col < dims[0]; col++) {
+        dialog.widgets['col_labels' + col.toString()].show = (max_grid_weapons > col);
+        dialog.widgets['col_labels' + col.toString()].str = String.fromCharCode('A'.charCodeAt(0) + col);
     }
-    dialog.user_data['wname_to_tag'] = {};
-    for(var y = 0; y < dims[1]; y++) {
-        for(var x = 0; x < dims[0]; x++) {
-            var wname = x.toString()+','+y.toString();
-            var tag = dialog.widgets['col_labels'+x.toString()].str + dialog.widgets['row_labels'+y.toString()].str;
-            dialog.user_data['wname_to_tag'][wname] = tag;
-            dialog.widgets['mine_slot'+wname].show = ((y*dims[0]+x) < max_minefields);
+    dialog.on_mousewheel_function = scroll_crafting_dialog_status_grid_weapons;
+}
+
+/** @param {SPUI.Dialog} dialog
+    @param {(Array<number>)} row_col */
+function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
+    if(!row_col) { return; } // Google compiler gives an error without this protection
+    var wname = SPUI.get_array_widget_name('', dialog.data['widgets']['grid_slot']['array'], row_col);
+    var tag = dialog.widgets['col_labels' + row_col[0].toString()].str + dialog.widgets['row_labels' + row_col[1].toString()].str;
+    var builder = dialog.parent.user_data['builder'];
+    var category = dialog.parent.user_data['category'];
+    var catspec = gamedata['crafting']['categories'][category];
+    var selected_rec = dialog.parent.user_data['selected_recipe'];
+    var selected_recipe = (selected_rec ? dialog.parent.user_data['selected_recipe']['spec'] : null);
+    var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
+    var selected_grid_item = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec)['name'] : null);
+    var selected_grid_spec = (selected_grid_item ? ItemDisplay.get_inventory_item_spec(selected_grid_item) : null);
+    var selected_grid_item_level = (selected_grid_item ? player.tech[selected_grid_spec['associated_tech']] || 1 : null);
+    var craft_queue = (builder ? builder.get_crafting_queue() : []);
+    var rows_per_page = dialog.data['widgets']['grid_slot']['array'][1]
+    var max_grid_weapons = (dialog.parent.user_data['builder'] ? get_max_grid_weapons(category) : 0);
+    dialog.parent.user_data['on_use_recipe'] = null; // default action when clicking the recipe on the left
+    var delivery_slot_type = catspec['delivery_slot_type'];
+    var delivery_slot_index = 0;
+    var multiple_delivery_slots;
+    var pending = false;
+
+
+    // set up default display, where minefield or ambush point does not exist
+    dialog.widgets['grid_icon'+wname].show =
+        dialog.widgets['grid_skull'+wname].show =
+        dialog.widgets['grid_timer'+wname].show =
+        dialog.widgets['grid_frame'+wname].show =
+        dialog.widgets['grid_cancel'+wname].show =
+        dialog.widgets['grid_pending'+wname].show = false;
+    dialog.widgets['grid_slot'+wname].state = 'locked';
+
+    // help to do what you need to do to unlock another slot
+    var help_pred = null;
+    var slot_building = gamedata['crafting']['categories'][category]['delivery_building_for_ui'];
+    var slot_building_spec = gamedata['buildings'][slot_building];
+    help_pred = {'predicate':'BUILDING_QUANTITY', 'building_type':slot_building, 'trigger_qty': count_objects_by_type(slot_building)+1};
+    dialog.widgets['grid_slot'+wname].tooltip.str = dialog.data['widgets']['grid_slot']['ui_tooltip_build_more'].replace('%s', slot_building_spec['ui_name']);
+
+    var helper = null;
+    if(help_pred && dialog.widgets['grid_slot'+wname].show) {
+        helper = function (use_short_circuit) { return function() {
+            var h = get_requirements_help(read_predicate(/** @type {!Object} */ (help_pred)), null, {short_circuit:use_short_circuit});
+            if(h) { h(); }
+        }; };
+    }
+    dialog.widgets['grid_slot'+wname].onclick = (helper ? helper(true) : null);
+    if(!dialog.parent.user_data['on_use_recipe']) {
+        dialog.parent.user_data['on_use_recipe'] = (helper ? helper(false) : null);
+    }
+
+    var tag_map, obj, cur_item, cur_config, cur_config_level = null;
+    if(category == 'mines') {
+        tag_map = session.minefield_tags_by_tag;
+    } else if (category == 'ambushes') {
+        tag_map = session.ambush_point_tags_by_tag;
+    } else {
+        throw Error('Unhandled category in grid weapons: ' + category);
+    }
+    if((tag in tag_map) && (session.get_real_world().objects.has_object(tag_map[tag]))) {
+        obj = session.get_real_world().objects.get_object(tag_map[tag]);
+        cur_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > 0 && obj.equipment[delivery_slot_type][0] ? player.decode_equipped_item(obj.equipment[delivery_slot_type][0]) : null);
+        cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type] && (player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] : null);
+        cur_config_level = ((obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type] && (player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[delivery_slot_type])['level'] : null) || 1);
+    }
+    if(obj) {
+        pending = !obj.is_in_sync();
+        dialog.widgets['grid_slot'+wname].state = 'normal';
+        var in_progress_recipe = null, in_progress_level = null, in_progress_bus = null, in_progress_togo = -1;
+        for(var i = 0; i < craft_queue.length; i++) {
+            var entry = craft_queue[i];
+            if(entry['craft']['delivery'] && entry['craft']['delivery']['obj_id'] == obj.id &&
+               (!('slot_type' in entry['craft']['delivery']) || entry['craft']['delivery']['slot_type'] == delivery_slot_type) &&
+               ((entry['craft']['delivery']['slot_index'] || 0) == 0)) {
+                in_progress_recipe = entry['craft']['recipe'];
+                in_progress_level = (entry['craft']['level'] || 1);
+                in_progress_bus = entry;
+                in_progress_togo = entry['total_time'] - entry['done_time'];
+                if(entry['start_time'] > 0) {
+                    in_progress_togo -= Math.max(0, server_time - entry['start_time']);
+                }
+                break;
+            }
+        }
+        dialog.widgets['grid_icon'+wname].show =
+        dialog.widgets['grid_frame'+wname].show =
+        dialog.widgets['grid_cancel'+wname].show = true;
+        dialog.widgets['grid_icon'+wname].state = 'normal';
+        dialog.widgets['grid_skull'+wname].show =
+        dialog.widgets['grid_timer'+wname].show = false;
+
+        var build_grid_item = cur_config || selected_grid_item || null;
+        var build_recipe = null;
+        if(build_grid_item) {
+            if(build_grid_item == selected_grid_item) {
+                build_recipe = selected_recipe;
+            } else {
+                // look up the recipe for a DIFFERENT grid item
+                for(var n in gamedata['crafting']['recipes']) {
+                    var rec = gamedata['crafting']['recipes'][n];
+                    if(rec['crafting_category'] == category && ItemDisplay.get_crafting_recipe_product_spec(rec)['name'] == build_grid_item) {
+                        build_recipe = n; break;
+                    }
+                }
+            }
+        }
+        var build_recipe_spec = (build_recipe ? gamedata['crafting']['recipes'][build_recipe] : null);
+
+        var build_cb = null;
+        var build_error_ui_text = null;
+
+        if(build_recipe_spec) {
+            var build_recipe_max_level = (build_recipe_spec['max_level'] || 1);
+            var build_recipe_associated_tech = (build_recipe_spec['associated_tech'] || false);
+            var build_recipe_level = 1;
+            if((build_recipe_max_level || 1) > 1 && build_recipe_associated_tech && player.tech[build_recipe_associated_tech]) {
+                build_recipe_level = player.tech[build_recipe_associated_tech];
+            }
+            var can_cast = can_cast_spell_detailed(builder.id, 'CRAFT_FOR_FREE', [{'recipe': build_recipe_spec['name'], // XXX level
+                                                                                   'delivery': {'obj_id':obj.id, 'slot_type':delivery_slot_type, 'slot_index': delivery_slot_index}}]);
+            if(can_cast[0]) {
+                // the real build function
+                build_cb = (function (_builder, _build_recipe_spec, _obj, _delivery_slot_index, _build_recipe_level) { return function() {
+                    var extra_params = {'delivery': {'obj_id':_obj.id, 'slot_type':delivery_slot_type, 'slot_index': _delivery_slot_index}, 'level': _build_recipe_level };
+                    start_crafting(_builder, _build_recipe_spec, extra_params);
+                    // play sound effect
+                    GameArt.play_canned_sound('action_button_134px');
+                    return true;
+                }; })(builder, build_recipe_spec, obj, delivery_slot_index, build_recipe_level);
+            } else {
+                build_error_ui_text = can_cast[1];
+                // get helper function
+                if(can_cast[2]) {
+                    helper = get_requirements_help(can_cast[2][0], can_cast[2][1], can_cast[2][2]);
+                    build_cb = (helper ? (function (_helper) { return function() { _helper(); return false; }; })(helper) : null);
+                }
+            }
+        }
+
+        var unconfig_cb = (function (_obj, _delivery_slot_type, _delivery_slot_index, _multiple) { return function(w) {
+            var new_config = (_obj.config ? goog.object.clone(_obj.config) : {});
+            if(_multiple) {
+                if(!new_config[_delivery_slot_type]) {
+                    new_config[_delivery_slot_type] = [];
+                }
+                while(new_config[_delivery_slot_type].length < _delivery_slot_index) {
+                    new_config[_delivery_slot_type].push(null);
+                }
+                new_config[_delivery_slot_type][_delivery_slot_index] = null;
+            } else {
+                if(_delivery_slot_type in new_config) { delete new_config[_delivery_slot_type]; }
+                if(goog.object.getCount(new_config) <= 0) { new_config = null; }
+            }
+            send_to_server.func(["CAST_SPELL", _obj.id, "CONFIG_SET", new_config]);
+            // client-side predict
+            _obj.config = new_config;
+            _obj.request_sync();
+        }; })(obj, delivery_slot_type, delivery_slot_index, multiple_delivery_slots);
+
+        if(cur_item) {
+            var cur_grid_item_spec = ItemDisplay.get_inventory_item_spec(cur_item['spec']);
+            var cur_grid_item_level = cur_item['level'] || 1;
+            dialog.widgets['grid_icon'+wname].alpha = 1;
+            dialog.widgets['grid_icon'+wname].asset = get_leveled_quantity(cur_grid_item_spec['icon'], cur_grid_item_level);
+            dialog.widgets['grid_frame'+wname].onclick = null;
+            dialog.widgets['grid_frame'+wname].tooltip.str = dialog.data['widgets']['grid_frame']['ui_tooltip_armed'].replace('%s', cur_grid_item_spec['ui_name']);
+            dialog.widgets['grid_cancel'+wname].show = !(('can_unequip' in cur_grid_item_spec) && !cur_grid_item_spec['can_unequip']);
+            dialog.widgets['grid_cancel'+wname].tooltip.str = dialog.data['widgets']['grid_cancel']['ui_tooltip_discard'].replace('%s', cur_grid_item_spec['ui_name']);
+            dialog.widgets['grid_cancel'+wname].onclick = (function (_obj, _cur_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb) { return function(w) {
+                send_to_server.func(["EQUIP_BUILDING", _obj.id, [_delivery_slot_type,_delivery_slot_index], -1, null, _cur_item, -1]);
+                // maybe put a confirmation dialog here?
+                invoke_ui_locker();
+                _unconfig_cb();
+            }; })(obj, cur_item, delivery_slot_type, delivery_slot_index, unconfig_cb);
+        } else if(in_progress_recipe) {
+            dialog.widgets['grid_icon'+wname].asset = get_leveled_quantity(get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]), in_progress_level);
+            dialog.widgets['grid_icon'+wname].alpha = 1;
+            dialog.widgets['grid_frame'+wname].onclick = null;
+            dialog.widgets['grid_frame'+wname].tooltip.str = dialog.data['widgets']['grid_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe])));
+            dialog.widgets['grid_cancel'+wname].tooltip.str = dialog.data['widgets']['grid_cancel']['ui_tooltip_cancel'];
+            dialog.widgets['grid_cancel'+wname].onclick = (function (_builder, _in_progress_bus, _unconfig_cb) { return function(w) {
+                do_cancel_crafting(_builder, _in_progress_bus);
+                _unconfig_cb();
+            }; })(builder, in_progress_bus, unconfig_cb);
+            dialog.widgets['grid_timer'+wname].show = true;
+            dialog.widgets['grid_timer'+wname].str = pretty_print_time_brief(in_progress_togo);
+        } else if(cur_config) {
+            var cur_config_spec = gamedata['items'][cur_config];
+            dialog.widgets['grid_icon'+wname].asset = get_leveled_quantity(cur_config_spec['icon'], cur_config_level);
+            dialog.widgets['grid_icon'+wname].state = 'icon_disabled';
+            dialog.widgets['grid_icon'+wname].alpha = 0.33;
+            dialog.widgets['grid_skull'+wname].show = true;
+            dialog.widgets['grid_frame'+wname].onclick = build_cb;
+            dialog.widgets['grid_frame'+wname].tooltip.str = dialog.data['widgets']['grid_frame']['ui_tooltip_produce'].replace('%s', cur_config_spec['ui_name']);
+            dialog.widgets['grid_cancel'+wname].onclick = unconfig_cb;
+
+            if(!dialog.parent.user_data['on_use_recipe'] && selected_grid_spec == cur_config_spec) {
+                dialog.parent.user_data['on_use_recipe'] = build_cb;
+            }
+
+        } else if(selected_grid_spec) {
+            dialog.widgets['grid_icon'+wname].alpha = 0.33;
+            dialog.widgets['grid_icon'+wname].asset = get_leveled_quantity(selected_grid_spec['icon'], selected_grid_item_level);
+            dialog.widgets['grid_icon'+wname].show = (dialog.widgets['grid_frame'+wname].mouse_enter_time > 0) && (dialog.widgets['grid_cancel'+wname].mouse_enter_time < 0);
+            dialog.widgets['grid_frame'+wname].tooltip.str = dialog.data['widgets']['grid_frame']['ui_tooltip_produce'].replace('%s', selected_grid_spec['ui_name']);
+            var build_and_config_cb;
+            if(('persist_config' in catspec) && !catspec['persist_config']) {
+                build_and_config_cb = build_cb; // no persistence
+            } else {
+                build_and_config_cb = (function (_obj, _selected_grid_spec, _delivery_slot_type, _delivery_slot_index, _multiple, _build_cb) { return function(w) {
+                if(_build_cb && _build_cb()) {
+                    var new_config = _obj.config || {};
+                    if(_multiple) {
+                        if(!new_config[_delivery_slot_type]) { new_config[_delivery_slot_type] = []; }
+                        while(new_config[_delivery_slot_type].length < _delivery_slot_index) {
+                            new_config[_delivery_slot_type].push(null);
+                        }
+                        new_config[_delivery_slot_type][_delivery_slot_index] = _selected_grid_spec['name'];
+                    } else {
+                        new_config[_delivery_slot_type] = _selected_grid_spec['name'];
+                    }
+                    send_to_server.func(["CAST_SPELL", _obj.id, "CONFIG_SET", new_config]);
+                    // client-side predict config
+                    _obj.config = new_config;
+                    _obj.request_sync();
+                }
+                }; })(obj, selected_grid_spec, delivery_slot_type, delivery_slot_index, multiple_delivery_slots, build_cb);
+            }
+            dialog.widgets['grid_frame'+wname].onclick = build_and_config_cb;
+            dialog.widgets['grid_cancel'+wname].show = false;
+
+            if(!dialog.parent.user_data['on_use_recipe']) {
+                dialog.parent.user_data['on_use_recipe'] = build_and_config_cb;
+            }
+        } else {
+            dialog.widgets['grid_icon'+wname].show =
+                dialog.widgets['grid_frame'+wname].show =
+                dialog.widgets['grid_cancel'+wname].show = false;
+        }
+
+        dialog.widgets['grid_pending'+wname].show = pending;
+        if(pending) {
+            dialog.widgets['grid_frame'+wname].onclick = null;
         }
     }
 }
 
 /** @param {SPUI.Dialog} dialog */
 function crafting_dialog_init_status_missiles(dialog) {
-    var dims = dialog.data['widgets']['mine_slot']['array'];
+    var dims = dialog.data['widgets']['missile_slot']['array'];
     dialog.user_data['wname_to_tag'] = {};
     for(var y = 0; y < dims[1]; y++) {
         for(var x = 0; x < dims[0]; x++) {
             var wname = x.toString()+','+y.toString();
             var tag = wname;
             dialog.user_data['wname_to_tag'][wname] = tag; // not sure we need this for missile slots
-            dialog.widgets['mine_slot'+wname].show = true; // update_status_missiles() takes care of hiding slots beyond the max available number
+            dialog.widgets['missile_slot'+wname].show = true; // update_status_missiles() takes care of hiding slots beyond the max available number
         }
     }
 }
@@ -35762,6 +36045,8 @@ function crafting_dialog_init_status_merge_items(dialog) {
     // nothing to do here
 }
 
+/** @param {SPUI.Dialog} dialog
+    @param {number} page */
 function crafting_dialog_scroll(dialog, page) {
     dialog.user_data['recipes_by_widget'] = null;
     var chapter_recipes = (dialog.user_data['recipes'] ? dialog.user_data['recipes'].length : 0);
@@ -35796,11 +36081,11 @@ function crafting_dialog_select_recipe(dialog, rec) {
     var recipe_level = rec['level'] || 1;
     dialog.show = true;
     dialog.user_data['recipe'] = recipe;
-    if(recipe['crafting_category'] == 'mines') {
-        crafting_dialog_select_recipe_mines(dialog, specname, recipe, recipe_level);
+    if(recipe['crafting_category'] == 'mines' || recipe['crafting_category'] == 'ambushes') {
+        crafting_dialog_select_recipe_grid_weapons(dialog, specname, recipe, recipe_level, recipe['crafting_category']);
     } else if(recipe['crafting_category'] == 'missiles') {
         crafting_dialog_select_recipe_missiles(dialog, specname, recipe);
-    } else if(recipe['crafting_category'] == 'leaders' || recipe['crafting_category'] == 'ambushes' || recipe['crafting_category'] == 'equips') {
+    } else if(recipe['crafting_category'] == 'leaders' || recipe['crafting_category'] == 'equips') {
         crafting_dialog_select_recipe_merge_items(dialog, specname, rec); // full dictionary, not recipe
     }
 }
@@ -35808,8 +36093,9 @@ function crafting_dialog_select_recipe(dialog, rec) {
 /** @param {SPUI.Dialog} dialog
     @param {string} specname
     @param {!Object} recipe
-    @param {number} recipe_level */
-function crafting_dialog_select_recipe_mines(dialog, specname, recipe, recipe_level) {
+    @param {number} recipe_level
+    @param {string} category */
+function crafting_dialog_select_recipe_grid_weapons(dialog, specname, recipe, recipe_level, category) {
     dialog.widgets['name'].str = get_crafting_recipe_ui_name(recipe, recipe_level);
     dialog.widgets['icon'].asset = get_crafting_recipe_icon(recipe, recipe_level);
     dialog.widgets['frame'].onclick = function(w) {
@@ -35819,25 +36105,25 @@ function crafting_dialog_select_recipe_mines(dialog, specname, recipe, recipe_le
         }
     };
 
-    var mine_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe, recipe_level);
-    var mine_spell = ItemDisplay.get_inventory_item_weapon_spell(mine_spec);
+    var grid_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe, recipe_level);
+    var grid_spell = ItemDisplay.get_inventory_item_weapon_spell(grid_spec);
     init_damage_vs_icons(dialog, {'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
-                         mine_spell);
-    var stat_spec = mine_spec;
+                         grid_spell);
+    var stat_spec = grid_spec;
 
-    var stat_level = ('level' in mine_spec ? mine_spec['level'] : recipe_level);
+    var stat_level = ('level' in grid_spec ? grid_spec['level'] : recipe_level);
     // The level that will apply to the created landmine item.
     // Normally equal to recipe_level, but legacy landmines that have a specific "level",
     // as opposed to newer multi-level landmine items, can override it.
 
-    var stat_spell = mine_spell;
+    var stat_spell = grid_spell;
 
     var stat_spell_level = recipe_level;
     // The level that the landmine's SHOOT spell will use.
     // For legacy landmines, recipe_level will always be 1, so this will select the individual LAMDINE_Lxxx_SHOOT spell, which only has one level.
     // For newer multi-level landmines, it will select the level of the unified LANDMINE_SHOOT spell appropriate for the item we're about to create.
-    if(('equip' in mine_spec) && ('effects' in mine_spec['equip'])) {
-        var effect_list = mine_spec['equip']['effects'];
+    if(('equip' in grid_spec) && ('effects' in grid_spec['equip'])) {
+        var effect_list = grid_spec['equip']['effects'];
         goog.array.forEach(effect_list, function(effect) {
             if(effect['code'] == 'modstat' && (effect['stat'] == 'weapon_level') && effect['method'] == 'replace') {
                 stat_spell_level = get_leveled_quantity(effect['strength'], recipe_level);
@@ -35845,8 +36131,13 @@ function crafting_dialog_select_recipe_mines(dialog, specname, recipe, recipe_le
         });
     }
 
-    // grab a random minefield building to catch any modstats that apply to mines
-    var minefield = find_any_player_minefield();
+    // grab a random minefield or ambush point building to catch any modstats that apply to mines
+    var grid_weapon;
+    if(category == 'mines') {
+        grid_weapon = find_any_player_minefield();
+    } else if (category == 'ambushes') {
+        grid_weapon = find_any_player_ambush_point();
+    }
 
     // set up stats display for this kind of recipe
     var statlist = gamedata['crafting']['categories'][recipe['crafting_category']]['display_stats'] || [];
@@ -35854,7 +36145,7 @@ function crafting_dialog_select_recipe_mines(dialog, specname, recipe, recipe_le
         if(i < statlist.length) {
             dialog.widgets[wname].show = true;
             var stat = statlist[i];
-            var modchain = (minefield && (stat in minefield.modstats) ? minefield.modstats[stat] : null);
+            var modchain = (grid_weapon && (stat in grid_weapon.modstats) ? grid_weapon.modstats[stat] : null);
             // hack - get the .str for the label, then reset the widget to be the stat value display, get the .str, and combine them
             ModChain.display_label_widget(dialog.widgets[wname], stat, stat_spell, true);
             var label_str = dialog.widgets[wname].str;
@@ -35866,6 +36157,10 @@ function crafting_dialog_select_recipe_mines(dialog, specname, recipe, recipe_le
         }
     });
 }
+
+/** @param {SPUI.Dialog} dialog
+    @param {string} specname
+    @param {!Object} recipe */
 function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) { // XXX does not handle recipe_level
     var product_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe);
     dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name_long(product_spec);
@@ -35916,6 +36211,9 @@ function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) { // X
     }
 }
 
+/** @param {SPUI.Dialog} dialog
+    @param {string} specname
+    @param {!Object} rec */
 function crafting_dialog_select_recipe_merge_items(dialog, specname, rec) {
     var recipe = gamedata['crafting']['recipes'][rec['spec']];
     var level = rec['level'] || 1;
@@ -36030,7 +36328,7 @@ function update_crafting_dialog_recipe_common(dialog) {
 }
 
 /** @param {SPUI.Dialog} dialog */
-function update_crafting_dialog_recipe_mines(dialog) {
+function update_crafting_dialog_recipe_grid_weapons(dialog) {
     update_crafting_dialog_recipe_common(dialog);
 }
 
@@ -36202,22 +36500,22 @@ function update_crafting_dialog(dialog) {
     dialog.widgets['scroll_right'].widgets['scroll_right_bg'].alpha = ((page < chapter_pages-1) ? (flash_scroll ? 1 : 0.86) : 0.25);
     dialog.widgets['scroll_right'].widgets['scroll_right_bg'].fade_unless_hover = ((page < chapter_pages-1) ? (flash_scroll ? 1 : 0.5) : 1);
 
-    if(dialog.user_data['category'] == 'mines') {
-        update_crafting_dialog_status_mines_and_missiles(dialog.widgets['status']);
+    if(dialog.user_data['category'] == 'mines' || dialog.user_data['category'] == 'ambushes') {
+        update_crafting_dialog_status_grid_weapons(dialog.widgets['status']);
     } else if(dialog.user_data['category'] == 'missiles') {
-        update_crafting_dialog_status_mines_and_missiles(dialog.widgets['status']);
-    } else if(dialog.user_data['category'] == 'leaders' || dialog.user_data['category'] == 'equips' || dialog.user_data['category'] == 'ambushes') {
+        update_crafting_dialog_status_missiles(dialog.widgets['status']);
+    } else if(dialog.user_data['category'] == 'leaders' || dialog.user_data['category'] == 'equips') {
         update_crafting_dialog_status_merge_items(dialog.widgets['status']);
     } else {
         throw Error('unhandled category '+dialog.user_data['category']);
     }
 
     if(dialog.user_data['selected_recipe']) {
-        if(dialog.user_data['category'] == 'mines') {
-            update_crafting_dialog_recipe_mines(dialog.widgets['recipe']);
+        if(dialog.user_data['category'] == 'mines' || dialog.user_data['category'] == 'ambushes') {
+            update_crafting_dialog_recipe_grid_weapons(dialog.widgets['recipe']);
         } else if(dialog.user_data['category'] == 'missiles') {
             update_crafting_dialog_recipe_missiles(dialog.widgets['recipe']);
-        } else if(dialog.user_data['category'] == 'leaders' || dialog.user_data['category'] == 'ambushes' || dialog.user_data['category'] == 'equips') {
+        } else if(dialog.user_data['category'] == 'leaders' || dialog.user_data['category'] == 'equips') {
             update_crafting_dialog_recipe_merge_items(dialog.widgets['recipe']);
         }
     }
@@ -36456,8 +36754,59 @@ function cancel_unfinished_crafting(builder) {
 }
 
 /** @param {SPUI.Dialog} dialog */
-function update_crafting_dialog_status_mines_and_missiles(dialog) {
-    var dims = dialog.data['widgets']['mine_slot']['array'];
+function update_crafting_dialog_status_grid_weapons(dialog) {
+    var page = dialog.user_data['page'];
+    var dims = dialog.data['widgets']['grid_slot']['array'];
+    var category = dialog.user_data['category'];
+    for(var row = 0; row < dims[1]; row++) {
+        dialog.widgets['row_labels' + row.toString()].str = (page + 1 + row).toString();
+        for(var col = 0; col < dims[0]; col++) {
+            crafting_dialog_status_grid_weapons_cell_setup(dialog, [col,row]);
+        }
+    }
+    var tag_map;
+    if(category == 'mines') {
+        tag_map = session.minefield_tags_by_tag;
+    } else if (category == 'ambushes') {
+        tag_map = session.ambush_point_tags_by_tag;
+    } else {
+        throw Error('Unhandled category in grid weapons: ' + category);
+    }
+    // ensures rowdata has enough entries to fill the default grid, enough entries for each mine or ambush point,
+    // and enough entries to be divisible by the number of columns
+    var total_rows = (goog.object.getCount(tag_map) > dims[0] * dims[1] ? Math.ceil(goog.object.getCount(tag_map) / dims[0]) : dims[1]);
+    var last_page = Math.max(total_rows - dims[1], 0);
+    dialog.user_data['last_page'] = last_page;
+    dialog.widgets['scroll_up'].show = dialog.widgets['scroll_down'].show = (last_page > 0);
+    dialog.widgets['scroll_up'].state = (page === 0 ? 'disabled' : 'normal');
+    dialog.widgets['scroll_down'].state = (page === last_page ? 'disabled' : 'normal');
+    dialog.widgets['scroll_up'].onclick = function(w) {
+        var _dialog = w.parent;
+        scroll_crafting_dialog_status_grid_weapons(_dialog, - 1);
+    };
+    dialog.widgets['scroll_down'].onclick = function(w) {
+        var _dialog = w.parent;
+        scroll_crafting_dialog_status_grid_weapons(_dialog, + 1);
+    };
+    dialog.widgets['scroll_up'].xy = [280,120];
+    dialog.widgets['scroll_down'].xy = [280,345];
+}
+
+/** @param {SPUI.Dialog} dialog */
+function scroll_crafting_dialog_status_grid_weapons(dialog, delta) {
+    var page = dialog.user_data['page'];
+    var last_page = dialog.user_data['last_page'];
+    if(delta < 0 && page > 0) {
+        dialog.user_data['page'] = page - 1;
+    }
+    if (delta > 0 && page < last_page) {
+        dialog.user_data['page'] = page + 1;
+    }
+}
+
+/** @param {SPUI.Dialog} dialog */
+function update_crafting_dialog_status_missiles(dialog) {
+    var dims = dialog.data['widgets']['missile_slot']['array'];
     var builder = dialog.parent.user_data['builder'];
     var category = dialog.parent.user_data['category'];
     var catspec = gamedata['crafting']['categories'][category];
@@ -36488,19 +36837,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
             var cur_config_level = null;
 
             if(builder) {
-                if(category == 'mines') {
-                    multiple_delivery_slots = false;
-                    max_slots = get_max_minefields();
-                    delivery_slot_index = 0;
-                    var tag = dialog.user_data['wname_to_tag'][wname];
-                    if((tag in session.minefield_tags_by_tag) && (session.get_real_world().objects.has_object(session.minefield_tags_by_tag[tag]))) {
-                        // minefield exists
-                        obj = session.get_real_world().objects.get_object(session.minefield_tags_by_tag[tag]);
-                        cur_mine_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > 0 && obj.equipment[delivery_slot_type][0] ? player.decode_equipped_item(obj.equipment[delivery_slot_type][0]) : null);
-                        cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type] && (player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] : null);
-                        cur_config_level = ((obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type] && (player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[delivery_slot_type])['level'] : null) || 1);
-                    }
-                } else if(category == 'missiles') {
+                if(category == 'missiles') {
                     obj = find_object_by_type(catspec['delivery_building_for_ui']);
                     multiple_delivery_slots = true;
                     delivery_slot_index = y*dims[0] + x; // XXX assumes you only have one delivery building
@@ -36519,7 +36856,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                 num_slots += 1;
 
                 pending = !obj.is_in_sync(); // || !builder.is_in_sync();
-                dialog.widgets['mine_slot'+wname].state = 'normal';
+                dialog.widgets['missile_slot'+wname].state = 'normal';
 
                 var in_progress_recipe = null, in_progress_level = null, in_progress_bus = null, in_progress_togo = -1;
                 for(var i = 0; i < craft_queue.length; i++) {
@@ -36538,12 +36875,12 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                     }
                 }
 
-                dialog.widgets['mine_icon'+wname].show =
-                    dialog.widgets['mine_frame'+wname].show =
-                    dialog.widgets['mine_cancel'+wname].show = true;
-                dialog.widgets['mine_icon'+wname].state = 'normal';
-                dialog.widgets['mine_skull'+wname].show =
-                    dialog.widgets['mine_timer'+wname].show = false;
+                dialog.widgets['missile_icon'+wname].show =
+                    dialog.widgets['missile_frame'+wname].show =
+                    dialog.widgets['missile_cancel'+wname].show = true;
+                dialog.widgets['missile_icon'+wname].state = 'normal';
+                dialog.widgets['missile_skull'+wname].show =
+                    dialog.widgets['missile_timer'+wname].show = false;
 
                 var build_mine = cur_config || selected_mine || null;
                 var build_recipe = null;
@@ -36617,49 +36954,49 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                     var cur_mine_spec = ItemDisplay.get_inventory_item_spec(cur_mine_item['spec']);
                     var cur_mine_level = cur_mine_item['level'] || 1;
                     num_ready += 1;
-                    dialog.widgets['mine_icon'+wname].alpha = 1;
-                    dialog.widgets['mine_icon'+wname].asset = get_leveled_quantity(cur_mine_spec['icon'], cur_mine_level);
-                    dialog.widgets['mine_frame'+wname].onclick = null;
-                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_armed'].replace('%s', cur_mine_spec['ui_name']);
-                    dialog.widgets['mine_cancel'+wname].show = !(('can_unequip' in cur_mine_spec) && !cur_mine_spec['can_unequip']);
-                    dialog.widgets['mine_cancel'+wname].tooltip.str = dialog.data['widgets']['mine_cancel']['ui_tooltip_discard'].replace('%s', cur_mine_spec['ui_name']);
-                    dialog.widgets['mine_cancel'+wname].onclick = (function (_obj, _cur_mine_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb) { return function(w) {
+                    dialog.widgets['missile_icon'+wname].alpha = 1;
+                    dialog.widgets['missile_icon'+wname].asset = get_leveled_quantity(cur_mine_spec['icon'], cur_mine_level);
+                    dialog.widgets['missile_frame'+wname].onclick = null;
+                    dialog.widgets['missile_frame'+wname].tooltip.str = dialog.data['widgets']['missile_frame']['ui_tooltip_armed'].replace('%s', cur_mine_spec['ui_name']);
+                    dialog.widgets['missile_cancel'+wname].show = !(('can_unequip' in cur_mine_spec) && !cur_mine_spec['can_unequip']);
+                    dialog.widgets['missile_cancel'+wname].tooltip.str = dialog.data['widgets']['missile_cancel']['ui_tooltip_discard'].replace('%s', cur_mine_spec['ui_name']);
+                    dialog.widgets['missile_cancel'+wname].onclick = (function (_obj, _cur_mine_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb) { return function(w) {
                         send_to_server.func(["EQUIP_BUILDING", _obj.id, [_delivery_slot_type,_delivery_slot_index], -1, null, _cur_mine_item, -1]);
                         // maybe put a confirmation dialog here?
                         invoke_ui_locker();
                         _unconfig_cb();
                     }; })(obj, cur_mine_item, delivery_slot_type, delivery_slot_index, unconfig_cb);
                 } else if(in_progress_recipe) {
-                    dialog.widgets['mine_icon'+wname].asset = get_leveled_quantity(get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]), in_progress_level);
-                    dialog.widgets['mine_icon'+wname].alpha = 1;
-                    dialog.widgets['mine_frame'+wname].onclick = null;
-                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe])));
-                    dialog.widgets['mine_cancel'+wname].tooltip.str = dialog.data['widgets']['mine_cancel']['ui_tooltip_cancel'];
-                    dialog.widgets['mine_cancel'+wname].onclick = (function (_builder, _in_progress_bus, _unconfig_cb) { return function(w) {
+                    dialog.widgets['missile_icon'+wname].asset = get_leveled_quantity(get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]), in_progress_level);
+                    dialog.widgets['missile_icon'+wname].alpha = 1;
+                    dialog.widgets['missile_frame'+wname].onclick = null;
+                    dialog.widgets['missile_frame'+wname].tooltip.str = dialog.data['widgets']['missile_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe])));
+                    dialog.widgets['missile_cancel'+wname].tooltip.str = dialog.data['widgets']['missile_cancel']['ui_tooltip_cancel'];
+                    dialog.widgets['missile_cancel'+wname].onclick = (function (_builder, _in_progress_bus, _unconfig_cb) { return function(w) {
                         do_cancel_crafting(_builder, _in_progress_bus);
                         _unconfig_cb();
                     }; })(builder, in_progress_bus, unconfig_cb);
-                    dialog.widgets['mine_timer'+wname].show = true;
-                    dialog.widgets['mine_timer'+wname].str = pretty_print_time_brief(in_progress_togo);
+                    dialog.widgets['missile_timer'+wname].show = true;
+                    dialog.widgets['missile_timer'+wname].str = pretty_print_time_brief(in_progress_togo);
                 } else if(cur_config) {
                     var cur_config_spec = gamedata['items'][cur_config];
-                    dialog.widgets['mine_icon'+wname].asset = get_leveled_quantity(cur_config_spec['icon'], cur_config_level);
-                    dialog.widgets['mine_icon'+wname].state = 'icon_disabled';
-                    dialog.widgets['mine_icon'+wname].alpha = 0.33;
-                    dialog.widgets['mine_skull'+wname].show = true;
-                    dialog.widgets['mine_frame'+wname].onclick = build_cb;
-                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_produce'].replace('%s', cur_config_spec['ui_name']);
-                    dialog.widgets['mine_cancel'+wname].onclick = unconfig_cb;
+                    dialog.widgets['missile_icon'+wname].asset = get_leveled_quantity(cur_config_spec['icon'], cur_config_level);
+                    dialog.widgets['missile_icon'+wname].state = 'icon_disabled';
+                    dialog.widgets['missile_icon'+wname].alpha = 0.33;
+                    dialog.widgets['missile_skull'+wname].show = true;
+                    dialog.widgets['missile_frame'+wname].onclick = build_cb;
+                    dialog.widgets['missile_frame'+wname].tooltip.str = dialog.data['widgets']['missile_frame']['ui_tooltip_produce'].replace('%s', cur_config_spec['ui_name']);
+                    dialog.widgets['missile_cancel'+wname].onclick = unconfig_cb;
 
                     if(!dialog.parent.user_data['on_use_recipe'] && selected_mine_spec == cur_config_spec) {
                         dialog.parent.user_data['on_use_recipe'] = build_cb;
                     }
 
                 } else if(selected_mine_spec) {
-                    dialog.widgets['mine_icon'+wname].alpha = 0.33;
-                    dialog.widgets['mine_icon'+wname].asset = get_leveled_quantity(selected_mine_spec['icon'], selected_mine_level);
-                    dialog.widgets['mine_icon'+wname].show = (dialog.widgets['mine_frame'+wname].mouse_enter_time > 0) && (dialog.widgets['mine_cancel'+wname].mouse_enter_time < 0);
-                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_produce'].replace('%s', selected_mine_spec['ui_name']);
+                    dialog.widgets['missile_icon'+wname].alpha = 0.33;
+                    dialog.widgets['missile_icon'+wname].asset = get_leveled_quantity(selected_mine_spec['icon'], selected_mine_level);
+                    dialog.widgets['missile_icon'+wname].show = (dialog.widgets['missile_frame'+wname].mouse_enter_time > 0) && (dialog.widgets['missile_cancel'+wname].mouse_enter_time < 0);
+                    dialog.widgets['missile_frame'+wname].tooltip.str = dialog.data['widgets']['missile_frame']['ui_tooltip_produce'].replace('%s', selected_mine_spec['ui_name']);
                     var build_and_config_cb;
                     if(('persist_config' in catspec) && !catspec['persist_config']) {
                         build_and_config_cb = build_cb; // no persistence
@@ -36683,31 +37020,31 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                         }
                         }; })(obj, selected_mine_spec, delivery_slot_type, delivery_slot_index, multiple_delivery_slots, build_cb);
                     }
-                    dialog.widgets['mine_frame'+wname].onclick = build_and_config_cb;
-                    dialog.widgets['mine_cancel'+wname].show = false;
+                    dialog.widgets['missile_frame'+wname].onclick = build_and_config_cb;
+                    dialog.widgets['missile_cancel'+wname].show = false;
 
                     if(!dialog.parent.user_data['on_use_recipe']) {
                         dialog.parent.user_data['on_use_recipe'] = build_and_config_cb;
                     }
                 } else {
-                    dialog.widgets['mine_icon'+wname].show =
-                        dialog.widgets['mine_frame'+wname].show =
-                        dialog.widgets['mine_cancel'+wname].show = false;
+                    dialog.widgets['missile_icon'+wname].show =
+                        dialog.widgets['missile_frame'+wname].show =
+                        dialog.widgets['missile_cancel'+wname].show = false;
                 }
 
-                dialog.widgets['mine_pending'+wname].show = pending;
+                dialog.widgets['missile_pending'+wname].show = pending;
                 if(pending) {
-                    dialog.widgets['mine_frame'+wname].onclick = null;
+                    dialog.widgets['missile_frame'+wname].onclick = null;
                 }
             } else if(delivery_slot_index < max_slots) {
                 // minefield does not exist
-                dialog.widgets['mine_icon'+wname].show =
-                    dialog.widgets['mine_skull'+wname].show =
-                    dialog.widgets['mine_timer'+wname].show =
-                    dialog.widgets['mine_frame'+wname].show =
-                    dialog.widgets['mine_cancel'+wname].show =
-                    dialog.widgets['mine_pending'+wname].show = false;
-                dialog.widgets['mine_slot'+wname].state = 'locked';
+                dialog.widgets['missile_icon'+wname].show =
+                    dialog.widgets['missile_skull'+wname].show =
+                    dialog.widgets['missile_timer'+wname].show =
+                    dialog.widgets['missile_frame'+wname].show =
+                    dialog.widgets['missile_cancel'+wname].show =
+                    dialog.widgets['missile_pending'+wname].show = false;
+                dialog.widgets['missile_slot'+wname].state = 'locked';
 
                 // Valentina help to do what you need to do to unlock another slot
                 // XXXXXX port this to a get_requirements_help('equip_slot', delivery_slot_type) call?
@@ -36717,35 +37054,35 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                 if('limit_requires' in slot_building_spec) {
                     // minefield-style buildings where you build more to open slots
                     help_pred = {'predicate':'BUILDING_QUANTITY', 'building_type':slot_building, 'trigger_qty': count_objects_by_type(slot_building)+1};
-                    dialog.widgets['mine_slot'+wname].tooltip.str = dialog.data['widgets']['mine_slot']['ui_tooltip_build_more'].replace('%s', slot_building_spec['ui_name']);
+                    dialog.widgets['missile_slot'+wname].tooltip.str = dialog.data['widgets']['missile_slot']['ui_tooltip_build_more'].replace('%s', slot_building_spec['ui_name']);
                 } else {
                     // missile-style buildings where you upgrade a building to open slots
                     var b = find_object_by_type(slot_building);
                     if(!b) { throw Error('not slot_building '+slot_building); }
                     help_pred = {'predicate':'BUILDING_LEVEL', 'building_type':slot_building, 'trigger_level': b.level + 1};
-                    dialog.widgets['mine_slot'+wname].tooltip.str = dialog.data['widgets']['mine_slot']['ui_tooltip_upgrade'].replace('%s', slot_building_spec['ui_name']);
+                    dialog.widgets['missile_slot'+wname].tooltip.str = dialog.data['widgets']['missile_slot']['ui_tooltip_upgrade'].replace('%s', slot_building_spec['ui_name']);
                 }
 
                 var helper = null;
-                if(help_pred && dialog.widgets['mine_slot'+wname].show) {
+                if(help_pred && dialog.widgets['missile_slot'+wname].show) {
                     helper = function (use_short_circuit) { return function() {
                         var h = get_requirements_help(read_predicate(/** @type {!Object} */ (help_pred)), null, {short_circuit:use_short_circuit});
                         if(h) { h(); }
                     }; };
                 }
-                dialog.widgets['mine_slot'+wname].onclick = (helper ? helper(true) : null);
+                dialog.widgets['missile_slot'+wname].onclick = (helper ? helper(true) : null);
                 if(!dialog.parent.user_data['on_use_recipe']) {
                     dialog.parent.user_data['on_use_recipe'] = (helper ? helper(false) : null);
                 }
             } else {
                 // cannot ever exist
-                dialog.widgets['mine_icon'+wname].show =
-                    dialog.widgets['mine_skull'+wname].show =
-                    dialog.widgets['mine_timer'+wname].show =
-                    dialog.widgets['mine_frame'+wname].show =
-                    dialog.widgets['mine_cancel'+wname].show =
-                    dialog.widgets['mine_slot'+wname].show =
-                    dialog.widgets['mine_pending'+wname].show = false;
+                dialog.widgets['missile_icon'+wname].show =
+                    dialog.widgets['missile_skull'+wname].show =
+                    dialog.widgets['missile_timer'+wname].show =
+                    dialog.widgets['missile_frame'+wname].show =
+                    dialog.widgets['missile_cancel'+wname].show =
+                    dialog.widgets['missile_slot'+wname].show =
+                    dialog.widgets['missile_pending'+wname].show = false;
             }
         }
     }
@@ -36754,7 +37091,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
     if('arrow0' in dialog.widgets) {
         for(var i = 0; i < dialog.data['widgets']['arrow']['array'][1]; i++) {
             var wname = 'arrow'+i.toString();
-            dialog.widgets[wname].show = (max_slots >= i*dialog.data['widgets']['mine_slot']['array'][0] + 1);
+            dialog.widgets[wname].show = (max_slots >= i*dialog.data['widgets']['missile_slot']['array'][0] + 1);
         }
     }
 

@@ -39,6 +39,8 @@ Session.Session = function() {
 
     this.minefield_tags_by_obj_id = {}; // mapping from obj_id to tag of player minefield buildings, used for GUI purposes only
     this.minefield_tags_by_tag = {}; // mapping from tag to obj_id
+    this.ambush_point_tags_by_obj_id = {}; // mapping from obj_id to tag of player minefield buildings, used for GUI purposes only
+    this.ambush_point_tags_by_tag = {}; // mapping from tag to obj_id
     this.factory_tags_by_obj_id = {}; // GUI purposes only - identify unique factories (same as minefield tags above)
     this.factory_tags_by_tag = {};
     this.viewing_user_id = null; // SpinPunch user ID of the person whose base we are looking at
@@ -322,13 +324,21 @@ Session.Session.prototype.on_real_world_object_added = function(event) {
     // XXX does this need to remain sorted?
     if(obj.is_building() && obj.team == 'player') {
         if(obj.is_minefield()) {
-            var dims = gamedata['dialogs']['crafting_dialog_status_mines']['widgets']['mine_slot']['array'];
+            var dims = gamedata['dialogs']['crafting_dialog_status_grid_weapons']['widgets']['grid_slot']['array'];
             var count = goog.object.getCount(this.minefield_tags_by_obj_id);
-            var rownum = Math.floor(count/dims[0]);
-            var collet = count - rownum*dims[0];
-            var tag = String.fromCharCode('A'.charCodeAt(0) + collet)+(rownum+1).toString();
+            var rownum = Math.floor(count / dims[0]);
+            var collet = count - rownum * dims[0];
+            var tag = String.fromCharCode('A'.charCodeAt(0) + collet) + (rownum + 1).toString();
             this.minefield_tags_by_obj_id[obj.id] = tag;
             this.minefield_tags_by_tag[tag] = obj.id;
+        } else if(obj.is_ambush()) {
+            var dims = gamedata['dialogs']['crafting_dialog_status_grid_weapons']['widgets']['grid_slot']['array'];
+            var count = goog.object.getCount(this.ambush_point_tags_by_obj_id);
+            var rownum = Math.floor(count / dims[0]);
+            var collet = count - rownum * dims[0];
+            var tag = String.fromCharCode('A'.charCodeAt(0) + collet) + (rownum + 1).toString();
+            this.ambush_point_tags_by_obj_id[obj.id] = tag;
+            this.ambush_point_tags_by_tag[tag] = obj.id;
         } else if(obj.is_factory()) {
             var count = goog.object.getCount(this.factory_tags_by_obj_id[obj.spec['name']] || {});
             var tag = String.fromCharCode('A'.charCodeAt(0) + count).toString();
