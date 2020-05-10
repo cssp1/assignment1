@@ -9,6 +9,7 @@ import socket
 import requests
 import copy
 import time
+import urllib
 
 # raw exception for technical server/network trouble, when the game request might have been OK
 class ControlAPIException(Exception):
@@ -63,7 +64,7 @@ def CONTROLAPI_raw(args, spin_user = None, host = None, http_port = None, ssl_po
             time.sleep(retry_delay)
 
         try:
-            response = requests.post(url, data = args)
+            response = requests.post(url + '?' + urllib.urlencode(args))
 
             if response.status_code == 200:
                 # success!
