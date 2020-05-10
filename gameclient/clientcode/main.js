@@ -36788,8 +36788,6 @@ function update_crafting_dialog_status_grid_weapons(dialog) {
         var _dialog = w.parent;
         scroll_crafting_dialog_status_grid_weapons(_dialog, + 1);
     };
-    dialog.widgets['scroll_up'].xy = [280,120];
-    dialog.widgets['scroll_down'].xy = [280,345];
 }
 
 /** @param {SPUI.Dialog} dialog */
