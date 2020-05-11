@@ -35734,8 +35734,11 @@ function crafting_dialog_change_category(dialog, category, page) {
 }
 
 /** @param {string} grid_type */
+// this gets the maximum count for buildings that use the "grid" crafting system, minefields and ambush points
+// it returns an integer used to determine how many row labels are needed by the crafting UI.
 function get_max_grid_weapons(grid_type) {
     var building_name_map = {'mines':'minefield', 'ambushes':'ambush_point'};
+    if(!(grid_type in building_name_map)) { return 0; }
     var building_name = building_name_map[grid_type];
     if(!(building_name in gamedata['buildings'])) { return 0; }
     var spec = gamedata['buildings'][building_name];
@@ -35743,8 +35746,11 @@ function get_max_grid_weapons(grid_type) {
 }
 
 /** @param {string} grid_type */
+// this gets the current count for buildings that use the "grid" crafting system, minefields and ambush points
+// it returns an integer used to determine how many rows are needed by the crafting UI.
 function get_current_grid_weapons(grid_type) {
     var building_name_map = {'mines':'minefield', 'ambushes':'ambush_point'};
+    if(!(grid_type in building_name_map)) { return 0; }
     var building_name = building_name_map[grid_type];
     if(!(building_name in gamedata['buildings'])) { return 0; }
     var count = 0;
@@ -35778,9 +35784,8 @@ function crafting_dialog_init_status_grid_weapons(dialog) {
 }
 
 /** @param {SPUI.Dialog} dialog
-    @param {(Array<number>)} row_col */
+    @param {(!Array<number>)} row_col */
 function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
-    if(!row_col) { return; } // Google compiler gives an error without this protection
     var wname = SPUI.get_array_widget_name('', dialog.data['widgets']['grid_slot']['array'], row_col);
     var tag = dialog.widgets['col_labels' + row_col[0].toString()].str + dialog.widgets['row_labels' + row_col[1].toString()].str;
     var builder = dialog.parent.user_data['builder'];
