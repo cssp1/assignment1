@@ -1937,7 +1937,7 @@
         }
     },
 
-    "crafting_dialog_recipe_mines": {
+    "crafting_dialog_recipe_grid_weapons": {
         "xy": [95,128],
         "dimensions": [180,231],
         "widgets": {
@@ -2031,58 +2031,6 @@
                                           "color_missing": [1,0,0,0.5],
                                           "array": [2,1], "array_offset": [66,0] },
             "requirements_item": { "kind": "Dialog", "dialog": "item_display", "xy": [195,160], "dimensions": [50,50],
-                                   "ui_tooltip": "Item required in Warehouse: %ITEM",
-                                   "array": [2,1], "array_offset": [66,0] }
-        }
-    },
-
-    "crafting_dialog_recipe_ambushes": {
-        "xy": [175,127],
-        "dimensions": [430,231],
-        "widgets": {
-            "bracket": { "kind": "SolidRect", "xy": [-28,1], "dimensions": [20,230],
-                         "color": null, "outline_color": [0.25,0.25,0.25,1], "outline_width": 2,
-                         "path": [[0,0], [10,0], [10,222], [0,222], null, [10,75], [20,75]] },
-
-            "sunken": {"kind": "StaticImage", "xy":[0,0], "dimensions":[430,231], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
-            "topbar": { "kind": "SolidRect", "xy": [2,2], "dimensions":[426,30], "color": [0,0,0,0.5] },
-            "topinfo": { "kind": "RichTextField", "xy": [12,2], "dimensions": [426,30], "text_size": 13, "text_style": "thick",
-                         "text_hjustify": "left", "text_vjustify": "center",
-                         "ui_name_set": "[b]%ITEM_SET (%INDEX of %MEMBERS)[/b] - %SUBTITLE", //  - Level %LEVEL"
-                         "ui_name": "[b]%SUBTITLE[/b] - Upgrade to Level %LEVEL"
-                       },
-
-            "item": { "kind": "Dialog", "dialog": "item_display", "xy": [25,49], "dimensions": [50,50] },
-
-            "name": { "kind": "TextField", "xy": [90,44], "dimensions": [330,65], "text_size": 13, "text_style": "bold", "drop_shadow": 1,
-                      "text_hjustify": "left", "text_vjustify": "top"},
-            "description": { "kind": "RichTextField", "xy": [90,66], "dimensions": [330,60], "text_size": 13, "text_style": "normal",
-                             "max_lines": 3, "ui_name_seemore": " ... [color=#ffff00][u]See More[/u][/color]",
-                             "ui_tooltip": "", "tooltip_delay": 0,
-                             "text_hjustify": "left", "text_vjustify": "top"},
-
-            "requirements_label": { "kind": "TextField", "xy": [20,131], "dimensions": [75,50], "text_size": 13, "text_style": "normal",
-                                    "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Requirements:",
-                                    "text_color": [0.8,0.8,0.8,1]},
-            "requirements_separator": {"kind": "Line", "xy": [130,141], "dimensions": [255,0], "color":  [0.5,0.5,0.5,1],
-                                       "stroke_width": 2 },
-
-            "requirements_icon": { "kind": "StaticImage", "xy": [19,162], "dimensions": [21,21], "asset": "resource_icon_water",
-                                   "array": [2,2], "array_offset": [95,27] },
-            "requirements_value": { "kind": "TextField", "xy": [40,162], "dimensions": [50,21], "text_size": 13, "text_hjustify": "right",
-                                    "ui_tooltip": "%qty %res required to manufacture", "tooltip_delay": 0,
-                                    "array": [2,2], "array_offset": [100,27] },
-
-            "requirements_time_icon": { "kind": "StaticImage", "xy": [114,189], "dimensions": [21,21], "asset": "resource_icon_combat_time" },
-            "requirements_time_value": { "kind": "TextField", "xy": [140,189], "dimensions": [50,21], "text_size": 13, "text_hjustify": "right",
-                                         "ui_tooltip": "Time required to train", "tooltip_delay": 0 },
-
-            "requirements_item_status": { "kind": "SolidRect", "xy": [213,158], "dimensions": [54,54],
-                                          "outline_width": 1,
-                                          "color_present": [0,1,0,0.5],
-                                          "color_missing": [1,0,0,0.5],
-                                          "array": [2,1], "array_offset": [66,0] },
-            "requirements_item": { "kind": "Dialog", "dialog": "item_display", "xy": [215,160], "dimensions": [50,50],
                                    "ui_tooltip": "Item required in Warehouse: %ITEM",
                                    "array": [2,1], "array_offset": [66,0] }
         }
@@ -2192,44 +2140,47 @@
         }
     },
 
-    "crafting_dialog_status_mines": {
+    "crafting_dialog_status_grid_weapons": {
         "xy": [0,0],
         "dimensions": [736,423],
         "transparent_to_mouse": true,
         "widgets": {
             // the slot only gets clicked on empty/locked spaces, otherwise the click goes to "frame"
-            "mine_slot": { "kind": "ActionButton", "xy": [304,138], "dimensions": [50,50], "bg_image": "inventory_slot",
+            "grid_slot": { "kind": "ActionButton", "xy": [304,138], "dimensions": [50,50], "bg_image": "inventory_slot",
                            "ui_tooltip": "", "tooltip_delay": 0, "ui_tooltip_build_more": "To unlock, add another %s",
                            "array": [7,4], "array_offset": [59,57] },
-            "mine_icon": { "kind": "StaticImage", "xy": [304,138], "dimensions": [50,50],
+            "grid_icon": { "kind": "StaticImage", "xy": [304,138], "dimensions": [50,50],
                            "array": [7,4], "array_offset": [59,57] },
-            "mine_skull": { "kind": "StaticImage", "xy": [318,153], "dimensions": [22,25], "asset": "repair_skull",
+            "grid_skull": { "kind": "StaticImage", "xy": [318,153], "dimensions": [22,25], "asset": "repair_skull",
                             "array": [7,4], "array_offset": [59,57] },
-            "mine_timer": { "kind": "TextField", "xy": [304,168], "dimensions": [50,17], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "drop_shadow":1,
+            "grid_timer": { "kind": "TextField", "xy": [304,168], "dimensions": [50,17], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "drop_shadow":1,
                             "array": [7,4], "array_offset": [59,57] },
-            "mine_frame": { "kind": "ActionButton", "xy": [304,138], "dimensions": [50,50], "bg_image": "inventory_frame",
+            "grid_frame": { "kind": "ActionButton", "xy": [304,138], "dimensions": [50,50], "bg_image": "inventory_frame",
                             "ui_tooltip": "", "tooltip_delay": 0.5,
                             "ui_tooltip_armed": "Armed with: %s",
                             "ui_tooltip_inprogress": "In production: %s",
                             "ui_tooltip_produce": "Click to queue %s for production",
                             "array": [7,4], "array_offset": [59,57] },
-            "mine_cancel": { "kind": "ActionButton", "xy": [335,139], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
+            "grid_cancel": { "kind": "ActionButton", "xy": [335,139], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
                              "ui_tooltip": "", "tooltip_delay": 0.5,
                              "ui_tooltip_discard": "Click to discard %s",
                              "ui_tooltip_cancel": "Click to cancel production",
                              "array": [7,4], "array_offset": [59,57] },
-            "mine_pending": { "kind": "StaticImage", "xy":[321,155], "dimensions":[16,16], "asset":"loading_spinner",
+            "grid_pending": { "kind": "StaticImage", "xy":[321,155], "dimensions":[16,16], "asset":"loading_spinner",
                               "array": [7,4], "array_offset": [59,57] },
 
             "col_labels": { "kind": "TextField", "xy": [304,116], "dimensions": [50,16], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "text_color": [0.4,0.4,0.4,1],
                             "array": [7,1], "array_offset": [59,57] },
             "row_labels": { "kind": "TextField", "xy": [286,138], "dimensions": [16,50], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "text_color": [0.4,0.4,0.4,1],
-                            "array": [1,4], "array_offset": [59,57] }
+                            "array": [1,4], "array_offset": [59,57] },
+            "scroll_up": { "kind": "ActionButton", "xy": [280,120], "dimensions": [27,30], "bg_image": "chat_scroll_up", "push_bg_image": 1,
+                           "bg_image_offset": [0,-5], "layout": { "hjustify": "right"}, "dripper": {"rate": 4.0, "delay": 0} },
+            "scroll_down": { "kind": "ActionButton", "xy": [280,345], "dimensions": [27,30], "bg_image": "chat_scroll_down", "push_bg_image": 1,
+                             "bg_image_offset": [0,-15], "layout": { "hjustify": "right"}, "dripper": {"rate": 4.0, "delay": 0} }
         }
     },
 
     "crafting_dialog_status_missiles": {
-        // note: this shares a lot of code with status_mines, so it uses the same widget names
         "xy": [0,0],
         "dimensions": [736,423],
         "transparent_to_mouse": true,
@@ -2241,27 +2192,27 @@
                            "text_hjustify": "left", "text_vjustify": "top", "ui_name": "%cur/%max %s Ready" },
 
             // the slot only gets clicked on empty/locked spaces, otherwise the click goes to "frame"
-            "mine_slot": { "kind": "ActionButton", "xy": [540,153], "dimensions": [50,50], "bg_image": "inventory_slot",
+            "missile_slot": { "kind": "ActionButton", "xy": [540,153], "dimensions": [50,50], "bg_image": "inventory_slot",
                            "ui_tooltip": "", "tooltip_delay": 0, "ui_tooltip_upgrade": "To unlock, upgrade %s",
                            "array": [3,3], "array_offset": [59,57] },
-            "mine_icon": { "kind": "StaticImage", "xy": [540,153], "dimensions": [50,50],
+            "missile_icon": { "kind": "StaticImage", "xy": [540,153], "dimensions": [50,50],
                            "array": [3,3], "array_offset": [59,57] },
-            "mine_skull": { "kind": "StaticImage", "xy": [554,168], "dimensions": [22,25], "asset": "repair_skull",
+            "missile_skull": { "kind": "StaticImage", "xy": [554,168], "dimensions": [22,25], "asset": "repair_skull",
                             "array": [3,3], "array_offset": [59,57] },
-            "mine_timer": { "kind": "TextField", "xy": [540,183], "dimensions": [50,17], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "drop_shadow":1,
+            "missile_timer": { "kind": "TextField", "xy": [540,183], "dimensions": [50,17], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "drop_shadow":1,
                             "array": [3,3], "array_offset": [59,57] },
-            "mine_frame": { "kind": "ActionButton", "xy": [540,153], "dimensions": [50,50], "bg_image": "inventory_frame",
+            "missile_frame": { "kind": "ActionButton", "xy": [540,153], "dimensions": [50,50], "bg_image": "inventory_frame",
                             "ui_tooltip": "", "tooltip_delay": 0.5,
                             "ui_tooltip_armed": "Armed with: %s",
                             "ui_tooltip_inprogress": "In production: %s",
                             "ui_tooltip_produce": "Click to queue %s for production",
                             "array": [3,3], "array_offset": [59,57] },
-            "mine_cancel": { "kind": "ActionButton", "xy": [571,154], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
+            "missile_cancel": { "kind": "ActionButton", "xy": [571,154], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
                              "ui_tooltip": "", "tooltip_delay": 0.5,
                              "ui_tooltip_discard": "Click to discard %s",
                              "ui_tooltip_cancel": "Click to cancel production",
                              "array": [3,3], "array_offset": [59,57] },
-            "mine_pending": { "kind": "StaticImage", "xy":[557,170], "dimensions":[16,16], "asset":"loading_spinner",
+            "missile_pending": { "kind": "StaticImage", "xy":[557,170], "dimensions":[16,16], "asset":"loading_spinner",
                               "array": [3,3], "array_offset": [59,57] }
         }
     },
@@ -2410,7 +2361,7 @@
 
             // "recipe" and "status" dialog widgets are added in JavaScript
             //"recipe": { "show": 0, "kind": "Dialog", "dialog": "crafting_dialog_recipe", "xy": [95,128], "dimensions":[180,221] },
-            //"mines": { "kind": "Dialog", "dialog": "crafting_dialog_status_mines", "xy": [0,0], "dimensions":[736,423] },
+            //"mines": { "kind": "Dialog", "dialog": "crafting_dialog_status_grid", "xy": [0,0], "dimensions":[736,423] },
             //"leaders": { "kind": "Dialog", "dialog": "crafting_dialog_status_leaders", "xy": [0,0], "dimensions":[736,423] },
 
             "crafting_progress": { "kind": "ProgressBar", "xy": [153,396], "dimensions": [295,6],
