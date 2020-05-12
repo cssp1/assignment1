@@ -35874,6 +35874,8 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
         dialog.widgets['grid_icon'+wname].state = 'normal';
         dialog.widgets['grid_skull'+wname].show =
         dialog.widgets['grid_timer'+wname].show = false;
+        dialog.widgets['grid_slot'+wname].tooltip.str = '';
+        dialog.widgets['grid_slot'+wname].state = 'normal';
 
         var build_grid_item = cur_config || selected_grid_item || null;
         var build_recipe = null;
