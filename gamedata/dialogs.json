@@ -1942,7 +1942,7 @@
             "name": { "kind": "TextField", "xy": [2,2], "dimensions": [181,30], "text_size": 15, "text_style": "thick", "drop_shadow": 1,
                       "text_hjustify": "center", "text_vjustify": "center" },
 
-            "icon": { "kind": "StaticImage", "xy": [15,44], "dimensions": [50,50] },
+            "icon": { "kind": "StaticImage", "xy": [15,44], "dimensions": [50,50], "ui_tooltip": "", "tooltip_delay": 0 },
             "frame": { "kind": "ActionButton", "xy": [15,44], "dimensions": [50,50], "bg_image": "inventory_frame", "state": "active" },
 
             "damage_vs_label": { "kind": "TextField", "xy": [77,47], "dimensions": [90,20], "text_size": 13, "text_style": "normal",
