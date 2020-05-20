@@ -35590,6 +35590,7 @@ function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
     dialog.widgets['scroll_right'].widgets['scroll_right'].onclick = function(w) { var dialog = w.parent.parent; dialog.user_data['scrolled'] = true; crafting_dialog_scroll(dialog, dialog.user_data['page']+1); };
 
     dialog.ondraw = update_crafting_dialog;
+    dialog.on_mousewheel_function = crafting_dialog_mousewheel;
 
     // listen for inventory updates, because they affect the crafting recipe list
     dialog.user_data['inventory_update_receiver'] = (function (_dialog) { return function() {
@@ -36121,6 +36122,13 @@ function crafting_dialog_init_status_missiles(dialog) {
 /** @param {SPUI.Dialog} dialog */
 function crafting_dialog_init_status_merge_items(dialog) {
     // nothing to do here
+}
+
+/** @param {SPUI.Dialog} dialog
+    @param {number} page */
+function crafting_dialog_mousewheel(dialog, page) {
+    var destination_page = (page > 0 ? dialog.user_data['page'] + 1 : dialog.user_data['page'] - 1);
+    crafting_dialog_scroll(dialog, destination_page)
 }
 
 /** @param {SPUI.Dialog} dialog
