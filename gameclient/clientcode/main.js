@@ -46523,13 +46523,23 @@ function update_upgrade_dialog(dialog) {
 
     dialog.widgets['predicate_help_button'].show = false;
 
+    var process_reqs_further = true;
+    var builder_reqs_processed = false;
+
     if(stats_only) {
         // do nothing
-    } else if(new_level > max_level) {
+        process_reqs_further = false;
+    }
+    if(process_reqs_further && new_level > max_level) {
         req.push(gamedata['errors']['MAX_LEVEL_REACHED']['ui_name']);
-    } else if (stats_when_busy) {
+        process_reqs_further = false;
+    }
+    if(process_reqs_further && stats_when_busy) {
         req.push(gamedata['errors']['STATS_WHILE_UPGRADING']['ui_name']);
-    } else if(builder && builder.is_damaged()) {
+        process_reqs_further = false;
+    }
+    if(!builder_reqs_processed && process_reqs_further && builder && builder.is_damaged()) {
+        builder_reqs_processed = true;
         // builder needs repair
         dialog.widgets['predicate_help_button'].show = true;
         dialog.widgets['predicate_help_button'].onclick = function(w) {
@@ -46541,7 +46551,9 @@ function update_upgrade_dialog(dialog) {
                 invoke_child_repair_dialog();
             }
         };
-    } else if(builder && (builder.time_until_finish() > 0)) {
+    }
+    if(!builder_reqs_processed && process_reqs_further && builder && (builder.time_until_finish() > 0)) {
+        builder_reqs_processed = true;
         // builder is busy
         dialog.widgets['predicate_help_button'].show = true;
         dialog.widgets['predicate_help_button'].onclick = function(w) {
@@ -46549,7 +46561,8 @@ function update_upgrade_dialog(dialog) {
             change_selection_unit(dialog.user_data['builder']);
             invoke_child_speedup_dialog('speedup');
         };
-    } else if(req_spec && !player.is_cheater) {
+    }
+    if(process_reqs_further && req_spec && !player.is_cheater) {
         var pred_raw = get_leveled_quantity(req_spec, new_level);
 
         // add requirement for enhancement host building level
@@ -46568,10 +46581,11 @@ function update_upgrade_dialog(dialog) {
         if(text) {
             req.push(text);
             use_resources_requirements_ok = instant_requirements_ok = false;
-
-            var helper = get_requirements_help(pred, null);
-            dialog.widgets['predicate_help_button'].show = !!helper;
-            dialog.widgets['predicate_help_button'].onclick = helper;
+            if (!builder_reqs_processed){
+                var helper = get_requirements_help(pred, null);
+                dialog.widgets['predicate_help_button'].show = !!helper;
+                dialog.widgets['predicate_help_button'].onclick = helper;
+            }
         }
     }
 
