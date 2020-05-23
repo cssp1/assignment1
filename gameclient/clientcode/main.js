@@ -46574,13 +46574,23 @@ function update_upgrade_dialog(dialog) {
 
     dialog.widgets['predicate_help_button'].show = false;
 
+    var show_complete_reqs = true;
+    var builder_blocks_upgrade = false;
+
     if(stats_only) {
         // do nothing
-    } else if(new_level > max_level) {
+        show_complete_reqs = false;
+    }
+    if(show_complete_reqs && new_level > max_level) {
         req.push(gamedata['errors']['MAX_LEVEL_REACHED']['ui_name']);
-    } else if (stats_when_busy) {
+        show_complete_reqs = false;
+    }
+    if(show_complete_reqs && stats_when_busy) {
         req.push(gamedata['errors']['STATS_WHILE_UPGRADING']['ui_name']);
-    } else if(builder && builder.is_damaged()) {
+        show_complete_reqs = false;
+    }
+    if(!builder_blocks_upgrade && show_complete_reqs && builder && builder.is_damaged()) {
+        builder_blocks_upgrade = true;
         // builder needs repair
         dialog.widgets['predicate_help_button'].show = true;
         dialog.widgets['predicate_help_button'].onclick = function(w) {
@@ -46592,7 +46602,9 @@ function update_upgrade_dialog(dialog) {
                 invoke_child_repair_dialog();
             }
         };
-    } else if(builder && (builder.time_until_finish() > 0)) {
+    }
+    if(!builder_blocks_upgrade && show_complete_reqs && builder && (builder.time_until_finish() > 0)) {
+        builder_blocks_upgrade = true;
         // builder is busy
         dialog.widgets['predicate_help_button'].show = true;
         dialog.widgets['predicate_help_button'].onclick = function(w) {
@@ -46600,7 +46612,8 @@ function update_upgrade_dialog(dialog) {
             change_selection_unit(dialog.user_data['builder']);
             invoke_child_speedup_dialog('speedup');
         };
-    } else if(req_spec && !player.is_cheater) {
+    }
+    if(show_complete_reqs && req_spec && !player.is_cheater) {
         var pred_raw = get_leveled_quantity(req_spec, new_level);
 
         // add requirement for enhancement host building level
@@ -46619,10 +46632,11 @@ function update_upgrade_dialog(dialog) {
         if(text) {
             req.push(text);
             use_resources_requirements_ok = instant_requirements_ok = false;
-
-            var helper = get_requirements_help(pred, null);
-            dialog.widgets['predicate_help_button'].show = !!helper;
-            dialog.widgets['predicate_help_button'].onclick = helper;
+            if (!builder_blocks_upgrade){
+                var helper = get_requirements_help(pred, null);
+                dialog.widgets['predicate_help_button'].show = !!helper;
+                dialog.widgets['predicate_help_button'].onclick = helper;
+            }
         }
     }
 
