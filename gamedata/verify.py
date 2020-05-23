@@ -1603,16 +1603,29 @@ def check_item(itemname, spec):
                 if effect['stat'] == 'permanent_auras' and not any(x['kind'] == 'building' for x in spec['equip'].get('compatible',[spec['equip']])):
                     error |= 1; print '%s: permanent_auras mods are not supported on mobile units (buildings only)' % itemname
                 if effect['stat'] in ('on_destroy','on_damage','on_approach') and ('strength' in effect):
-                    for cons in effect['strength']:
-                        if cons['consequent'] == 'SPAWN_SECURITY_TEAM':
-                            if cons.get('persist') and not all('ersist' in ui_descr for ui_descr in ui_descr_list):
-                                error |= 1; print '%s\'s ui_description does not mention that its security team is persistent' % (itemname,)
-                            for unit, val in cons['units'].iteritems():
-                                if not isinstance(val, int):
-                                    if val['apply_auras']:
-                                        for aura in val['apply_auras']:
-                                            if aura['aura_name'] not in gamedata['auras']:
-                                                error |= 1; print '%s\'s apply_auras unit %s has an invalid aura, %s.' % (itemname,unit,aura['aura_name'])
+                    for entry in effect['strength']:
+                        if isinstance(entry,dict):
+                            cons = entry
+                            if cons['consequent'] == 'SPAWN_SECURITY_TEAM':
+                                if cons.get('persist') and not all('ersist' in ui_descr for ui_descr in ui_descr_list):
+                                    error |= 1; print '%s\'s ui_description does not mention that its security team is persistent' % (itemname,)
+                                for unit, val in cons['units'].iteritems():
+                                    if not isinstance(val, int):
+                                        if val['apply_auras']:
+                                            for aura in val['apply_auras']:
+                                                if aura['aura_name'] not in gamedata['auras']:
+                                                    error |= 1; print '%s\'s apply_auras unit %s has an invalid aura, %s.' % (itemname,unit,aura['aura_name'])
+                        elif isinstance(entry,list):
+                            for cons in entry:
+                                if cons['consequent'] == 'SPAWN_SECURITY_TEAM':
+                                    if cons.get('persist') and not all('ersist' in ui_descr for ui_descr in ui_descr_list):
+                                        error |= 1; print '%s\'s ui_description does not mention that its security team is persistent' % (itemname,)
+                                    for unit, val in cons['units'].iteritems():
+                                        if not isinstance(val, int):
+                                            if val['apply_auras']:
+                                                for aura in val['apply_auras']:
+                                                    if aura['aura_name'] not in gamedata['auras']:
+                                                        error |= 1; print '%s\'s apply_auras unit %s has an invalid aura, %s.' % (itemname,unit,aura['aura_name'])
 
             if 'consequent' in effect:
                 error |= check_consequent(effect['consequent'], reason = 'item %s: effects' % itemname)
