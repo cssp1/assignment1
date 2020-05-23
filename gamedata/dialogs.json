@@ -1942,7 +1942,7 @@
             "name": { "kind": "TextField", "xy": [2,2], "dimensions": [181,30], "text_size": 15, "text_style": "thick", "drop_shadow": 1,
                       "text_hjustify": "center", "text_vjustify": "center" },
 
-            "icon": { "kind": "StaticImage", "xy": [15,44], "dimensions": [50,50] },
+            "icon": { "kind": "StaticImage", "xy": [15,44], "dimensions": [50,50], "ui_tooltip": "", "tooltip_delay": 0 },
             "frame": { "kind": "ActionButton", "xy": [15,44], "dimensions": [50,50], "bg_image": "inventory_frame", "state": "active" },
 
             "damage_vs_label": { "kind": "TextField", "xy": [77,47], "dimensions": [90,20], "text_size": 13, "text_style": "normal",
@@ -2137,41 +2137,43 @@
     },
 
     "crafting_dialog_status_grid_weapons": {
-        "xy": [0,0],
-        "dimensions": [736,423],
+        "xy": [275,110],
+        "dimensions": [460,313],
         "transparent_to_mouse": true,
         "widgets": {
+            // helps catch on_mousewheel
+            "grid_background": { "kind": "SolidRect", "xy": [0,0], "dimensions":[460,230], "color": [0,0,0,0] },
             // the slot only gets clicked on empty/locked spaces, otherwise the click goes to "frame"
-            "grid_slot": { "kind": "ActionButton", "xy": [304,138], "dimensions": [50,50], "bg_image": "inventory_slot",
+            "grid_slot": { "kind": "ActionButton", "xy": [29,28], "dimensions": [50,50], "bg_image": "inventory_slot",
                            "ui_tooltip": "", "tooltip_delay": 0, "ui_tooltip_build_more": "To unlock, add another %s",
                            "array": [7,4], "array_offset": [59,57] },
-            "grid_icon": { "kind": "StaticImage", "xy": [304,138], "dimensions": [50,50],
+            "grid_icon": { "kind": "StaticImage", "xy": [29,28], "dimensions": [50,50],
                            "array": [7,4], "array_offset": [59,57] },
-            "grid_skull": { "kind": "StaticImage", "xy": [318,153], "dimensions": [22,25], "asset": "repair_skull",
+            "grid_skull": { "kind": "StaticImage", "xy": [43,43], "dimensions": [22,25], "asset": "repair_skull",
                             "array": [7,4], "array_offset": [59,57] },
-            "grid_timer": { "kind": "TextField", "xy": [304,168], "dimensions": [50,17], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "drop_shadow":1,
+            "grid_timer": { "kind": "TextField", "xy": [29,58], "dimensions": [50,17], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "drop_shadow":1,
                             "array": [7,4], "array_offset": [59,57] },
-            "grid_frame": { "kind": "ActionButton", "xy": [304,138], "dimensions": [50,50], "bg_image": "inventory_frame",
+            "grid_frame": { "kind": "ActionButton", "xy": [29,28], "dimensions": [50,50], "bg_image": "inventory_frame",
                             "ui_tooltip": "", "tooltip_delay": 0.5,
                             "ui_tooltip_armed": "Armed with: %s",
                             "ui_tooltip_inprogress": "In production: %s",
                             "ui_tooltip_produce": "Click to queue %s for production",
                             "array": [7,4], "array_offset": [59,57] },
-            "grid_cancel": { "kind": "ActionButton", "xy": [335,139], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
+            "grid_cancel": { "kind": "ActionButton", "xy": [60,29], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
                              "ui_tooltip": "", "tooltip_delay": 0.5,
                              "ui_tooltip_discard": "Click to discard %s",
                              "ui_tooltip_cancel": "Click to cancel production",
                              "array": [7,4], "array_offset": [59,57] },
-            "grid_pending": { "kind": "StaticImage", "xy":[321,155], "dimensions":[16,16], "asset":"loading_spinner",
+            "grid_pending": { "kind": "StaticImage", "xy":[46,45], "dimensions":[16,16], "asset":"loading_spinner",
                               "array": [7,4], "array_offset": [59,57] },
 
-            "col_labels": { "kind": "TextField", "xy": [304,116], "dimensions": [50,16], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "text_color": [0.4,0.4,0.4,1],
+            "col_labels": { "kind": "TextField", "xy": [29,6], "dimensions": [50,16], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "text_color": [0.4,0.4,0.4,1],
                             "array": [7,1], "array_offset": [59,57] },
-            "row_labels": { "kind": "TextField", "xy": [286,138], "dimensions": [16,50], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "text_color": [0.4,0.4,0.4,1],
+            "row_labels": { "kind": "TextField", "xy": [11,28], "dimensions": [16,50], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "text_color": [0.4,0.4,0.4,1],
                             "array": [1,4], "array_offset": [59,57] },
-            "scroll_up": { "kind": "ActionButton", "xy": [280,120], "dimensions": [27,30], "bg_image": "chat_scroll_up", "push_bg_image": 1,
+            "scroll_up": { "kind": "ActionButton", "xy": [5,10], "dimensions": [27,30], "bg_image": "chat_scroll_up", "push_bg_image": 1,
                            "bg_image_offset": [0,-5], "layout": { "hjustify": "right"}, "dripper": {"rate": 4.0, "delay": 0} },
-            "scroll_down": { "kind": "ActionButton", "xy": [280,345], "dimensions": [27,30], "bg_image": "chat_scroll_down", "push_bg_image": 1,
+            "scroll_down": { "kind": "ActionButton", "xy": [5,235], "dimensions": [27,30], "bg_image": "chat_scroll_down", "push_bg_image": 1,
                              "bg_image_offset": [0,-15], "layout": { "hjustify": "right"}, "dripper": {"rate": 4.0, "delay": 0} }
         }
     },
@@ -2210,29 +2212,6 @@
                              "array": [3,3], "array_offset": [59,57] },
             "missile_pending": { "kind": "StaticImage", "xy":[557,170], "dimensions":[16,16], "asset":"loading_spinner",
                               "array": [3,3], "array_offset": [59,57] }
-        }
-    },
-
-    "crafting_dialog_status_ambushes": {
-        "xy": [0,0],
-        "dimensions": [736,423],
-        "transparent_to_mouse": true,
-        "widgets": {
-            "arrow": {"kind": "Dialog", "dialog": "crafting_dialog_arrow_right", "xy": [613,183], "dimensions": [32,34] },
-            // the slot only gets clicked on empty/locked spaces, otherwise the click goes to "frame"
-            "leader_slot": { "kind": "ActionButton", "xy": [653,176], "dimensions": [50,50], "bg_image": "inventory_slot" },
-            "leader_prompt": { "kind": "TextField", "xy": [653,176], "dimensions": [50,50], "text_size": 13, "drop_shadow": 1, "ui_name": "Train" },
-            "leader_icon": { "kind": "StaticImage", "xy": [653,176], "dimensions": [50,50] },
-            "leader_timer": { "kind": "TextField", "xy": [653,206], "dimensions": [50,17], "text_size": 12, "text_hjustify": "center", "text_vjustify": "center", "drop_shadow":1, "text_offset": [1,0] },
-            "leader_frame": { "kind": "ActionButton", "xy": [653,176], "dimensions": [50,50], "bg_image": "inventory_frame",
-                              "ui_tooltip": "", "tooltip_delay": 0.5,
-                              "ui_tooltip_armed": "Armed with: %s",
-                              "ui_tooltip_inprogress": "In training: %s",
-                              "ui_tooltip_produce": "Click to queue %s for training" },
-            "leader_cancel": { "kind": "ActionButton", "xy": [684,177], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
-                               "ui_tooltip": "", "tooltip_delay": 0.5,
-                               "ui_tooltip_cancel": "Click to cancel training" },
-            "leader_pending": { "kind": "StaticImage", "xy":[669,193], "dimensions":[16,16], "asset":"loading_spinner" }
         }
     },
 

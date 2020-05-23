@@ -23272,20 +23272,33 @@ function invoke_building_context_menu(mouse_xy) {
                 }
             }
 
-            if(session.home_base && obj.is_minefield()) {
-                buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_minefield'],
+            if(session.home_base && (obj.is_minefield() || obj.is_ambush())) {
+                var building_context = '';
+                var crafting_category = '';
+                var grid_item_name = null;
+                if (obj.is_minefield()) {
+                    building_context = 'ui_name_building_context_minefield';
+                    crafting_category = 'mines';
+                    grid_item_name = obj.minefield_item();
+                } else if (obj.is_ambush()) {
+                    building_context = 'ui_name_building_context_ambush_point';
+                    crafting_category = 'ambushes';
+                    grid_item_name = obj.ambush_item();
+                }
+                if(!gamedata['spells']['CRAFT_FOR_FREE'][building_context]) {
+                    throw Error('Missing CRAFT_FOR_FREE building context, ' + building_context);
+                }
+                buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CRAFT_FOR_FREE'][building_context],
                                                     onclick: (function (_obj) { return function() {
-                                                        invoke_crafting_dialog('mines');
+                                                        invoke_crafting_dialog(crafting_category);
                                                     }; })(obj), asset: 'menu_button_resizable'}));
-
-                var mine_item_name = obj.minefield_item();
-                if(mine_item_name) {
-                    var mine_item = ItemDisplay.get_inventory_item_spec(mine_item_name);
-                    if(mine_item && mine_item['associated_tech']) {
+                if(grid_item_name) {
+                    var grid_item = ItemDisplay.get_inventory_item_spec(grid_item_name);
+                    if(grid_item && grid_item['associated_tech']) {
                         buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['UPGRADE_FOR_FREE']['ui_name'],
                                                             onclick: (function (_techname) { return function() {
                                                                 invoke_upgrade_tech_dialog(_techname, null);
-                                                            }; })(mine_item['associated_tech']), asset: 'menu_button_resizable'}));
+                                                            }; })(grid_item['associated_tech']), asset: 'menu_button_resizable'}));
                     }
                 }
             }
@@ -35577,6 +35590,7 @@ function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
     dialog.widgets['scroll_right'].widgets['scroll_right'].onclick = function(w) { var dialog = w.parent.parent; dialog.user_data['scrolled'] = true; crafting_dialog_scroll(dialog, dialog.user_data['page']+1); };
 
     dialog.ondraw = update_crafting_dialog;
+    dialog.on_mousewheel_function = crafting_dialog_mousewheel;
 
     // listen for inventory updates, because they affect the crafting recipe list
     dialog.user_data['inventory_update_receiver'] = (function (_dialog) { return function() {
@@ -35637,14 +35651,16 @@ function crafting_dialog_change_category(dialog, category, page) {
             dialog.widgets['category_button'+i.toString()].str = entry['ui_name'];
             dialog.widgets['category_button'+i.toString()].text_color = (category === entry['name'] ? SPUI.default_text_color : SPUI.disabled_text_color);
             dialog.widgets['category_button'+i.toString()].state = (category === entry['name'] ? 'active' : 'normal');
-            dialog.widgets['category_button'+i.toString()].onclick = (function (_entry) { return function(w) {
-                if(entry['table_of_contents']) {
+            if(entry['table_of_contents']) {
+                dialog.widgets['category_button'+i.toString()].onclick = (function (_entry) { return function(w) {
                     change_selection_ui(null);
                     invoke_crafting_table_of_contents_dialog(_entry['name']);
-                } else {
+                }; })(entry);
+            } else {
+                dialog.widgets['category_button'+i.toString()].onclick = (function (_entry) { return function(w) {
                     crafting_dialog_change_category(w.parent, _entry['name']);
-                }
-            }; })(entry);
+                }; })(entry);
+            }
         }
     }
 
@@ -35676,50 +35692,9 @@ function crafting_dialog_change_category(dialog, category, page) {
         dialog.widgets['coverup_button'].onclick = (helper ? helper : function() { invoke_build_dialog('production'); });
 
     } else {
-        // construct recipe list
-        dialog.user_data['recipes'] = [];
-
-        for(var name in gamedata['crafting']['recipes']) {
-            var spec = gamedata['crafting']['recipes'][name];
-            if(spec['crafting_category'] != category) { continue; }
-
-            // subcategory/associated_item_set mismatch
-            if(dialog.user_data['subcategory'] && (dialog.user_data['subcategory'] != spec['associated_item_set'])) { continue; }
-
-            if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { continue; }
-            if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
-            if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
-
-            if((spec['max_level'] || 1) > 1) {
-                if (spec['associated_tech'] && player.tech[spec['associated_tech']]) {
-                        var rec = {'spec': name, 'level': player.tech[spec['associated_tech']]};
-                        dialog.user_data['recipes'].push(rec);
-                        if(!preselect) { preselect = rec; }
-                } else if(spec['associated_item']) {
-                    // this recipe upgrades an existing item. Show only if the item is available in inventory.
-                    var seen_levels = {};
-                    player.stored_item_iter(function (entry) {
-                        if(entry['spec'] === spec['associated_item']) {
-                            var existing_level = entry['level'] || 1;
-                            if(existing_level < spec['max_level'] &&
-                               get_leveled_quantity(spec['cost'], existing_level + 1) !== null &&
-                               !(existing_level.toString() in seen_levels)) {
-                                // item not already maxed, we can upgrade it
-                                seen_levels[existing_level.toString()] = 1; // mark seen
-                                var rec_this_level = {'spec': name, 'level': existing_level + 1}
-                                dialog.user_data['recipes'].push(rec_this_level);
-                                if(!preselect) { preselect = rec_this_level; }
-                            }
-                        }
-                    });
-                } else {
-                    throw Error('leveled crafting recipe without associated_item');
-                }
-            } else {
-                var rec = {'spec': name};
-                dialog.user_data['recipes'].push(rec);
-                if(!preselect) { preselect = rec; }
-            }
+        refresh_crafting_dialog_recipes(dialog);
+        if(dialog.user_data['recipes'].length > 0) {
+            preselect = dialog.user_data['recipes'][0];
         }
     }
 
@@ -35760,6 +35735,59 @@ function crafting_dialog_change_category(dialog, category, page) {
     crafting_dialog_scroll(dialog, page || 0);
 
     if(dialog.user_data['page'] == 0) {
+        // select first buildable recipe
+        crafting_dialog_select_recipe(dialog.widgets['recipe'], preselect);
+    }
+}
+
+/** @param {SPUI.Element} dialog */
+function refresh_crafting_dialog_recipes(dialog) {
+    var category, preselect;
+    category = dialog.user_data['category'];
+    preselect = dialog.user_data['selected_recipe'];
+    dialog.user_data['recipes'] = [];
+    for(var name in gamedata['crafting']['recipes']) {
+        var spec = gamedata['crafting']['recipes'][name];
+        if(spec['crafting_category'] != category) { continue; }
+
+        // subcategory/associated_item_set mismatch
+        if(dialog.user_data['subcategory'] && (dialog.user_data['subcategory'] != spec['associated_item_set'])) { continue; }
+        if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { continue; }
+        if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
+        if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
+
+        if((spec['max_level'] || 1) > 1) {
+            if (spec['associated_tech'] && player.tech[spec['associated_tech']]) {
+                    var rec = {'spec': name, 'level': player.tech[spec['associated_tech']]};
+                    dialog.user_data['recipes'].push(rec);
+                    if(!preselect) { preselect = rec; }
+            } else if(spec['associated_item']) {
+                // this recipe upgrades an existing item. Show only if the item is available in inventory.
+                var seen_levels = {};
+                player.stored_item_iter(function (entry) {
+                    if(entry['spec'] === spec['associated_item']) {
+                        var existing_level = entry['level'] || 1;
+                        if(existing_level < spec['max_level'] &&
+                           get_leveled_quantity(spec['cost'], existing_level + 1) !== null &&
+                           !(existing_level.toString() in seen_levels)) {
+                            // item not already maxed, we can upgrade it
+                            seen_levels[existing_level.toString()] = 1; // mark seen
+                            var rec_this_level = {'spec': name, 'level': existing_level + 1}
+                            dialog.user_data['recipes'].push(rec_this_level);
+                            if(!preselect) { preselect = rec_this_level; }
+                        }
+                    }
+                });
+            } else {
+                throw Error('leveled crafting recipe without associated_item');
+            }
+        } else {
+            var rec = {'spec': name};
+            dialog.user_data['recipes'].push(rec);
+            if(!preselect) { preselect = rec; }
+        }
+    }
+    if(dialog.user_data['page'] == 0 && preselect) {
         // select first buildable recipe
         crafting_dialog_select_recipe(dialog.widgets['recipe'], preselect);
     }
@@ -35837,6 +35865,7 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
     var delivery_slot_index = 0;
     var multiple_delivery_slots;
     var pending = false;
+    var grid_frame_tooltip = '';
 
 
     // set up default display, where minefield or ambush point does not exist
@@ -35853,7 +35882,6 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
     var slot_building = gamedata['crafting']['categories'][category]['delivery_building_for_ui'];
     var slot_building_spec = gamedata['buildings'][slot_building];
     help_pred = {'predicate':'BUILDING_QUANTITY', 'building_type':slot_building, 'trigger_qty': count_objects_by_type(slot_building)+1};
-    dialog.widgets['grid_slot'+wname].tooltip.str = dialog.data['widgets']['grid_slot']['ui_tooltip_build_more'].replace('%s', slot_building_spec['ui_name']);
 
     var helper = null;
     if(help_pred && dialog.widgets['grid_slot'+wname].show) {
@@ -35906,8 +35934,7 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
         dialog.widgets['grid_icon'+wname].state = 'normal';
         dialog.widgets['grid_skull'+wname].show =
         dialog.widgets['grid_timer'+wname].show = false;
-        dialog.widgets['grid_slot'+wname].tooltip.str = '';
-        dialog.widgets['grid_slot'+wname].state = 'normal';
+        dialog.widgets['grid_slot'+wname].show = false;
 
         var build_grid_item = cur_config || selected_grid_item || null;
         var build_recipe = null;
@@ -35938,6 +35965,14 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
             }
             var can_cast = can_cast_spell_detailed(builder.id, 'CRAFT_FOR_FREE', [{'recipe': build_recipe_spec['name'], // XXX level
                                                                                    'delivery': {'obj_id':obj.id, 'slot_type':delivery_slot_type, 'slot_index': delivery_slot_index}}]);
+            if (!!!can_cast[0]) {
+                if('requires' in build_recipe_spec) {
+                    grid_frame_tooltip = read_predicate(get_leveled_quantity(build_recipe_spec['requires'], build_recipe_level)).ui_describe(player);
+                } else if (can_cast[1]) {
+                    grid_frame_tooltip = can_cast[1];
+                }
+            }
+
             if(can_cast[0]) {
                 // the real build function
                 build_cb = (function (_builder, _build_recipe_spec, _obj, _delivery_slot_index, _build_recipe_level) { return function() {
@@ -35983,7 +36018,7 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
             dialog.widgets['grid_icon'+wname].alpha = 1;
             dialog.widgets['grid_icon'+wname].asset = get_leveled_quantity(cur_grid_item_spec['icon'], cur_grid_item_level);
             dialog.widgets['grid_frame'+wname].onclick = null;
-            dialog.widgets['grid_frame'+wname].tooltip.str = dialog.data['widgets']['grid_frame']['ui_tooltip_armed'].replace('%s', cur_grid_item_spec['ui_name']);
+            grid_frame_tooltip = dialog.data['widgets']['grid_frame']['ui_tooltip_armed'].replace('%s', cur_grid_item_spec['ui_name']);
             dialog.widgets['grid_cancel'+wname].show = !(('can_unequip' in cur_grid_item_spec) && !cur_grid_item_spec['can_unequip']);
             dialog.widgets['grid_cancel'+wname].tooltip.str = dialog.data['widgets']['grid_cancel']['ui_tooltip_discard'].replace('%s', cur_grid_item_spec['ui_name']);
             dialog.widgets['grid_cancel'+wname].onclick = (function (_obj, _cur_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb) { return function(w) {
@@ -35996,7 +36031,7 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
             dialog.widgets['grid_icon'+wname].asset = get_leveled_quantity(get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]), in_progress_level);
             dialog.widgets['grid_icon'+wname].alpha = 1;
             dialog.widgets['grid_frame'+wname].onclick = null;
-            dialog.widgets['grid_frame'+wname].tooltip.str = dialog.data['widgets']['grid_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe])));
+            grid_frame_tooltip = dialog.data['widgets']['grid_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe])));
             dialog.widgets['grid_cancel'+wname].tooltip.str = dialog.data['widgets']['grid_cancel']['ui_tooltip_cancel'];
             dialog.widgets['grid_cancel'+wname].onclick = (function (_builder, _in_progress_bus, _unconfig_cb) { return function(w) {
                 do_cancel_crafting(_builder, _in_progress_bus);
@@ -36011,7 +36046,7 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
             dialog.widgets['grid_icon'+wname].alpha = 0.33;
             dialog.widgets['grid_skull'+wname].show = true;
             dialog.widgets['grid_frame'+wname].onclick = build_cb;
-            dialog.widgets['grid_frame'+wname].tooltip.str = dialog.data['widgets']['grid_frame']['ui_tooltip_produce'].replace('%s', cur_config_spec['ui_name']);
+            grid_frame_tooltip = dialog.data['widgets']['grid_frame']['ui_tooltip_produce'].replace('%s', cur_config_spec['ui_name']);
             dialog.widgets['grid_cancel'+wname].onclick = unconfig_cb;
 
             if(!dialog.parent.user_data['on_use_recipe'] && selected_grid_spec == cur_config_spec) {
@@ -36022,7 +36057,8 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
             dialog.widgets['grid_icon'+wname].alpha = 0.33;
             dialog.widgets['grid_icon'+wname].asset = get_leveled_quantity(selected_grid_spec['icon'], selected_grid_item_level);
             dialog.widgets['grid_icon'+wname].show = (dialog.widgets['grid_frame'+wname].mouse_enter_time > 0) && (dialog.widgets['grid_cancel'+wname].mouse_enter_time < 0);
-            dialog.widgets['grid_frame'+wname].tooltip.str = dialog.data['widgets']['grid_frame']['ui_tooltip_produce'].replace('%s', selected_grid_spec['ui_name']);
+            if(grid_frame_tooltip == '') { grid_frame_tooltip = dialog.data['widgets']['grid_frame']['ui_tooltip_produce'].replace('%s', selected_grid_spec['ui_name']); }
+
             var build_and_config_cb;
             if(('persist_config' in catspec) && !catspec['persist_config']) {
                 build_and_config_cb = build_cb; // no persistence
@@ -36062,6 +36098,10 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
         if(pending) {
             dialog.widgets['grid_frame'+wname].onclick = null;
         }
+        dialog.widgets['grid_frame'+wname].tooltip.str = grid_frame_tooltip;
+    } else {
+        dialog.widgets['grid_slot'+wname].show = true;
+        dialog.widgets['grid_slot'+wname].tooltip.str = grid_frame_tooltip = dialog.data['widgets']['grid_slot']['ui_tooltip_build_more'].replace('%s', slot_building_spec['ui_name']);
     }
 }
 
@@ -36082,6 +36122,13 @@ function crafting_dialog_init_status_missiles(dialog) {
 /** @param {SPUI.Dialog} dialog */
 function crafting_dialog_init_status_merge_items(dialog) {
     // nothing to do here
+}
+
+/** @param {SPUI.Dialog} dialog
+    @param {number} page */
+function crafting_dialog_mousewheel(dialog, page) {
+    var destination_page = (page > 0 ? dialog.user_data['page'] + 1 : dialog.user_data['page'] - 1);
+    crafting_dialog_scroll(dialog, destination_page)
 }
 
 /** @param {SPUI.Dialog} dialog
@@ -36145,6 +36192,9 @@ function crafting_dialog_select_recipe_grid_weapons(dialog, specname, recipe, re
     };
 
     var grid_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe, recipe_level);
+    if('ui_description' in grid_spec) {
+        dialog.widgets['icon'].tooltip.str = grid_spec['ui_description'];
+    }
     var grid_spell = ItemDisplay.get_inventory_item_weapon_spell(grid_spec);
     init_damage_vs_icons(dialog, {'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
                          grid_spell);
@@ -36368,6 +36418,7 @@ function update_crafting_dialog_recipe_common(dialog) {
 
 /** @param {SPUI.Dialog} dialog */
 function update_crafting_dialog_recipe_grid_weapons(dialog) {
+    refresh_crafting_dialog_recipes(dialog.parent);
     update_crafting_dialog_recipe_common(dialog);
 }
 
