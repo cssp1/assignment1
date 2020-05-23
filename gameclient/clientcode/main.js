@@ -46523,23 +46523,23 @@ function update_upgrade_dialog(dialog) {
 
     dialog.widgets['predicate_help_button'].show = false;
 
-    var process_reqs_further = true;
-    var builder_reqs_processed = false;
+    var show_complete_reqs = true;
+    var builder_blocks_upgrade = false;
 
     if(stats_only) {
         // do nothing
-        process_reqs_further = false;
+        show_complete_reqs = false;
     }
-    if(process_reqs_further && new_level > max_level) {
+    if(show_complete_reqs && new_level > max_level) {
         req.push(gamedata['errors']['MAX_LEVEL_REACHED']['ui_name']);
-        process_reqs_further = false;
+        show_complete_reqs = false;
     }
-    if(process_reqs_further && stats_when_busy) {
+    if(show_complete_reqs && stats_when_busy) {
         req.push(gamedata['errors']['STATS_WHILE_UPGRADING']['ui_name']);
-        process_reqs_further = false;
+        show_complete_reqs = false;
     }
-    if(!builder_reqs_processed && process_reqs_further && builder && builder.is_damaged()) {
-        builder_reqs_processed = true;
+    if(!builder_blocks_upgrade && show_complete_reqs && builder && builder.is_damaged()) {
+        builder_blocks_upgrade = true;
         // builder needs repair
         dialog.widgets['predicate_help_button'].show = true;
         dialog.widgets['predicate_help_button'].onclick = function(w) {
@@ -46552,8 +46552,8 @@ function update_upgrade_dialog(dialog) {
             }
         };
     }
-    if(!builder_reqs_processed && process_reqs_further && builder && (builder.time_until_finish() > 0)) {
-        builder_reqs_processed = true;
+    if(!builder_blocks_upgrade && show_complete_reqs && builder && (builder.time_until_finish() > 0)) {
+        builder_blocks_upgrade = true;
         // builder is busy
         dialog.widgets['predicate_help_button'].show = true;
         dialog.widgets['predicate_help_button'].onclick = function(w) {
@@ -46562,7 +46562,7 @@ function update_upgrade_dialog(dialog) {
             invoke_child_speedup_dialog('speedup');
         };
     }
-    if(process_reqs_further && req_spec && !player.is_cheater) {
+    if(show_complete_reqs && req_spec && !player.is_cheater) {
         var pred_raw = get_leveled_quantity(req_spec, new_level);
 
         // add requirement for enhancement host building level
@@ -46581,7 +46581,7 @@ function update_upgrade_dialog(dialog) {
         if(text) {
             req.push(text);
             use_resources_requirements_ok = instant_requirements_ok = false;
-            if (!builder_reqs_processed){
+            if (!builder_blocks_upgrade){
                 var helper = get_requirements_help(pred, null);
                 dialog.widgets['predicate_help_button'].show = !!helper;
                 dialog.widgets['predicate_help_button'].onclick = helper;
