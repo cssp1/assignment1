@@ -108,6 +108,22 @@ ItemDisplay.get_crafting_recipe_product_spec = function(recipe, level) {
     return gamedata['items']['unknown_crafting_product'];
 };
 
+/** For an item that has a crafting recipe, return the name of that recipe.
+    Otherwise, return unknown_crafting_recipe, which points to unknown_crafting_product.
+    @param {string} item
+    @return {Object} the crafting recipe name */
+ItemDisplay.get_inventory_item_crafting_recipe = function(item) {
+    var recipe_result = gamedata['crafting']['recipes']['unknown_crafting_recipe'];
+    for(var name in gamedata['crafting']['recipes']){
+        var recipe = gamedata['crafting']['recipes'][name];
+        if('associated_item' in recipe && recipe['associated_item'] == item) {
+            recipe_result = recipe;
+            break;
+        }
+    }
+    return recipe_result;
+}
+
 /** given a 50x50 SPUI.StaticImage widget, set the widget's asset/state/alpha to show the item indicated by 'spec' (a spec from gamedata['items'])
    @param {SPUI.DialogWidget} widget
    @param {Object} spec */
