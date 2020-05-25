@@ -23378,7 +23378,7 @@ function invoke_building_context_menu(mouse_xy) {
                 // object is busy with something, cannot upgrade
             } else if((session.home_base || quarry_upgradable || quarry_stats_viewable) &&
                       (obj.get_max_ui_level() > 1 || obj.is_storage() ||
-                       (('equip_slots' in obj.spec) && !obj.is_minefield()))
+                       (('equip_slots' in obj.spec) && !obj.is_minefield() && !obj.is_ambush()))
                      ) {
                 var spell = gamedata['spells']['SHOW_UPGRADE'];
                 if(obj.level < obj.get_max_ui_level()) {
@@ -23495,7 +23495,11 @@ function invoke_building_context_menu(mouse_xy) {
         dialog.widgets['level'].str = session.minefield_tags_by_obj_id[obj.id];
 
         dialog.widgets['level'].str += ' ('+gamedata['strings'][obj.is_minefield_armed() ? 'minefield_armed' : 'minefield_not_armed']+')';
-    } else if(obj.is_inert() && ('ui_description' in spec)) {
+    } else if(obj.is_building() && obj.is_ambush() && (obj.id in session.ambush_point_tags_by_obj_id)) {
+        dialog.widgets['level'].str = session.ambush_point_tags_by_obj_id[obj.id];
+
+        dialog.widgets['level'].str += ' ('+gamedata['strings'][obj.is_ambush_armed() ? 'ambush_point_armed' : 'ambush_point_not_armed']+')';
+    }  else if(obj.is_inert() && ('ui_description' in spec)) {
         // this used to be an amount specified in obj.metadata (iron_deposit contents), but we decided to hide it from players
         dialog.widgets['level'].str = obj.get_leveled_quantity(spec['ui_description']).replace('%d', '??');
     } else {
@@ -53107,6 +53111,9 @@ function create_mouse_tooltip() {
             if(obj.is_building() && obj.is_minefield() && (obj.id in session.minefield_tags_by_obj_id)) {
                 nameline += ' '+session.minefield_tags_by_obj_id[obj.id];
             }
+            if(obj.is_building() && obj.is_ambush() && (obj.id in session.ambush_point_tags_by_obj_id)) {
+                nameline += ' '+session.ambush_point_tags_by_obj_id[obj.id];
+            }
             str.push(nameline);
 
             if(obj.team === 'player' && obj.is_building() && obj.is_shooter() && !obj.is_minefield() && !obj.is_ambush() && !obj.is_emplacement() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall()) {
@@ -53244,7 +53251,7 @@ function create_mouse_tooltip() {
                                 var item_spec = ItemDisplay.get_inventory_item_spec(player.decode_equipped_item(item_list[i])['spec']);
                                 var equip_ui_name = ItemDisplay.get_inventory_item_ui_name(item_spec);
                                 var ui_level = null;
-                                if(obj.is_building() && obj.is_minefield() && obj.is_minefield_armed()) {
+                                if(obj.is_building() && ((obj.is_minefield() && obj.is_minefield_armed()) || (obj.is_ambush() && obj.is_ambush_armed()))) {
                                     if (equip_ui_name.indexOf('_L') === -1 && item_spec['associated_tech']) {
                                         var item_cur_level = player.decode_equipped_item(item_list[i])['level'];
                                         var tech_max_level = get_max_ui_level(gamedata['tech'][item_spec['associated_tech']]);
