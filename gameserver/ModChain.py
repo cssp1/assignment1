@@ -23,7 +23,7 @@ def get_base_value(stat, spec, level):
     elif hasattr(spec, stat): return get_leveled_quantity(getattr(spec, stat), level)
     elif stat == 'armor': # XXX annoying special case
         return 0
-    elif stat in ('on_destroy','on_damage','on_approach'):
+    elif stat in ('on_destroy','on_damage','on_approach','strike_team'):
         return None
     elif stat == 'repair_price_cap':
         return -1

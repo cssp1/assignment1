@@ -67,6 +67,48 @@ ModChain.get_base_value = function(stat, spec, level) {
             });
         }
         return ret;
+    } else if(stat == 'strike_team') { // special for strike teams
+        var effects = spec['equip']['effects']
+        var desc = '';
+        for(var i = 0; i < effects.length; i ++) {
+            var effect = effects[i];
+            if(desc !== '') { continue; }
+            if('apply_if' in effect && !read_predicate(effect['apply_if']).is_satisfied(player,null)) { continue; }
+            if('stat' in effect && (effect['stat'] == 'on_destroy' || effect['stat'] == 'on_damage' || effect['stat'] == 'on_approach')) {
+                var this_effect, secteam
+                this_effect = get_leveled_quantity(effect['strength'], level);
+                if(Array.isArray(this_effect)) {
+                    secteam = this_effect[0]['units'];
+                } else {
+                    secteam = this_effect['units'];
+                }
+                for(var specname in secteam) {
+                    var entry = secteam[specname];
+                    if(desc !== '') {
+                        desc += '\n'
+                    }
+                    var unit_spec = gamedata['units'][specname];
+                    var ui_name = '';
+                    var qty;
+                    var ui_level = '';
+                    if(typeof(entry) === 'number') {
+                        qty = entry.toString() + 'x ';
+                    } else if('qty' in entry) {
+                        qty = entry['qty'].toString() + 'x ';
+                        if('force_level' in entry) {
+                            ui_level = 'L'+entry['force_level'].toString() + ' ';
+                        }
+                    }
+                    if(qty > 1) {
+                        ui_name = unit_spec['ui_name_plural'];
+                    } else {
+                        ui_name = unit_spec['ui_name'];
+                    }
+                    desc += qty + ui_level + ui_name;
+                }
+            }
+        }
+        return desc;
     } else if(stat in spec) {
         return get_leveled_quantity(spec[stat], level);
     } else if(stat == 'armor') { // annoying special cases
