@@ -45878,6 +45878,9 @@ function update_upgrade_dialog(dialog) {
         if('power_shutdown_threshold' in unit.spec) { feature_list.push('power_shutdown_threshold'); }
         if('provides_foremen' in unit.spec) { feature_list.push('provides_foremen'); }
 
+        // special stat for ambush points
+        if('strike_team' in unit.spec) { feature_list.push('strike_team'); }
+
         // detect enhanceable stats
         if(unit.spec['enhancement_categories']) {
             for(var enh_name in gamedata['enhancements']) {
