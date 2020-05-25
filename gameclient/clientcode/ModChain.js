@@ -68,14 +68,14 @@ ModChain.get_base_value = function(stat, spec, level) {
         }
         return ret;
     } else if(stat == 'strike_team') { // special for strike teams
-        var effects = spec['equip']['effects']
+        var effects = spec['equip']['effects'];
         var desc = '';
         for(var i = 0; i < effects.length; i ++) {
             var effect = effects[i];
             if(desc !== '') { continue; }
             if('apply_if' in effect && !read_predicate(effect['apply_if']).is_satisfied(player,null)) { continue; }
             if('stat' in effect && (effect['stat'] == 'on_destroy' || effect['stat'] == 'on_damage' || effect['stat'] == 'on_approach')) {
-                var this_effect, secteam
+                var this_effect, secteam;
                 this_effect = get_leveled_quantity(effect['strength'], level);
                 if(Array.isArray(this_effect)) {
                     secteam = this_effect[0]['units'];
@@ -85,7 +85,7 @@ ModChain.get_base_value = function(stat, spec, level) {
                 for(var specname in secteam) {
                     var entry = secteam[specname];
                     if(desc !== '') {
-                        desc += '\n'
+                        desc += '\n';
                     }
                     var unit_spec = gamedata['units'][specname];
                     var ui_name = '';
