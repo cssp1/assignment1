@@ -36014,10 +36014,13 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
 
         if(cur_item) {
             var cur_grid_item_spec = ItemDisplay.get_inventory_item_spec(cur_item['spec']);
+            var current_grid_item_recipe = ItemDisplay.get_inventory_item_crafting_recipe(cur_item['spec']);
             var cur_grid_item_level = cur_item['level'] || 1;
             dialog.widgets['grid_icon'+wname].alpha = 1;
             dialog.widgets['grid_icon'+wname].asset = get_leveled_quantity(cur_grid_item_spec['icon'], cur_grid_item_level);
-            dialog.widgets['grid_frame'+wname].onclick = null;
+            dialog.widgets['grid_frame'+wname].onclick = (function (_rec) { return function(w) {
+                crafting_dialog_select_recipe(w.parent.parent.widgets['recipe'], {'spec': _rec['name']});
+            }; })(current_grid_item_recipe);
             grid_frame_tooltip = dialog.data['widgets']['grid_frame']['ui_tooltip_armed'].replace('%s', cur_grid_item_spec['ui_name']);
             dialog.widgets['grid_cancel'+wname].show = !(('can_unequip' in cur_grid_item_spec) && !cur_grid_item_spec['can_unequip']);
             dialog.widgets['grid_cancel'+wname].tooltip.str = dialog.data['widgets']['grid_cancel']['ui_tooltip_discard'].replace('%s', cur_grid_item_spec['ui_name']);
