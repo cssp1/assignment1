@@ -1055,9 +1055,8 @@ class ObjectOwnershipPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
         self.team = data['team']
-        self.object = qdata['source_obj']
     def is_satisfied2(self, session,player, qdata, override_time = None):
-        return self.object.team == self.team
+        return self.team == qdata['source_obj'].team
 
 # instantiate a Predicate object from JSON
 def read_predicate(data):
