@@ -36898,18 +36898,11 @@ function update_crafting_dialog_status_grid_weapons(dialog) {
 function scroll_crafting_dialog_status_grid_weapons(dialog, delta) {
     var page = dialog.user_data['page'];
     var last_page = dialog.user_data['last_page'];
-    var new_page = 0;
-    if(delta < 0 && delta >= -1) {
-        new_page = page - 1;
-    } else if(delta > 0 && delta < 2) {
-        new_page = page + 1;
-    } else if(delta == -2) { // corner case for restoring scroll position
-        new_page = 1;
-    } else {
-        new_page = delta;
+    if(delta < 0 && page > 0) {
+        dialog.user_data['page'] = page - 1;
     }
-    if(new_page >= 0 && new_page <= last_page) {
-        dialog.user_data['page'] = new_page;
+    if (delta > 0 && page < last_page) {
+        dialog.user_data['page'] = page + 1;
     }
 }
 
