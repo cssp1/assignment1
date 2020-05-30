@@ -36029,14 +36029,13 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
             dialog.widgets['grid_cancel'+wname].show = !(('can_unequip' in cur_grid_item_spec) && !cur_grid_item_spec['can_unequip']);
             dialog.widgets['grid_cancel'+wname].tooltip.str = dialog.data['widgets']['grid_cancel']['ui_tooltip_discard'].replace('%s', cur_grid_item_spec['ui_name']);
             var scrolling_current_page = dialog.user_data['page'];
-            if(scrolling_current_page === 1) { scrolling_current_page = -2; }
             dialog.widgets['grid_cancel'+wname].onclick = (function (_obj, _cur_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb, _scrolling_current_page) { return function(w) {
                 send_to_server.func(["EQUIP_BUILDING", _obj.id, [_delivery_slot_type,_delivery_slot_index], -1, null, _cur_item, -1]);
                 // maybe put a confirmation dialog here?
                 var current_page = _scrolling_current_page;
                 var restore_scrolling = (function (_current_page) { return function(w) {
                     var scroll_dialog = find_dialog('crafting_dialog').widgets['status'];
-                    scroll_crafting_dialog_status_grid_weapons(scroll_dialog, _current_page);
+                    scroll_dialog.user_data['page'] = scrolling_current_page;
                 }; })(current_page);
                 invoke_ui_locker(null,restore_scrolling);
                 _unconfig_cb();
