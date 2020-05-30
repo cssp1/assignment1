@@ -12517,7 +12517,7 @@ class Player(AbstractPlayer):
                                 if enh_spec.effects:
                                     for i, effect in enumerate(enh_spec.effects):
                                         if effect['code'] == 'modstat':
-                                            if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                            if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, {'source_obj':obj}):
                                                 strength = self.get_modstat_strength(effect, enh_level)
                                                 if effect.get('affects') == "player":
                                                     # apply to player for mechanical effect, AND to building for GUI stat display
