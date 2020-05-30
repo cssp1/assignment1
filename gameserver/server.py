@@ -9405,6 +9405,7 @@ class AbstractPlayer(object):
         self.stattab = self.AbstractStattab()
     def get_any_abtest_value(self, key, default_value): return default_value
     def is_ai(self): return True
+    def is_ai_user_id_range(self): return is_ai_user_id_range(self.user_id)
     def is_human(self): return not self.is_ai()
     def ai_or_human(self):
         if self.is_ai():
@@ -9726,6 +9727,7 @@ class Player(AbstractPlayer):
             self.apply_aura(aura['name'], strength = aura.get('strength',1), duration = aura.get('duration',-1), level = aura.get('level',1), stack = aura.get('stack',-1), ignore_limit = True)
 
     def is_ai(self): return self.read_only
+    def is_ai_user_id_range(self): return is_ai_user_id_range(self.user_id)
     def is_human(self): return not self.is_ai()
     def ai_or_human(self):
         if self.is_ai():
