@@ -1055,7 +1055,10 @@ class ObjectOwnershipPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
         self.team = data['team']
-    def is_satisfied2(self, session,player, qdata, override_time = None):
+        self.ai_only = data.get('ai_only', False)
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        if self.ai_only:
+            return player.is_ai() and (player.user_id > 0 and (player.user_id <= player.get_gamedata_var('max_ai_user_id') or player.user_id <= 1100)) and self.team == qdata['source_obj'].team
         return self.team == qdata['source_obj'].team
 
 # instantiate a Predicate object from JSON
