@@ -36028,12 +36028,18 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
             grid_frame_tooltip = dialog.data['widgets']['grid_frame']['ui_tooltip_armed'].replace('%s', cur_grid_item_spec['ui_name']);
             dialog.widgets['grid_cancel'+wname].show = !(('can_unequip' in cur_grid_item_spec) && !cur_grid_item_spec['can_unequip']);
             dialog.widgets['grid_cancel'+wname].tooltip.str = dialog.data['widgets']['grid_cancel']['ui_tooltip_discard'].replace('%s', cur_grid_item_spec['ui_name']);
-            dialog.widgets['grid_cancel'+wname].onclick = (function (_obj, _cur_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb) { return function(w) {
+            var scrolling_current_page = dialog.user_data['page'];
+            dialog.widgets['grid_cancel'+wname].onclick = (function (_obj, _cur_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb, _scrolling_current_page) { return function(w) {
                 send_to_server.func(["EQUIP_BUILDING", _obj.id, [_delivery_slot_type,_delivery_slot_index], -1, null, _cur_item, -1]);
                 // maybe put a confirmation dialog here?
-                invoke_ui_locker();
+                var current_page = _scrolling_current_page;
+                var restore_scrolling = (function (_current_page) { return function(w) {
+                    var scroll_dialog = find_dialog('crafting_dialog').widgets['status'];
+                    scroll_dialog.user_data['page'] = scrolling_current_page;
+                }; })(current_page);
+                invoke_ui_locker(null,restore_scrolling);
                 _unconfig_cb();
-            }; })(obj, cur_item, delivery_slot_type, delivery_slot_index, unconfig_cb);
+            }; })(obj, cur_item, delivery_slot_type, delivery_slot_index, unconfig_cb, scrolling_current_page);
         } else if(in_progress_recipe) {
             dialog.widgets['grid_icon'+wname].asset = get_leveled_quantity(get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]), in_progress_level);
             dialog.widgets['grid_icon'+wname].alpha = 1;
@@ -36887,7 +36893,8 @@ function update_crafting_dialog_status_grid_weapons(dialog) {
     };
 }
 
-/** @param {SPUI.Dialog} dialog */
+/** @param {SPUI.Dialog} dialog
+    @param {number} delta */
 function scroll_crafting_dialog_status_grid_weapons(dialog, delta) {
     var page = dialog.user_data['page'];
     var last_page = dialog.user_data['last_page'];
