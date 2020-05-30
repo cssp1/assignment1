@@ -12499,7 +12499,7 @@ class Player(AbstractPlayer):
                                 effects = equip['equip']['effects']
                                 for i in xrange(len(effects)):
                                     effect = effects[i]
-                                    if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied2(None, self.player, {'source_obj':obj}):
+                                    if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied2(get_session_by_user_id(self.player.user_id), self.player, {'source_obj':obj}):
                                         if effect['code'] == 'modstat':
                                             strength = self.get_modstat_strength(effect, level)
                                             self.apply_modstat_to_building(obj, effect['stat'], effect['method'], strength, 'equipment', equip['name'], {'effect':i, 'level':level})
@@ -12519,7 +12519,7 @@ class Player(AbstractPlayer):
                                 if enh_spec.effects:
                                     for i, effect in enumerate(enh_spec.effects):
                                         if effect['code'] == 'modstat':
-                                            if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied2(None, self.player, {'source_obj':obj}):
+                                            if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied2(get_session_by_user_id(self.player.user_id), self.player, {'source_obj':obj}):
                                                 strength = self.get_modstat_strength(effect, enh_level)
                                                 if effect.get('affects') == "player":
                                                     # apply to player for mechanical effect, AND to building for GUI stat display
