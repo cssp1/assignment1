@@ -1205,7 +1205,7 @@ def read_predicate(data):
     elif kind == 'CLIENT_PLATFORM':
         return ClientPlatformPredicate(data)
     elif kind == 'OBJECT_OWNERSHIP':
-        return ObjectOwnershipPredicate(data, qdata)
+        return ObjectOwnershipPredicate(data)
     raise Exception('unknown predicate %s' % repr(data))
 
 # evaluate a "cond" expression in the form of [[pred1,val1], [pred2,val2], ...]
