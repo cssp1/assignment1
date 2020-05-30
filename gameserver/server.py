@@ -12497,7 +12497,7 @@ class Player(AbstractPlayer):
                                 effects = equip['equip']['effects']
                                 for i in xrange(len(effects)):
                                     effect = effects[i]
-                                    if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                    if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, {'source_obj':obj}):
                                         if effect['code'] == 'modstat':
                                             strength = self.get_modstat_strength(effect, level)
                                             self.apply_modstat_to_building(obj, effect['stat'], effect['method'], strength, 'equipment', equip['name'], {'effect':i, 'level':level})

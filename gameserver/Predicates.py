@@ -1051,6 +1051,14 @@ class PrivacyConsentPredicate(Predicate):
     def is_satisfied2(self, session, player, qdata, override_time = None):
         return session.user.privacy_consent == self.state
 
+class ObjectOwnershipPredicate(Predicate):
+    def __init__(self, data, qdata):
+        Predicate.__init__(self, data)
+        self.team = data['team']
+        self.object = qdata['source_obj']
+    def is_satisfied(self, session,player, qdata, override_time = None):
+        return self.object.team == self.team
+
 # instantiate a Predicate object from JSON
 def read_predicate(data):
     kind = data['predicate']
@@ -1197,6 +1205,8 @@ def read_predicate(data):
         return ClimatePredicate(data)
     elif kind == 'CLIENT_PLATFORM':
         return ClientPlatformPredicate(data)
+    elif kind == 'OBJECT_OWNERSHIP':
+        return ObjectOwnershipPredicate(data, qdata)
     raise Exception('unknown predicate %s' % repr(data))
 
 # evaluate a "cond" expression in the form of [[pred1,val1], [pred2,val2], ...]
