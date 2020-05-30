@@ -1052,7 +1052,7 @@ class PrivacyConsentPredicate(Predicate):
         return session.user.privacy_consent == self.state
 
 class ObjectOwnershipPredicate(Predicate):
-    def __init__(self, data, qdata):
+    def __init__(self, data):
         Predicate.__init__(self, data)
         self.team = data['team']
         self.object = qdata['source_obj']
