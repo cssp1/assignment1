@@ -9405,6 +9405,7 @@ class AbstractPlayer(object):
         self.stattab = self.AbstractStattab()
     def get_any_abtest_value(self, key, default_value): return default_value
     def is_ai(self): return True
+    def is_ai_user_id_range(self): return is_ai_user_id_range(self.user_id)
     def is_human(self): return not self.is_ai()
     def ai_or_human(self):
         if self.is_ai():
@@ -9726,6 +9727,7 @@ class Player(AbstractPlayer):
             self.apply_aura(aura['name'], strength = aura.get('strength',1), duration = aura.get('duration',-1), level = aura.get('level',1), stack = aura.get('stack',-1), ignore_limit = True)
 
     def is_ai(self): return self.read_only
+    def is_ai_user_id_range(self): return is_ai_user_id_range(self.user_id)
     def is_human(self): return not self.is_ai()
     def ai_or_human(self):
         if self.is_ai():
@@ -11632,7 +11634,7 @@ class Player(AbstractPlayer):
     def get_gamedata_var(self, name): # similar to get_abtest(), for use by Predicates, but does not support overrides
         v = gamedata
         for elem in name.split('.'):
-            v = v[elem]
+            v = v.get(elem, None)
         return v
 
     # check for ANY active abtest group we're in that contains a value named 'key'
@@ -12497,7 +12499,7 @@ class Player(AbstractPlayer):
                                 effects = equip['equip']['effects']
                                 for i in xrange(len(effects)):
                                     effect = effects[i]
-                                    if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                    if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied2(get_session_by_user_id(self.player.user_id), self.player, {'source_obj':obj}):
                                         if effect['code'] == 'modstat':
                                             strength = self.get_modstat_strength(effect, level)
                                             self.apply_modstat_to_building(obj, effect['stat'], effect['method'], strength, 'equipment', equip['name'], {'effect':i, 'level':level})
@@ -12517,7 +12519,7 @@ class Player(AbstractPlayer):
                                 if enh_spec.effects:
                                     for i, effect in enumerate(enh_spec.effects):
                                         if effect['code'] == 'modstat':
-                                            if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                            if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied2(get_session_by_user_id(self.player.user_id), self.player, {'source_obj':obj}):
                                                 strength = self.get_modstat_strength(effect, enh_level)
                                                 if effect.get('affects') == "player":
                                                     # apply to player for mechanical effect, AND to building for GUI stat display
