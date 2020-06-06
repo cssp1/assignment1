@@ -1993,6 +1993,19 @@ GameObject.prototype.update_and_apply_auras = function(world) {
     }
 };
 
+/** @param {string} aura_name
+    remove an aura with a specific name */
+GameObject.prototype.remove_aura = function(aura_name) {
+    for(var i = 0; i < this.auras.length; i++) {
+        var a = this.auras[i];
+        if(a.spec['name'] === aura_name) {
+            this.auras.splice(i,1);
+            a.end(this);
+            return;
+        }
+    }
+};
+
 /** @param {!World.World} world */
 GameObject.prototype.update_aura_effects = function(world) {
     goog.array.forEach(this.auras, function(aura) { aura.update_effect(world, this); }, this);

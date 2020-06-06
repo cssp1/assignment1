@@ -461,6 +461,7 @@ CombatEngine.HealAllTeamDamageEffect.prototype.apply = function(world) {
         if(obj.is_destroyed()) { return; } // destroyed objects will be restored by the server
         var amt = (obj.max_hp - obj.hp) * -1;
         if(amt != 0) {
+            obj.remove_aura('weak_zombie');
             world.hurt_object(obj, amt, {}, null, null);
         }
     }, this);
