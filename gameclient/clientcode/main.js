@@ -1986,6 +1986,7 @@ GameObject.prototype.update_and_apply_auras = function(world) {
         var a = this.auras[i];
         if(!a.expire_tick.is_infinite() && GameTypes.TickCount.gt(session.get_real_world().combat_engine.cur_tick, a.expire_tick)) {
             this.auras.splice(i,1);
+            i -= 1; // correction for loop iteration
             a.end(this);
             continue;
         }
@@ -2054,6 +2055,7 @@ GameObject.prototype.receive_auras_update = function(world, alist) {
         var a = this.auras[i];
         if(a.expire_tick.is_infinite() || GameTypes.TickCount.gt(world.combat_engine.cur_tick, a.expire_tick)) {
             this.auras.splice(i,1);
+            i -= 1; // correction for loop iteration
             a.end(this);
             continue;
         }
@@ -28250,7 +28252,9 @@ function update_unit_donation_dialog(dialog) {
     for(var i = 0; i < donation.length; i++) {
         if((source == 'session' && !(session.get_real_world().objects.has_object(donation[i]))) ||
            (source == 'army' && !(donation[i] in player.my_army))) {
-            donation.splice(i,1); continue;
+            donation.splice(i,1);
+            i -= 1; // correction for loop iteration
+            continue;
         }
 
         var obj_spec, obj_level, hp_ratio;
@@ -28262,7 +28266,9 @@ function update_unit_donation_dialog(dialog) {
         } else if(source == 'army') {
             var unit = player.my_army[donation[i]];
             if(SQUAD_IDS.is_mobile_squad_id(unit['squad_id']||0)) { // can't donate units in mobile squads
-                donation.splice(i,1); continue;
+                donation.splice(i,1);
+                i -= 1; // correction for loop iteration
+                continue;
             }
             obj_spec = gamedata['units'][unit['spec']];
             obj_level = ('level' in unit ? unit['level'] : 1);
@@ -28274,7 +28280,9 @@ function update_unit_donation_dialog(dialog) {
         if((hp_ratio < 1) || (proposed_space + req['cur_space'] > req['max_space'])) {
             // damaged, or won't fit
             proposed_space -= space;
-            donation.splice(i,1); continue;
+            donation.splice(i,1);
+            i -= 1; // correction for loop iteration
+            continue;
         }
         if(!(obj_spec['name'] in donation_by_type)) { donation_by_type[obj_spec['name']] = 0; }
         donation_by_type[obj_spec['name']] += 1;
