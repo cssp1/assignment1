@@ -1998,10 +1998,10 @@ GameObject.prototype.update_and_apply_auras = function(world) {
 GameObject.prototype.remove_aura = function(aura_name) {
     for(var i = 0; i < this.auras.length; i++) {
         var a = this.auras[i];
-        if(a['spec']['name'] === aura_name) {
+        if(a.spec['name'] === aura_name) {
             this.auras.splice(i,1);
             a.end(this);
-            continue;
+            return;
         }
     }
 };
