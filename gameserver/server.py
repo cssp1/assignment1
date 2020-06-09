@@ -14758,13 +14758,11 @@ class LivePlayer(Player):
                     spec_build_total_time = GameObjectSpec.get_leveled_quantity(obj.spec.build_time, 1)
                     if obj.build_total_time > spec_build_total_time:
                         obj.build_total_time = spec_build_total_time
-                        obj.build_done_time = obj.build_start_time + spec_build_total_time
                 # check buildings being upgraded for time requirements that exceed the current gamedata requirements
                 if obj.is_building() and obj.is_upgrading():
-                    spec_upgrade_total_time = GameObjectSpec.get_leveled_quantity(obj.spec.build_time, obj.level+1)
+                    spec_upgrade_total_time = GameObjectSpec.get_leveled_quantity(obj.spec.build_time, obj.level + 1)
                     if obj.upgrade_total_time > spec_upgrade_total_time:
                         obj.upgrade_total_time = spec_upgrade_total_time
-                        obj.upgrade_done_time = obj.upgrade_start_time + spec_build_total_time
                 # check techs being researched for time requirements that exceed the current gamedata requirements
                 if obj.is_building() and obj.is_researching():
                     tech_spec = session.player.get_abtest_spec(TechSpec, obj.research_item)
@@ -14775,7 +14773,6 @@ class LivePlayer(Player):
                     tech_research_total_time = int(TechSpec.get_leveled_quantity(tech_spec.research_time, tech_current_level + 1) / obj.get_stat('research_speed', 1))
                     if obj.research_total_time > tech_research_total_time:
                         obj.research_total_time = tech_research_total_time
-                        obj.research_done_time = obj.research_start_time + tech_research_total_time
             self.history['last_major_time_requirements_update'] = server_time
 
         UNIT_EQUIP_DATE = 1362070800 # UNIX time when mod techs were replaced by unit equipment (2013 Feb 26)
