@@ -14764,10 +14764,7 @@ class LivePlayer(Player):
             # check techs being researched for time requirements that exceed the current gamedata requirements
             if obj.is_building() and obj.is_researching():
                 tech_spec = session.player.get_abtest_spec(TechSpec, obj.research_item)
-                if session.player.tech.has_key(obj.research_item):
-                    tech_current_level = session.player.tech[obj.research_item]
-                else:
-                    tech_current_level = 0
+                tech_current_level = session.player.tech.get(obj.research_item, 0)
                 tech_research_total_time = int(TechSpec.get_leveled_quantity(tech_spec.research_time, tech_current_level + 1) / obj.get_stat('research_speed', 1))
                 if obj.research_total_time > tech_research_total_time:
                     obj.research_total_time = tech_research_total_time
