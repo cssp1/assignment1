@@ -22,7 +22,7 @@ def login_sources_schema(sql_util): return {
                ('frame_platform', 'CHAR(2)'),
                ('country', 'VARCHAR(2)'),
                ('country_tier', 'CHAR(1)'),
-               ('ip', 'VARCHAR(16)'),
+               ('ip', 'VARCHAR(39)'),
                ('browser_name', 'VARCHAR(16)'),
                ('browser_os', 'VARCHAR(16)'),
                ('browser_version', 'FLOAT4'),
