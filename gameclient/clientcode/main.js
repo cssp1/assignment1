@@ -1241,6 +1241,9 @@ Aura.prototype.apply = function(world, obj) {
             obj.combat_stats.avoided_detection = 1;
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
+        } else if(code === 'grounded') {
+            obj.combat_stats.flying = false;
+            obj.combat_stats.maxvel = 0;
         } else if(code === 'disarmed') {
             obj.combat_stats.disarmed += this.strength;
         } else if(code === 'range_reduction') {
@@ -1794,6 +1797,7 @@ function CombatStats() {
     this.weapon_facing_fudge = 0;
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
+    this.flying = false;
 
     // Mobile only
 
@@ -2017,6 +2021,7 @@ GameObject.prototype.update_aura_effects = function(world) {
 GameObject.prototype.update_stats = function(world) {
     this.combat_stats.clear();
     this.combat_stats.invisible = this.is_invisible_default();
+    this.combat_stats.flying = this.is_flying_default();
     this.combat_stats.weapon_facing_fudge = this.spec['weapon_facing_fudge'] || 0;
     this.combat_stats.muzzle_offset = this.spec['muzzle_offset'] || [0,0,0];
     this.combat_stats.muzzle_height = this.spec['muzzle_height'] || 0;
@@ -2245,6 +2250,8 @@ GameObject.prototype.is_building = function() { return (this.spec['kind'] === 'b
 GameObject.prototype.is_mobile = function() { return (this.spec['kind'] === 'mobile'); };
 /** @return {boolean} */
 GameObject.prototype.is_flying = function() { return false; };
+/** @return {boolean} */
+GameObject.prototype.is_flying_default = function() { return false; };
 /** @return {boolean} */
 GameObject.prototype.is_inert = function() { return (this.spec['kind'] === 'inert'); };
 /** @return {boolean} */
@@ -9264,7 +9271,8 @@ Mobile.prototype.on_removed_from_world = function(world) {
 };
 
 Mobile.prototype.is_temporary = function() { return !!this.temporary; };
-Mobile.prototype.is_flying = function() { return this.spec['flying'] || false; };
+Mobile.prototype.is_flying = function() { return this.combat_stats.flying || false; };
+Mobile.prototype.is_flying_default = function() { return this.spec['flying'] || false; };
 Mobile.prototype.passes_through_walls = function() { return this.spec['flying'] || this.spec['noclip']; };
 Mobile.prototype.is_under_repair = function() { return this.under_repair_finish > 0; };
 
