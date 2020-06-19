@@ -1244,6 +1244,7 @@ Aura.prototype.apply = function(world, obj) {
         } else if(code === 'grounded') {
             obj.combat_stats.flying = false;
             obj.combat_stats.maxvel = 0;
+            obj.combat_stats.altitude = 0;
         } else if(code === 'disarmed') {
             obj.combat_stats.disarmed += this.strength;
         } else if(code === 'range_reduction') {
@@ -1291,7 +1292,7 @@ Aura.prototype.update_effect = function(world, obj) {
     if(('visual_effect' in this.spec) && !obj.spec['worth_less_xp'] && (!obj.is_invisible() || (obj.team === 'player' && !session.is_replay()))) {
         // do not show FX on barriers or invisible objects
         var vfx_props = {'radius': 0.8*obj.hit_radius() };
-        this.visual_effect = world.fxworld.add_visual_effect_at_time(obj.interpolate_pos(world), (obj.is_mobile() ? obj.altitude : 0), [0,1,0], client_time, this.spec['visual_effect'], true, vfx_props);
+        this.visual_effect = world.fxworld.add_visual_effect_at_time(obj.interpolate_pos(world), (obj.is_mobile() ? obj.combat_stats.altitude : 0), [0,1,0], client_time, this.spec['visual_effect'], true, vfx_props);
     }
 };
 
@@ -1798,6 +1799,7 @@ function CombatStats() {
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
     this.flying = false;
+    this.altitude = 0;
 
     // Mobile only
 
@@ -2022,6 +2024,7 @@ GameObject.prototype.update_stats = function(world) {
     this.combat_stats.clear();
     this.combat_stats.invisible = this.is_invisible_default();
     this.combat_stats.flying = this.is_flying_default();
+    this.combat_stats.altitude = this.default_altitude;
     this.combat_stats.weapon_facing_fudge = this.spec['weapon_facing_fudge'] || 0;
     this.combat_stats.muzzle_offset = this.spec['muzzle_offset'] || [0,0,0];
     this.combat_stats.muzzle_height = this.spec['muzzle_height'] || 0;
@@ -2699,7 +2702,7 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                                  'tick_offset': 0,
                                  'my_next_pos': this.next_pos};
                 var muzzle_vfx = spell['muzzle_flash_effect'];
-                world.fxworld.add_visual_effect_at_tick(this.interpolate_pos(world), (this.is_flying() ? this.altitude : 0),
+                world.fxworld.add_visual_effect_at_tick(this.interpolate_pos(world), (this.is_flying() ? this.combat_stats.altitude : 0),
                                                         [Math.cos(this.cur_facing), 0, Math.sin(this.cur_facing)],
                                                         world.combat_engine.cur_tick, 0,
                                                         muzzle_vfx, true, vfx_props);
@@ -3091,10 +3094,10 @@ GameObject.prototype.run_control_shooting = function(world) {
 
             if(spell['targets_self']) {
                 target_pos = this.raw_pos();
-                target_height = this.is_flying() ? this.altitude : 0;
+                target_height = this.is_flying() ? this.combat_stats.altitude : 0;
             } else {
                 target_pos = target.raw_pos();
-                target_height = target.is_flying() ? target.altitude : 0;
+                target_height = target.is_flying() ? target.combat_stats.altitude : 0;
             }
 
             this.fire_projectile(world, world.combat_engine.cur_tick, client_time, null, -1, spell, spell_level, target, target_pos, target_height);
@@ -3975,7 +3978,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
     @param {number} target_height */
 GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, force_hit_tick, force_hit_time, spell, spell_level, target, target_pos, target_height) {
     var my_pos = this.interpolate_pos(world);
-    var my_height = (this.is_flying() ? this.altitude : 0);
+    var my_height = (this.is_flying() ? this.combat_stats.altitude : 0);
     var my_muzzle_pos = my_pos;
 
     // compute bullet origin in map coordinates
@@ -5214,10 +5217,10 @@ GameObject.prototype.update_permanent_effect = function(world) {
 
     if(this.permanent_effect) {
         // move existing effect
-        this.permanent_effect.reposition([pos[0], this.altitude || 0, pos[1]]);
+        this.permanent_effect.reposition([pos[0], this.combat_stats.altitude || 0, pos[1]]);
     } else {
         // create new effect
-        this.permanent_effect = world.fxworld.add_visual_effect_at_time(pos, this.altitude || 0, [0, 1, 0], client_time, fx, true, null);
+        this.permanent_effect = world.fxworld.add_visual_effect_at_time(pos, this.combat_stats.altitude || 0, [0, 1, 0], client_time, fx, true, null);
         this.permanent_effect_source = fx;
     }
 };
@@ -9186,7 +9189,7 @@ function Mobile() {
     this.next_pos = [-1,-1]; // position at beginning of next tick
 
     /** @type {number} altitude above ground, if flying */
-    this.altitude = 0;
+    this.default_altitude = 0;
 
     /** @type {?Array.<number>} */
     this.dest = [-1,-1]; // final movement destination
@@ -9254,10 +9257,12 @@ Mobile.prototype.apply_snapshot = function(snap) {
 /** @override */
 Mobile.prototype.on_added_to_world = function(world) {
     goog.base(this, 'on_added_to_world', world);
-    this.altitude = (this.get_leveled_quantity(this.spec['altitude'] || 0));
-    if(this.altitude != 0 && world.base.base_climate_data['fly_at_ground_level']) {
+    this.default_altitude = (this.get_leveled_quantity(this.spec['altitude'] || 0));
+    this.combat_stats.altitude = this.default_altitude;
+    if(this.combat_stats.altitude != 0 && world.base.base_climate_data['fly_at_ground_level']) {
         // set altitudes low, but not to zero, so it doesn't screw up anti-air/anti-ground weapon behavior
-        this.altitude = 1.0;
+        this.default_altitude = 1.0;
+        this.combat_stats.altitude = 1.0;
     }
 };
 
@@ -9632,7 +9637,7 @@ Mobile.prototype.detect_click = function(world, xy, ji, zoom, fuzz) {
     // mobile units use the sprite hit detection code
     var asset = GameArt.assets[this.get_leveled_quantity(this.spec['art_asset'])];
     var pos = this.interpolate_pos(world);
-    if(asset.detect_click(ortho_to_screen_3d([pos[0], this.altitude, pos[1]]), this.interpolate_facing(world), client_time, 'normal', xy, zoom, fuzz)) {
+    if(asset.detect_click(ortho_to_screen_3d([pos[0], this.combat_stats.altitude, pos[1]]), this.interpolate_facing(world), client_time, 'normal', xy, zoom, fuzz)) {
         return true;
     }
     return false;
@@ -10034,7 +10039,7 @@ Mobile.prototype.run_control_pathing = function(world) {
 Mobile.prototype.add_movement_effect = function(fxworld) {
     if(!this.is_destroyed() && this.control_state === control_states.CONTROL_MOVING &&
        ('movement_effect' in this.spec)) {
-        fxworld.add_visual_effect_at_time(this.pos, this.altitude, [0,1,0], client_time, this.spec['movement_effect'], true, null);
+        fxworld.add_visual_effect_at_time(this.pos, this.combat_stats.altitude, [0,1,0], client_time, this.spec['movement_effect'], true, null);
     }
 };
 
@@ -56313,7 +56318,7 @@ function draw_shadow(world, unit) {
 
     if(session.viewing_base.base_climate_data['fly_at_ground_level']) { return; }
 
-    if(unit.altitude > 0 && !unit.is_destroyed() && 'shadow_asset' in unit.spec) {
+    if(unit.combat_stats.altitude > 0 && !unit.is_destroyed() && 'shadow_asset' in unit.spec) {
         var curpos = unit.interpolate_pos_for_draw(world);
         var xy = draw_quantize(ortho_to_draw(curpos));
 
@@ -56339,7 +56344,7 @@ function draw_shadow(world, unit) {
 function draw_unit(world, unit) {
     // get simulated position
     var curpos = unit.interpolate_pos_for_draw(world);
-    var alt = unit.altitude;
+    var alt = unit.combat_stats.altitude;
 
     // don't levitate debris piles
     if(unit.hp <= 0 && !unit.is_indestructible()) { alt = 0; }
@@ -56355,7 +56360,7 @@ function draw_unit(world, unit) {
 
     var xy = ortho_to_draw_3d([curpos[0], alt, curpos[1]]);
 
-    if(unit.altitude > 0 || view_is_zoomed()) {
+    if(unit.combat_stats.altitude > 0 || view_is_zoomed()) {
         // NOTE: do not quantize xy, to get subpixel motion on the hovering effect for flying units
         // may be slow on some browsers!
     } else {
@@ -56563,7 +56568,7 @@ function draw_unit(world, unit) {
     for(var i = 0; i < unit.auras.length; i++) {
         var aura = unit.auras[i];
         if(aura.visual_effect) {
-            aura.visual_effect.reposition([curpos[0], unit.altitude, curpos[1]]);
+            aura.visual_effect.reposition([curpos[0], unit.combat_stats.altitude, curpos[1]]);
         }
         if(draw_aura(xy, [xy[0]+15*count, xy[1]-35], aura)) {
             count++;
@@ -56872,9 +56877,9 @@ function draw_selection_highlight(world, unit, config_override) {
             }
         }
 
-        if(unit.altitude > 0 && gamedata['client']['unit_control_detail'] >= 2) {
+        if(unit.combat_stats.altitude > 0 && gamedata['client']['unit_control_detail'] >= 2) {
             // draw height line for flying units
-            var xya = draw_quantize(ortho_to_draw_3d([curpos[0], unit.altitude, curpos[1]]));
+            var xya = draw_quantize(ortho_to_draw_3d([curpos[0], unit.combat_stats.altitude, curpos[1]]));
             ctx.strokeStyle = config['basecol']+config['altitude_alpha'].toString()+')';
             ctx.beginPath();
             ctx.moveTo(xy[0], xy[1]);
