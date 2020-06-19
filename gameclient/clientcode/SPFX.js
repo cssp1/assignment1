@@ -2032,7 +2032,7 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     this.obj.control_state = (this.start_halted ? control_states.CONTROL_STOP : control_states.CONTROL_MOVING);
     this.obj.pos = [pos[0],pos[1]];
     this.obj.next_pos = [pos[0],pos[1]];
-    this.obj.altitude = altitude;
+    this.obj.combat_stats.altitude = altitude;
 };
 goog.inherits(SPFX.PhantomUnit, SPFX.Effect);
 

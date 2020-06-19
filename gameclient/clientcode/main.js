@@ -53324,7 +53324,7 @@ function create_mouse_tooltip() {
 
         var pos = mouse_state.hovering_over.interpolate_pos(world);
         var alt = (mouse_state.hovering_over.is_mobile() && mouse_state.hovering_over.is_flying() ?
-                   mouse_state.hovering_over.altitude - 1 : 0);
+                   mouse_state.hovering_over.combat_stats.altitude - 1 : 0);
 
         if(!spin_secure_mode && player.is_developer()) {
             str.push('Coords: '+pos[0].toFixed(0)+','+pos[1].toFixed(0));

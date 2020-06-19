@@ -683,7 +683,7 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source, d
     if(COMBAT_DEBUG) {
         // Damage text
         this.fxworld.add(new SPFX.CombatText(pos,
-                                             target.is_flying() ? target.altitude : 0,
+                                             target.is_flying() ? target.combat_stats.altitude : 0,
                                              pretty_print_number(Math.abs(damage)),
                                              (damage >= 0 ? [1, 1, 0.1, 1] : [0,1,0,1]),
                                              (COMBAT_ENGINE_USE_TICKS ? new SPFX.When(null, this.combat_engine.cur_tick, time_offset) : new SPFX.When(client_time + time_offset, null)),
@@ -823,7 +823,7 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source, d
         }
 
         if(fx_data) {
-            this.fxworld.add_visual_effect_at_time(pos, (target.is_mobile() && target.is_flying() ? target.altitude : 0), [0,1,0], client_time+time_offset, fx_data, true, null);
+            this.fxworld.add_visual_effect_at_time(pos, (target.is_mobile() && target.is_flying() ? target.combat_stats.altitude : 0), [0,1,0], client_time+time_offset, fx_data, true, null);
         }
 
         target.update_permanent_effect(this);
@@ -876,7 +876,7 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source, d
         }
 
         if('damaged_effect' in target.spec) {
-            this.fxworld.add_visual_effect_at_time(pos, (target.is_mobile() && target.is_flying() ? target.altitude : 0), [0,1,0], client_time+time_offset, target.spec['damaged_effect'], true, null);
+            this.fxworld.add_visual_effect_at_time(pos, (target.is_mobile() && target.is_flying() ? target.combat_stats.altitude : 0), [0,1,0], client_time+time_offset, target.spec['damaged_effect'], true, null);
         }
     }
 
