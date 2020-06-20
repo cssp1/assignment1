@@ -29695,7 +29695,7 @@ function can_show_replay_for_battle_summary(summary) {
     var their_replay_version = summary['replay_version'] || 0;
     var cur_replay_version = gamedata['replay_version'] || 0;
     can_show_replay = their_replay_version === cur_replay_version;
-    if ('time' in summary && 'replay_oldest_timestamp' in gamedata) {
+    if (can_show_replay && 'time' in summary && 'replay_oldest_timestamp' in gamedata) {
         can_show_replay = summary['time'] >= gamedata['replay_oldest_timestamp'];
     }
     return can_show_replay;
