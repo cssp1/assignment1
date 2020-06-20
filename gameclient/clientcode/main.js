@@ -1909,11 +1909,11 @@ CombatStats.prototype.apply_snapshot = function(snap) {
     if('invisible' in snap) { this.invisible = snap['invisible']; }
     if('detected' in snap) { this.detected = snap['detected']; }
     if('avoided_detection' in snap) { this.avoided_detection = snap['avoided_detection']; }
-    if('weapon_facing_fudge') in snap) { this.weapon_facing_fudge = snap['weapon_facing_fudge']; }
-    if('muzzle_offset') in snap) { this.muzzle_offset = snap['muzzle_offset']; }
-    if('muzzle_height') in snap) { this.muzzle_height = snap['muzzle_height']; }
-    if('altitude') in snap) { this.altitude = snap['altitude']; }
-    if('flying') in snap) { this.flying = snap['flying']; }
+    if('weapon_facing_fudge' in snap) { this.weapon_facing_fudge = snap['weapon_facing_fudge']; }
+    if('muzzle_offset' in snap) { this.muzzle_offset = snap['muzzle_offset']; }
+    if('muzzle_height' in snap) { this.muzzle_height = snap['muzzle_height']; }
+    if('altitude' in snap) { this.altitude = snap['altitude']; }
+    if('flying' in snap) { this.flying = snap['flying']; }
 };
 
 // "merge" together two damage_vs tables, returning a table that has
