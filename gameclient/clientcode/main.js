@@ -29716,10 +29716,15 @@ function get_battle_log(battle_time, attacker_id, defender_id, base_id, signatur
 
 // given a battle summary, determine if we can show a replay (doesn't check for actual existence)
 function can_show_replay_for_battle_summary(summary) {
-    if(!read_predicate(gamedata['client']['enable_replay_playback']).is_satisfied(player, null)) { return false; }
+    var can_show_replay = false;
+    if(!read_predicate(gamedata['client']['enable_replay_playback']).is_satisfied(player, null)) { return can_show_replay; }
     var their_replay_version = summary['replay_version'] || 0;
     var cur_replay_version = gamedata['replay_version'] || 0;
-    return their_replay_version === cur_replay_version;
+    can_show_replay = their_replay_version === cur_replay_version;
+    if (can_show_replay && 'time' in summary && 'replay_oldest_timestamp' in gamedata) {
+        can_show_replay = summary['time'] >= gamedata['replay_oldest_timestamp'];
+    }
+    return can_show_replay;
 }
 
 /** @param {!SPUI.Dialog} dialog
