@@ -1837,6 +1837,8 @@ CombatStats.prototype.clear = function() {
     this.weapon_facing_fudge = 0;
     this.muzzle_offset = [0,0,0];
     this.muzzle_height = 0;
+    this.flying = false;
+    this.altitude = 0;
 };
 
 /** @override */
@@ -1874,6 +1876,8 @@ CombatStats.prototype.serialize = function() {
     if(this.weapon_facing_fudge) { ret['weapon_facing_fudge'] = this.weapon_facing_fudge; }
     if(this.muzzle_offset) { ret['muzzle_offset'] = this.muzzle_offset; }
     if(this.muzzle_height) { ret['muzzle_height'] = this.muzzle_height; }
+    if(this.altitude) { ret['altitude'] = this.altitude; }
+    if(this.flying) { ret['flying'] = this.flying; }
     return ret;
 };
 
@@ -1905,6 +1909,11 @@ CombatStats.prototype.apply_snapshot = function(snap) {
     if('invisible' in snap) { this.invisible = snap['invisible']; }
     if('detected' in snap) { this.detected = snap['detected']; }
     if('avoided_detection' in snap) { this.avoided_detection = snap['avoided_detection']; }
+    if('weapon_facing_fudge') in snap) { this.weapon_facing_fudge = snap['weapon_facing_fudge']; }
+    if('muzzle_offset') in snap) { this.muzzle_offset = snap['muzzle_offset']; }
+    if('muzzle_height') in snap) { this.muzzle_height = snap['muzzle_height']; }
+    if('altitude') in snap) { this.altitude = snap['altitude']; }
+    if('flying') in snap) { this.flying = snap['flying']; }
 };
 
 // "merge" together two damage_vs tables, returning a table that has
@@ -2023,8 +2032,6 @@ GameObject.prototype.update_aura_effects = function(world) {
 GameObject.prototype.update_stats = function(world) {
     this.combat_stats.clear();
     this.combat_stats.invisible = this.is_invisible_default();
-    this.combat_stats.flying = this.is_flying_default();
-    this.combat_stats.altitude = this.default_altitude;
     this.combat_stats.weapon_facing_fudge = this.spec['weapon_facing_fudge'] || 0;
     this.combat_stats.muzzle_offset = this.spec['muzzle_offset'] || [0,0,0];
     this.combat_stats.muzzle_height = this.spec['muzzle_height'] || 0;
@@ -2032,6 +2039,14 @@ GameObject.prototype.update_stats = function(world) {
     if(world) {
         this.update_and_apply_auras(world);
     }
+};
+
+/** called once per tick
+    @param {World.World|null} world */
+Mobile.prototype.update_stats = function(world) {
+    goog.base(this, 'update_stats', world);
+    this.combat_stats.flying = this.is_flying_default();
+    this.combat_stats.altitude = this.default_altitude;
 };
 
 /** @param {!Base.Base} base */
@@ -9258,11 +9273,9 @@ Mobile.prototype.apply_snapshot = function(snap) {
 Mobile.prototype.on_added_to_world = function(world) {
     goog.base(this, 'on_added_to_world', world);
     this.default_altitude = (this.get_leveled_quantity(this.spec['altitude'] || 0));
-    this.combat_stats.altitude = this.default_altitude;
-    if(this.combat_stats.altitude != 0 && world.base.base_climate_data['fly_at_ground_level']) {
+    if(this.default_altitude != 0 && world.base.base_climate_data['fly_at_ground_level']) {
         // set altitudes low, but not to zero, so it doesn't screw up anti-air/anti-ground weapon behavior
         this.default_altitude = 1.0;
-        this.combat_stats.altitude = 1.0;
     }
 };
 
