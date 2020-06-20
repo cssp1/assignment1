@@ -1586,6 +1586,8 @@ function GameObject() {
     /** @type {SPFX.FXObject|null} */
     this.permanent_effect = null;
 
+    this.default_altitude = 0;
+
     // for incremental serialization only
     this.serialization_dirty = false;
     /** @type {Object<string,?>|null} */
@@ -2035,18 +2037,12 @@ GameObject.prototype.update_stats = function(world) {
     this.combat_stats.weapon_facing_fudge = this.spec['weapon_facing_fudge'] || 0;
     this.combat_stats.muzzle_offset = this.spec['muzzle_offset'] || [0,0,0];
     this.combat_stats.muzzle_height = this.spec['muzzle_height'] || 0;
+    this.combat_stats.flying = this.is_flying_default();
+    this.combat_stats.altitude = this.default_altitude;
     this.modify_stats_by_modstats();
     if(world) {
         this.update_and_apply_auras(world);
     }
-};
-
-/** called once per tick
-    @param {World.World|null} world */
-Mobile.prototype.update_stats = function(world) {
-    goog.base(this, 'update_stats', world);
-    this.combat_stats.flying = this.is_flying_default();
-    this.combat_stats.altitude = this.default_altitude;
 };
 
 /** @param {!Base.Base} base */
