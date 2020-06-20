@@ -1130,6 +1130,8 @@ Aura.prototype.apply = function(world, obj) {
             obj.combat_stats.rate_of_fire *= (1 + this.strength);
         } else if(code === 'damage_boosted') {
             obj.combat_stats.weapon_damage *= (1 + this.strength);
+        } else if(code === 'damage_weakened') {
+            obj.combat_stats.weapon_damage *= (1 - this.strength);
         } else if(code === 'armor_boosted') {
             obj.combat_stats.extra_armor = Math.max(obj.combat_stats.extra_armor, this.strength);
         } else if(code.indexOf('damage_type_shielder') === 0) { // this handles both damage_type_shielder and damage_type_shielder_invisible
