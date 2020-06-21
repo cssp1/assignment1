@@ -13318,7 +13318,7 @@ class Player(AbstractPlayer):
                         turret_level = int(obj.turret_head_item()[obj.turret_head_item().index('_L') + 2:]) # makes int from all characters after _L, which is turret level
                         turret_spec = obj.turret_head_item()[:obj.turret_head_item().index('_L')] # makes string from all characters before _L, which is turret spec
                         # last check ensures that new object is in the gamedata
-                        if emplacement_spec in gamedata['items']:
+                        if turret_spec in gamedata['items']:
                             obj.equipment['turret_head'][0] = {"spec": turret_spec, "level": turret_level} # replaces old turret with new mine
 
             # remove invalid recipes from crafting queues
