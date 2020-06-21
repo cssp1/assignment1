@@ -8151,6 +8151,8 @@ class Building(MapBlockingGameObject):
         return None
     def is_emplacement(self):
         return self.spec.equip_slots and ('turret_head' in self.spec.equip_slots)
+    def is_emplacement_armed(self):
+        return self.equipment and Equipment.equip_has(self.equipment, ('turret_head',0))
     def turret_head_item(self): # note: returns spec name
         item = Equipment.equip_get(self.equipment, ('turret_head',0))
         if item: return item['spec']
@@ -13308,6 +13310,16 @@ class Player(AbstractPlayer):
                                 mine_spec = obj.config[key][:obj.config[key].index('_L')] # makes string from all characters before _L, which is mine spec
                                 if mine_spec in gamedata['items']:
                                     obj.config[key] = {'spec':mine_spec, 'level':mine_level}
+
+            if gamedata['server'].get('migrate_turrets_to_leveled_items', False) and not self.history.get('turret_leveled_item_migrated', False):
+                # only turret emplacements need to be processed for turret heads
+                if obj.is_building() and obj.is_emplacement():
+                    if obj.is_emplacement_armed() and '_L' in obj.turret_head_item():
+                        turret_level = int(obj.turret_head_item()[obj.turret_head_item().index('_L') + 2:]) # makes int from all characters after _L, which is turret level
+                        turret_spec = obj.turret_head_item()[:obj.turret_head_item().index('_L')] # makes string from all characters before _L, which is turret spec
+                        # last check ensures that new object is in the gamedata
+                        if turret_spec in gamedata['items']:
+                            obj.equipment['turret_head'][0] = {"spec": turret_spec, "level": turret_level} # replaces old turret with new mine
 
             # remove invalid recipes from crafting queues
             if obj.is_building() and obj.is_crafter() and obj.is_crafting():
