@@ -10683,6 +10683,26 @@ function invoke_playfield_controls_bar() {
     return dialog;
 }
 
+// note: sound/music, fullscreen, and settings buttons
+function invoke_electron_exit_button() {
+    if(!eval_cond_or_literal(gamedata['client']['show_electron_exit_button'], player, null)) { return; }
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['electron_exit_button']);
+    dialog.user_data['dialog'] = 'electron_exit_button';
+    dialog.transparent_to_mouse = true;
+    dialog.widgets['exit_button'].onclick = function() {
+        window.top.postMessage('bh_electron_exit_command', '*');
+    };
+    dialog.ondraw = update_electron_exit_button;
+    return dialog;
+}
+
+/**
+    @param {SPUI.Dialog} dialog
+*/
+function update_electron_exit_button(dialog) {
+    dialog.xy = [canvas_width-dialog.wh[0],0]; //ensures exit button is at top far-right if canvas is resized
+}
+
 /**
     @param {SPUI.Dialog} dialog
     @param {number} delta
@@ -12148,6 +12168,15 @@ function init_desktop_dialogs() {
     var controls_bar = invoke_playfield_controls_bar();
     desktop_dialogs['playfield_controls_bar'] = controls_bar;
     SPUI.root.add_after(dialog, controls_bar); // add controls_bar to SPUI.root right after desktop_top, because its update method depends on desktop_top's position
+
+    // Electron-only exit button
+    var show_electron_exit_button = eval_cond_or_literal(gamedata['client']['show_electron_exit_button'], player, null);
+    if(show_electron_exit_button) {
+        var electron_exit_button = invoke_electron_exit_button();
+        desktop_dialogs['electron_exit_button'] = electron_exit_button;
+        SPUI.root.add_under(electron_exit_button)
+    }
+
 
     // desktop bottom
 
