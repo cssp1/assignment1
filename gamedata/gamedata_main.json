@@ -37,6 +37,11 @@
             [{"predicate": "CLIENT_PLATFORM", "any_electron": 1}, 1] // turns on always fullscreen for any electron build
         ],
 
+        "show_electron_exit_button": [
+            [{"predicate": "CLIENT_PLATFORM", "platforms": ["web"]}, 0],
+            [{"predicate": "CLIENT_PLATFORM", "any_electron": 1}, 1] // turns on always fullscreen for any electron build
+        ],
+
         // true if the HTML5 fullscreen API is available
         "truefullscreen": {"predicate": "OR", "subpredicates": [
             {"predicate": "FRAME_PLATFORM", "platform":"fb"},
