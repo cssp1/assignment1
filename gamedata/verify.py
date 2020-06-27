@@ -826,8 +826,8 @@ def check_aura(auraname, spec, maxlevel):
                     error |= 1; print '%s: uses a server-side effect code but client != 0' % auraname
 
             # client-side codes (implemented in main.js)
-            elif effect['code'] in ('speed_boosted', 'speed_weakened', 'defense_boosted', 'defense_weakened', 'radiation_hardened',
-                                    'frozen', 'ice_shielded', 'ice_encrusted', 'moving_in_swamp', 'swamp_shielded', 'range_booster_invisible',
+            elif effect['code'] in ('speed_boosted', 'speed_weakened', 'defense_boosted', 'defense_weakened', 'radiation_hardened', 'grounded',
+                                    'frozen', 'ice_shielded', 'ice_encrusted', 'moving_in_swamp', 'swamp_shielded', 'range_booster_invisible', 'damage_weakened',
                                     'rate_of_fire_boosted', 'damage_boosted', 'range_boosted', 'on_island', 'damage_booster_invisible', 'defense_booster_invisible',
                                     'armor_boosted', 'damage_booster', 'defense_booster', 'stunned', 'disarmed', 'hacked', 'range_reduction', 'weak_zombie',
                                     'on_fire', 'projectile_speed_reduced', 'range_booster', 'sprite_swapped', 'cast_spell_continuously', 'avoided_detection',
