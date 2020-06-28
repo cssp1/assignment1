@@ -3095,6 +3095,15 @@
                             "ui_tooltip": "Click to modify", "tooltip_delay": 0,"fixed_tooltip_offset": [268,133],
                             "show": 0
                           },
+            "secteam_behavior_button": { "kind": "ActionButton", "xy": [288,101], "dimensions": [22,20], "mod_showing_xy": [312,101],
+                                         "bg_image": "resource_bar_add_button",
+                                         "secteam_default_image": "resource_bar_add_button",
+                                         "secteam_hold_image": "resource_bar_add_button",
+                                         "secteam_aggressive_image": "resource_bar_add_button",
+                                         "array": [1,8], "array_offset": [0,19], "state": "normal",
+                                         "ui_tooltip": "Current: %cur\nClick to toggle", "tooltip_delay": 0,"fixed_tooltip_offset": [268,133],
+                                         "show": 0
+                                        },
 
             "requirements": { "kind": "TextField", "xy": [588,75], "dimensions": [135,26], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "REQUIREMENTS" },
 
