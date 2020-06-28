@@ -26749,7 +26749,11 @@ class GAMEAPI(resource.Resource):
                             # check for equipment that has on_destroy consequents (such as security team spawning)
                             on_destroy_cons_list = obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
                             if on_destroy_cons_list:
+                                secteam_behavior = obj.config.get('on_destroy_behavior', None);
                                 for cons in on_destroy_cons_list:
+                                    if secteam_behavior:
+                                        cons['ai_state'] = secteam_behavior['ai_state']
+                                        cons['ai_aggressive'] = secteam_behavior['ai_aggressive']
                                     session.execute_consequent_safe(cons, obj.owner, retmsg,
                                                                     # for buildings last_hp is always the POST-damage HP value
                                                                     context = {'source_obj': obj, 'xy': [obj.x,obj.y], 'last_hp': newhp},
@@ -26852,8 +26856,12 @@ class GAMEAPI(resource.Resource):
             cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_approach', obj.get_leveled_quantity(obj.spec.on_approach))
 
         if cons_list:
+            secteam_behavior = obj.config.get('on_approach_behavior', None);
             obj.on_approach_fired = True
             for cons in cons_list:
+                if secteam_behavior:
+                    cons['ai_state'] = secteam_behavior['ai_state']
+                    cons['ai_aggressive'] = secteam_behavior['ai_aggressive']
                 session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y] if obj.is_building() else map(int, xy), 'last_hp': obj.hp, 'trigger_obj': trigger_obj}, reason='on_approach(%s)' % obj.spec.name)
 
         retmsg.append(["ON_APPROACH_RESULT", obj.owner.user_id, id, client_time, server_time])
@@ -27026,8 +27034,13 @@ class GAMEAPI(resource.Resource):
 
         if on_destroy_enabled:
             on_destroy_cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
+
             if on_destroy_cons_list:
+                secteam_behavior = obj.config.get('on_destroy_behavior', None);
                 for cons in on_destroy_cons_list:
+                    if secteam_behavior:
+                        cons['ai_state'] = secteam_behavior['ai_state']
+                        cons['ai_aggressive'] = secteam_behavior['ai_aggressive']
                     session.execute_consequent_safe(cons, obj.owner, retmsg,
                                                     # for mobile units, last_hp is the HP it has AFTER damage but BEFORE retreating
                                                     context = {'source_obj':obj, 'last_hp': original_hp if method == 'retreat' else 0,
