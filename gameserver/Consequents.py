@@ -218,6 +218,11 @@ class SpawnSecurityTeamConsequent(Consequent):
         if self.aggro_trigger_obj:
             ai_target = context['trigger_obj']
 
+        if self.ai_aggressive and self.ai_aggressive not in (0, 1):
+            self.ai_aggressive = None
+        if self.ai_state and self.ai_state not in (0, 1, 2, 3, 4, 5, 6, 7, 8):
+            self.ai_state = None
+
         session.spawn_security_team(player, retmsg, context['source_obj'], context['xy'], self.units, self.spread, self.persist,
                                     ai_state = self.ai_state, ai_target = ai_target, ai_aggressive = self.ai_aggressive,
                                     pack_aggro = self.pack_aggro, behaviors = self.behaviors,
