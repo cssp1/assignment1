@@ -46444,7 +46444,7 @@ function update_upgrade_dialog(dialog) {
             var cur_config = (unit.config ? goog.object.clone(unit.config) : {});
             var cur_behavior, cur_behavior_ui_name = null;
             var config_key = stat_name + '_behavior';
-            if(!(config_key in cur_config)){
+            if(!cur_config[config_key]){
                 cur_config[config_key] = {'name':'secteam_default'};
             }
             cur_behavior = cur_config[config_key]['name'];
