@@ -31490,12 +31490,18 @@ class GAMEAPI(resource.Resource):
                     assert len(config) <= gamedata['server'].get('max_object_config_settings', 10)
                     for key, val in config.iteritems():
                         assert type(key) in (str, unicode)
-                        assert type(val) in (int, str, unicode, list)
+                        assert type(val) in (int, str, unicode, list, dict)
                         if type(val) in (str, unicode): assert len(val) <= gamedata['server'].get('max_object_config_string', 64)
                         if type(val) is list:
                             assert len(val) <= gamedata['server'].get('max_object_config_settings', 10)
                             for item in val:
                                 assert (type(item) in (str, unicode) or (item is None))
+                                if type(item) in (str, unicode): assert len(item) <= gamedata['server'].get('max_object_config_string', 64)
+                        if type(val) is dict:
+                            assert len(val) <= gamedata['server'].get('max_object_config_settings', 10)
+                            for subkey in val:
+                                item = val[subkey]
+                                assert (type(item) in (str, unicode, int) or (item is None))
                                 if type(item) in (str, unicode): assert len(item) <= gamedata['server'].get('max_object_config_string', 64)
                 object.config = copy.deepcopy(config)
                 retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
