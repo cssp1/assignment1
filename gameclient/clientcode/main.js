@@ -46059,6 +46059,10 @@ function update_upgrade_dialog(dialog) {
             feature_list = feature_list.concat(get_weapon_spell_features2(unit.spec, auto_spell));
         }
 
+        if('on_damage' in unit.spec) { feature_list.push('on_damage'); }
+        if('on_destroy' in unit.spec) { feature_list.push('on_destroy'); }
+        if('on_approach' in unit.spec) { feature_list.push('on_approach'); }
+
         if(unit.spec['permanent_auras']) {
             feature_list.push('permanent_auras');
         }
