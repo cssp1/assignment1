@@ -13357,6 +13357,8 @@ class Player(AbstractPlayer):
         # after stepping through all base objects, change migration history key if this is not done yet and it's a game that gets migrated
         if gamedata['server'].get('migrate_landmines_to_leveled_items', False) and not self.history.get('landmine_leveled_item_migrated', False):
             self.history['landmine_leveled_item_migrated'] = 1
+        if gamedata['server'].get('migrate_turrets_to_leveled_items', False) and not self.history.get('turret_leveled_item_migrated', False):
+            self.history['turret_leveled_item_migrated'] = 1
         if to_delete:
             for obj in to_delete:
                 self.home_base_remove(obj)
