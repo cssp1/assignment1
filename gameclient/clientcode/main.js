@@ -46460,8 +46460,8 @@ function update_upgrade_dialog(dialog) {
             }
             dialog.widgets['secteam_behavior_button'+grid_y.toString()].tooltip.str = dialog.data['widgets']['secteam_behavior_button']['ui_tooltip'].replace('%cur', cur_behavior_ui_name);
             var next_behavior = {'secteam_default':'secteam_hold','secteam_hold':'secteam_aggressive','secteam_aggressive':'secteam_default'}[cur_behavior];
-            var next_ai_state = {'secteam_default':4,'secteam_hold':2,'secteam_aggressive':2}[cur_behavior];
-            var next_ai_aggressive = {'secteam_default':0,'secteam_hold':1,'secteam_aggressive':0}[cur_behavior];
+            var next_ai_state = {'secteam_default':4,'secteam_hold':2,'secteam_aggressive':'default'}[cur_behavior];
+            var next_ai_aggressive = {'secteam_default':0,'secteam_hold':1,'secteam_aggressive':'default'}[cur_behavior];
             dialog.widgets['secteam_behavior_button'+grid_y.toString()].onclick = (function (_unit, _cur_config, _config_key, _next_behavior, _next_ai_state, _next_ai_aggressive) { return function(w) {
                 var new_config = goog.object.clone(_cur_config);
                 new_config[_config_key] = {'name': _next_behavior,'ai_state':_next_ai_state, 'ai_aggressive':_next_ai_aggressive};
