@@ -26750,7 +26750,7 @@ class GAMEAPI(resource.Resource):
                             on_destroy_cons_list = obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
                             if on_destroy_cons_list:
                                 secteam_behavior = None
-                                if obj.config:
+                                if obj.is_building() and obj.config:
                                     secteam_behavior = obj.config.get('on_destroy_behavior', None);
                                 for cons in on_destroy_cons_list:
                                     if secteam_behavior:
@@ -26859,7 +26859,7 @@ class GAMEAPI(resource.Resource):
 
         if cons_list:
             secteam_behavior = None
-            if obj.config:
+            if obj.is_building() and obj.config:
                 secteam_behavior = obj.config.get('on_approach_behavior', None);
             obj.on_approach_fired = True
             for cons in cons_list:
@@ -27041,7 +27041,7 @@ class GAMEAPI(resource.Resource):
 
             if on_destroy_cons_list:
                 secteam_behavior = None
-                if obj.config:
+                if obj.is_building() and obj.config:
                     secteam_behavior = obj.config.get('on_destroy_behavior', None);
                 for cons in on_destroy_cons_list:
                     if secteam_behavior:

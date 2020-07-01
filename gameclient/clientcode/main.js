@@ -46434,7 +46434,7 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['mod_bar'+grid_y.toString()].show =
             dialog.widgets['mod_text'+grid_y.toString()].show = !!(mod_tech || enh_tech);
         dialog.widgets['mod_button'+grid_y.toString()].show = (!stats_only && dialog.widgets['mod_bar'+grid_y.toString()].show);
-        dialog.widgets['secteam_behavior_button'+grid_y.toString()].show = (stat_name === 'on_destroy' || stat_name === 'on_approach' || stat_name === 'on_damage');
+        dialog.widgets['secteam_behavior_button'+grid_y.toString()].show = (unit.is_building() && (stat_name === 'on_destroy' || stat_name === 'on_approach' || stat_name === 'on_damage'));
         if (dialog.widgets['secteam_behavior_button'+grid_y.toString()].show && dialog.widgets['mod_button'+grid_y.toString()].show) {
             dialog.widgets['secteam_behavior_button'+grid_y.toString()].xy[0] = dialog.data['widgets']['secteam_behavior_button']['mod_showing_xy'][0];
         } else {
