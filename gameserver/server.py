@@ -26749,7 +26749,8 @@ class GAMEAPI(resource.Resource):
                             # check for equipment that has on_destroy consequents (such as security team spawning)
                             on_destroy_cons_list = obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
                             if on_destroy_cons_list:
-                                secteam_behavior = obj.config.get('on_destroy_behavior', None);
+                                if obj.config:
+                                    secteam_behavior = obj.config.get('on_destroy_behavior', None);
                                 for cons in on_destroy_cons_list:
                                     if secteam_behavior:
                                         cons['ai_state'] = secteam_behavior['ai_state']
@@ -26856,7 +26857,8 @@ class GAMEAPI(resource.Resource):
             cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_approach', obj.get_leveled_quantity(obj.spec.on_approach))
 
         if cons_list:
-            secteam_behavior = obj.config.get('on_approach_behavior', None);
+            if obj.config:
+                secteam_behavior = obj.config.get('on_approach_behavior', None);
             obj.on_approach_fired = True
             for cons in cons_list:
                 if secteam_behavior:
@@ -27036,7 +27038,8 @@ class GAMEAPI(resource.Resource):
             on_destroy_cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
 
             if on_destroy_cons_list:
-                secteam_behavior = obj.config.get('on_destroy_behavior', None);
+                if obj.config:
+                    secteam_behavior = obj.config.get('on_destroy_behavior', None);
                 for cons in on_destroy_cons_list:
                     if secteam_behavior:
                         cons['ai_state'] = secteam_behavior['ai_state']
