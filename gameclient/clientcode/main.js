@@ -46059,6 +46059,10 @@ function update_upgrade_dialog(dialog) {
             feature_list = feature_list.concat(get_weapon_spell_features2(unit.spec, auto_spell));
         }
 
+        if('on_damage' in unit.spec) { feature_list.push('on_damage'); }
+        if('on_destroy' in unit.spec) { feature_list.push('on_destroy'); }
+        if('on_approach' in unit.spec) { feature_list.push('on_approach'); }
+
         if(unit.spec['permanent_auras']) {
             feature_list.push('permanent_auras');
         }
@@ -46434,6 +46438,39 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['mod_bar'+grid_y.toString()].show =
             dialog.widgets['mod_text'+grid_y.toString()].show = !!(mod_tech || enh_tech);
         dialog.widgets['mod_button'+grid_y.toString()].show = (!stats_only && dialog.widgets['mod_bar'+grid_y.toString()].show);
+        dialog.widgets['secteam_behavior_button'+grid_y.toString()].show = (unit && unit.is_building() && (stat_name === 'on_destroy' || stat_name === 'on_approach' || stat_name === 'on_damage'));
+        if (dialog.widgets['secteam_behavior_button'+grid_y.toString()].show && dialog.widgets['mod_button'+grid_y.toString()].show) {
+            dialog.widgets['secteam_behavior_button'+grid_y.toString()].xy[0] = dialog.data['widgets']['secteam_behavior_button']['mod_showing_xy'][0];
+        } else {
+            dialog.widgets['secteam_behavior_button'+grid_y.toString()].xy[0] = dialog.data['widgets']['secteam_behavior_button']['xy'][0];
+        }
+        if(dialog.widgets['secteam_behavior_button'+grid_y.toString()].show) {
+            var cur_config = (unit.config ? goog.object.clone(unit.config) : {});
+            var cur_behavior, cur_behavior_ui_name = null;
+            var config_key = stat_name + '_behavior';
+            if(!cur_config[config_key]){
+                cur_config[config_key] = {'name':'secteam_default'};
+            }
+            cur_behavior = cur_config[config_key]['name'];
+            dialog.widgets['secteam_behavior_button'+grid_y.toString()].bg_image = dialog.data['widgets']['secteam_behavior_button'][cur_behavior + '_image'];
+            if('secteam_behaviors' in gamedata['strings']['modstats']) {
+                cur_behavior_ui_name = gamedata['strings']['modstats']['secteam_behaviors'][cur_behavior];
+            } else {
+                cur_behavior_ui_name = {'secteam_default':'Default','secteam_hold':'Hold','secteam_aggressive':'Relentless'}[cur_behavior];
+            }
+            dialog.widgets['secteam_behavior_button'+grid_y.toString()].tooltip.str = dialog.data['widgets']['secteam_behavior_button']['ui_tooltip'].replace('%cur', cur_behavior_ui_name);
+            var next_behavior = {'secteam_default':'secteam_hold','secteam_hold':'secteam_aggressive','secteam_aggressive':'secteam_default'}[cur_behavior];
+            var next_ai_state = {'secteam_default':4,'secteam_hold':2,'secteam_aggressive':'default'}[cur_behavior];
+            var next_ai_aggressive = {'secteam_default':0,'secteam_hold':1,'secteam_aggressive':'default'}[cur_behavior];
+            dialog.widgets['secteam_behavior_button'+grid_y.toString()].onclick = (function (_unit, _cur_config, _config_key, _next_behavior, _next_ai_state, _next_ai_aggressive) { return function(w) {
+                var new_config = goog.object.clone(_cur_config);
+                new_config[_config_key] = {'name': _next_behavior,'ai_state':_next_ai_state, 'ai_aggressive':_next_ai_aggressive};
+                send_to_server.func(["CAST_SPELL", _unit.id, "CONFIG_SET", new_config]);
+                // client-side predict
+                _unit.config = new_config;
+                _unit.request_sync();
+            }; })(unit, cur_config, config_key, next_behavior, next_ai_state, next_ai_aggressive);
+        }
 
         if(mod_tech || enh_tech) {
             // handler for click on "Modify" button
