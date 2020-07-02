@@ -13354,11 +13354,21 @@ class Player(AbstractPlayer):
             # bring unit levels up to player tech level
             if obj.is_mobile(): obj.ensure_level(self.tech.get(obj.spec.level_determined_by_tech, 1))
 
+        if gamedata['server'].get('migrate_unit_equips_to_no_pct_name', False) and not self.history.get('unit_equips_to_no_pct_name_migrated', False):
+            for name, unit in player.unit_equipment.iteritems():
+                for slotname, slot in unit.iteritems():
+                    for equip in slot:
+                        if 'pct' in equip['spec']:
+                            for i in reversed(range(21)):
+                                equip['spec'] = equip['spec'].replace('_' + str(i) + 'pct','')
+
         # after stepping through all base objects, change migration history key if this is not done yet and it's a game that gets migrated
         if gamedata['server'].get('migrate_landmines_to_leveled_items', False) and not self.history.get('landmine_leveled_item_migrated', False):
             self.history['landmine_leveled_item_migrated'] = 1
         if gamedata['server'].get('migrate_turrets_to_leveled_items', False) and not self.history.get('turret_leveled_item_migrated', False):
             self.history['turret_leveled_item_migrated'] = 1
+        if gamedata['server'].get('migrate_unit_equips_to_no_pct_name', False) and not self.history.get('unit_equips_to_no_pct_name_migrated', False):
+            self.history['unit_equips_to_no_pct_name_migrated'] = 1
         if to_delete:
             for obj in to_delete:
                 self.home_base_remove(obj)
