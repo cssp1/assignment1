@@ -197,7 +197,11 @@ class SpawnSecurityTeamConsequent(Consequent):
         self.spread = data.get('spread',-1)
         self.persist = data.get('persist',False)
         self.ai_state = data.get('ai_state',None)
+        if self.ai_state and self.ai_state not in (0, 1, 2, 3, 4, 5, 6, 7, 8):
+            self.ai_state = None
         self.ai_aggressive = data.get('ai_aggressive',None)
+        if self.ai_aggressive and self.ai_aggressive not in (0, 1):
+            self.ai_aggressive = None
         self.pack_aggro = data.get('pack_aggro',False)
         self.aggro_trigger_obj = data.get('aggro_trigger_obj',False)
         self.behaviors = data.get('behaviors',None)
@@ -217,11 +221,6 @@ class SpawnSecurityTeamConsequent(Consequent):
         ai_target = None
         if self.aggro_trigger_obj:
             ai_target = context['trigger_obj']
-
-        if self.ai_aggressive and self.ai_aggressive not in (0, 1):
-            self.ai_aggressive = None
-        if self.ai_state and self.ai_state not in (0, 1, 2, 3, 4, 5, 6, 7, 8):
-            self.ai_state = None
 
         session.spawn_security_team(player, retmsg, context['source_obj'], context['xy'], self.units, self.spread, self.persist,
                                     ai_state = self.ai_state, ai_target = ai_target, ai_aggressive = self.ai_aggressive,
