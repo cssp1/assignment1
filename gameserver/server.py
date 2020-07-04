@@ -13358,10 +13358,16 @@ class Player(AbstractPlayer):
             for name, unit in self.unit_equipment.iteritems():
                 for slotname, slot in unit.iteritems():
                     for equip in slot:
-                        if 'pct' in equip['spec']:
-                            for i in reversed(range(21)):
-                                if '_' + str(i) + 'pct' in equip['spec'] and equip['spec'].replace('_' + str(i) + 'pct','') in gamedata['items']:
-                                    equip['spec'] = equip['spec'].replace('_' + str(i) + 'pct','')
+                        if isinstance(equip,dict):
+                            if 'pct' in equip['spec']:
+                                for i in reversed(range(21)):
+                                    if '_' + str(i) + 'pct' in equip['spec'] and equip['spec'].replace('_' + str(i) + 'pct','') in gamedata['items']:
+                                        equip['spec'] = equip['spec'].replace('_' + str(i) + 'pct','')
+                        elif isinstance(equip,basestring):
+                            if 'pct' in equip:
+                                for i in reversed(range(21)):
+                                    if '_' + str(i) + 'pct' in equip and equip.replace('_' + str(i) + 'pct','') in gamedata['items']:
+                                        equip = equip.replace('_' + str(i) + 'pct','')
             for item in self.inventory:
                 if 'equip_L' in item['spec'] and 'pct' in item['spec']:
                     for i in reversed(range(21)):
