@@ -13360,7 +13360,13 @@ class Player(AbstractPlayer):
                     for equip in slot:
                         if 'pct' in equip['spec']:
                             for i in reversed(range(21)):
-                                equip['spec'] = equip['spec'].replace('_' + str(i) + 'pct','')
+                                if '_' + str(i) + 'pct' in equip['spec'] and equip['spec'].replace('_' + str(i) + 'pct','') in gamedata['items']:
+                                    equip['spec'] = equip['spec'].replace('_' + str(i) + 'pct','')
+            for item in self.inventory:
+                if 'equip_L' in item['spec'] and 'pct' in item['spec']:
+                    for i in reversed(range(21)):
+                        if '_' + str(i) + 'pct' in item['spec'] and item['spec'].replace('_' + str(i) + 'pct','') in gamedata['items']:
+                            item['spec'] = item['spec'].replace('_' + str(i) + 'pct','')
 
         # after stepping through all base objects, change migration history key if this is not done yet and it's a game that gets migrated
         if gamedata['server'].get('migrate_landmines_to_leveled_items', False) and not self.history.get('landmine_leveled_item_migrated', False):
