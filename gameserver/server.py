@@ -13355,7 +13355,7 @@ class Player(AbstractPlayer):
             if obj.is_mobile(): obj.ensure_level(self.tech.get(obj.spec.level_determined_by_tech, 1))
 
         if gamedata['server'].get('migrate_unit_equips_to_no_pct_name', False) and not self.history.get('unit_equips_to_no_pct_name_migrated', False):
-            for name, unit in player.unit_equipment.iteritems():
+            for name, unit in self.unit_equipment.iteritems():
                 for slotname, slot in unit.iteritems():
                     for equip in slot:
                         if 'pct' in equip['spec']:
