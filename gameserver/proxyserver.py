@@ -1555,6 +1555,8 @@ class GameProxy(proxy.ReverseProxyResource):
         url = SpinConfig.config['battlehouse_api_path']+'/verify?' + \
               urllib.urlencode({'bh_access_token':bh_access_token,
                                 'service':SpinConfig.game()})
+        exception_log.event(proxy_time, str(url))
+        exception_log.event(proxy_time, str({'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}))
         d = bh_async_http.queue_request_deferred(proxy_time, url, headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']})
         d.addCallback(self.index_visit_do_bh_login_response, request, visitor, bh_access_token, battlehouse_id)
         d.addBoth(SpinHTTP.complete_deferred_request_safe, request)
