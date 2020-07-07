@@ -13355,6 +13355,7 @@ class Player(AbstractPlayer):
             if obj.is_mobile(): obj.ensure_level(self.tech.get(obj.spec.level_determined_by_tech, 1))
 
         if gamedata['server'].get('migrate_unit_equips_to_no_pct_name', False) and not self.history.get('unit_equips_to_no_pct_name_migrated', False):
+            # legacy unit equips had their boost percentages hard-coded into their names. This migration replaces instances with new instances stripped of the pct value
             for equipment in player.unit_equipment.itervalues():
                 for slot_type in equipment:
                     for i in xrange(len(equipment[slot_type])):
