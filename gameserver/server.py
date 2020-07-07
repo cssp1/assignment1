@@ -13355,19 +13355,20 @@ class Player(AbstractPlayer):
             if obj.is_mobile(): obj.ensure_level(self.tech.get(obj.spec.level_determined_by_tech, 1))
 
         if gamedata['server'].get('migrate_unit_equips_to_no_pct_name', False) and not self.history.get('unit_equips_to_no_pct_name_migrated', False):
-            for name, unit in self.unit_equipment.iteritems():
-                for slotname, slot in unit.iteritems():
-                    for equip in slot:
-                        if isinstance(equip,dict):
-                            if 'pct' in equip['spec']:
+            for equipment in player.unit_equipment.itervalues():
+                for slot_type in equipment:
+                    for i in xrange(len(equipment[slot_type])):
+                        if isinstance(equipment[slot_type][i], dict):
+                            if 'pct' in equipment[slot_type][i]['spec']:
                                 for i in reversed(range(21)):
-                                    if '_' + str(i) + 'pct' in equip['spec'] and equip['spec'].replace('_' + str(i) + 'pct','') in gamedata['items']:
-                                        equip['spec'] = equip['spec'].replace('_' + str(i) + 'pct','')
-                        elif isinstance(equip,basestring):
-                            if 'pct' in equip:
+                                    if '_' + str(i) + 'pct' in equipment[slot_type][i]['spec'] and equipment[slot_type][i]['spec'].replace('_' + str(i) + 'pct','') in gamedata['items']:
+                                        equipment[slot_type][i]['spec'] = equipment[slot_type][i]['spec'].replace('_' + str(i) + 'pct','')
+                        elif isinstance(equipment[slot_type][i], basestring):
+                            if 'pct' in equipment[slot_type][i]:
                                 for i in reversed(range(21)):
-                                    if '_' + str(i) + 'pct' in equip and equip.replace('_' + str(i) + 'pct','') in gamedata['items']:
-                                        equip = equip.replace('_' + str(i) + 'pct','')
+                                    if '_' + str(i) + 'pct' in equipment[slot_type][i] and equipment[slot_type][i].replace('_' + str(i) + 'pct','') in gamedata['items']:
+                                        equipment[slot_type][i] = equipment[slot_type][i].replace('_' + str(i) + 'pct','')
+
             for item in self.inventory:
                 if 'equip_L' in item['spec'] and 'pct' in item['spec']:
                     for i in reversed(range(21)):
