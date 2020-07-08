@@ -13356,19 +13356,18 @@ class Player(AbstractPlayer):
 
         if gamedata['server'].get('migrate_unit_equips_to_no_pct_name', False) and not self.history.get('unit_equips_to_no_pct_name_migrated', False):
             # legacy unit equips had their boost percentages hard-coded into their names. This migration replaces instances with new instances stripped of the pct value
+            pct_detector = re.compile(r'_[0-9]+pct')
             for equipment in player.unit_equipment.itervalues():
                 for slot_type in equipment:
                     for i in xrange(len(equipment[slot_type])):
-                        if isinstance(equipment[slot_type][i], dict):
-                            equipment[slot_type][i]['spec'] = re.sub(r'.+_[0-9]+pct', '', equipment[slot_type][i]['spec'])
-                        elif isinstance(equipment[slot_type][i], basestring):
-                            equipment[slot_type][i] = re.sub(r'.+_[0-9]+pct', '', equipment[slot_type][i])
+                        if isinstance(equipment[slot_type][i], dict) and pct_detector.sub('', equipment[slot_type][i]['spec']) in gamedata['items']:
+                            equipment[slot_type][i]['spec'] = pct_detector.sub('', equipment[slot_type][i]['spec'])
+                        elif isinstance(equipment[slot_type][i], basestring) and pct_detector.sub('', equipment[slot_type][i]) in gamedata['items']:
+                            equipment[slot_type][i] = pct_detector.sub('', equipment[slot_type][i])
 
             for item in self.inventory:
-                if 'equip_L' in item['spec'] and 'pct' in item['spec']:
-                    for i in reversed(range(21)):
-                        if '_' + str(i) + 'pct' in item['spec'] and item['spec'].replace('_' + str(i) + 'pct','') in gamedata['items']:
-                            item['spec'] = item['spec'].replace('_' + str(i) + 'pct','')
+                if 'equip_L' in item['spec'] and 'pct' in item['spec'] and pct_detector.sub('', item['spec']) in gamedata['items']:
+                    item['spec'] = pct_detector.sub('', item['spec'])
 
         # after stepping through all base objects, change migration history key if this is not done yet and it's a game that gets migrated
         if gamedata['server'].get('migrate_landmines_to_leveled_items', False) and not self.history.get('landmine_leveled_item_migrated', False):
