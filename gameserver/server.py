@@ -13360,15 +13360,9 @@ class Player(AbstractPlayer):
                 for slot_type in equipment:
                     for i in xrange(len(equipment[slot_type])):
                         if isinstance(equipment[slot_type][i], dict):
-                            if 'pct' in equipment[slot_type][i]['spec']:
-                                for i in reversed(range(21)):
-                                    if '_' + str(i) + 'pct' in equipment[slot_type][i]['spec'] and equipment[slot_type][i]['spec'].replace('_' + str(i) + 'pct','') in gamedata['items']:
-                                        equipment[slot_type][i]['spec'] = equipment[slot_type][i]['spec'].replace('_' + str(i) + 'pct','')
+                            equipment[slot_type][i]['spec'] = re.sub(r'.+_[0-9]+pct', '', equipment[slot_type][i]['spec'])
                         elif isinstance(equipment[slot_type][i], basestring):
-                            if 'pct' in equipment[slot_type][i]:
-                                for i in reversed(range(21)):
-                                    if '_' + str(i) + 'pct' in equipment[slot_type][i] and equipment[slot_type][i].replace('_' + str(i) + 'pct','') in gamedata['items']:
-                                        equipment[slot_type][i] = equipment[slot_type][i].replace('_' + str(i) + 'pct','')
+                            equipment[slot_type][i] = re.sub(r'.+_[0-9]+pct', '', equipment[slot_type][i])
 
             for item in self.inventory:
                 if 'equip_L' in item['spec'] and 'pct' in item['spec']:
