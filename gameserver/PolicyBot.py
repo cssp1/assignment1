@@ -156,12 +156,12 @@ class AntiVPNPolicy(Policy):
         # player messages are slightly different depending on whether the game is majority anti-VPN (DV) or not (WSE,TR,etc).
         if not is_repeat_offender:
             if is_majority_anti_vpn_game:
-                message_body = 'We identified your connection method as a VPN and therefore relocated your base to %s. If we falsely identified your connection as a VPN, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-VPN policy will result in a permanent ban from map regions.' % (cur_region['ui_name'], new_region['ui_name'])
+                message_body = 'We identified your connection method as a VPN and therefore relocated your base to %s. If we falsely identified your connection as a VPN, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-VPN policy will result in a permanent ban from map regions.' % (new_region['ui_name'])
             else:
                 message_body = 'We identified your connection method as a VPN while using anti-VPN region %s and therefore relocated your base to %s. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-VPN policy will result in a permanent ban from anti-VPN maps.' % (cur_region['ui_name'], new_region['ui_name'])
         else: # repeat offender
             if is_majority_anti_vpn_game:
-                message_body = 'We identified your connection method as a VPN and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our anti-VPN policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (cur_region['ui_name'], new_region['ui_name'])
+                message_body = 'We identified your connection method as a VPN and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our anti-VPN policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (new_region['ui_name'])
             else:
                 message_body = 'We identified your connection method as a VPN while using anti-VPN region %s and therefore relocated your base to %s. Moreover, your account has been locked from anti-VPN map regions due to repeated violations of our anti-VPN policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (cur_region['ui_name'], new_region['ui_name'])
 
