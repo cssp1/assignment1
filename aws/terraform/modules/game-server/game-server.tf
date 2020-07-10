@@ -126,7 +126,7 @@ resource "aws_instance" "game_server" {
   associate_public_ip_address = true
   iam_instance_profile = "${aws_iam_instance_profile.game_server.name}"
   subnet_id = "${element(split(",", var.subnet_ids), var.zone_index)}" # later: count.index
-  vpc_security_group_ids = ["${var.security_group_id_list}"]
+  vpc_security_group_ids = var.security_group_id_list
   key_name = "${var.key_pair_name}"
   depends_on = ["aws_iam_role_policy.game_server"]
   tags = { 
@@ -135,10 +135,11 @@ resource "aws_instance" "game_server" {
     Terraform = "true"
     game_id = "${var.game_id}"
   }
-
-  lifecycle = {
+  monitoring = var.enable_swap_alarm ? true : false
+  
+  lifecycle {
     create_before_destroy = true
-    ignore_changes = ["ami", "user_data", "tags", "key_name", "ebs_optimized"] # must manually taint for these changes
+    ignore_changes = ["ami", "instance_type", "user_data", "tags", "key_name", "ebs_optimized"] # must manually taint for these changes
   }
 
   user_data = "${data.template_cloudinit_config.conf.*.rendered[count.index]}"
@@ -176,6 +177,9 @@ resource "aws_ebs_volume" "swap" {
     Terraform = "true"
     game_id = "${var.game_id}"
   }
+  lifecycle {
+    ignore_changes = ["iops"] # must manually taint for these changes
+  }
 }
 resource "aws_volume_attachment" "swap" {
   count = "${var.n_instances}"
@@ -199,5 +203,5 @@ resource "aws_cloudwatch_metric_alarm" "game_server_swap" {
   statistic = "Average"
   threshold = "10"
   alarm_description = "${var.sitename}-game-server-${var.game_id} High Swap Usage"
-  alarm_actions = ["${var.emergency_sns_topic}"]
+  alarm_actions = [var.emergency_sns_topic]
 }
