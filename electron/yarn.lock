@@ -92,11 +92,6 @@ core-util-is@~1.0.0:
   resolved "https://registry.yarnpkg.com/core-util-is/-/core-util-is-1.0.2.tgz#b5fd54220aa2bc5ab57aab7140c940754503c1a7"
   integrity sha1-tf1UIgqivFq1eqtxQMlAdUUDwac=
 
-custom-electron-titlebar@^3.2.2:
-  version "3.2.2"
-  resolved "https://registry.yarnpkg.com/custom-electron-titlebar/-/custom-electron-titlebar-3.2.2.tgz#1b1a63b6db7edc0c8413dd46d38aa671bf330157"
-  integrity sha512-xthUHTEh7WPHfZXutlohkdjnHUWMtmdEOVwU0ckwGWaqpXcPcsCclcokDeILnBneZmIgLH/cHijYAUkjhIO7TQ==
-
 debug@2.6.9:
   version "2.6.9"
   resolved "https://registry.yarnpkg.com/debug/-/debug-2.6.9.tgz#5d128515df134ff327e90a4c93f4e077a536341f"
@@ -163,10 +158,10 @@ electron-localshortcut@^3.2.1:
     keyboardevent-from-electron-accelerator "^2.0.0"
     keyboardevents-areequal "^0.2.1"
 
-electron@^8.0.1:
-  version "8.0.1"
-  resolved "https://registry.yarnpkg.com/electron/-/electron-8.0.1.tgz#7f5070a1625f423cddcece25a1eb9e6d2f1339fb"
-  integrity sha512-kLZAQkbrAFNjQVpcHJUnjRYQNafuuWKnsdxzag5do1ewMqN0J4Pi/hPE27+5/1YAFMcbvCrPqhWIpcMsi8mKXQ==
+electron@^8.2.4:
+  version "8.2.4"
+  resolved "https://registry.yarnpkg.com/electron/-/electron-8.2.4.tgz#c4e51ca8e84b5a5beaaabdae1024bd52ba487ba4"
+  integrity sha512-Lle0InIgSAHZxD5KDY0wZ1A2Zlc6GHwMhAxoHMzn05mndyP1YBkCYHc0TDDofzUTrsLFofduPjlknO5Oj9fTPA==
   dependencies:
     "@electron/get" "^1.0.1"
     "@types/node" "^12.0.12"
