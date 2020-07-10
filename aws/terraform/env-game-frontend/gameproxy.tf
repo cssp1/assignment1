@@ -93,8 +93,8 @@ module "game_haproxy" {
     [
       data.terraform_remote_state.corp.outputs.spinpunch_prod_game_haproxy_security_group_id,
     ],
-    module.ipranges.cloudfront_ingress_security_group_id_list,
-    module.ipranges.cloudflare_ingress_security_group_id_list,
+#    module.ipranges.cloudfront_ingress_security_group_id_list,
+#    module.ipranges.cloudflare_ingress_security_group_id_list,
     [
       data.terraform_remote_state.corp.outputs.spinpunch_ssh_access_security_group_id,
     ],
