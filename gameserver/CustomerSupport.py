@@ -345,9 +345,6 @@ class HandleUnban(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleVPNExcuse(Handler):
-    def __init__(self, *args, **kwargs):
-        Handler.__init__(self, *args, **kwargs)
-
     def do_exec_online(self, session, retmsg):
         session.player.history['vpn_excused'] = 1
         return ReturnValue(result = 'ok')
