@@ -398,6 +398,22 @@ var method_unban = function() {
         send_request('player', 'unban', $.extend(ident, {'ui_reason':ui_reason}), function(result) { display_response("Success!"); });
     }
 };
+var method_vpn_excuse = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#vpn_reason")[0].value);
+    args = {'ui_reason': ui_reason};
+
+    if(ident && ui_reason) {
+        send_request('player', 'vpn_excuse', $.extend(ident, args), function(result) { display_response("Success!"); });
+    }
+};
+var method_vpn_unexcuse = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#vpn_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'vpn_unexcuse', $.extend(ident, {'ui_reason':ui_reason}), function(result) { display_response("Success!"); });
+    }
+};
 var method_kick_alliance_member = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#alliance_reason")[0].value);
@@ -1768,6 +1784,7 @@ $(function() {
     <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
     <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
     <li><a href="#player_tools_alts" id="player_tools_alts_header">Alts</a></li>
+    <li><a href="#player_tools_vpn" id="player_tools_vpn_header">VPN</a></li>
     <li><a href="#player_tools_change_region" id="player_tools_change_region_header">Map Region</a></li>
     <li><a href="#player_tools_alliance" id="player_tools_alliance_header">Clan</a></li>
     <li><a href="#player_tools_privacy" id="player_tools_privacy_header">Privacy</a></li>
@@ -1901,6 +1918,15 @@ $(function() {
       Reason for this action:
       <br>
       <input type="text" id="alts_reason" style="width:500px;">
+    </div>
+
+    <div id="player_tools_vpn">
+      <button onclick="method_vpn_excuse()" class="spin_button">Allow VPN</button>
+      <button onclick="method_vpn_unexcuse()" class="spin_button">Disallow VPN</button>
+      <p>
+    Reason for this action:
+      <br>
+      <input type="text" id="vpn_reason" style="width:500px;">
     </div>
 
     <div id="player_tools_ban">

@@ -344,6 +344,26 @@ class HandleUnban(Handler):
         player['banned_until'] = -1
         return ReturnValue(result = 'ok')
 
+class HandleVPNExcuse(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+
+    def do_exec_online(self, session, retmsg):
+        session.player.history['vpn_excused'] = 1
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        player['history']['vpn_excused'] = 1
+        return ReturnValue(result = 'ok')
+
+class HandleVPNUnexcuse(Handler):
+    need_user = False
+    def do_exec_online(self, session, retmsg):
+        session.player.history['vpn_excused'] = 0
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        player['history']['vpn_excused'] = 0
+        return ReturnValue(result = 'ok')
+
 class HandleApplyLockout(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
@@ -2095,6 +2115,8 @@ methods = {
     'add_note': HandleAddNote,
     'ban': HandleBan,
     'unban': HandleUnban,
+    'vpn_excuse': HandleVPNExcuse,
+    'vpn_unexcuse': HandleVPNUnexcuse,
     'mark_uninstalled': HandleMarkUninstalled,
     'record_alt_login': HandleRecordAltLogin,
     'make_developer': HandleMakeDeveloper,
