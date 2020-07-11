@@ -21,8 +21,9 @@ BATCH_SIZE = 5
 
 time_now = int(time.time())
 
-def do_CONTROLAPI(args):
+def do_CONTROLAPI(args, extra_text = None):
     args['ui_reason'] = 'PolicyBot' # for CustomerSupport action log entries
+    if extra_text: args['ui_reason'] += ' ' + extra_text
     return ControlAPI.CONTROLAPI(args, 'PolicyBot', max_tries = 3) # allow some retries
 
 # given two pcache entries for an alt pair, return the entry that is the more senior "master" account
@@ -100,7 +101,7 @@ class AntiVPNPolicy(Policy):
         if player['history'].get('vpn_excused', 0): return
 
         try:
-            new_region_name = self.punish_player(user_id, player['home_region'])
+            new_region_name = self.punish_player(user_id, player['home_region'], last_login_ip, repr(ip_rep_result))
 
             player['home_region'] = new_region_name
             print >> self.msg_fd, 'moved to region %s' % (new_region_name)
@@ -108,7 +109,7 @@ class AntiVPNPolicy(Policy):
         except:
             sys.stderr.write(('error punishing user %d: '%(player['user_id'])) + traceback.format_exc())
 
-    def punish_player(self, user_id, cur_region_name):
+    def punish_player(self, user_id, cur_region_name, last_login_ip, ip_rep_result):
 
         cur_region = gamedata['regions'][cur_region_name]
         cur_continent_id = cur_region.get('continent_id',None)
@@ -166,10 +167,11 @@ class AntiVPNPolicy(Policy):
                 message_body = 'We identified your connection method as a VPN while using anti-VPN region %s and therefore relocated your base to %s. Moreover, your account has been locked from anti-VPN map regions due to repeated violations of our anti-VPN policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (cur_region['ui_name'], new_region['ui_name'])
 
         if not self.dry_run:
+            extra_text = 'VPN violation: last IP %s, reputation result %s' % (last_login_ip, ip_rep_result)
             assert do_CONTROLAPI({'user_id':user_id, 'method':'send_message',
                                   'message_body': message_body,
                                   'message_subject': 'VPN Connection Policy',
-                                  }) == 'ok'
+                                  }, extra_text) == 'ok'
 
         event_props = {'user_id': user_id, 'event_name': '7301_policy_bot_punished', 'code':7301,
                        'old_region': cur_region_name, 'new_region': new_region['id'],
