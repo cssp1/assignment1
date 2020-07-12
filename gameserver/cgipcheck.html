@@ -811,8 +811,8 @@ var logs_yesterday = function() {
 // reset to 24 hours prior to current display
 var logs_rewind_one_day = function() {
     reset_logs();
-    log_end_time = log_end_time - 86400; // rewind log by 24 hours
-    log_start_time = log_start_time - 86400;
+    log_start_time -= 86400; // rewind log by 24 hours
+    log_end_time = log_start_time + 86400;
     refresh_logs();
 };
 
@@ -820,8 +820,8 @@ var logs_rewind_one_day = function() {
 var logs_forward_one_day = function() {
     reset_logs();
     var time_now = (new Date()).getTime()/1000;
-    log_end_time = log_end_time + 86400; // rewind log by 24 hours
-    log_start_time = log_start_time + 86400;
+    log_start_time += 86400; // forward log by 24 hours
+    log_end_time = log_start_time + 86400;
     if(log_end_time >= time_now) {
         log_end_time = -1; // reset to default end if end time exceeds now
     }
