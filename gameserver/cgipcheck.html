@@ -808,6 +808,32 @@ var logs_yesterday = function() {
     refresh_logs();
 };
 
+// reset to 24 hours prior to current display
+var logs_rewind_one_day = function() {
+    reset_logs();
+    log_end_time = log_end_time - 86400; // rewind log by 24 hours
+    log_start_time = log_end_time - 86400;
+    refresh_logs();
+};
+
+// reset to 24 hours after current display
+var logs_forward_one_day = function() {
+    reset_logs();
+    var time_now = (new Date()).getTime()/1000;
+    log_end_time = log_end_time + 86400; // rewind log by 24 hours
+    log_start_time = log_end_time + 86400;
+    if(log_end_time >= time_now) {
+        log_end_time = -1; // reset to default end if end time exceeds now
+    }
+    if(log_start_time >= time_now) { // if start time exceeds now, use today function instead
+        logs_today();
+        return;
+    }
+    refresh_logs();
+};
+
+
+
 var logs_clear = function() {
     $('#logs_output').empty();
 
@@ -2048,6 +2074,8 @@ Status: <span id="payment_status"></span>
 
 
 <div style="float:right;">
+<button onclick="logs_rewind_one_day()" style="width:120px;height:30px;">Back 1 Day</button>
+<button onclick="logs_forward_one_day()" style="width:120px;height:30px;">Forward 1 Day</button>
 <button onclick="logs_yesterday()" style="width:120px;height:30px;">Yesterday</button>
 <button onclick="logs_today()" style="width:120px;height:30px;">Today</button>
 <button onclick="logs_clear()" style="width:120px;height:30px;">Clear</button>
