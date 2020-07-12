@@ -2608,7 +2608,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$LOADING_SCREEN_NAME$': screen_name,
             '$LOADING_SCREEN_DATA$': SpinJSON.dumps(screen_data),
             '$INDEX_CSS$': get_static_include('index_body_%s.css' % index_body_platform),
-            '$IS_ELECTRON$': 1 if visitor.spin_client_platform != 'web' else 0,
+            '$IS_ELECTRON$': 1 if 'electron' in visitor.spin_client_platform else 0,
             '$INDEX_BODY$': get_static_include('index_body_%s.html' % index_body_platform).replace('$GAME_COPYRIGHT_INFO$', SpinConfig.config.get('game_copyright_info', '$YEAR$ Example copyright info').replace('$YEAR$', repr(time.gmtime(proxy_time).tm_year))),
             })
 
