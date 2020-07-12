@@ -20,6 +20,9 @@ var height_calc = 'calc(100vh - 24px)'
 if(navigator.appVersion.indexOf("MSIE 9") >= 0) {
      height_calc = 'calc(100% - 24px)';
 }
+if($IS_ELECTRON$) { // on Electron, there is no bottom bar, so the iframe should occupy the entire vertical window
+    height_calc = 'calc(100vh)';
+}
 document.getElementById('startup_div').style.height =
     document.getElementById('canvas_div').style.height = height_calc;
 
@@ -27,6 +30,11 @@ document.getElementById('startup_div').style.height =
    Better way is to teach proxyserver to load in the localized gamedata strings. */
 if(spin_demographics['locale'] && spin_demographics['locale'].indexOf('ko') === 0) {
     document.getElementById('startup_msg').innerHTML = '환영합니다!';
+}
+
+if($IS_ELECTRON$) { // on Electron, hide the header and footer divs
+    document.getElementById('spin_header').style.visibility = 'none';
+    document.getElementById('spin_footer').style.visibility = 'none';
 }
 
 </script>
