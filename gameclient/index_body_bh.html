@@ -39,12 +39,13 @@ if(spin_demographics['locale'] && spin_demographics['locale'].indexOf('ko') === 
             <div id="spin_footer_linkbar_id_container" style="float:right;position:absolute;top:0px;right:0px">
                 &copy; $GAME_COPYRIGHT_INFO$&nbsp;&nbsp;|&nbsp;&nbsp;<span id="spin_footer_linkbar_id">Player ID: <b>Loading</b>&nbsp;&nbsp;&nbsp;</span>
             </div>
+            <div id="spin_is_electron" style="visibility: hidden;">$IS_ELECTRON$</div>
         </div>
     </div>
 </div>
 
 <script>
-if($IS_ELECTRON$) {
+if(document.getElementById('spin_is_electron').innerHTML === 'electron') {
     // on Electron, hide the header and footer divs
     document.getElementById('spin_header').style.visibility = 'none';
     document.getElementById('spin_footer').style.visibility = 'none';
