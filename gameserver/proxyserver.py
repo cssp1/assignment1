@@ -2547,6 +2547,8 @@ class GameProxy(proxy.ReverseProxyResource):
         replacements = self.get_fb_global_variables(request, visitor)
         index_body_platform = visitor.frame_platform
         if index_body_platform == 'k2': index_body_platform = 'kg'
+        electron_body_string = 'moo'
+        if 'electron' in visitor.spin_client_platform: electron_body_string = 'electron'
         replacements.update({
             '$SERVER_HTTP_PORT$': str(SpinConfig.config['proxyserver']['external_http_port']),
             '$SERVER_SSL_PORT$': str(SpinConfig.config['proxyserver'].get('external_ssl_port',-1)),
@@ -2608,8 +2610,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$LOADING_SCREEN_NAME$': screen_name,
             '$LOADING_SCREEN_DATA$': SpinJSON.dumps(screen_data),
             '$INDEX_CSS$': get_static_include('index_body_%s.css' % index_body_platform),
-            '$IS_ELECTRON$': 1 if 'electron' in visitor.spin_client_platform else 0,
-            '$INDEX_BODY$': get_static_include('index_body_%s.html' % index_body_platform).replace('$GAME_COPYRIGHT_INFO$', SpinConfig.config.get('game_copyright_info', '$YEAR$ Example copyright info').replace('$YEAR$', repr(time.gmtime(proxy_time).tm_year))),
+            '$INDEX_BODY$': get_static_include('index_body_%s.html' % index_body_platform).replace('$GAME_COPYRIGHT_INFO$', SpinConfig.config.get('game_copyright_info', '$YEAR$ Example copyright info').replace('$YEAR$', repr(time.gmtime(proxy_time).tm_year))).replace('$IS_ELECTRON$', electron_body_string),
             })
 
         expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
