@@ -26766,7 +26766,7 @@ class GAMEAPI(resource.Resource):
 
                         if obj.is_on_destroy_enabled():
                             # check for equipment that has on_destroy consequents (such as security team spawning)
-                            on_destroy_cons_list = obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
+                            on_destroy_cons_list = copy.deepcopy(obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy)))
                             if on_destroy_cons_list:
                                 secteam_behavior = None
                                 if obj.is_building() and obj.config:
@@ -26872,9 +26872,9 @@ class GAMEAPI(resource.Resource):
 
         cons_list = None
         if obj.is_building():
-            cons_list = obj.get_stat('on_approach', obj.get_leveled_quantity(obj.spec.on_approach))
+            cons_list = copy.deepcopy(obj.get_stat('on_approach', obj.get_leveled_quantity(obj.spec.on_approach)))
         elif obj.is_mobile():
-            cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_approach', obj.get_leveled_quantity(obj.spec.on_approach))
+            cons_list = copy.deepcopy(obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_approach', obj.get_leveled_quantity(obj.spec.on_approach)))
 
         if cons_list:
             secteam_behavior = None
@@ -27056,7 +27056,7 @@ class GAMEAPI(resource.Resource):
             session.damage_log.record(obj)
 
         if on_destroy_enabled:
-            on_destroy_cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
+            on_destroy_cons_list = copy.deepcopy(obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy)))
 
             if on_destroy_cons_list:
                 secteam_behavior = None
