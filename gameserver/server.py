@@ -19641,6 +19641,99 @@ class XSAPI(resource.Resource):
         request.setResponseCode(http.NO_CONTENT)
         return ''
 
+    def handle_refund(self, request, session, request_data):
+        payment_id = request_data['transaction']['id']
+        entry = None
+        for ent in session.player.history.get('money_purchase_history',[]):
+            if ('payment_id' in ent) and str(ent['payment_id']) == str(payment_id):
+                entry = ent
+                break
+        if not entry: return False # never completed
+        if entry.get('refunded',0): return False # already refunded
+
+        real_currency = 'xsolla:'+request_data['purchase']['checkout']['currency']
+        real_currency_amount = request_data['purchase']['checkout']['amount']
+
+        # look for SKU here based on order parameters
+        if 'custom_parameters' in request_data and 'spin_spellname' in request_data['custom_parameters']:
+            spellname = request_data['custom_parameters']['spin_spellname']
+            spin_spellarg = request_data['custom_parameters'].get('spin_spellarg')
+            if spin_spellarg:
+                spellarg = SpinJSON.loads(spin_spellarg)
+
+        else:
+            # fallback path to determine gamebucks value
+            gamesite.exception_log.event(server_time, 'player %d missing custom_parameters for purchase: %r' % (session.user.user_id, request_data['purchase']))
+
+            for entry in gamedata['store']['gamebucks_open_graph_prices']:
+                currency, str_value = entry[0], entry[1]
+                if currency == str(request_data['purchase']['checkout']['currency']):
+                    gamebucks_amount = int((real_currency_amount / float(str_value)) + 0.5)
+                    spellname, spellarg = session.user.find_buy_gamebucks_spell(session, real_currency, real_currency_amount, gamebucks_amount)
+                    if spellname is None: # fallback - raw gamebuck purchase at equivalent value
+                        spellname = 'XSOLLA_PAYMENT'
+                        spellarg = gamebucks_amount
+                    break
+
+        refund_type = 'refund'
+        paid_amount = request_data['purchase']['payment']['amount']
+        tax_amount = request_data['purchase']['sales_tax']['amount']
+        user_facing_amount = paid_amount
+        paid_currency = request_data['purchase']['payment']['currency']
+        refund_amount = paid_amount
+        refund_tax_amount = tax_amount
+        refund_currency = paid_currency
+
+        try:
+            usd_equivalent = request_data['purchase']['payout']['amount']
+            item = request_data['purchase']['custom_parameters']['spin_spellname']
+            gamebucks = self.parse_buy_gamebucks_spell_quantity(spellname, spellarg)
+            gift_order = entry.get('gift_order', None)
+            time_struct = time.gmtime(server_time)
+
+            if gamedata['store'].get('enable_refunds', True):
+                gift_refund = 0
+                if gift_order and (gamedata['store'].get('refund_gift_order_from','recipient') == 'recipient'):
+                    gift_refund += self.refund_gift_order(session, retmsg, time_struct, str(payment_id), gift_order)
+                if gamebucks > gift_refund:
+                    # refund any excess
+                    self.refund_gamebucks(session, retmsg, gamebucks - gift_refund, time_struct, str(payment_id), refund_type)
+                entry['refunded'] = 1
+                entry['refunded_at'] = server_time
+
+                session.increment_player_metric('money_refunded', usd_equivalent)
+                session.increment_player_metric('gamebucks_refunded', gamebucks)
+
+                gamesite.credits_log.event(server_time, {'user_id':session.user.user_id,
+                                                         'summary': session.player.get_denormalized_summary_props('brief'),
+                                                         'country_tier': session.player.country_tier,
+                                                         'event_name':'1310_order_refunded',
+                                                         'code':1310,
+                                                         'Billing Amount': usd_equivalent,
+                                                         'currency': paid_currency,
+                                                         'currency_amount': user_facing_amount,
+                                                         'tax_amount': tax_amount,
+                                                         'refund_tax_amount': refund_tax_amount,
+                                                         'tax_country': request_data['purchase'].get('tax_country',None),
+                                                         'country': session.user.country,
+                                                         'payout_foreign_exchange_rate':request_data['purchase'].get('payout_foreign_exchange_rate',-1),
+                                                         'quantity': item['quantity'],
+                                                         'product': item['product'],
+                                                         'request_id': request_data['purchase'].get('request_id',None),
+                                                         'payment_id': payment_id,
+                                                         'gift_order': gift_order})
+                dry_run = ''
+            else:
+                dry_run = '(dry run) '
+
+                gamesite.exception_log.event(server_time, '%sREFUND (%s) payment %s player %d amount %d gamebucks (balance %d) paid_amount %r (incl. %r tax) paid_currency %s refund_amount %f refund_currency %s gift_order %s' % \
+                                             (dry_run, refund_type, str(payment['id']), session.player.user_id, gamebucks, session.player.resources.gamebucks,
+                                              paid_amount, tax_amount, paid_currency, refund_amount, refund_currency, repr(gift_order)))
+
+        except:
+            gamesite.exception_log.event(server_time, ('ping_fbpayment_post_complete player %d payment_id %s error: ' % (session.user.user_id, str(payment_id)))+traceback.format_exc().strip()) # OK
+            pass
+
     # not part of the API handler - this is called on behalf of the client via GAMEAPI
     def get_token(self, session, retmsg, spellname, spellarg): # spellname being an xsolla BUY_GAMEBUCKS SKU
         spell = gamedata['spells'][spellname]
