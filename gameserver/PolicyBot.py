@@ -474,7 +474,7 @@ class IdleCheckAntiRefreshPolicy(AntiRefreshPolicy):
 
 class AntiAltPolicy(Policy):
     # min number of simultaneous logins to trigger action
-    MIN_LOGINS = 10
+    MIN_LOGINS = 5
 
     # ignore alt-account logins that last happened over a week ago
     IGNORE_AGE = 7*86400
