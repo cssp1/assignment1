@@ -10707,41 +10707,6 @@ function invoke_playfield_controls_bar() {
     return dialog;
 }
 
-// note: sound/music, fullscreen, and settings buttons
-function invoke_electron_control_dialog() {
-    if(!('electron_is_windowed' in player.preferences)) {
-        // to tightly control the new player experience, add this key to the player preferences with the default value
-        player.preferences['electron_is_windowed'] = 0;
-        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
-    }
-    if(!eval_cond_or_literal(gamedata['client']['show_electron_control_dialog'], player, null)) { return; }
-    var dialog = new SPUI.Dialog(gamedata['dialogs']['electron_control_dialog']);
-    dialog.user_data['dialog'] = 'electron_control_dialog';
-    dialog.transparent_to_mouse = true;
-    dialog.widgets['exit_button'].onclick = function() {
-        window.top.postMessage('bh_electron_exit_command', '*');
-    };
-    dialog.ondraw = update_electron_control_dialog;
-    return dialog;
-}
-
-/**
-    @param {SPUI.Dialog} dialog
-*/
-function update_electron_control_dialog(dialog) {
-    dialog.xy = [canvas_width-dialog.wh[0],0]; //ensures exit button is at top far-right if canvas is resized
-    var electron_is_windowed = player.preferences['electron_is_windowed'];
-    dialog.widgets['window_mode_button'].state = electron_is_windowed ? 'normal' : 'reverse';
-    dialog.widgets['window_mode_button'].tooltip.str = electron_is_windowed ? 'Run in Fullscreen' : 'Run in Window';
-    var new_preference = electron_is_windowed ? 0 : 1;
-    var controller_message = electron_is_windowed ? 'bh_electron_fullscreen_mode' : 'bh_electron_windowed_mode';
-    dialog.widgets['window_mode_button'].onclick = function() {
-        window.top.postMessage(controller_message, '*');
-        player.preferences['electron_is_windowed'] = new_preference;
-        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
-    }
-}
-
 /**
     @param {SPUI.Dialog} dialog
     @param {number} delta
@@ -12207,15 +12172,6 @@ function init_desktop_dialogs() {
     var controls_bar = invoke_playfield_controls_bar();
     desktop_dialogs['playfield_controls_bar'] = controls_bar;
     SPUI.root.add_after(dialog, controls_bar); // add controls_bar to SPUI.root right after desktop_top, because its update method depends on desktop_top's position
-
-    // Electron-only control buttons
-    var show_electron_control_dialog = eval_cond_or_literal(gamedata['client']['show_electron_control_dialog'], player, null);
-    if(show_electron_control_dialog) {
-        var electron_control_dialog = invoke_electron_control_dialog();
-        desktop_dialogs['electron_control_dialog'] = electron_control_dialog;
-        SPUI.root.add_under(electron_control_dialog)
-    }
-
 
     // desktop bottom
 
