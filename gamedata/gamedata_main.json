@@ -40,7 +40,7 @@
         // true if the HTML5 fullscreen API is available
         "truefullscreen": {"predicate": "OR", "subpredicates": [
             {"predicate": "FRAME_PLATFORM", "platform":"fb"},
-            {"predicate": "CLIENT_PLATFORM", "any_electron": 1}
+            {"predicate": "CLIENT_PLATFORM", "any_electron": 1},
             {"predicate": "FRAME_PLATFORM", "platform":"bh"}
         ]},
 
