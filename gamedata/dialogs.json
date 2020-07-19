@@ -692,6 +692,16 @@
         }
     },
 
+    // electron-only exit button
+    "electron_control_dialog": {
+        "xy": [0,0],
+        "dimensions": [25,25],
+        "widgets": {
+            "exit_button": { "kind": "ActionButton", "xy": [0,0], "dimensions": [24,24], "bg_image": "close_button_big",
+                              "ui_tooltip": "Exit Game", "tooltip_delay": 0, "fixed_tooltip_offset": [-55,31], "push_bg_image": 1 }
+        }
+    },
+
     // horizontal version of the controls bar
     "playfield_controls_bar_horizontal": {
         "xy": [0,180],
