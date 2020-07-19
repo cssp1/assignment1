@@ -12207,7 +12207,7 @@ function init_desktop_dialogs() {
     desktop_dialogs['playfield_controls_bar'] = controls_bar;
     SPUI.root.add_after(dialog, controls_bar); // add controls_bar to SPUI.root right after desktop_top, because its update method depends on desktop_top's position
 
-    // Electron-only exit button
+    // Electron-only control buttons
     var show_electron_control_dialog = eval_cond_or_literal(gamedata['client']['show_electron_control_dialog'], player, null);
     if(show_electron_control_dialog) {
         var electron_control_dialog = invoke_electron_control_dialog();
