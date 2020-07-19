@@ -6,14 +6,10 @@ let main_window;
 ipc.on('message', (event, message) => {
     if(message === 'electron-shutdown-game') {
         shutdown_app();
-    } else if(message === 'electron-windowed-mode' && main_window && main_window.isFullScreen()) {
-        var mainScreen = screen.getPrimaryDisplay();
-        var new_width = Math.floor(mainScreen.workArea['width'] * 0.8);
-        var new_height = Math.floor(mainScreen.workArea['height'] * 0.8);
+    } else if(message === 'electron-cancel-fullscreen' && main_window && main_window.isFullScreen()) {
         main_window.setFullScreen(false);
-        main_window.setSize(new_width,new_height);
         main_window.center();
-    } else if(message === 'electron-fullscreen-mode' && main_window && !main_window.isFullScreen()) {
+    } else if (message === 'electron-request-fullscreen' && main_window && !main_window.isFullScreen()) {
         main_window.setFullScreen(true);
     }
 });
@@ -29,19 +25,22 @@ async function shutdown_app() {
 }
 
 function createMainWindow () {
-
     session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
         details.requestHeaders['User-Agent'] = 'bh_electron_microsoft';
         callback({ cancel: false, requestHeaders: details.requestHeaders });
     });
+    var mainScreen = screen.getPrimaryDisplay();
+    var new_width = Math.floor(mainScreen.workArea['width']);
+    var new_height = Math.floor(mainScreen.workArea['height']);
     main_window = new BrowserWindow({
         webPreferences: {
             nodeIntegration: true,
             preload: __dirname + '/listener.js'
         },
+        width: new_width,
+        height: new_height,
         frame: false
     });
-    main_window.setFullScreen(true);
     main_window.on('closed', () => {
         main_window = null;
     });
@@ -50,6 +49,7 @@ function createMainWindow () {
     // waits until app is ready, then shows the window
     main_window.once('ready-to-show', () => {
         main_window.show();
+        main_window.center();
     })
 }
 

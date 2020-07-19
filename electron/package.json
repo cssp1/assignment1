@@ -11,11 +11,12 @@
   },
   "license": "UNLICENSED",
   "devDependencies": {
-    "electron-localshortcut": "^3.2.1",
     "electro": "^2.1.1",
-    "electron": "^8.0.1"
+    "electron": "^8.0.1",
+    "electron-localshortcut": "^3.2.1"
   },
   "dependencies": {
+    "custom-electron-titlebar": "^3.2.3",
     "electron-localshortcut": "^3.2.1"
   }
 }
