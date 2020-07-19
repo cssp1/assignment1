@@ -692,6 +692,7 @@ function has_true_fullscreen() {
 function toggle_true_fullscreen() {
     if(canvas_is_fullscreen) {
         document['SPINcancelFullScreen']();
+        window.top.postMessage('bh_electron_cancel_fullscreen', '*');
     } else {
         if(player.record_feature_use('truefullscreen')) {
             metric_event('6501_fullscreen_engaged', add_demographics({}));
@@ -701,6 +702,7 @@ function toggle_true_fullscreen() {
             player.record_feature_use('truefullscreen_during_tutorial');
         }
         canvas_div['SPINrequestFullScreen']();
+        window.top.postMessage('bh_electron_request_fullscreen', '*');
     }
 }
 
@@ -10630,19 +10632,17 @@ function invoke_playfield_controls_bar() {
     dialog.user_data['adjusting_sound'] = false;
     dialog.transparent_to_mouse = true;
 
-    var always_fullscreen = eval_cond_or_literal(gamedata['client']['always_fullscreen'], player, null);
-
     // true FS support
-    if(has_true_fullscreen() && !always_fullscreen) {
+    if(has_true_fullscreen()) {
         dialog.widgets['fullscreen_button'].show = true;
-    } else if(is_browser_standalone_mode() || always_fullscreen) {
+    } else if(is_browser_standalone_mode()) {
         // no need for this button (?)
         dialog.widgets['fullscreen_button'].show = false;
     } else {
         // fake FS dialog - breaks tutorial and has no useful info for non-Windows/Mac browsers
         dialog.widgets['fullscreen_button'].show = ((player.tutorial_state == "COMPLETE") &&
                                                     (spin_demographics['browser_OS'] === "Mac" ||
-                                                     spin_demographics['browser_OS'] === "Windows") && !always_fullscreen);
+                                                     spin_demographics['browser_OS'] === "Windows"));
     }
     dialog.widgets['fullscreen_button'].onclick = function() {
         if(has_true_fullscreen()) {
@@ -10707,9 +10707,7 @@ function invoke_playfield_controls_bar() {
     return dialog;
 }
 
-// note: sound/music, fullscreen, and settings buttons
 function invoke_electron_control_dialog() {
-    if(!eval_cond_or_literal(gamedata['client']['show_electron_control_dialog'], player, null)) { return; }
     var dialog = new SPUI.Dialog(gamedata['dialogs']['electron_control_dialog']);
     dialog.user_data['dialog'] = 'electron_control_dialog';
     dialog.transparent_to_mouse = true;
@@ -10725,22 +10723,7 @@ function invoke_electron_control_dialog() {
 */
 function update_electron_control_dialog(dialog) {
     dialog.xy = [canvas_width-dialog.wh[0],0]; //ensures exit button is at top far-right if canvas is resized
-    var electron_is_windowed = !!player.preferences['electron_is_windowed'];
-    dialog.widgets['window_mode_button'].state = electron_is_windowed ? 'normal' : 'reverse';
-    dialog.widgets['window_mode_button'].tooltip.str = electron_is_windowed ? 'Run in Fullscreen' : 'Run in Window';
-    if(electron_is_windowed) {
-        window.top.postMessage('bh_electron_fullscreen_mode', '*');
-        dialog.widgets['window_mode_button'].onclick = function() {
-            player.preferences['electron_is_windowed'] = 1;
-            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
-        }
-    } else {
-        window.top.postMessage('bh_electron_windowed_mode', '*');
-        dialog.widgets['window_mode_button'].onclick = function() {
-            player.preferences['electron_is_windowed'] = 0;
-            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
-        }
-    }
+    dialog.widgets['exit_button'].show = canvas_is_fullscreen;
 }
 
 /**
@@ -10817,11 +10800,6 @@ function update_playfield_controls_bar(dialog) {
                                                 ((player.tutorial_state == "COMPLETE") &&
                                                  (dialog.user_data['dialog'] == 'playfield_controls_bar_vertical' || (session.home_base && !session.has_attacked)) &&
                                                  post_screenshot_enabled()));
-
-    var always_fullscreen = eval_cond_or_literal(gamedata['client']['always_fullscreen'], player, null);
-    if(always_fullscreen && has_true_fullscreen() && !canvas_is_fullscreen) {
-        toggle_true_fullscreen();
-    }
 
     dialog.widgets['volume_down_button'].show = dialog.widgets['volume_up_button'].show = (dialog.user_data['adjusting_music'] || dialog.user_data['adjusting_sound']);
     if (dialog.user_data['adjusting_music'] || dialog.user_data['adjusting_sound']) {
@@ -12209,7 +12187,7 @@ function init_desktop_dialogs() {
     desktop_dialogs['playfield_controls_bar'] = controls_bar;
     SPUI.root.add_after(dialog, controls_bar); // add controls_bar to SPUI.root right after desktop_top, because its update method depends on desktop_top's position
 
-    // Electron-only control buttons
+    // Electron-only exit button
     var show_electron_control_dialog = eval_cond_or_literal(gamedata['client']['show_electron_control_dialog'], player, null);
     if(show_electron_control_dialog) {
         var electron_control_dialog = invoke_electron_control_dialog();
@@ -50016,11 +49994,6 @@ function handle_server_message(data) {
                 var s = document.getElementsByTagName('script')[0];
                 s.parentNode.insertBefore(pa, s);
             })();
-        }
-
-        var always_fullscreen = eval_cond_or_literal(gamedata['client']['always_fullscreen'], player, null);
-        if(always_fullscreen && !canvas_is_fullscreen) {
-            toggle_true_fullscreen();
         }
 
     } else if(msg == "SQUADS_UPDATE") {
