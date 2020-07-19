@@ -10709,6 +10709,11 @@ function invoke_playfield_controls_bar() {
 
 // note: sound/music, fullscreen, and settings buttons
 function invoke_electron_control_dialog() {
+    if(!('electron_is_windowed' in player.preferences)) {
+        // to tightly control the new player experience, add this key to the player preferences with the default value
+        player.preferences['electron_is_windowed'] = 0;
+        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+    }
     if(!eval_cond_or_literal(gamedata['client']['show_electron_control_dialog'], player, null)) { return; }
     var dialog = new SPUI.Dialog(gamedata['dialogs']['electron_control_dialog']);
     dialog.user_data['dialog'] = 'electron_control_dialog';
@@ -10725,21 +10730,15 @@ function invoke_electron_control_dialog() {
 */
 function update_electron_control_dialog(dialog) {
     dialog.xy = [canvas_width-dialog.wh[0],0]; //ensures exit button is at top far-right if canvas is resized
-    var electron_is_windowed = !!player.preferences['electron_is_windowed'];
+    var electron_is_windowed = player.preferences['electron_is_windowed'];
     dialog.widgets['window_mode_button'].state = electron_is_windowed ? 'normal' : 'reverse';
     dialog.widgets['window_mode_button'].tooltip.str = electron_is_windowed ? 'Run in Fullscreen' : 'Run in Window';
-    if(electron_is_windowed) {
-        window.top.postMessage('bh_electron_fullscreen_mode', '*');
-        dialog.widgets['window_mode_button'].onclick = function() {
-            player.preferences['electron_is_windowed'] = 1;
-            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
-        }
-    } else {
-        window.top.postMessage('bh_electron_windowed_mode', '*');
-        dialog.widgets['window_mode_button'].onclick = function() {
-            player.preferences['electron_is_windowed'] = 0;
-            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
-        }
+    var new_preference = electron_is_windowed ? 0 : 1;
+    var controller_message = electron_is_windowed ? 'bh_electron_fullscreen_mode' : 'bh_electron_windowed_mode';
+    dialog.widgets['window_mode_button'].onclick = function() {
+        window.top.postMessage(controller_message, '*');
+        player.preferences['electron_is_windowed'] = new_preference;
+        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
     }
 }
 
