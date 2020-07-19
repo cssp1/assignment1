@@ -10725,18 +10725,20 @@ function invoke_electron_control_dialog() {
 */
 function update_electron_control_dialog(dialog) {
     dialog.xy = [canvas_width-dialog.wh[0],0]; //ensures exit button is at top far-right if canvas is resized
-    var electron_is_fullscreen = !!player.preferences['electron_is_fullscreen'];
-    dialog.widgets['window_mode_button'].state = electron_is_fullscreen ? 'reverse' : 'normal';
-    dialog.widgets['window_mode_button'].tooltip.str = electron_is_fullscreen ? 'Run in Window' : 'Run in Fullscreen';
-    if(electron_is_fullscreen) {
+    var electron_is_windowed = !!player.preferences['electron_is_windowed'];
+    dialog.widgets['window_mode_button'].state = electron_is_windowed ? 'normal' : 'reverse';
+    dialog.widgets['window_mode_button'].tooltip.str = electron_is_windowed ? 'Run in Fullscreen' : 'Run in Window';
+    if(electron_is_windowed) {
         window.top.postMessage('bh_electron_fullscreen_mode', '*');
         dialog.widgets['window_mode_button'].onclick = function() {
-            player.preferences['electron_is_fullscreen'] = 0;
+            player.preferences['electron_is_windowed'] = 1;
+            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
         }
     } else {
         window.top.postMessage('bh_electron_windowed_mode', '*');
         dialog.widgets['window_mode_button'].onclick = function() {
-            player.preferences['electron_is_fullscreen'] = 1;
+            player.preferences['electron_is_windowed'] = 0;
+            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
         }
     }
 }

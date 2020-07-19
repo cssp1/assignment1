@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, session } = require('electron');
+const { app, BrowserWindow, dialog, session, screen } = require('electron');
 const ipc = require('electron').ipcMain;
 let main_window;
 
@@ -7,7 +7,12 @@ ipc.on('message', (event, message) => {
     if(message === 'electron-shutdown-game') {
         shutdown_app();
     } else if(message === 'electron-windowed-mode' && main_window && main_window.isFullScreen()) {
+        var mainScreen = screen.getPrimaryDisplay();
+        var new_width = Math.floor(mainScreen.workArea['width'] * 0.8);
+        var new_height = Math.floor(mainScreen.workArea['height'] * 0.8);
         main_window.setFullScreen(false);
+        main_window.setSize(new_width,new_height);
+        main_window.center();
     } else if(message === 'electron-fullscreen-mode' && main_window && !main_window.isFullScreen()) {
         main_window.setFullScreen(true);
     }
