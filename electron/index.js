@@ -6,6 +6,10 @@ let main_window;
 ipc.on('message', (event, message) => {
     if(message === 'electron-shutdown-game') {
         shutdown_app();
+    } else if(message === 'electron-windowed-mode' && main_window && main_window.isFullScreen()) {
+        main_window.setFullScreen(false);
+    } else if(message === 'electron-fullscreen-mode' && main_window && !main_window.isFullScreen()) {
+        main_window.setFullScreen(true);
     }
 });
 
