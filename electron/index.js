@@ -24,6 +24,11 @@ async function shutdown_app() {
     main_window.destroy();
 }
 
+function runAppSetup() {
+    // allows for other pre-setup functions
+    createMainWindow();
+}
+
 function createMainWindow () {
     session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
         details.requestHeaders['User-Agent'] = 'bh_electron_microsoft';
@@ -45,17 +50,16 @@ function createMainWindow () {
         main_window = null;
     });
     main_window.loadURL('https://www.battlehouse.com/play/thunderrun/');
-    const menu = new Menu();
-    Menu.setApplicationMenu(menu);
 
     // waits until app is ready, then shows the window
     main_window.once('ready-to-show', () => {
         main_window.show();
         main_window.center();
+        main_window.maximize();
     })
 }
 
-app.whenReady().then(createMainWindow);
+app.whenReady().then(runAppSetup);
 app.on('window-all-closed', () => {
   app.quit();
 })
