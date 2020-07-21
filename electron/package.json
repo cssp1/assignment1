@@ -1,7 +1,7 @@
 {
-  "name": "Firestrike-Windows",
-  "version": "0.0.1",
-  "description": "Battlehouse Electron App Prototype",
+  "name": "ThunderRun",
+  "version": "1.0.0",
+  "description": "Thunder Run: Global Warfare",
   "main": "index.js",
   "start": "index.js",
   "bin": "index.js",
