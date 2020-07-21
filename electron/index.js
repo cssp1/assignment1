@@ -45,6 +45,8 @@ function createMainWindow () {
         main_window = null;
     });
     main_window.loadURL('https://www.battlehouse.com/play/thunderrun/');
+    const menu = new Menu();
+    Menu.setApplicationMenu(menu);
 
     // waits until app is ready, then shows the window
     main_window.once('ready-to-show', () => {
