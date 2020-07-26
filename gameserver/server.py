@@ -19533,7 +19533,7 @@ class XSAPI(resource.Resource):
                 if user_id:
                     gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s user_id %d), queueing' % (xs_id, user_id))
                     gamesite.msg_client.msg_send([{'to':[user_id],
-                                                   'type':'XSAPI_payment',
+                                                   'type':'XSAPI_' + request_data['notification_type'],
                                                    'time':server_time,
                                                    'expire_time': server_time + SpinConfig.config['proxyserver'].get('XSAPI_payment_msg_duration', 30*24*60*60),
                                                    'response': request_data}])
@@ -19642,10 +19642,10 @@ class XSAPI(resource.Resource):
         return ''
 
     def handle_refund(self, request, session, request_data):
-        payment_id = request_data['transaction']['id']
+        order_id = request_data['transaction']['id']
         entry = None
         for ent in session.player.history.get('money_purchase_history',[]):
-            if ('payment_id' in ent) and str(ent['payment_id']) == str(payment_id):
+            if ('order_id' in ent) and str(ent['order_id']) == order_id:
                 entry = ent
                 break
         if not entry: return False # never completed
@@ -19667,7 +19667,7 @@ class XSAPI(resource.Resource):
 
             for entry in gamedata['store']['gamebucks_open_graph_prices']:
                 currency, str_value = entry[0], entry[1]
-                if currency == str(request_data['purchase']['checkout']['currency']):
+                if currency == request_data['purchase']['checkout']['currency']:
                     gamebucks_amount = int((real_currency_amount / float(str_value)) + 0.5)
                     spellname, spellarg = session.user.find_buy_gamebucks_spell(session, real_currency, real_currency_amount, gamebucks_amount)
                     if spellname is None: # fallback - raw gamebuck purchase at equivalent value
@@ -19676,8 +19676,8 @@ class XSAPI(resource.Resource):
                     break
 
         refund_type = 'refund'
-        paid_amount = request_data['purchase']['payment']['amount']
-        tax_amount = request_data['purchase']['sales_tax']['amount']
+        paid_amount = request_data['payment_details']['payment']['amount']
+        tax_amount = request_data['payment_details']['sales_tax']['amount']
         user_facing_amount = paid_amount
         paid_currency = request_data['purchase']['payment']['currency']
         refund_amount = paid_amount
@@ -19685,7 +19685,7 @@ class XSAPI(resource.Resource):
         refund_currency = paid_currency
 
         try:
-            usd_equivalent = request_data['purchase']['payout']['amount']
+            usd_equivalent = request_data['payment_details']['payout']['amount']
             item = request_data['purchase']['custom_parameters']['spin_spellname']
             gamebucks = self.parse_buy_gamebucks_spell_quantity(spellname, spellarg)
             gift_order = entry.get('gift_order', None)
@@ -19694,10 +19694,10 @@ class XSAPI(resource.Resource):
             if gamedata['store'].get('enable_refunds', True):
                 gift_refund = 0
                 if gift_order and (gamedata['store'].get('refund_gift_order_from','recipient') == 'recipient'):
-                    gift_refund += self.refund_gift_order(session, retmsg, time_struct, str(payment_id), gift_order)
+                    gift_refund += self.refund_gift_order(session, retmsg, time_struct, order_id, gift_order)
                 if gamebucks > gift_refund:
                     # refund any excess
-                    self.refund_gamebucks(session, retmsg, gamebucks - gift_refund, time_struct, str(payment_id), refund_type)
+                    session.user.refund_gamebucks(session, retmsg, gamebucks - gift_refund, time_struct, order_id, refund_type)
                 entry['refunded'] = 1
                 entry['refunded_at'] = server_time
 
@@ -19714,13 +19714,13 @@ class XSAPI(resource.Resource):
                                                          'currency_amount': user_facing_amount,
                                                          'tax_amount': tax_amount,
                                                          'refund_tax_amount': refund_tax_amount,
-                                                         'tax_country': request_data['purchase'].get('tax_country',None),
+                                                         'tax_country': 'unknown',
                                                          'country': session.user.country,
-                                                         'payout_foreign_exchange_rate':request_data['purchase'].get('payout_foreign_exchange_rate',-1),
-                                                         'quantity': item['quantity'],
-                                                         'product': item['product'],
-                                                         'request_id': request_data['purchase'].get('request_id',None),
-                                                         'payment_id': payment_id,
+                                                         'payout_foreign_exchange_rate':'unknown',
+                                                         'quantity': 1,
+                                                         'product': item,
+                                                         'request_id': request_data['transaction']['id'],
+                                                         'order_id': order_id,
                                                          'gift_order': gift_order})
                 dry_run = ''
             else:
@@ -19731,7 +19731,7 @@ class XSAPI(resource.Resource):
                                               paid_amount, tax_amount, paid_currency, refund_amount, refund_currency, repr(gift_order)))
 
         except:
-            gamesite.exception_log.event(server_time, ('ping_fbpayment_post_complete player %d payment_id %s error: ' % (session.user.user_id, str(payment_id)))+traceback.format_exc().strip()) # OK
+            gamesite.exception_log.event(server_time, ('ping_fbpayment_post_complete player %d payment_id %s error: ' % (session.user.user_id, str(order_id)))+traceback.format_exc().strip()) # OK
             pass
 
     # not part of the API handler - this is called on behalf of the client via GAMEAPI
@@ -26434,6 +26434,25 @@ class GAMEAPI(resource.Resource):
                         gamesite.exception_log.event(server_time, 'XSAPI_payment API fail on user %d payment %s: ' % (session.user.user_id, payment_id) + traceback.format_exc().strip()) # OK
                         pass
                     to_ack.append(msg['msg_id'])
+                elif msg['type'] == 'XSAPI_refund':
+                    try:
+                        request_data = msg['response'] # note: we don't check the signature, assuming proxyserver checked it already.
+                        payment_id = request_data['transaction']['id']
+                        # don't re-run an already-completed payment
+                        found = False
+                        for entry in session.player.history.get('money_purchase_history',[]):
+                            if ('order_id' in entry) and str(entry['order_id']) == str(payment_id):
+                                found = True
+                                break
+
+                        if not found: # run the payment
+                            gamesite.xsapi.handle_refund(None, session, request_data)
+                            gamesite.exception_log.event(server_time, 'XSAPI_refund API success on user %d refund %s' % (session.user.user_id, payment_id))
+                    except:
+                        gamesite.exception_log.event(server_time, 'XSAPI_refund API fail on user %d refund %s: ' % (session.user.user_id, payment_id) + traceback.format_exc().strip()) # OK
+                        pass
+                    to_ack.append(msg['msg_id'])
+
 
                 else:
                     gamesite.exception_log.event(server_time, 'user %d: unhandled msg type %s' % (session.user.user_id, msg['type']))
