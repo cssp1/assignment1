@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, session, screen } = require('electron');
+const { app, BrowserWindow, dialog, session, screen, webContents } = require('electron');
 const ipc = require('electron').ipcMain;
 let main_window;
 
@@ -24,8 +24,9 @@ async function shutdown_app() {
     main_window.destroy();
 }
 
-function runAppSetup() {
+async function runAppSetup() {
     // allows for other pre-setup functions
+    // await session.defaultSession.clearStorageData(); // for login tests only, clears cookies and tokens on each startup
     createMainWindow();
 }
 
@@ -50,6 +51,20 @@ function createMainWindow () {
     });
     main_window.on('closed', () => {
         main_window = null;
+    });
+    main_window.webContents.on('did-finish-load', () => { // checks for existence of MSAL back button, which is broken in Electron. This hides the button
+        let currentURL = main_window.webContents.getURL();
+        if(currentURL.indexOf('https://login.microsoftonline.com') === 0){
+            main_window.webContents.executeJavaScript(`
+                var checkForBackButton = function () {
+                    var backButton = document.getElementsByClassName('btn btn-block')['idBtn_Back'];
+                    if(backButton) {
+                        backButton.remove();
+                    }
+                };
+                setInterval(checkForBackButton, 100);
+                `);
+        }
     });
     main_window.loadURL('https://www.battlehouse.com/play/thunderrun/');
     main_window.center();
