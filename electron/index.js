@@ -35,8 +35,8 @@ function createMainWindow () {
         callback({ cancel: false, requestHeaders: details.requestHeaders });
     });
     var mainScreen = screen.getPrimaryDisplay();
-    var new_width = Math.floor(mainScreen.workArea['width']);
-    var new_height = Math.floor(mainScreen.workArea['height']);
+    var new_width = Math.floor(mainScreen.workArea['width'] * 0.8);
+    var new_height = Math.floor(mainScreen.workArea['height'] * 0.8);
     main_window = new BrowserWindow({
         webPreferences: {
             nodeIntegration: true,
@@ -44,18 +44,20 @@ function createMainWindow () {
         },
         width: new_width,
         height: new_height,
+        show: false,
+        backgroundColor: '#222',
         frame: false
     });
     main_window.on('closed', () => {
         main_window = null;
     });
     main_window.loadURL('https://www.battlehouse.com/play/thunderrun/');
+    main_window.center();
+    main_window.maximize();
 
     // waits until app is ready, then shows the window
     main_window.once('ready-to-show', () => {
         main_window.show();
-        main_window.center();
-        main_window.maximize();
     })
 }
 
