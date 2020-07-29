@@ -21633,7 +21633,7 @@ function do_invoke_speedup_dialog(kind) {
         dialog.widgets['price_display'].onclick = closure;
 
     // alliance help system
-    if(price > 0 && player.alliance_help_enabled() &&
+    if(price > 0 && player.alliance_help_enabled() && !session.is_quarry() &&
        selection.unit.is_building() && !selection.unit.is_damaged() && selection.unit.is_upgrading() &&
        !('show_if' in gamedata['spells']['REQUEST_ALLIANCE_HELP'] && !read_predicate(gamedata['spells']['REQUEST_ALLIANCE_HELP']['show_if']).is_satisfied(player))) {
         var spell = gamedata['spells']['REQUEST_ALLIANCE_HELP'];
