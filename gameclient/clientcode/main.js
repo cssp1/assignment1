@@ -5969,6 +5969,14 @@ Building.prototype.is_crafting = function() { // return current recipe name or n
     }
     return false;
 };
+Building.prototype.is_crafting_grid_weapon = function() { // return current recipe name or null if not crafting
+    if(!(this.is_crafting())) { return false; }
+    var craft_queue = this.get_crafting_queue();
+    if(craft_queue && craft_queue.length > 0) {
+        return craft_queue[0]['craft']['recipe']['crafting_category'] === 'mines' || craft_queue[0]['craft']['recipe']['crafting_category'] === 'ambushes';
+    }
+    return false;
+};
 Building.prototype.is_manufacturing = function() {
     return (this.manuf_queue.length > 0);
 };
@@ -21536,6 +21544,9 @@ function do_invoke_speedup_dialog(kind) {
             description_finish = gamedata['strings']['speedup']['finish_tech_unlock'].replace('%s', gamedata['tech'][selection.unit.research_item]['ui_name']);
         }
     } else if(selection.unit.is_building() && selection.unit.is_crafting()) {
+        if(selection.unit.is_crafting_grid_weapon()) {
+            time_left = selection.unit.crafting_time_left_all();
+        }
         if(selection.unit.is_emplacement()) {
             var product = selection.unit.turret_head_inprogress_item();
             var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
