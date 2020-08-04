@@ -191,18 +191,21 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
             var tech_spec = gamedata['tech'][goody['tech']];
             if(tech_spec['developer_only'] && !player.is_developer()) { return; }
             if(('show_if' in tech_spec) && !read_predicate(tech_spec['show_if']).is_satisfied(player,null)) { return; }
+            if(level > get_max_ui_level(tech_spec)) { return; } // maxed out
             temp = temp.replace('%THING', tech_spec['ui_name']);
             linkcode = 'tech='+goody['tech'];
         } else if('enhancement' in goody) {
             var tech_spec = gamedata['enhancements'][goody['enhancement']];
             if(tech_spec['developer_only'] && !player.is_developer()) { return; }
             if(('show_if' in tech_spec) && !read_predicate(tech_spec['show_if']).is_satisfied(player,null)) { return; }
+            if(level > get_max_ui_level(tech_spec)) { return; } // maxed out
             temp = temp.replace('%THING', tech_spec['ui_name']);
             linkcode = 'enhancement='+goody['enhancement'];
         } else if('building' in goody) {
             var building_spec = gamedata['buildings'][goody['building']];
             if(building_spec['developer_only'] && !player.is_developer()) { return; }
             if(('show_if' in building_spec) && !read_predicate(building_spec['show_if']).is_satisfied(player,null)) { return; }
+            if(level > get_max_ui_level(building_spec)) { return; } // maxed out
             temp = temp.replace('%THING', building_spec['ui_name']);
             linkcode = 'building='+goody['building'];
         } else if('crafting_recipe' in goody) {
