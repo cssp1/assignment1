@@ -26441,11 +26441,11 @@ class GAMEAPI(resource.Resource):
                         # don't re-run an already-completed payment
                         found = False
                         for entry in session.player.history.get('money_purchase_history',[]):
-                            if ('order_id' in entry) and str(entry['order_id']) == str(payment_id):
+                            if ('order_id' in entry) and str(entry['order_id']) == str(payment_id) and entry.get('refunded',0):
                                 found = True
                                 break
 
-                        if not found: # run the payment
+                        if found: # run the refund
                             gamesite.xsapi.handle_refund(None, session, request_data)
                             gamesite.exception_log.event(server_time, 'XSAPI_refund API success on user %d refund %s' % (session.user.user_id, payment_id))
                     except:
