@@ -2741,7 +2741,7 @@ class GameProxy(proxy.ReverseProxyResource):
                     # user is valid, nothing more to do
                     request.setResponseCode(http.NO_CONTENT)
                     return ''
-                elif request_data['notification_type'] == 'payment':
+                elif request_data['notification_type'] in ('payment', 'refund'):
                     # proxy to gameserver, if player is logged in
                     session = ProxySession.emulate(db_client.session_get_by_social_id(social_id, reason=self.path))
                     if session:
@@ -2750,7 +2750,7 @@ class GameProxy(proxy.ReverseProxyResource):
                     # player is not logged in - queue a mail message so gameserver will receive it on next login
                     exception_log.event(proxy_time, 'session not found for XSAPI order, queueing: '+repr(request_data))
                     db_client.msg_send([{'to':[user_id],
-                                         'type':'XSAPI_payment',
+                                         'type':'XSAPI_'+request_data['notification_type'],
                                          'time':proxy_time,
                                          'expire_time': proxy_time + SpinConfig.config['proxyserver'].get('XSAPI_payment_msg_duration', 30*24*60*60),
                                          'response': request_data}])
