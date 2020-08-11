@@ -19686,15 +19686,15 @@ class XSAPI(resource.Resource):
 
         try:
             usd_equivalent = request_data['payment_details']['payout']['amount']
-            item = request_data['purchase']['custom_parameters']['spin_spellname']
-            gamebucks = self.parse_buy_gamebucks_spell_quantity(spellname, spellarg)
+            item = spellname
+            gamebucks = session.user.parse_buy_gamebucks_spell_quantity(spellname, spellarg)
             gift_order = entry.get('gift_order', None)
             time_struct = time.gmtime(server_time)
 
             if gamedata['store'].get('enable_refunds', True):
                 gift_refund = 0
                 if gift_order and (gamedata['store'].get('refund_gift_order_from','recipient') == 'recipient'):
-                    gift_refund += self.refund_gift_order(session, retmsg, time_struct, order_id, gift_order)
+                    gift_refund += session.user.refund_gift_order(session, retmsg, time_struct, order_id, gift_order)
                 if gamebucks > gift_refund:
                     # refund any excess
                     session.user.refund_gamebucks(session, retmsg, gamebucks - gift_refund, time_struct, order_id, refund_type)
@@ -19731,7 +19731,7 @@ class XSAPI(resource.Resource):
                                               paid_amount, tax_amount, paid_currency, refund_amount, refund_currency, repr(gift_order)))
 
         except:
-            gamesite.exception_log.event(server_time, ('ping_fbpayment_post_complete player %d payment_id %s error: ' % (session.user.user_id, str(order_id)))+traceback.format_exc().strip()) # OK
+            gamesite.exception_log.event(server_time, ('XSAPI.handle_refund() player %d payment_id %s error: ' % (session.user.user_id, str(order_id)))+traceback.format_exc().strip()) # OK
             pass
 
     # not part of the API handler - this is called on behalf of the client via GAMEAPI
