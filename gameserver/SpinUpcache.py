@@ -1108,7 +1108,10 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                 obj['browser_supports_'+cap] = obj['browser_caps'][cap]
 
     if ('last_sprobe_result' in obj) and ('graphics' in obj['last_sprobe_result']['tests']) and ('framerate' in obj['last_sprobe_result']['tests']['graphics']):
-        obj['last_framerate'] = float(obj['last_sprobe_result']['tests']['graphics']['framerate'])
+        try:
+            obj['last_framerate'] = float(obj['last_sprobe_result']['tests']['graphics']['framerate'])
+        except TypeError:
+            pass
 
     # deleted keys that should not be cached or output to CSV
     for field in HOG_FIELDS:
