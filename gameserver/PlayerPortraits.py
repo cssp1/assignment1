@@ -137,11 +137,19 @@ class PlayerPortraits(object):
             d.errback()
             return
 
+    def image_body_is_ok(self, body):
+        # ensure 'body' is a PNG or JPEG, and not some other image format that PIL might mis-parse
+        return body.startswith(b'\x89PNG') or \
+               body.startswith(b'\xff\xd8\xff')
+
     def shrink_image(self, body, content_type):
         try:
             from PIL import Image
         except ImportError:
             raise Exception('PIL not available')
+
+        if not self.image_body_is_ok(body):
+            raise Exception('Portrait unrecognized image format: %r' % body[0:10])
 
         size = (100, 100)
         img = Image.open(BytesIO(body))
