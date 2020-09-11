@@ -24,7 +24,7 @@ maxminddb==1.5.4
 matplotlib>=2.0.2
 
 # MySQL library
-PyMySQL==0.10.0 # pure-Python implementation
+PyMySQL==0.10.1 # pure-Python implementation
 # MySQL-python==1.2.5 # note: will require a MySQL-devel package to build against
 
 Pillow==6.2.2
