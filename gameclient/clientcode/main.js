@@ -27743,8 +27743,11 @@ function invoke_equip_chooser_dialog(inv_dialog, parent_widget, tech, unit, slot
     dialog.widgets['equip_nothing_frame'].tooltip.str = null;
     if(equipped_now_specname) {
         var spec = ItemDisplay.get_inventory_item_spec(equipped_now_specname);
+        if(!spec || !('equip' in spec)) {
+            throw Error('Item ' + equipped_now_specname + ' missing spec value or equip field.');
+        }
         // check predicate
-        var pred = ('unequip_requires' in spec['equip'] ? read_predicate(spec['equip']['unequip_requires']) : null);
+        var pred = ('unequip_requires' in spec['equip']) ? read_predicate(spec['equip']['unequip_requires']) : null);
         if(pred && !pred.is_satisfied(player, null)) {
             dialog.widgets['equip_nothing_frame'].state = 'disabled_clickable';
             var help_func = get_requirements_help(pred);
