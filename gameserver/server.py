@@ -13354,7 +13354,7 @@ class Player(AbstractPlayer):
             # bring unit levels up to player tech level
             if obj.is_mobile(): obj.ensure_level(self.tech.get(obj.spec.level_determined_by_tech, 1))
 
-        if gamedata['server'].get('migrate_unit_equips_to_no_pct_name', False) and not self.history.get('unit_equips_to_no_pct_name_migrated', False):
+        if (gamedata['server'].get('migrate_unit_equips_to_no_pct_name', False) and not self.history.get('unit_equips_to_no_pct_name_migrated', False)) or (gamedata['server'].get('migrate_unit_equips_to_no_pct_name_again', False) and not self.history.get('unit_equips_to_no_pct_name_migrated_again', False)):
             # legacy unit equips had their boost percentages hard-coded into their names. This migration replaces instances with new instances stripped of the pct value
             pct_detector = re.compile(r'_[0-9]+pct')
             for equipment in self.unit_equipment.itervalues():
@@ -13376,6 +13376,8 @@ class Player(AbstractPlayer):
             self.history['turret_leveled_item_migrated'] = 1
         if gamedata['server'].get('migrate_unit_equips_to_no_pct_name', False) and not self.history.get('unit_equips_to_no_pct_name_migrated', False):
             self.history['unit_equips_to_no_pct_name_migrated'] = 1
+        if gamedata['server'].get('migrate_unit_equips_to_no_pct_name_again', False) and not self.history.get('unit_equips_to_no_pct_name_migrated_again', False):
+            self.history['unit_equips_to_no_pct_name_migrated_again'] = 1
         if to_delete:
             for obj in to_delete:
                 self.home_base_remove(obj)
