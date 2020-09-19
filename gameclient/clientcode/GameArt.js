@@ -1037,7 +1037,7 @@ GameArt.Sprite.prototype.do_draw = function(xy, facing, time, dest_wh) {
 
         if(dest_wh) {
             GameArt.ctx.save();
-            GameArt.ctx.fillStyle = 'rgba(0,50,0,0.25)';
+            GameArt.ctx.fillStyle = 'rgba(50,0,0,0.25)';
             GameArt.ctx.fillRect(xy[0], xy[1], dest_wh[0], dest_wh[1]);
             GameArt.ctx.restore();
         }
