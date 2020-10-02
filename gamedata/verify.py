@@ -4236,7 +4236,7 @@ def main(args):
 
     # note: checks payment API to allow for Electron and second Kongregate release. Only TR is planned for now, but add games if they get ported
     if 'payments_api' in gamedata['store'] and type(gamedata['store']['payments_api']) is list and gamedata['game_id'] in ('tr','eg'):
-        for platform in ('fb','kg','k2','ag','bh'):
+        for platform in ('fb','k2','ag','bh'):
             found_platform = False
             for predicate in gamedata['store']['payments_api']:
                 if predicate[0]['platform'] == platform:
