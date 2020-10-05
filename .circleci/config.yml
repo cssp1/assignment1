@@ -8,6 +8,9 @@ jobs:
 
     docker:
       - image: circleci/python:2.7
+        auth:
+          username: $DOCKER_HUB_USERNAME
+          password: $DOCKER_HUB_PASSWORD
     steps:
       - checkout:
           path: ~/repo/game
@@ -43,6 +46,9 @@ jobs:
   make_gamedata_eg:
     docker:
       - image: bayesimpact/circleci
+        auth:
+          username: $DOCKER_HUB_USERNAME
+          password: $DOCKER_HUB_PASSWORD
     steps:
       - setup_remote_docker
       - checkout:
@@ -61,6 +67,9 @@ jobs:
   make_gameclient:
     docker:
       - image: bayesimpact/circleci
+        auth:
+          username: $DOCKER_HUB_USERNAME
+          password: $DOCKER_HUB_PASSWORD
     steps:
       - setup_remote_docker
       - checkout:
