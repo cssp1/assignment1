@@ -1091,6 +1091,14 @@ def check_region(name, data):
 
     error |= require_art_asset(data['bg_image'], name+':bg_image')
 
+    if 'show_if' in data and data['show_if']['predicate'] == 'ALWAYS_FALSE' and 'prison' not in data['id']:
+        if data['auto_join']:
+            error |= 1
+            print '%s: is set to auto_join:1 but is a non-prison hidden region' % name
+        if data['open_join']:
+            error |= 1
+            print '%s: is set to open_join:1 but is a non-prison hidden region' % name
+
     if ('continent_id' not in data) or data['continent_id'] not in gamedata['continents']:
         error |= 1
         print '%s: missing or invalid continent_id' % name
