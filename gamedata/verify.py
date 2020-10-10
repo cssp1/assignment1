@@ -3471,6 +3471,9 @@ def check_achievements(achievements):
             print 'achievement %s has the same ui_name as %s ("%s")' % (key, seen_ui_names[data['ui_name']], data['ui_name'])
         else:
             seen_ui_names[data['ui_name']] = key
+        if len(data['ui_name']) > 34:
+            error |= 1
+            print 'achievement %s ui_name %s is more than 50 characters long. It will overlap other text on the UI.' % (key, data['ui_name'])
 
     return error
 
