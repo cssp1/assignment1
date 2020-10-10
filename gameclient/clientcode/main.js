@@ -23769,16 +23769,41 @@ function setup_region_map_feature_list_header(dialog, mode) {
             }
         }
     };
+    dialog.user_data['page'] = 0;
     dialog.ondraw = update_region_map_feature_list_header;
+    dialog.on_mousewheel_function = scroll_region_map_feature_list_header;
+}
+
+/** @param {SPUI.Dialog} dialog */
+function scroll_region_map_feature_list_header(dialog, delta) {
+    var current_page = dialog.user_data['page'];
+    var mode = dialog.user_data['mode'];
+    var feature_list = dialog.user_data['feature_list'] = session.region.find_own_features_by_type((mode == 'squads' ? 'squad' : 'quarry'));
+    var max_page = feature_list.length - dialog.data['widgets']['element']['array'][1];
+    if(max_page < 1) { return; }
+    if(delta < 0 && current_page === 0) { return; }
+    if(delta > 0 && current_page === max_page) { return; }
+    if(delta > 0) { current_page += 1; }
+    if(delta < 0) { current_page -= 1; }
+    dialog.user_data['page'] = current_page;
 }
 
 /** @param {SPUI.Dialog} dialog */
 function update_region_map_feature_list_header(dialog) {
     var mode = dialog.user_data['mode'];
     var feature_list = dialog.user_data['feature_list'] = session.region.find_own_features_by_type((mode == 'squads' ? 'squad' : 'quarry'));
+    var display_feature_list = [];
+    var current_page = dialog.user_data['page'];
+    var max_feature_length = dialog.data['widgets']['element']['array'][1];
+    var max_page = feature_list.length - dialog.data['widgets']['element']['array'][1];
+    if(max_page < 0) { max_page = 0; }
     dialog.widgets['number'].str = feature_list.length.toString();
-    for(var i = 0; i < dialog.data['widgets']['element']['array'][1]; i++) {
+    for(var i = current_page; i < (dialog.data['widgets']['element']['array'][1] + max_page); i++) {
         var ft = (i < feature_list.length && dialog.user_data['expanded'] ? feature_list[i] : null);
+        display_feature_list.push(ft);
+    }
+    for(var i = 0; i < dialog.data['widgets']['element']['array'][1]; i ++){
+        var ft = (i < display_feature_list.length && dialog.user_data['expanded'] ? display_feature_list[i] : null);
         update_region_map_feature_list_element(dialog.widgets['element'+i.toString()], i, ft);
     }
     dialog.widgets['expand'].show = !dialog.user_data['expanded'];
