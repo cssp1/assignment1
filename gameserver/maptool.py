@@ -1582,6 +1582,8 @@ def remove_player_from_map(db, lock_manager, region_id, user_id, feature = None,
         nosql_client.player_cache_update(user_id, {'home_region': player_data['home_region'], 'ladder_player': 0})
 
     lock_manager.release_player(user_id, generation = player_data.get('generation',-1))
+    if not dry_run:
+        do_CONTROLAPI({'user_id': user_id, 'method': 'modify_scores', 'stat': 'trophies_pvp', 'value': 0})
     print 'REMOVED FROM MAP', pretty_feature(player_data)
     return True
 
