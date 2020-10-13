@@ -45687,25 +45687,41 @@ function update_upgrade_dialog(dialog) {
         if(old_level === 0) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_unlock'];
             widget.str = widget.data['ui_name_unlock'].replace('%s',tech['ui_name']).replace('%d', new_level.toString());
+            widget.xy = widget.data['ui_name_unlock_xy'];
         } else if(new_level > max_level) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
             widget.str = widget.data['ui_name_stats'].replace('%s',tech['ui_name']).replace('%d',max_level.toString());
+            widget.xy = widget.data['ui_name_stats_xy'];
+            if(widget.str.length > widget.data['ui_name_stats_max_length']) {
+                widget.str = widget.data['ui_name_stats_short'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
+            }
         } else {
             if(('update_unit_levels_on_tech_upgrade' in gamedata) &&
                !gamedata['update_unit_levels_on_tech_upgrade']) {
                 // call this "Research" instead of "Upgrade" when the new level isn't applied to existing units
                 dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_research'];
+                widget.xy = widget.data['ui_name_research_xy'];
             } else {
                 dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name'];
+                widget.xy = widget.data['ui_name_xy'];
             }
             widget.str = widget.data['ui_name'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
+            if(widget.str.length > widget.data['ui_name_max_length']) {
+                widget.str = widget.data['ui_name_short'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
+            }
         }
     } else {
         if(new_level > max_level || stats_only || stats_when_busy) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
             widget.str = widget.data['ui_name_stats'].replace('%s',unit.spec['ui_name']).replace('%d',old_level.toString());
+            if(widget.str.length > widget.data['ui_name_stats_max_length']) {
+                widget.str = widget.data['ui_name_stats_short'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+            }
         } else {
             widget.str = widget.data['ui_name'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+            if(widget.str.length > widget.data['ui_name_max_length']) {
+                widget.str = widget.data['ui_name_short'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+            }
         }
     }
 

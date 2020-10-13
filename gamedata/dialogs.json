@@ -2976,8 +2976,8 @@
             "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
             "sunken": {"kind": "StaticImage", "xy":[8,64], "dimensions":[720,257], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
 
-            "title_bold": { "kind": "TextField", "xy": [30,8], "dimensions": [123, 48], "text_size": 30, "text_style": "bold",
-                            "text_hjustify": "center",
+            "title_bold": { "kind": "TextField", "xy": [15,8], "dimensions": [123, 48], "text_size": 30, "text_style": "bold",
+                            "text_hjustify": "left",
                             "ui_name": "Upgrade",
                             "ui_name_research": "Research",
                             "ui_name_unlock": "Unlock",
@@ -2985,9 +2985,17 @@
 
             "title": { "kind": "TextField", "xy": [156,8], "dimensions": [540, 48], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left",
-                       "ui_name": ":: %s to Level %d",
-                       "ui_name_unlock": ":: %s", // Level %d",
-                       "ui_name_stats": ":: %s at Level %d"
+                       "ui_name": ": %s to Level %d",
+                       "ui_name_max_length": 40,
+                       "ui_name_short": ": %s to L%d",
+                       "ui_name_xy": [140,8],
+                       "ui_name_research_xy": [145,8],
+                       "ui_name_unlock": ": %s", // Level %d",
+                       "ui_name_unlock_xy": [115,8],
+                       "ui_name_stats": ": %s at Level %d",
+                       "ui_name_stats_max_length": 50,
+                       "ui_name_stats_short": ": %s at L%d",
+                       "ui_name_stats_xy": [90,8]
                      },
 
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
