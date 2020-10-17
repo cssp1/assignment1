@@ -396,6 +396,7 @@ class Visitor(object):
         self.first_hit_uri = None
         self.game_container = None
         self.spin_client_platform = None
+        self.spin_client_version = None
 
         self.server_protocol = None
         self.server_host = None
@@ -411,8 +412,13 @@ class Visitor(object):
         self.browser_info = BrowserDetect.get_browser(self.demographics['User-Agent'])
         if 'electron_' in self.browser_info['name']:
             self.spin_client_platform = self.browser_info['name']
+            if 'build_' in self.demographics['User-Agent']:
+                self.spin_client_version = self.demographics['User-Agent'].split('build_')[-1]
+            else:
+                self.spin_client_version = 0
         else:
             self.spin_client_platform = 'web'
+            self.spin_client_version = 0
 
         # canonical protocol/host/port for game server (in case browser needs to reload it)
         self.server_protocol, self.server_host, self.server_port = \
@@ -2576,6 +2582,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$MATTERMOST_ENABLED$': 'true' if SpinConfig.config.get('enable_mattermost',0) else 'false',
             '$FRAME_PLATFORM$': visitor.frame_platform,
             '$SPIN_CLIENT_PLATFORM$': visitor.spin_client_platform,
+            '$SPIN_CLIENT_VERSION$': visitor.spin_client_version,
             '$SOCIAL_ID$': visitor.social_id,
             '$FACEBOOK_ID$': "'"+visitor.facebook_id+"'" if isinstance(visitor, FBVisitor) else 'null',
             '$ARMORGAMES_ID$': "'"+visitor.armorgames_id+"'" if isinstance(visitor, AGVisitor) else 'null',

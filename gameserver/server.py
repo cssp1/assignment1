@@ -1118,6 +1118,7 @@ class UserTable:
               ('birthday', None),
               ('browser_name', coerce_to_str),
               ('spin_client_platform', coerce_to_str),
+              ('spin_client_version', int),
               ('browser_version', int),
               ('browser_os', coerce_to_str),
               ('browser_hardware', str),
@@ -1349,6 +1350,7 @@ class User:
 
         # client platform, used to report if player is using an Electron-based client
         self.spin_client_platform = 'unknown'
+        self.spin_client_version = 0
 
         # last result sent by SProbe.js
         self.last_sprobe_result = None
@@ -13768,6 +13770,7 @@ class LivePlayer(Player):
         # necessary for evaluating predicates that depend on them
         self.browser_name = 'unknown'
         self.spin_client_platform = 'unknown'
+        self.spin_client_version = 0
         self.browser_os = 'unknown'
         self.browser_version = 'unknown'
         self.browser_hardware = 'unknown'
@@ -13796,6 +13799,7 @@ class LivePlayer(Player):
         self.browser_caps = user.browser_caps
         self.user_facebook_likes = user.facebook_likes
         self.spin_client_platform = user.spin_client_platform
+        self.spin_client_version = user.spin_client_version
 
     def ai_instance_generation_put(self, ai_id, gen, base_expiration_time):
         gen_expiration_time = server_time + gamedata['server'].get('ai_instance_generation_duration', 60)
@@ -27456,6 +27460,7 @@ class GAMEAPI(resource.Resource):
                                                                              'browser_version': session.user.browser_version,
                                                                              'browser_hardware': session.user.browser_hardware,
                                                                              'spin_client_platform': session.user.spin_client_platform,
+                                                                             'spin_client_version': session.user.spin_client_version,
                                                                              'country': session.user.country })
             http_request.setHeader('Connection', 'close') # stop keepalive
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]})
@@ -27711,6 +27716,7 @@ class GAMEAPI(resource.Resource):
                                                                                  'browser_version': session.user.browser_version,
                                                                                  'browser_hardware': session.user.browser_hardware,
                                                                                  'spin_client_platform': session.user.spin_client_platform,
+                                                                                 'spin_client_version': session.user.spin_client_version,
                                                                                  'country': session.user.country })
                     reactor.callLater(0, self.log_out_async, session, 'timeout')
                 request.setHeader('Connection', 'close') # stop keepalive
@@ -28095,6 +28101,14 @@ class GAMEAPI(resource.Resource):
             else:
                 # default to web if there is no valid data
                 user.spin_client_platform = 'web'
+        if len(user_demographics) >= 10:
+            spin_client_version = user_demographics[9]
+            # only accept values we expect, in case the client lies to us
+            if isinstance(spin_client_version, int) and (spin_client_version > 0):
+                user.spin_client_version = spin_client_version
+            else:
+                # default to web if there is no valid data
+                user.spin_client_version = 0
 
         for cap in gamedata['browser_caps']:
             if cap in client_browser_caps:
@@ -28407,6 +28421,7 @@ class GAMEAPI(resource.Resource):
                            'browser_name':user.browser_name,
                            'browser_version':user.browser_version,
                            'spin_client_platform':user.spin_client_platform,
+                           'spin_client_version':user.spin_client_version,
                            'browser_hardware':user.browser_hardware}
 
         if client_permissions: acq_event_props['scope'] = client_permissions
