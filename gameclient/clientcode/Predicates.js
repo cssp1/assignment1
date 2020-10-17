@@ -2356,6 +2356,7 @@ ClientVersionPredicate.prototype.is_satisfied = function(player, qdata) {
     } else if(this.method === '<') {
         return spin_client_version < this.version;
     }
+    return false;
 };
 
 /** @param {!Object} data
