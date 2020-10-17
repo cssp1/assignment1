@@ -59,7 +59,6 @@ import SpinGeoIP
 import SpinIPReputation
 import SpinBrotli
 import PlayerPortraits
-import re
 
 proxy_daemonize = ('-n' not in sys.argv)
 verbose_in_argv = ('-v' in sys.argv)
