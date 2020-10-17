@@ -1118,6 +1118,7 @@ class UserTable:
               ('birthday', None),
               ('browser_name', coerce_to_str),
               ('spin_client_platform', coerce_to_str),
+              ('spin_client_vendor', coerce_to_st),
               ('spin_client_version', int),
               ('browser_version', int),
               ('browser_os', coerce_to_str),
@@ -1350,6 +1351,7 @@ class User:
 
         # client platform, used to report if player is using an Electron-based client
         self.spin_client_platform = 'unknown'
+        self.spin_client_vendor = 'unknown'
         self.spin_client_version = 0
 
         # last result sent by SProbe.js
@@ -13770,6 +13772,7 @@ class LivePlayer(Player):
         # necessary for evaluating predicates that depend on them
         self.browser_name = 'unknown'
         self.spin_client_platform = 'unknown'
+        self.spin_client_vendor = 'unknown'
         self.spin_client_version = 0
         self.browser_os = 'unknown'
         self.browser_version = 'unknown'
@@ -13799,6 +13802,7 @@ class LivePlayer(Player):
         self.browser_caps = user.browser_caps
         self.user_facebook_likes = user.facebook_likes
         self.spin_client_platform = user.spin_client_platform
+        self.spin_client_vendor = user.spin_client_vendor
         self.spin_client_version = user.spin_client_version
 
     def ai_instance_generation_put(self, ai_id, gen, base_expiration_time):
@@ -27460,6 +27464,7 @@ class GAMEAPI(resource.Resource):
                                                                              'browser_version': session.user.browser_version,
                                                                              'browser_hardware': session.user.browser_hardware,
                                                                              'spin_client_platform': session.user.spin_client_platform,
+                                                                             'spin_client_vendor': session.user.spin_client_vendor,
                                                                              'spin_client_version': session.user.spin_client_version,
                                                                              'country': session.user.country })
             http_request.setHeader('Connection', 'close') # stop keepalive
@@ -27716,6 +27721,7 @@ class GAMEAPI(resource.Resource):
                                                                                  'browser_version': session.user.browser_version,
                                                                                  'browser_hardware': session.user.browser_hardware,
                                                                                  'spin_client_platform': session.user.spin_client_platform,
+                                                                                 'spin_client_vendor': session.user.spin_client_vendor,
                                                                                  'spin_client_version': session.user.spin_client_version,
                                                                                  'country': session.user.country })
                     reactor.callLater(0, self.log_out_async, session, 'timeout')
@@ -28096,13 +28102,20 @@ class GAMEAPI(resource.Resource):
         if len(user_demographics) >= 9:
             spin_client_platform = user_demographics[8]
             # only accept values we expect, in case the client lies to us
-            if isinstance(spin_client_platform, basestring) and (spin_client_platform == 'web' or spin_client_platform.startswith('electron_')):
+            if isinstance(spin_client_platform, basestring) and (spin_client_platform == 'web' or spin_client_platform.startswith('electron_') or spin_client_platform == 'electron'):
                 user.spin_client_platform = spin_client_platform
             else:
                 # default to web if there is no valid data
                 user.spin_client_platform = 'web'
         if len(user_demographics) >= 10:
-            spin_client_version = user_demographics[9]
+            spin_client_vendor = user_demographics[9]
+            if isinstance(spin_client_platform, basestring):
+                user.spin_client_vendor = spin_client_vendor
+            else:
+                # default to 'unknown' if there is no valid data
+                user.spin_client_vendor = 'unknown'
+        if len(user_demographics) >= 11:
+            spin_client_version = user_demographics[10]
             # only accept values we expect, in case the client lies to us
             if isinstance(spin_client_version, int) and (spin_client_version > 0):
                 user.spin_client_version = spin_client_version
@@ -28421,6 +28434,7 @@ class GAMEAPI(resource.Resource):
                            'browser_name':user.browser_name,
                            'browser_version':user.browser_version,
                            'spin_client_platform':user.spin_client_platform,
+                           'spin_client_vendor':user.spin_client_vendor,
                            'spin_client_version':user.spin_client_version,
                            'browser_hardware':user.browser_hardware}
 

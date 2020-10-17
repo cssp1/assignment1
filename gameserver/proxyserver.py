@@ -396,6 +396,7 @@ class Visitor(object):
         self.first_hit_uri = None
         self.game_container = None
         self.spin_client_platform = None
+        self.spin_client_vendor = None
         self.spin_client_version = 0
 
         self.server_protocol = None
@@ -410,16 +411,17 @@ class Visitor(object):
         self.demographics['User-Agent'] = SpinHTTP.get_twisted_header(request, 'user-agent') or 'unknown'
         self.demographics['ip'] = SpinHTTP.get_twisted_client_ip(request) or 'unknown'
         self.browser_info = BrowserDetect.get_browser(self.demographics['User-Agent'])
-        if 'electron_' in self.browser_info['name']:
-            self.spin_client_platform = self.browser_info['name']
-            # valid post-Microsoft Electron client User-Agent ends in _build_X
-            # there should be exactly one number string in the agent. If there isn't, leave spin_client_version at 0
-            electron_client_build_number = re.findall("build_([\d]+)", self.demographics['User-Agent'])
-            if len(electron_client_build_number) == 1:
-                try:
-                    self.spin_client_version = int(electron_client_build_number[0])
-                except:
-                    self.spin_client_version = 0
+        if self.browser_info['name'] == 'bh_electron':
+            self.spin_client_platform = 'electron'
+            electron_agent = self.demographics['User-Agent'].replace('bh_electron_','') # Electron client agents begin with bh_electron_ followed by a JSON string. Strip off the prefix before attempting to load json
+            try:
+                decoded_agent = SpinJSON.loads(electron_agent)
+                self.spin_client_vendor = decoded_agent.get('client_vendor', 'microsoft') # falls back to default if key missing
+                self.spin_client_version = decoded_agent.get('client_build_number', 0) # falls back to default if key missing
+            except:
+                # falls back to default if no JSON object
+                self.spin_client_vendor = 'microsoft'
+                self.spin_client_version = 0
         else:
             self.spin_client_platform = 'web'
 
@@ -2585,6 +2587,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$MATTERMOST_ENABLED$': 'true' if SpinConfig.config.get('enable_mattermost',0) else 'false',
             '$FRAME_PLATFORM$': visitor.frame_platform,
             '$SPIN_CLIENT_PLATFORM$': visitor.spin_client_platform,
+            '$SPIN_CLIENT_VENDOR$': visitor.spin_client_vendor,
             '$SPIN_CLIENT_VERSION$': visitor.spin_client_version,
             '$SOCIAL_ID$': visitor.social_id,
             '$FACEBOOK_ID$': "'"+visitor.facebook_id+"'" if isinstance(visitor, FBVisitor) else 'null',

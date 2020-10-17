@@ -2330,7 +2330,7 @@ goog.inherits(ClientPlatformPredicate, Predicate);
 ClientPlatformPredicate.prototype.is_satisfied = function(player, qdata) {
     var ret = false;
     if(this.any_electron) {
-        return spin_client_platform.indexOf('electron_') == 0;
+        return spin_client_platform.indexOf('electron') == 0;
     }
     goog.array.forEach(this.platforms, function(platform) {
         if(platform === spin_client_platform) {
