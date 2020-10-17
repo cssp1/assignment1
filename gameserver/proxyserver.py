@@ -414,9 +414,12 @@ class Visitor(object):
             self.spin_client_platform = self.browser_info['name']
             # valid post-Microsoft Electron client User-Agent ends in _build_X
             # there should be exactly one number string in the agent. If there isn't, leave spin_client_version at 0
-            electron_client_build_number = re.findall("([\d]+)", self.demographics['User-Agent'])
+            electron_client_build_number = re.findall("build_([\d]+)", self.demographics['User-Agent'])
             if len(electron_client_build_number) == 1:
-                self.spin_client_version = int(electron_client_build_number[0])
+                try:
+                    self.spin_client_version = int(electron_client_build_number[0])
+                except:
+                    self.spin_client_version = 0
         else:
             self.spin_client_platform = 'web'
 
