@@ -59,6 +59,7 @@ import SpinGeoIP
 import SpinIPReputation
 import SpinBrotli
 import PlayerPortraits
+import re
 
 proxy_daemonize = ('-n' not in sys.argv)
 verbose_in_argv = ('-v' in sys.argv)
@@ -396,7 +397,7 @@ class Visitor(object):
         self.first_hit_uri = None
         self.game_container = None
         self.spin_client_platform = None
-        self.spin_client_version = None
+        self.spin_client_version = 0
 
         self.server_protocol = None
         self.server_host = None
@@ -412,13 +413,13 @@ class Visitor(object):
         self.browser_info = BrowserDetect.get_browser(self.demographics['User-Agent'])
         if 'electron_' in self.browser_info['name']:
             self.spin_client_platform = self.browser_info['name']
-            if 'build_' in self.demographics['User-Agent']:
-                self.spin_client_version = self.demographics['User-Agent'].split('build_')[-1]
-            else:
-                self.spin_client_version = 0
+            # valid post-Microsoft Electron client User-Agent ends in _build_X
+            # there should be exactly one number string in the agent. If there isn't, leave spin_client_version at 0
+            electron_client_build_number = re.findall("([\d]+)", self.demographics['User-Agent'])
+            if len(electron_client_build_number) == 1:
+                self.spin_client_version = int(electron_client_build_number[0])
         else:
             self.spin_client_platform = 'web'
-            self.spin_client_version = 0
 
         # canonical protocol/host/port for game server (in case browser needs to reload it)
         self.server_protocol, self.server_host, self.server_port = \

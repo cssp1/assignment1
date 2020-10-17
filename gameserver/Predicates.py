@@ -53,11 +53,11 @@ class ClientVersionPredicate(Predicate):
         self.version = data.get('version', 0)
     def is_satisfied(self, player, qdata):
         if self.method == '>=':
-            return player.spin_client_platform >= self.version
+            return player.spin_client_version >= self.version
         elif self.method == '==':
-            return player.spin_client_platform == self.version
+            return player.spin_client_version == self.version
         elif self.method == '<':
-            return player.spin_client_platform < self.version
+            return player.spin_client_version < self.version
         else:
             raise Exception('unknown method '+ self.method)
 
