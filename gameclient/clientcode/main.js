@@ -692,7 +692,7 @@ function has_true_fullscreen() {
 function toggle_true_fullscreen() {
     if(canvas_is_fullscreen) {
         document['SPINcancelFullScreen']();
-        window.top.postMessage('bh_electron_cancel_fullscreen', '*');
+        window.top.postMessage({'method': 'bh_electron_command', 'type':'APP_COMMAND', 'command':'CANCEL_FULLSCREEN'}', '*');
     } else {
         if(player.record_feature_use('truefullscreen')) {
             metric_event('6501_fullscreen_engaged', add_demographics({}));
@@ -702,7 +702,7 @@ function toggle_true_fullscreen() {
             player.record_feature_use('truefullscreen_during_tutorial');
         }
         canvas_div['SPINrequestFullScreen']();
-        window.top.postMessage('bh_electron_request_fullscreen', '*');
+        window.top.postMessage({'method': 'bh_electron_command', 'type':'APP_COMMAND', 'command':'ACTIVATE_FULLSCREEN'}', '*');
     }
 }
 
@@ -10720,7 +10720,7 @@ function invoke_electron_control_dialog() {
     dialog.user_data['dialog'] = 'electron_control_dialog';
     dialog.transparent_to_mouse = true;
     dialog.widgets['exit_button'].onclick = function() {
-        window.top.postMessage('bh_electron_exit_command', '*');
+        window.top.postMessage({'method': 'bh_electron_command', 'type':'APP_COMMAND', 'command':'EXIT'}', '*');
     };
     dialog.ondraw = update_electron_control_dialog;
     return dialog;
