@@ -61,7 +61,9 @@ var spin_secure_mode;
 var spin_kissmetrics_enabled;
 /** @type {string} */
 var spin_frame_platform;
+var spin_client_vendor;
 var spin_client_platform;
+var spin_client_version;
 var spin_social_id;
 /** @type {boolean} */
 var spin_armorgames_enabled;

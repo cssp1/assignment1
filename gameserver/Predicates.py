@@ -46,6 +46,21 @@ class ClientPlatformPredicate(Predicate):
             return player.spin_client_platform.startswith('electron_')
         return player.spin_client_platform in self.platforms
 
+class ClientVersionPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.method = data.get('method', '>=')
+        self.version = data.get('version', 0)
+    def is_satisfied(self, player, qdata):
+        if self.method == '>=':
+            return player.spin_client_version >= self.version
+        elif self.method == '==':
+            return player.spin_client_version == self.version
+        elif self.method == '<':
+            return player.spin_client_version < self.version
+        else:
+            raise Exception('unknown method '+ self.method)
+
 class RandomPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1207,6 +1222,8 @@ def read_predicate(data):
         return ClimatePredicate(data)
     elif kind == 'CLIENT_PLATFORM':
         return ClientPlatformPredicate(data)
+    elif kind == 'CLIENT_VERSION':
+        return ClientVersionPredicate(data)
     elif kind == 'OBJECT_OWNERSHIP':
         return ObjectOwnershipPredicate(data)
     raise Exception('unknown predicate %s' % repr(data))

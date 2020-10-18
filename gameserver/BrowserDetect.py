@@ -96,11 +96,8 @@ def get_browser(ag):
     elif ('Opera' in ag):
         name = 'Opera'
         ver = get_version(ag, 'Version')
-    elif ('electron' in ag and ('windows' in ag or 'microsoft' in ag)):
-        name = 'electron_windows'
-        ver = get_version(ag, 'Version')
-    elif ('electron' in ag and 'steam' in ag):
-        name = 'electron_steam'
+    elif 'bh_electron' in ag:
+        name = 'bh_electron'
         ver = get_version(ag, 'Version')
 
     if os is None:
