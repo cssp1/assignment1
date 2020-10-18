@@ -1118,7 +1118,7 @@ class UserTable:
               ('birthday', None),
               ('browser_name', coerce_to_str),
               ('spin_client_platform', coerce_to_str),
-              ('spin_client_vendor', coerce_to_st),
+              ('spin_client_vendor', coerce_to_str),
               ('spin_client_version', int),
               ('browser_version', int),
               ('browser_os', coerce_to_str),
