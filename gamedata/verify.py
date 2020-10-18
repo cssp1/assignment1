@@ -1943,7 +1943,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AURA_INACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE', 'USING_TITLE', 'PLAYER_LEVEL',
                    'PURCHASED_RECENTLY', 'SESSION_LENGTH_TREND', 'ARMY_SIZE', 'PLAYER_VPN',
                    'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE', 'BASE_TYPE', 'BASE_RICHNESS', 'QUERY_STRING',
-                   'HAS_MENTOR', 'TRUST_LEVEL', 'OBJECT_OWNERSHIP', 'CLIENT_PLATFORM', 'CLIENT_VERSION',
+                   'HAS_MENTOR', 'TRUST_LEVEL', 'OBJECT_OWNERSHIP', 'CLIENT_PLATFORM', 'CLIENT_VENDOR', 'CLIENT_VERSION',
                    ])
 
 # context: 'ai_base', 'ai_attack', etc - describes the general environment of the predicate
@@ -2174,8 +2174,14 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             error |= 1; print '%s: %s predicate must have "platforms" as list of valid platforms or have "any_electron" set to 1' % (reason, pred['predicate'])
         elif 'any_electron' not in pred:
             for platform in pred.get('platforms'):
-                if not isinstance(platform, basestring) or not (platform == 'web' or platform.startswith('electron_')):
-                    error |= 1; print '%s: %s valid "platforms" entries must be either "web" or start with "electron_". Entry %s is not valid' % (reason, pred['predicate'], str(platform))
+                if not isinstance(platform, basestring) or not (platform in ('web','electron')):
+                    error |= 1; print '%s: %s valid "platforms" entries must be either "web" or "electron". Entry %s is not valid' % (reason, pred['predicate'], str(platform))
+    elif pred['predicate'] == 'CLIENT_VENDOR':
+        if 'vendors' not in pred or not isinstance(pred['vendors'], list):
+            error |= 1; print '%s: %s predicate must have "vendors" as list of valid vendors' % (reason, pred['predicate'])
+        for vendor in pred.get('vendors',[]):
+            if not isinstance(vendor, basestring):
+                error |= 1; print '%s: %s valid "vendors" entries must be strings. Entry %s is not valid' % (reason, pred['predicate'], str(vendor))
     elif pred['predicate'] == 'CLIENT_VERSION':
         if 'method' not in pred or pred['method'] not in ('>=', '==', '<'):
             error |= 1; print '%s: %s predicate must have "method" value of ">=", "==", or "<"' % (reason, pred['predicate'])

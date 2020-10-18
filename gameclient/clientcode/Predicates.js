@@ -2342,6 +2342,23 @@ ClientPlatformPredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function ClientVendorPredicate(data) {
+    goog.base(this, data);
+    this.vendors = data['vendors'];
+}
+goog.inherits(ClientVendorPredicate, Predicate);
+ClientVendorPredicate.prototype.is_satisfied = function(player, qdata) {
+    var ret = false;
+    goog.array.forEach(this.vendors, function(vendor) {
+        if(vendor === spin_client_vendor) {
+            ret = true;
+        }
+    });
+    return ret;
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function ClientVersionPredicate(data) {
     goog.base(this, data);
     this.method = data['method'];
@@ -2526,6 +2543,8 @@ function read_predicate(data) {
         return new QueryStringPredicate(data);
     } else if (kind === 'CLIENT_PLATFORM') {
         return new ClientPlatformPredicate(data);
+    } else if (kind === 'CLIENT_VENDOR') {
+        return new ClientVendorPredicate(data);
     } else if (kind === 'CLIENT_VERSION') {
         return new ClientVersionPredicate(data);
     } else {
