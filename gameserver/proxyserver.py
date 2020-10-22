@@ -2588,7 +2588,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$FRAME_PLATFORM$': visitor.frame_platform,
             '$SPIN_CLIENT_PLATFORM$': visitor.spin_client_platform,
             '$SPIN_CLIENT_VENDOR$': visitor.spin_client_vendor,
-            '$SPIN_CLIENT_VERSION$': visitor.spin_client_version,
+            '$SPIN_CLIENT_VERSION$': str(visitor.spin_client_version),
             '$SOCIAL_ID$': visitor.social_id,
             '$FACEBOOK_ID$': "'"+visitor.facebook_id+"'" if isinstance(visitor, FBVisitor) else 'null',
             '$ARMORGAMES_ID$': "'"+visitor.armorgames_id+"'" if isinstance(visitor, AGVisitor) else 'null',
