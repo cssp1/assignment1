@@ -5,9 +5,6 @@ on:
     # Sundays at 17:00 UTC
     - cron: 0 17 * * 0
   workflow_dispatch:
-  push:
-    branches:
-      - github-automation
 
 jobs:
   aws_reserved_instance_report:
