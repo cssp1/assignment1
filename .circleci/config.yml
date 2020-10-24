@@ -90,17 +90,17 @@ workflows:
   version: 2
   all_tests:
     jobs:
-      - test_python_libs
+      - test_python_libs:
           filters:
             branches:
               ignore:
                 - github-automation
-      - make_gameclient
+      - make_gameclient:
           filters:
             branches:
               ignore:
                 - github-automation
-      - make_gamedata_eg
+      - make_gamedata_eg:
           filters:
             branches:
               ignore:

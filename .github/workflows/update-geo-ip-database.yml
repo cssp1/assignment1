@@ -9,10 +9,10 @@ jobs:
     name: Update SpinPunch Geo IP Location Database (weekly)
     runs-on: ubuntu-latest
     container:
-      image: docker://docker.pkg.github.com/spinpunch/game/game-batch-tasks:latest
+      image: docker://ghcr.io/spinpunch/game-batch-tasks:latest
       credentials:
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_PAT }}
       env:
         ENVKEY: ${{ secrets.ENVKEY_MANAGEMENT }}
     steps:
