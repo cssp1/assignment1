@@ -14,6 +14,7 @@ import SpinJSON
 # regular expression that matches C++-style comments (see gamedata/preprocess.py for a better explanation)
 comment_remover = re.compile('(?<!tp:|ps:|: "|":"|=\\\\")//.*?$')
 slurp_detector = re.compile('@"([^"]+)"')
+env_var_detector = re.compile('\$\{(.+)\}')
 include_detector = re.compile('^#include "(.+)"')
 include_stripped_detector = re.compile('^#include_stripped "(.+)"')
 
@@ -39,6 +40,13 @@ def load_fd_raw(fd, stripped = False, verbose = False, path = None, override_gam
 
                 contents_cache[filename] = contents
             line = slurp_detector.sub('"'+contents+'"', line)
+
+        # look for ${ENVVAR} and replace with its value
+        env_var_match = env_var_detector.search(line)
+        if env_var_match:
+            env_var_name = env_var_match.group(1)
+            env_var_value = os.getenv(env_var_name)
+            line = env_var_detector.sub('"'+env_var_value+'"', line)
 
         # detect #include directives
         include_match = include_detector.search(line)

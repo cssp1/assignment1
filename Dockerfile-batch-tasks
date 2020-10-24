@@ -1,0 +1,28 @@
+# This is used to run batch tasks (e.g. ETL jobs or periodic maintenance)
+# inside a Docker container.
+
+FROM python:2.7.18-alpine
+
+RUN apk update && \
+    apk add --virtual build-deps gcc g++ libc-dev \
+    	    python-dev libffi-dev libpng-dev jpeg-dev freetype-dev postgresql-dev && \
+    apk add make curl git ca-certificates
+
+# install Envkey
+RUN curl -s https://raw.githubusercontent.com/envkey/envkey-source/master/install.sh | /bin/sh
+
+WORKDIR /usr/src/app
+
+COPY gameserver gameserver
+# COPY gamedata gamedata
+# COPY gameclient gameclient
+
+RUN pip install --no-cache-dir -r gameserver/requirements.txt
+
+COPY gameserver/config.json.example gameserver/config.json
+COPY Dockerfile-batch-tasks-entrypoint.sh /entrypoint.sh
+
+WORKDIR /usr/src/app/gameserver
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD echo "Your command here."
