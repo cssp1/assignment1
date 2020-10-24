@@ -20,5 +20,6 @@ jobs:
         working-directory: /usr/src/app/gameserver
     steps:
       - name: Run Geo IP Location Update
+        run: /entrypoint.sh
         with:
           args: python ./SpinGeoIP.py --put
