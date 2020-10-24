@@ -1,6 +1,6 @@
 .git
 .env
-aws
+aws/terraform*
 gameclient/art*
 gameclient/compiled-client*
 gamedata/linebreak/built/*

@@ -1,0 +1,24 @@
+on:
+  schedule:
+    # Sundays at 17:00 UTC
+    - cron: 0 17 * * 0
+  workflow_dispatch:
+
+jobs:
+  update_ip_reputation:
+    name: Update SpinPunch IP Reputation Database (weekly)
+    runs-on: ubuntu-latest
+    container:
+      image: docker://ghcr.io/spinpunch/game-batch-tasks:latest
+      credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+      env:
+        ENVKEY: ${{ secrets.ENVKEY_MANAGEMENT }}
+    defaults:
+      run:
+        working-directory: /usr/src/app/gameserver
+    steps:
+      - name: Run SpinPunch IP Reputation Update
+        working-directory: /usr/src/app
+        run: /entrypoint.sh python spinpunch-private/update-ip-reputation.py
