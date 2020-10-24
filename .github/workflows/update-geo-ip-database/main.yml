@@ -4,6 +4,7 @@ on:
     - cron: 0 17 * * 0
   push:
     # And on push to github-automation branch
+    # and master, for testing
     branches:
       - github-automation
       - master
