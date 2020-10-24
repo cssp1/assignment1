@@ -45,7 +45,7 @@ def load_fd_raw(fd, stripped = False, verbose = False, path = None, override_gam
         env_var_match = env_var_detector.search(line)
         if env_var_match:
             env_var_name = env_var_match.group(1)
-            env_var_value = os.getenv(env_var_name)
+            env_var_value = os.getenv(env_var_name) or ''
             line = env_var_detector.sub('"'+env_var_value+'"', line)
 
         # detect #include directives
