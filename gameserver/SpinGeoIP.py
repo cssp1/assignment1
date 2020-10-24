@@ -110,7 +110,7 @@ if __name__ == '__main__':
 
         # Maxmind now requires registration and a (free) license key to download this file
         # It's stored in EnvKey in the "Management" environment, MAXMIND_LICENSE_KEY variable
-        if 'maxmind_license_key' not in SpinConfig.config:
+        if not SpinConfig.config.get('maxmind_license_key'):
             print 'Please add "maxmind_license_key" to config.json'
             sys.exit(1)
 
