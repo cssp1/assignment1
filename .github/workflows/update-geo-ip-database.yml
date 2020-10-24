@@ -12,12 +12,15 @@ on:
 
 jobs:
   update_geo_ip_database:
-    runs-on: ubuntu-latest
     name: Update SpinPunch Geo IP Location Database (weekly)
-    env:
-      ENVKEY: ${{ secrets.ENVKEY_MANAGEMENT }}
+    runs-on: ubuntu-latest
+    container:
+      image: docker://docker.pkg.github.com/spinpunch/game/game-batch-tasks:latest
+      credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        ENVKEY: ${{ secrets.ENVKEY_MANAGEMENT }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v2
       - name: Run Geo IP Location Update
-        uses: ./.github/actions/update-geo-ip-database
+        run: python ./SpinGeoIP.py --put

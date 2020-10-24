@@ -1,7 +1,0 @@
-name: 'Update SpinPunch Geo IP Location Database'
-description: 'Pulls latest Maxmind database and uploads to S3 config bucket for use by servers'
-runs:
-  using: 'docker'
-  image: '../../../Dockerfile-batch-tasks'
-  args:
-    - python ./SpinGeoIP.py --put
