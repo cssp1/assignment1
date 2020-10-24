@@ -86,8 +86,24 @@ locals {
       ]
     },
     {
+      "Action": ["sns:Publish"],
+      "Effect": "Allow",
+      "Resource": [
+        "${data.terraform_remote_state.corp.outputs.cron_mail_sns_topic}"
+      ]
+    },
+    {
       "Action": [
-        "cloudwatch:PutMetricData"
+        "cloudwatch:PutMetricData",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus",
+        "ec2:DescribeInstanceAttribute",
+        "ec2:DescribeReservedInstances",
+        "ec2:DescribeReservedInstancesListings",
+        "ec2:DescribeReservedInstancesOfferings",
+        "rds:DescribeDBInstances",
+        "rds:DescribeReservedDBInstances",
+        "rds:DescribeReservedDBInstancesOfferings"
       ],
       "Effect": "Allow",
       "Resource": "*"

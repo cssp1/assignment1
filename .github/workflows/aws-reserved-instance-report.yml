@@ -1,0 +1,21 @@
+on:
+  schedule:
+    # Sundays at 17:00 UTC
+    - cron: 0 17 * * 0
+  workflow_dispatch:
+
+jobs:
+  aws_reserved_instance_report:
+    name: Report status of EC2/RDS reserved instances
+    runs-on: ubuntu-latest
+    container:
+      image: docker://ghcr.io/spinpunch/game-batch-tasks:latest
+      credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+      env:
+        ENVKEY: ${{ secrets.ENVKEY_MANAGEMENT }}
+    steps:
+      - name: Run AWS instance update
+        working-directory: /usr/src/app
+        run: /entrypoint.sh sh -c 'python aws/ec2res.py --color=no | grep -v \.micro | python aws/sns-publish.py --subject "EC2/RDS Reserved Instance Report" --topic "${BATCH_TASKS_SNS_TOPIC}"'
