@@ -6,6 +6,7 @@ on:
     # And on push to github-automation branch
     branches:
       - github-automation
+  workflow_dispatch:
 
 jobs:
   update_geo_ip_database:
