@@ -1,3 +1,5 @@
+name: update-geo-ip-database
+
 on:
   schedule:
     # Sundays at 17:00 UTC
