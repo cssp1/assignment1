@@ -11,4 +11,4 @@ eval $(envkey-source)
 export AWS_ACCESS_KEY_ID=${BATCH_TASKS_AWS_KEY_ID}
 export AWS_SECRET_ACCESS_KEY=${BATCH_TASKS_AWS_SECRET_KEY}
 
-exec $@
+exec "$@"

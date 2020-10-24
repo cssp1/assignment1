@@ -17,6 +17,10 @@ COPY gameserver gameserver
 # COPY gamedata gamedata
 # COPY gameclient gameclient
 
+# enable installation of pre-made "manylinux" Python binary builds on Alpine
+# see https://github.com/pypa/pip/issues/3969#issuecomment-247381915
+RUN echo 'manylinux1_compatible = True' > /usr/local/lib/python2.7/site-packages/_manylinux.py
+
 RUN pip install --no-cache-dir -r gameserver/requirements.txt
 
 COPY gameserver/config.json.example gameserver/config.json

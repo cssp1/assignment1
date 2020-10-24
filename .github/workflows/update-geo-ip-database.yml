@@ -2,12 +2,6 @@ on:
   schedule:
     # Sundays at 17:00 UTC
     - cron: 0 17 * * 0
-  push:
-    # And on push to github-automation branch
-    # and master, for testing
-    branches:
-      - github-automation
-      - master
   workflow_dispatch:
 
 jobs:
