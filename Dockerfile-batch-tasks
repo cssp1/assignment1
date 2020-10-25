@@ -6,7 +6,8 @@ FROM python:2.7.18-alpine
 RUN apk update && \
     apk add --virtual build-deps gcc g++ libc-dev \
     	    python-dev libffi-dev libpng-dev jpeg-dev freetype-dev postgresql-dev && \
-    apk add make curl git grep ca-certificates
+    apk add make curl git grep ca-certificates && \
+    apk add nodejs npm bind-tools # these are for update-ip-reputation.py
 
 # install Envkey
 RUN curl -s https://raw.githubusercontent.com/envkey/envkey-source/master/install.sh | /bin/sh
@@ -23,7 +24,7 @@ COPY spinpunch-private spinpunch-private
 # see https://github.com/pypa/pip/issues/3969#issuecomment-247381915
 RUN echo 'manylinux1_compatible = True' > /usr/local/lib/python2.7/site-packages/_manylinux.py
 
-# aws scripts need the legacy boto v2 library
+# some aws scripts need the legacy boto v2 library
 RUN pip install boto>=2.49.0
 
 RUN pip install --no-cache-dir -r gameserver/requirements.txt
