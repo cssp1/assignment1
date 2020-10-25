@@ -23,4 +23,8 @@ jobs:
     steps:
       - name: Run SpinPunch IP Reputation Update
         working-directory: /usr/src/app
-        run: /entrypoint.sh sh -c 'npm install -g proxy-lists && python spinpunch-private/update-ip-reputation.py'
+        # install proxy-lists module manually here to avoid bloating
+        # the batch-tasks Docker image. --unsafe-perm flag is required
+        # to work around puppeteer issue:
+        # https://github.com/puppeteer/puppeteer/issues/5656
+        run: /entrypoint.sh sh -c 'npm install -g proxy-lists --unsafe-perm && python spinpunch-private/update-ip-reputation.py'

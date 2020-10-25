@@ -1,3 +1,5 @@
+name: build-batch-tasks-image
+
 on:
   push:
     branches:
