@@ -23,4 +23,4 @@ jobs:
     steps:
       - name: Run SpinPunch IP Reputation Update
         working-directory: /usr/src/app
-        run: /entrypoint.sh python spinpunch-private/update-ip-reputation.py
+        run: /entrypoint.sh sh -c 'npm install -g proxy-lists && python spinpunch-private/update-ip-reputation.py'
