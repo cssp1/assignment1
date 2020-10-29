@@ -82,5 +82,5 @@
     // https://graph.facebook.com/oauth/access_token?client_id=YOUR_APP_ID&client_secret=YOUR_APP_SECRET&grant_type=client_credentials
     "facebook_app_access_token": "",
 
-    "maxmind_license_key": ${MAXMIND_LICENSE_KEY}
+    "maxmind_license_key": ${{MAXMIND_LICENSE_KEY}}
 }

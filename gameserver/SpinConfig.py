@@ -14,7 +14,7 @@ import SpinJSON
 # regular expression that matches C++-style comments (see gamedata/preprocess.py for a better explanation)
 comment_remover = re.compile('(?<!tp:|ps:|: "|":"|=\\\\")//.*?$')
 slurp_detector = re.compile('@"([^"]+)"')
-env_var_detector = re.compile('\$\{(.+)\}')
+env_var_detector = re.compile('\$\{\{(.+)\}\}')
 include_detector = re.compile('^#include "(.+)"')
 include_stripped_detector = re.compile('^#include_stripped "(.+)"')
 
