@@ -11,13 +11,14 @@ goog.provide('SPay');
 goog.require('goog.array');
 goog.require('SPFB');
 goog.require('SPKongregate');
+goog.require('Battlehouse');
 
 /** @type {string|null} */
 SPay.api = null;
 
 /** @param {string} api - "fbpayments", "kgcredits", or "xsolla" */
 SPay.set_api = function(api) {
-    if(!goog.array.contains(['fbpayments', 'kgcredits', 'xsolla'], api)) {
+    if(!goog.array.contains(['fbpayments', 'kgcredits', 'xsolla', 'microsoft'], api)) {
         throw Error('invalid SPay API '+api);
     }
     SPay.api = api;
@@ -56,6 +57,20 @@ SPay.place_order_fbcredits = function (order_info, callback, use_local_currency)
     @param {function(?)} callback */
 SPay.place_order_kgcredits = function (order_info, callback) {
     SPKongregate.purchaseItemsRemote(order_info, callback);
+};
+
+/** @param {Object} order_info
+    @param {function(?)} callback */
+SPay.place_order_microsoft = function (order_info) {
+    return new Promise(function(resolve, reject) {
+        Battlehouse.postMessage_receiver.listenOnce('bh_electron_microsoft_store_result',
+                                                    function(event) { if('result' in event.result) {
+                                                        resolve(event.result['result']);
+                                                    } else {
+                                                        reject(event.result['error']);
+                                                    } });
+        window.top.postMessage('bh_make_microsoft_store_purchase', order_info);
+    });
 };
 
 /** @param {function(?)} callback */

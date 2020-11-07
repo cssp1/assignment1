@@ -41620,7 +41620,7 @@ function buy_gamebucks_dialog_select(dialog, num) {
     dialog.user_data['selection'] = num;
 
     var display_currency = null;
-    if(SPay.api == 'fbpayments') {
+    if(SPay.api == 'fbpayments' || SPay.api == 'microsoft') {
         // display_currency will be set on a per-spell basis
     } else if(SPay.api == 'kgcredits') {
         display_currency = 'Kongregate Kreds';
@@ -41640,7 +41640,7 @@ function buy_gamebucks_dialog_select(dialog, num) {
 
         var payment_currency = ('currency' in spell ? spell['currency'] : 'fbcredits');
 
-        if(SPay.api == 'fbpayments' || SPay.api == 'xsolla') {
+        if(SPay.api == 'fbpayments' || SPay.api == 'xsolla' || SPay.api == 'microsoft') {
             if(payment_currency.indexOf(SPay.api+':') != 0) { throw Error('bad payment_currency '+payment_currency); }
             display_currency = payment_currency.split(':')[1];
         }
@@ -41731,7 +41731,7 @@ function buy_gamebucks_dialog_select(dialog, num) {
     var spellname = spell_list[num];
     var spell = gamedata['spells'][spellname];
     var payment_currency = ('currency' in spell ? spell['currency'] : 'fbcredits');
-    if(SPay.api == 'fbpayments') { display_currency = payment_currency.split(':')[1]; }
+    if(SPay.api == 'fbpayments' || SPay.api == 'microsoft') { display_currency = payment_currency.split(':')[1]; }
     var alloy_qty = (spell['price_formula'] == 'gamebucks_topup' ? topup_bucks : spell['quantity']);
     var spellarg = (spell['price_formula'] == 'gamebucks_topup' ? topup_bucks : null);
     var payment_price = Store.get_price(payment_currency, GameObject.VIRTUAL_ID, spell, spellarg, false);
@@ -42304,7 +42304,7 @@ function update_buy_gamebucks_sku23(dialog) {
     }
 
     var display_currency = null;
-    if(SPay.api == 'fbpayments' || SPay.api == 'xsolla') {
+    if(SPay.api == 'fbpayments' || SPay.api == 'xsolla' || SPay.api == 'microsoft') {
         // display_currency will be set on a per-spell basis
     } else if(SPay.api == 'kgcredits') {
         display_currency = 'Kongregate Kreds';
@@ -42317,7 +42317,7 @@ function update_buy_gamebucks_sku23(dialog) {
     var alloy_qty = (spell['price_formula'] == 'gamebucks_topup' ? topup_bucks : spell['quantity']);
 
     var payment_currency = ('currency' in spell ? spell['currency'] : 'fbcredits');
-    if(SPay.api == 'fbpayments' || SPay.api == 'xsolla') {
+    if(SPay.api == 'fbpayments' || SPay.api == 'xsolla' || SPay.api == 'microsoft') {
         if(payment_currency.indexOf(SPay.api+':') != 0) { throw Error('bad payment_currency '+payment_currency); }
         display_currency = payment_currency.split(':')[1];
     }
@@ -47529,7 +47529,7 @@ Store.display_real_currency_amount = function (display_currency, price, price_cu
         curr_prefix = template['prefix'] || '';
         curr_suffix = template['suffix'] || '';
 
-        if((SPay.api == 'fbpayments' || SPay.api == 'xsolla') && player.facebook_currency && player.facebook_currency['user_currency'] != display_currency && !abbreviate) {
+        if((SPay.api == 'fbpayments' || SPay.api == 'xsolla' || SPay.api == 'microsoft') && player.facebook_currency && player.facebook_currency['user_currency'] != display_currency && !abbreviate) {
             // when showing prices in a currency that is not the player's own currency, be very explicit about what we are showing
             // because it might be e.g. an Australian user seeing a US Dollar price
             if(curr_prefix.indexOf(display_currency) === -1 && curr_suffix.indexOf(display_currency) === -1) {
@@ -48823,10 +48823,16 @@ Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) 
         if(!no_clear) { change_selection(null); }
         Store.place_kgcredits_order(price, unit_id, spellname, spellarg, cb, (props ? (props['fail_cb'] || null) : null));
         return false;
+    } else if(currency == 'microsoft') {
+        if(!no_clear) { change_selection(null); }
+        Store.place_microsoft_order(price, unit_id, spellname, spellarg, cb, (props ? (props['fail_cb'] || null) : null));
+        return false;
     } else if(currency.indexOf('fbpayments:') === 0 || currency.indexOf('xsolla:') === 0) {
         if(!no_clear) { change_selection(null); }
         if(SPay.api == 'xsolla') {
             Store.place_xsolla_order(spellname, spellarg, cb, props);
+        } else if (SPay.api == 'microsoft') {
+            Store.place_microsoft_order(spellname, spellarg, cb, props);
         } else {
             Store.place_fbpayments_order(currency, price, unit_id, spellname, spellarg, cb, props);
         }
@@ -49157,6 +49163,54 @@ Store.place_kgcredits_order = function(price, unit_id, spellname, spellarg, on_f
         user_log.msg('Simulating payment of '+ price.toString() + ' Kongregate Kred(s)', new SPUI.Color(1,1,0,1));
     }
 
+    metric_event('4060_order_prompt', props);
+    return true;
+};
+
+Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_finish, on_fail) {
+    var descr = spellname;
+    if(spellarg) {
+        descr += ','+spellarg;
+    }
+    if(unit_id && unit_id != GameObject.VIRTUAL_ID) {
+        var object = session.get_real_world().objects.get_object(unit_id);
+        descr += ','+object.spec['name'];
+    }
+    // this is arbitrary custom data for our server
+    var order_info = {
+        'session_id': session.session_id,
+        'unit_id': unit_id,
+        'client_unit_type': (object ? object.spec['name'] : null),
+        'server_time_according_to_client': Math.floor(server_time),
+        'spellname': spellname,
+        'spellarg': spellarg,
+        'client_price': price,
+        'tag': tag,
+        'image_url': spin_server_protocol+spin_server_host+':'+spin_server_port+'/'+icon
+    };
+    var props = {'currency': 'microsoft_store',
+                 'Billing Amount': price,
+                 'Billing Description': descr};
+    SPay.place_order_microsoft(order_info)
+                .then(function(result) {
+                    var receipt = result['result'];
+                    send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", receipt, "order_complete"]);
+                    send_to_server.func(["PING_TECH"]);
+                    send_to_server.func(["PING_PLAYER"]);
+
+                    var msg = 'receipt: '+ receipt;
+                    props['receipt'] = receipt;
+                    metric_event('4070_order_prompt_success', props);
+                    console.log('ORDER SUCCESSFUL: '+msg);
+                },
+                      function(error) {
+                          var msg = 'unknown error';
+                          console.log('ORDER PROBLEM: '+msg);
+                          props['method'] = msg;
+                          log_exception(error, 'place_order');
+                          metric_event('4061_order_prompt_api_error', props);
+                          if(on_fail) { on_fail(); }
+                });
     metric_event('4060_order_prompt', props);
     return true;
 };
