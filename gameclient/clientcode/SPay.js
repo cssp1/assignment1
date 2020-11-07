@@ -59,17 +59,16 @@ SPay.place_order_kgcredits = function (order_info, callback) {
     SPKongregate.purchaseItemsRemote(order_info, callback);
 };
 
-/** @param {Object} order_info
-    @param {function(?)} callback */
-SPay.place_order_microsoft = function (order_info) {
+/** @param {string} sku */
+SPay.place_order_microsoft = function (sku) {
     return new Promise(function(resolve, reject) {
         Battlehouse.postMessage_receiver.listenOnce('bh_electron_microsoft_store_result',
-                                                    function(event) { if('result' in event.result) {
-                                                        resolve(event.result['result']);
+                                                    function(event) { if('result' in event) {
+                                                        resolve(event['result']);
                                                     } else {
-                                                        reject(event.result['error']);
+                                                        reject(event['error']);
                                                     } });
-        window.top.postMessage('bh_make_microsoft_store_purchase', order_info);
+        window.top.postMessage('bh_make_microsoft_store_purchase', sku);
     });
 };
 

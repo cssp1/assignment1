@@ -48832,7 +48832,7 @@ Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) 
         if(SPay.api == 'xsolla') {
             Store.place_xsolla_order(spellname, spellarg, cb, props);
         } else if (SPay.api == 'microsoft') {
-            Store.place_microsoft_order(spellname, spellarg, cb, props);
+            Store.place_microsoft_order(price, unit_id, spellname, spellarg, cb, (props ? (props['fail_cb'] || null) : null));
         } else {
             Store.place_fbpayments_order(currency, price, unit_id, spellname, spellarg, cb, props);
         }
@@ -49184,14 +49184,12 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
         'server_time_according_to_client': Math.floor(server_time),
         'spellname': spellname,
         'spellarg': spellarg,
-        'client_price': price,
-        'tag': tag,
-        'image_url': spin_server_protocol+spin_server_host+':'+spin_server_port+'/'+icon
+        'client_price': price
     };
     var props = {'currency': 'microsoft_store',
                  'Billing Amount': price,
                  'Billing Description': descr};
-    SPay.place_order_microsoft(order_info)
+    SPay.place_order_microsoft(spellname)
                 .then(function(result) {
                     var receipt = result['result'];
                     send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", receipt, "order_complete"]);
