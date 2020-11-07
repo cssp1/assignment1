@@ -6,6 +6,8 @@ goog.provide('SPay');
 
 /** @fileoverview
     Some common interfaces for payments backends.
+
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
 */
 
 goog.require('goog.array');
@@ -59,14 +61,17 @@ SPay.place_order_kgcredits = function (order_info, callback) {
     SPKongregate.purchaseItemsRemote(order_info, callback);
 };
 
-/** @param {string} sku */
+/** @param {string} sku
+    @return {!Promise} */
 SPay.place_order_microsoft = function (sku) {
     return new Promise(function(resolve, reject) {
         Battlehouse.postMessage_receiver.listenOnce('bh_electron_microsoft_store_result',
-                                                    function(event) { if('result' in event) {
+                                                    function(event) { if(typeof(event) === 'object' && 'result' in event) {
                                                         resolve(event['result']);
-                                                    } else {
+                                                    } else if (typeof(event) === 'object' && 'error' in event) {
                                                         reject(event['error']);
+                                                    } else {
+                                                        reject(event);
                                                     } });
         window.top.postMessage('bh_make_microsoft_store_purchase', sku);
     });
