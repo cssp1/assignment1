@@ -49176,6 +49176,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
         var object = session.get_real_world().objects.get_object(unit_id);
         descr += ','+object.spec['name'];
     }
+    var tag = Store.listen_for_order_ack('mso', on_finish);
     // this is arbitrary custom data for our server
     var order_info = {
         'session_id': session.session_id,
@@ -49184,12 +49185,13 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
         'server_time_according_to_client': Math.floor(server_time),
         'spellname': spellname,
         'spellarg': spellarg,
+        'tag': tag,
         'client_price': price
     };
     var props = {'currency': 'microsoft_store',
                  'Billing Amount': price,
                  'Billing Description': descr};
-    SPay.place_order_microsoft(spellname)
+    SPay.place_order_microsoft(order_info)
                 .then(function(result) {
                     var receipt = result['result'];
                     send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", receipt, "order_complete"]);
