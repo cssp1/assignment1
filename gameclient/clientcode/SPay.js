@@ -65,6 +65,7 @@ SPay.place_order_kgcredits = function (order_info, callback) {
     @return {!Promise} */
 SPay.place_order_microsoft = function (order_info) {
     var listen_tag = order_info['tag'];
+    order_info['method'] = 'bh_make_microsoft_store_purchase';
     return new Promise(function(resolve, reject) {
         Battlehouse.postMessage_receiver.listenOnce(listen_tag,
                                                     function(event) { if(typeof(event) === 'object' && 'result' in event) {
@@ -74,7 +75,7 @@ SPay.place_order_microsoft = function (order_info) {
                                                     } else {
                                                         reject(event);
                                                     } });
-        window.top.postMessage('bh_make_microsoft_store_purchase', order_info);
+        window.top.postMessage(order_info, '*');
     });
 };
 

@@ -49184,6 +49184,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
         'client_unit_type': (object ? object.spec['name'] : null),
         'server_time_according_to_client': Math.floor(server_time),
         'spellname': spellname,
+        'sku': spellname,
         'spellarg': spellarg,
         'tag': tag,
         'client_price': price
