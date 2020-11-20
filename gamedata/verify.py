@@ -4261,6 +4261,7 @@ def main(args):
         for platform in ('fb','k2','ag','bh'):
             found_platform = False
             for predicate in gamedata['store']['payments_api']:
+                if predicate == [{"predicate": "LIBRARY", "name": "use_microsoft_payments"}, "microsoft"]: continue
                 if predicate[0]['platform'] == platform:
                     found_platform = True
             if not found_platform:
