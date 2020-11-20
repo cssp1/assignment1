@@ -49195,7 +49195,9 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
     SPay.place_order_microsoft(order_info)
                 .then(function(result) {
                     var receipt = result['result'];
-                    send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", receipt, "order_complete"]);
+                    console.log('Microsoft payments API result received') // debugging message, remove after testing
+                    console.log(result) // debugging message, remove after testing
+                    // send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", receipt, "order_complete"]); // add back in when ready for server verification phase
                     send_to_server.func(["PING_TECH"]);
                     send_to_server.func(["PING_PLAYER"]);
 
@@ -49206,7 +49208,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
                 },
                       function(error) {
                           var msg = 'unknown error';
-                          console.log('ORDER PROBLEM: '+msg);
+                          console.log('Microsoft payments API ORDER PROBLEM: '+msg); // debugging message, remove 'Microsoft payments API' after testing
                           props['method'] = msg;
                           log_exception(error, 'place_order');
                           metric_event('4061_order_prompt_api_error', props);
