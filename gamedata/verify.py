@@ -64,6 +64,15 @@ def require_art_file(name):
 MAX_RESOURCE_COST = 78000000
 MAX_STORAGE = None
 
+def get_level_number_from_string(level_string):
+    if '_L' not in level_string:
+        return '-1'
+    valid_numbers = '0123456789'
+    for chunk in level_string.split('_'):
+        if chunk.startswith('L') and chunk[-1] in valid_numbers:
+            return chunk.replace('L','')
+    return '-1'
+
 def check_url(url, reason):
     if not url: return 0
 
@@ -1498,6 +1507,21 @@ def check_item(itemname, spec):
             error |= 1; print '%s: blueprint item "use" keys must contain a PLAYER_HISTORY consequent, the key for which must be %s' % (itemname,expect_history)
         if not blueprint_congrats_found:
             error |= 1; print '%s: blueprint item "use" keys should contain an INVOKE_BLUEPRINT_CONGRATS consequent' % (itemname,)
+
+    if spec.get('category') == 'blueprint' and '_L' in spec['name'] and 'tech' not in spec['name']:
+        blueprint_level = get_level_number_from_string(spec['name'])
+        if 'use' in spec:
+            for cons in spec['use']['subconsequents']:
+                if 'key' in cons:
+                    history_level = get_level_number_from_string(cons['key'])
+                    if history_level != blueprint_level:
+                        error |= 1
+                        print '%s: indicates it is level %s, but its PLAYER_HISTORY "key" value grants level %s' % (spec['name'], blueprint_level, history_level)
+                elif 'item' in cons:
+                    congrats_level = get_level_number_from_string(cons['item'])
+                    if congrats_level != blueprint_level:
+                        error |= 1
+                        print '%s: indicates it is level %s, but its INVOKE_BLUEPRINTS_CONGRATS "item" value refers to level %s' % (spec['name'], blueprint_level, congrats_level)
 
     if 'requires' in spec:
         error |= check_predicate(spec['requires'], reason = 'item %s: requires' % itemname)
