@@ -2339,6 +2339,11 @@ ClientPlatformPredicate.prototype.is_satisfied = function(player, qdata) {
     });
     return ret;
 };
+/** @override */
+ClientPlatformPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+/** @override
+    Never relevant mentioning this to the player. */
+ClientPlatformPredicate.prototype.do_ui_describe = function(player) { return null; };
 
 /** @constructor @struct
   * @extends Predicate */
