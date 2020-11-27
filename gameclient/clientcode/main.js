@@ -47546,7 +47546,7 @@ Store.display_real_currency_amount = function (display_currency, price, price_cu
     }
 
     var display_price;
-    if(price_currency == display_currency || ((price_currency.indexOf('fbpayments:') == 0 || price_currency.indexOf('xsolla:') == 0) && price_currency.split(':')[1] == display_currency) ||
+    if(price_currency == display_currency || ((price_currency.indexOf('fbpayments:') == 0 || price_currency.indexOf('xsolla:') == 0 || price_currency.indexOf('microsoft:') == 0) && price_currency.split(':')[1] == display_currency) ||
        (price_currency == 'fbcredits' && display_currency == 'Facebook Credits') ||
        (price_currency == 'kgcredits' && display_currency == 'Kongregate Kreds')) {
         display_price = price;
@@ -48827,7 +48827,7 @@ Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) 
         if(!no_clear) { change_selection(null); }
         Store.place_microsoft_order(price, unit_id, spellname, spellarg, cb, (props ? (props['fail_cb'] || null) : null));
         return false;
-    } else if(currency.indexOf('fbpayments:') === 0 || currency.indexOf('xsolla:') === 0) {
+    } else if(currency.indexOf('fbpayments:') === 0 || currency.indexOf('xsolla:') === 0 || currency.indexOf('microsoft:') === 0) {
         if(!no_clear) { change_selection(null); }
         if(SPay.api == 'xsolla') {
             Store.place_xsolla_order(spellname, spellarg, cb, props);
