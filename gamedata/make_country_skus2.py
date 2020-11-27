@@ -1411,12 +1411,13 @@ if __name__ == '__main__':
                 assert xsolla_sku['requires']['subpredicates'][0] == {'predicate':'FRAME_PLATFORM', 'platform': 'fb'}
                 xsolla_sku['requires']['subpredicates'][0] = {"predicate": "GAMEDATA_VAR", "name": "store.payments_api", "value":"xsolla"}
                 out[xsolla_sku_name] = xsolla_sku
+                microsoft_sku_name = 'BUY_GAMEBUCKS_%d' % data['alloy'] + ('_UNITS' if unit_bonus else '') + '_MS_'+slate_name
                 microsoft_sku = copy.deepcopy(sku)
                 microsoft_sku['currency'] = 'microsoft:'+val['currency']
                 del microsoft_sku['open_graph_prices']
                 assert microsoft_sku['requires']['subpredicates'][0] == {'predicate':'FRAME_PLATFORM', 'platform': 'fb'}
                 microsoft_sku['requires']['subpredicates'][0] = {"predicate": "GAMEDATA_VAR", "name": "store.payments_api", "value":"microsoft"}
-                out[microsoft_sku] = microsoft_sku
+                out[microsoft_sku_name] = microsoft_sku
 
     out_keys = sorted(out.keys(), key = lambda x: -int(x.split('_')[2]))
     for name in out_keys:
