@@ -2361,6 +2361,11 @@ ClientVendorPredicate.prototype.is_satisfied = function(player, qdata) {
     });
     return ret;
 };
+/** @override */
+ClientVendorPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+/** @override
+    Never relevant mentioning this to the player. */
+ClientVendorPredicate.prototype.do_ui_describe = function(player) { return null; };
 
 /** @constructor @struct
   * @extends Predicate */
@@ -2380,6 +2385,11 @@ ClientVersionPredicate.prototype.is_satisfied = function(player, qdata) {
     }
     return false;
 };
+/** @override */
+ClientVersionPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+/** @override
+    Never relevant mentioning this to the player. */
+ClientVersionPredicate.prototype.do_ui_describe = function(player) { return null; };
 
 /** @param {!Object} data
     @return {!Predicate} */
