@@ -76,6 +76,8 @@ SPay.place_order_microsoft = function (order_info) {
                                                         reject(event);
                                                     } });
         window.top.postMessage(order_info, '*');
+        console.log('Sent order request from game client'); // remove when debugging is finished
+        console.log(order_info); // remove when debugging is finished
     });
 };
 
