@@ -9085,6 +9085,9 @@ if(1) {
 var USING_REQUESTANIMATIONFRAME = false;
 var LAST_ANIM_FRAME_TIMEOUT = 0;
 
+var LAST_ELECTRON_DEBUG_SYNC_TIME = 0;
+var ELECTRON_DEBUG_SYNC_INTERVAL = 60;
+
 var COMBAT_ENGINE_USE_TICKS = false;
 
 /** @const */
@@ -10896,6 +10899,15 @@ function update_playfield_controls_bar(dialog) {
     if(GameArt.enable_audio) {
         dialog.widgets['music_button'].state = GameArt.music_volume > 0 ? 'on' : 'off';
         dialog.widgets['sound_button'].state = GameArt.sound_volume > 0 ? 'on' : 'off';
+    }
+
+    if(client_time - LAST_ELECTRON_DEBUG_SYNC_TIME > ELECTRON_DEBUG_SYNC_INTERVAL) {
+        LAST_ELECTRON_DEBUG_SYNC_TIME = client_time;
+        if(!!player.preferences['electron_debugging_enabled']) {
+            window.top.postMessage({'method': 'bh_electron_command', 'type':'APP_COMMAND', 'command':'ALLOW_DEBUG'}, '*');
+        } else {
+            window.top.postMessage({'method': 'bh_electron_command', 'type':'APP_COMMAND', 'command':'NO_DEBUG'}, '*');
+        }
     }
 }
 
