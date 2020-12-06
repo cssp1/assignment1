@@ -49190,6 +49190,8 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
     }
     var tag = Store.listen_for_order_ack('mso', on_finish);
     // this is arbitrary custom data for our server
+    var store_quantity = gamedata['spells'][spellname]['quantity'].toString();
+    var pretty_store_name = "%gamebuck_number %gamebuck_name".replace('%gamebuck_number', store_quantity).replace('%gamebuck_name', Store.gamebucks_ui_name());
     var order_info = {
         'session_id': session.session_id,
         'unit_id': unit_id,
@@ -49199,6 +49201,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
         'sku': spellname,
         'spellarg': spellarg,
         'tag': tag,
+        'ui_name': pretty_store_name,
         'client_price': price
     };
     // add a debug flag to the Microsoft payments API if debugging is enabled
