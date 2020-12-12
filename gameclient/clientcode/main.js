@@ -45533,8 +45533,9 @@ function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
 /** Get list of features to show for a weapon on a unit or building
     @param {Object} spec
     @param {Object} spell
+    @param {number} new_level
     @return {Array.<string>} */
-function get_weapon_spell_features2(spec, spell) {
+function get_weapon_spell_features2(spec, spell, new_level) {
     var ret = [];
     var ui_show_weapon_features = true;
     if('ui_show_weapon_features' in spell && !spell['ui_show_weapon_features']) {
@@ -45569,6 +45570,12 @@ function get_weapon_spell_features2(spec, spell) {
             var is_dot = false;
             goog.array.forEach(effects, function(effect) { if('code' in effect && effect['code'] == 'on_fire') { is_dot = true; } });
             if(is_dot) { return; }
+            if('duration' in aura) {
+                if(get_leveled_quantity(aura['duration'], new_level) <= 0) { return; } // don't show effects that won't have any duration at the new level (always means 0 at old level too)
+            }
+            if('strength' in aura) {
+                if(get_leveled_quantity(aura['strength'], new_level) <= 0) { return; } // don't show effects that won't have any strength at the new level (always means 0 at old level too)
+            }
             ret.push('impact_auras:' + name);
         });
     }
@@ -45960,7 +45967,7 @@ function update_upgrade_dialog(dialog) {
             var spec = gamedata['units'][tech['associated_unit']];
             feature_list.push('max_hp');
             if(gamedata['show_armor_in_ui']) { feature_list.push('armor'); }
-            feature_list = feature_list.concat(get_weapon_spell_features2(spec, get_auto_spell_for_unit(player, spec)));
+            feature_list = feature_list.concat(get_weapon_spell_features2(spec, get_auto_spell_for_unit(player, spec), new_level));
             feature_list.push('maxvel');
             if(get_leveled_quantity(spec['consumes_space']||0, 1) > 0) {
                 feature_list.push('consumes_space');
@@ -45995,7 +46002,7 @@ function update_upgrade_dialog(dialog) {
             var item_spec = ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level, max_level)));
             var auto_spell = get_auto_spell_for_item(item_spec);
             if(auto_spell) {
-                feature_list = feature_list.concat(get_weapon_spell_features2(item_spec, auto_spell));
+                feature_list = feature_list.concat(get_weapon_spell_features2(item_spec, auto_spell, new_level));
             }
             if('equip' in item_spec && 'effects' in item_spec['equip']) {
                 goog.array.forEach(item_spec['equip']['effects'], function(effect) {
@@ -46117,7 +46124,7 @@ function update_upgrade_dialog(dialog) {
 
         var auto_spell = get_auto_spell_raw(unit.spec); // not unit.get_auto_spell(), since that includes equipped item mods
         if(auto_spell) {
-            feature_list = feature_list.concat(get_weapon_spell_features2(unit.spec, auto_spell));
+            feature_list = feature_list.concat(get_weapon_spell_features2(unit.spec, auto_spell, new_level));
         }
 
         if('on_damage' in unit.spec) { feature_list.push('on_damage'); }
