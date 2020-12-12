@@ -855,11 +855,11 @@ MountedWeaponDialog.set_stats_display = function(dialog, mounting_obj, item, rel
                          spell);
 
     // set up stats display
-    var statlist = (spell ? get_weapon_spell_features2(mounting_obj.spec, spell) : []);
+    var statlist = (spell ? get_weapon_spell_features2(mounting_obj.spec, spell, level) : []);
 
     // create the UNION of the two stat lists
     if(relative_to) {
-        var relative_statlist = (relative_spell ? get_weapon_spell_features2(mounting_obj.spec, relative_spell) : []);
+        var relative_statlist = (relative_spell ? get_weapon_spell_features2(mounting_obj.spec, relative_spell, relative_level) : []);
         goog.array.forEach(relative_statlist, function(rstat) {
             // when switching from a ranged weapon to a PBAOE weapon, don't show range dropping to zero
             if(rstat == 'weapon_range') { return; }
