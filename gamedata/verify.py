@@ -165,6 +165,21 @@ def check_mandatory_fields(specname, spec, kind):
             error |= 1
             print '%s missing mandatory field "%s"' % (specname, f)
 
+    if not isinstance(spec['defense_types'], list):
+        error |= 1
+        print '%s "defense_types" should be a list' % specname
+
+    for defense_type in spec['defense_types']:
+        if defense_type not in gamedata['strings']['defense_types']:
+            error |= 1
+            print '%s "defense_types" entry %s is not in gamedata["strings"]["defense_types"]' % (specname, defense_type)
+        if 'ui_name_singular' not in gamedata['strings']['defense_types'][defense_type]:
+            error |= 1
+            print '%s "defense_types" entry %s has no "ui_name_singular" value in gamedata["strings"]["defense_types"]' % (specname, defense_type)
+        if 'ui_name_plural' not in gamedata['strings']['defense_types'][defense_type]:
+            error |= 1
+            print '%s "defense_types" entry %s has no "ui_name_plural" value in gamedata["strings"]["defense_types"]' % (specname, defense_type)
+
     if spec['name'] != specname.split(':')[1]:
         error |= 1
         print '%s "name" mismatch' % specname

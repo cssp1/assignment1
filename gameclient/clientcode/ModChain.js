@@ -63,6 +63,9 @@ ModChain.get_base_value = function(stat, spec, level) {
                     if('strength' in aura) {
                         ret['strength'] = get_leveled_quantity(aura['strength'], level);
                     }
+                    if('duration_vs' in aura) {
+                        ret['duration_vs'] = get_leveled_quantity(aura['duration_vs'], level);
+                    }
                 };
             });
         }
@@ -481,6 +484,19 @@ ModChain.display_value = function(value, display_mode, context, ui_mod_level) {
                         ui_duration = (value['duration']).toFixed(parsed.precision).toString() + ' seconds';
                     }
                     ui_aura += '\n' + spec['ui_description'].replace('%pct', ui_pct).replace('%dur', ui_duration);
+                    var zero_duration_targets = [];
+                    if('duration_vs' in value && typeof(value['duration_vs']) === 'object') {
+                        for (var unit_type in value['duration_vs']) {
+                            if(value['duration_vs'][unit_type] <= 0) {
+                                zero_duration_targets.push(ModChain.get_zero_duration_ui_name(unit_type));
+                            }
+                        }
+                    }
+                    if(zero_duration_targets.length > 0) {
+                        ui_aura += ModChain.get_zero_duration_label(zero_duration_targets);
+                    }
+
+
                 }
                 ui_value = ui_aura;
             }
@@ -497,6 +513,42 @@ ModChain.display_value = function(value, display_mode, context, ui_mod_level) {
     }
     return ui_value;
 };
+
+/** Return a plain-text lavel of no-effect targets for impact_auras that don't affect every target type
+    @param {Array} zero_duration_targets
+    @return {string} */
+ModChain.get_zero_duration_label = function(zero_duration_targets) {
+    if(zero_duration_targets.length === 1) { return '\nNo effect against ' + zero_duration_targets[0] + '.'; }
+    if(zero_duration_targets.length === 2) { return '\nNo effect against ' + zero_duration_targets[0] + ' and ' + zero_duration_targets[1] + '.'; }
+    var zero_duration_label = '\nNo effect against ';
+    for(var i = 0; i < zero_duration_targets.length - 1; i++) {
+        zero_duration_label += zero_duration_targets[i] + ', ';
+    }
+    zero_duration_label += 'and ' + zero_duration_targets[zero_duration_targets.length - 1] + '.';
+    return zero_duration_label;
+}
+
+/** Return the ui_name of plain-text lavel of no-effect targets for impact_auras that don't affect every target type
+    @param {string} kind
+    @return {string} */
+ModChain.get_zero_duration_ui_name = function(kind) {
+    if(kind in gamedata['strings']['defense_types']) { return gamedata['strings']['defense_types'][kind]['ui_name_plural']; }
+    var ui_name = '';
+    if(kind.indexOf(',') !== -1) {
+        var terms = kind.split(',');
+        ui_name = ModChain.get_zero_duration_ui_name(terms[0]);
+        for(var j = 1; j < terms.length; j++) {
+            var term = terms[j];
+            ui_name += ' that are ';
+            if(term[0] === '!') {
+                ui_name += 'not ';
+                term = term.slice(1);
+            }
+            ui_name += ModChain.get_zero_duration_ui_name(term);
+        }
+    }
+    return ui_name;
+}
 
 /** Return a plain-text description of a percentage delta in a stat with appropriate precision
     @param {number} strength

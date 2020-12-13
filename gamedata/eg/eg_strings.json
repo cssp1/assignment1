@@ -80,6 +80,16 @@
         "sonic": {"ui_name": "Sonic", "ui_description": "Disrupts the target's senses with loud or uncomfortable sound", "asset": "damage_type_special"}
     },
 
+    "defense_types": {
+        "building": { "ui_name_singular":"building", "ui_name_plural":"buildings" },
+        "barrier": { "ui_name_singular":"barrier", "ui_name_plural":"barriers" },
+        "turret": { "ui_name_singular":"turret", "ui_name_plural":"turrets" },
+        "unit": { "ui_name_singular":"mobile unit", "ui_name_plural":"mobile units" },
+        "rover": { "ui_name_singular":"infantry", "ui_name_plural":"infantry" },
+        "transport": { "ui_name_singular":"vehicle", "ui_name_plural":"vehicles" },
+        "starcraft": { "ui_name_singular":"aircraft", "ui_name_plural":"aircraft" }
+    },
+
     "unboosted_value": "%val (Level %lev Base %stat)",
     "boosted_value": "(Level %modlev Mod)",
     "mod_tech_names": { // obsolete
