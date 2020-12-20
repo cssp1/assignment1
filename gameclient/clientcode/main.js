@@ -3033,6 +3033,9 @@ GameObject.prototype.run_control_shooting = function(world) {
 
     if(this.is_destroyed() || this.combat_stats.stunned) { return; }
 
+    // checks for player-owned minefields. If the option to disable minefields exists and the predicate is met, the minefield won't shoot.
+    if(this.is_building() && this.is_minefield() && this.team === 'player' && 'disable_mines_if' in gamedata && read_predicate(gamedata['disable_mines_if']).is_satisfied(player, null)) { return; }
+
     if(this.control_state === control_states.CONTROL_SHOOT) {
         this.serialization_dirty = true;
 
@@ -36623,6 +36626,22 @@ function update_crafting_dialog(dialog) {
     var chapter_recipes = (dialog.user_data['recipes'] ? dialog.user_data['recipes'].length : 0);
     var recipes_per_page = dialog.user_data['recipe_columns']*dialog.data['widgets']['recipe_icon']['array'][1];
     var grid = [0,0];
+
+    // handles Disable/Enable minefields interface
+    dialog.widgets["disable_minefields"].show = (dialog.user_data['category'] === 'mines' && 'disable_mines_if' in gamedata);
+    if(dialog.user_data['category'] === 'mines' && 'disable_mines_if' in gamedata && read_predicate(gamedata['disable_mines_if']).is_satisfied(player, null)) {
+        dialog.widgets["disable_minefields"].str = dialog.data['widgets']['disable_minefields']['ui_name_enable'].replace();
+        dialog.widgets["disable_minefields"].tooltip.str = dialog.data['widgets']['disable_minefields']['ui_tooltip_enable'];
+        dialog.widgets["disable_minefields"].onclick = (function () { return function(w) {
+            send_to_server.func(["CANCEL_PLAYER_AURA", "disable_minefields"]);
+        }; })();
+    } else {
+        dialog.widgets["disable_minefields"].str = dialog.data['widgets']['disable_minefields']['ui_name_disable'];
+        dialog.widgets["disable_minefields"].tooltip.str = dialog.data['widgets']['disable_minefields']['ui_tooltip_disable'];
+        dialog.widgets["disable_minefields"].onclick = (function (_builder_id) { return function(w) {
+            send_to_server.func(["CAST_SPELL", _builder_id, 'DISABLE_MINEFIELDS', 'player', 'disable_minefields', 1, -1]);
+        }; })(dialog.user_data['builder'].id);
+    }
 
     if(chapter_pages > 0) {
         dialog.user_data['recipes_by_widget'] = {};

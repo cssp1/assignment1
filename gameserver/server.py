@@ -31538,6 +31538,10 @@ class GAMEAPI(resource.Resource):
             if spellname == "SPEEDUP_FOR_FREE":
                 self.do_speedup_for_free(session, retmsg, object)
 
+            elif spellname == "DISABLE_MINEFIELDS":
+                spell = gamedata['spells'][spellname]
+                assert self.execute_spell(session, retmsg, spell['effect']['spellname'], spell['effect']['spellarg'])
+
             elif spellname == "REPAIR":
                 self.do_start_repairs(session, retmsg, spellargs[0])
 
