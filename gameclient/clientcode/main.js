@@ -3034,7 +3034,8 @@ GameObject.prototype.run_control_shooting = function(world) {
     if(this.is_destroyed() || this.combat_stats.stunned) { return; }
 
     // checks for player-owned minefields. If the option to disable minefields exists and the predicate is met, the minefield won't shoot.
-    if(this.is_building() && this.is_minefield() && this.team === 'player' && 'disable_mines_if' in gamedata && read_predicate(gamedata['disable_mines_if']).is_satisfied(player, null)) { return; }
+
+    if(this.is_building() && this.is_minefield() && this.team === 'player' && goog.array.find(player.player_auras, function(a) { return a['spec'] === 'disable_minefields'; })) { return; }
 
     if(this.control_state === control_states.CONTROL_SHOOT) {
         this.serialization_dirty = true;
