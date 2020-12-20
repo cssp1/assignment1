@@ -9883,7 +9883,7 @@ class Player(AbstractPlayer):
                 continue
             yield aura
 
-    def prune_player_auras(self, is_session_change = False, is_login = False, is_recalc_stattab = False):
+    def prune_player_auras(self, is_session_change = False, is_login = False, is_recalc_stattab = False, is_logout = False):
         to_remove = []
         for aura in self.player_auras:
             end_time = aura.get('end_time',-1)
@@ -9903,6 +9903,8 @@ class Player(AbstractPlayer):
                 to_remove.append(aura)
                 metric_event_coded(self.user_id, '5142_dp_cancel_aura_ended', {'aura_name': aura['spec'], 'start_time': aura.get('start_time',-1)}) # XXX hack
                 continue
+            if is_logout and ends_on == 'logout':
+                to_remove.append(aura); continue
 
         for aura in to_remove:
             self.player_auras.remove(aura)
@@ -28729,6 +28731,8 @@ class GAMEAPI(resource.Resource):
             else:
                 ascdebug('log_out_async (waiting) %d' % (session.user.user_id))
                 return session.logout_d
+
+        session.player.prune_player_auras(is_logout = True)
 
         ascdebug('log_out_async %d' % (session.user.user_id))
         session.debug_log_action('log_out_async (%s)' % method)

@@ -873,7 +873,7 @@ def check_aura(auraname, spec, maxlevel):
 
     if 'ends_on' in spec:
         has_cons = False
-        if spec['ends_on'] not in ('session_change', 'battle_end', 'recalc_stattab', 'damage_protection'):
+        if spec['ends_on'] not in ('session_change', 'battle_end', 'recalc_stattab', 'damage_protection', 'logout'):
             error |= 1; print '%s: invalid ends_on code' % auraname
         if spec['ends_on'] == 'battle_end':
             for outcome in ('defeat','victory'):
