@@ -36633,12 +36633,14 @@ function update_crafting_dialog(dialog) {
         dialog.widgets["disable_minefields"].str = dialog.data['widgets']['disable_minefields']['ui_name_enable'].replace();
         dialog.widgets["disable_minefields"].tooltip.str = dialog.data['widgets']['disable_minefields']['ui_tooltip_enable'];
         dialog.widgets["disable_minefields"].onclick = (function () { return function(w) {
+            invoke_ui_locker(synchronizer.request_sync());
             send_to_server.func(["CANCEL_PLAYER_AURA", "disable_minefields"]);
         }; })();
     } else {
         dialog.widgets["disable_minefields"].str = dialog.data['widgets']['disable_minefields']['ui_name_disable'];
         dialog.widgets["disable_minefields"].tooltip.str = dialog.data['widgets']['disable_minefields']['ui_tooltip_disable'];
         dialog.widgets["disable_minefields"].onclick = (function (_builder_id) { return function(w) {
+            invoke_ui_locker(synchronizer.request_sync());
             send_to_server.func(["CAST_SPELL", _builder_id, 'DISABLE_MINEFIELDS', 'player', 'disable_minefields', 1, -1]);
         }; })(dialog.user_data['builder'].id);
     }
