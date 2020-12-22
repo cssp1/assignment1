@@ -9883,7 +9883,7 @@ class Player(AbstractPlayer):
                 continue
             yield aura
 
-    def prune_player_auras(self, is_session_change = False, is_login = False, is_recalc_stattab = False):
+    def prune_player_auras(self, is_session_change = False, is_login = False, is_recalc_stattab = False, is_logout = False):
         to_remove = []
         for aura in self.player_auras:
             end_time = aura.get('end_time',-1)
@@ -9903,6 +9903,8 @@ class Player(AbstractPlayer):
                 to_remove.append(aura)
                 metric_event_coded(self.user_id, '5142_dp_cancel_aura_ended', {'aura_name': aura['spec'], 'start_time': aura.get('start_time',-1)}) # XXX hack
                 continue
+            if is_logout and ends_on == 'logout':
+                to_remove.append(aura); continue
 
         for aura in to_remove:
             self.player_auras.remove(aura)
@@ -28773,6 +28775,8 @@ class GAMEAPI(resource.Resource):
     def log_out_preflush(self, session, method):
         # PRE-WRITE portion
 
+        session.player.prune_player_auras(is_logout = True)
+
         # force repairs to start to avoid exploits where you leave your own buildings unrepaired
         self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
         session.player.ladder_point_decay_check(session) # logout
@@ -31537,6 +31541,10 @@ class GAMEAPI(resource.Resource):
 
             if spellname == "SPEEDUP_FOR_FREE":
                 self.do_speedup_for_free(session, retmsg, object)
+
+            elif spellname == "DISABLE_MINEFIELDS":
+                spell = gamedata['spells'][spellname]
+                assert self.execute_spell(session, retmsg, spell['effect']['spellname'], spell['effect']['spellarg'])
 
             elif spellname == "REPAIR":
                 self.do_start_repairs(session, retmsg, spellargs[0])

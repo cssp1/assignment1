@@ -2366,6 +2366,11 @@
                                "ui_tooltip": "", "tooltip_delay": 0 },
             "price_spinner": { "kind": "StaticImage", "xy":[520,387], "dimensions":[16,16], "asset":"loading_spinner" },
 
+            "disable_minefields": { "kind": "ActionButton", "xy": [235,380], "dimensions": [134,28], "text_offset": [0,0], "text_size": 13,
+                                    "bg_image": "action_button_134px", "text_style": "bold", "ui_name": "Toggle Minefield", "ui_tooltip": "Toggles minefields",
+                                    "ui_name_disable": "Disable Minefields", "ui_tooltip_disable": "Click to disable your minefields. They will automatically enable if you log off.",
+                                    "ui_name_enable": "Enable Minefields", "ui_tooltip_enable": "Click to enable your minefields.",
+                                    "tooltip_delay": 0 },
 
             "scroll_left": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_left", "xy": [28,107], "dimensions": [50,16] },
             "scroll_right": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_right", "xy": [28,350], "dimensions": [50,16] },
