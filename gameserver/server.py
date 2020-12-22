@@ -28732,8 +28732,6 @@ class GAMEAPI(resource.Resource):
                 ascdebug('log_out_async (waiting) %d' % (session.user.user_id))
                 return session.logout_d
 
-        session.player.prune_player_auras(is_logout = True)
-
         ascdebug('log_out_async %d' % (session.user.user_id))
         session.debug_log_action('log_out_async (%s)' % method)
 
@@ -28776,6 +28774,8 @@ class GAMEAPI(resource.Resource):
 
     def log_out_preflush(self, session, method):
         # PRE-WRITE portion
+
+        session.player.prune_player_auras(is_logout = True)
 
         # force repairs to start to avoid exploits where you leave your own buildings unrepaired
         self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
