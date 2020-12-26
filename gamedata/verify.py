@@ -1518,6 +1518,9 @@ def check_item(itemname, spec):
         if gamedata['game_id'] in ('bfm',):
             # BFM still uses buildings, not techs, for turrets, but has blueprints
             blueprint_congrats_found = True
+        if spec.get('crafting_blueprint', False):
+            # TR/DV craftable troop blueprints have no tech
+            blueprint_congrats_found = True
         if not player_history_found:
             error |= 1; print '%s: blueprint item "use" keys must contain a PLAYER_HISTORY consequent, the key for which must be %s' % (itemname,expect_history)
         if not blueprint_congrats_found:
