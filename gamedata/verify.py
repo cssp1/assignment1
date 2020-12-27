@@ -1463,7 +1463,7 @@ def check_item(itemname, spec):
             error |= 1; print '%s is not listed in item_set "%s" members' % (itemname, spec['item_set'])
         if 'ui_name' in set_spec:
             for ui_descr in ui_descr_list:
-                if set_spec['ui_name'] not in ui_descr:
+                if set_spec['ui_name'] not in ui_descr and spec.get('show_set_name_in_ui_description', True):
                     error |= 1; print '%s\'s ui_description does not mention the name of the set it belongs to ("%s")' % (itemname, set_spec['ui_name'])
 
     if 'limited_equipped' in spec:
