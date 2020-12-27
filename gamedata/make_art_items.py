@@ -112,7 +112,7 @@ if __name__ == '__main__':
     if game_id in ('mf','tr','mf2','dv','bfm'):
         buff_kinds = ['damage', 'armor', 'range', 'speed']
         if game_id in ('tr','dv','sg','bfm','mf2'):
-            buff_kinds += ['damage_resist_equip','damage_boost_equip','range_boost_equip']
+            buff_kinds += ['damage_resist_equip','damage_boost_equip','range_boost_equip','secteam_equip']
         if game_id != 'bfm':
             buff_kinds += ['radcold']
         if game_id in ('tr','dv'):
