@@ -45607,6 +45607,22 @@ function get_weapon_spell_features2(spec, spell, new_level) {
     return ret;
 };
 
+/** scrolls update dialog log by the amount and direction of delta
+    @param {SPUI.Dialog|null} dialog
+    @param {number} delta
+*/
+function scroll_upgrade_dialog(dialog, delta){
+    // error catching to prevent attempting to scroll if not receiving a dialog or a delta
+    if (!dialog || !delta) { return; }
+    var max_rows = dialog.user_data['max_rows'];
+    var feature_length = dialog.user_data['feature_length'];
+    if (delta < 0 && dialog.user_data['feature_scroll'] > 0) {
+        dialog.user_data['feature_scroll'] -= 1;
+    } else if (delta > 0 && dialog.user_data['feature_scroll'] < (feature_length - max_rows)) {
+        dialog.user_data['feature_scroll'] += 1;
+    }
+}
+
 /** @param {SPUI.Dialog} dialog  */
 function update_upgrade_dialog(dialog) {
     var techname = dialog.user_data['techname'];
@@ -46302,6 +46318,9 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['feature_scroll_down'].state = (dialog.user_data['feature_scroll'] < (feature_list.length-max_rows) ? 'normal' : 'disabled');
         dialog.widgets['feature_scroll_up'].onclick = function(w) { w.parent.user_data['feature_scroll'] -= 1; };
         dialog.widgets['feature_scroll_down'].onclick = function(w) { w.parent.user_data['feature_scroll'] += 1; };
+        dialog.user_data['max_rows'] = max_rows;
+        dialog.user_data['feature_length'] = feature_list.length;
+        dialog.on_mousewheel_function = scroll_upgrade_dialog;
     } else {
         dialog.user_data['feature_scroll'] = 0;
     }
