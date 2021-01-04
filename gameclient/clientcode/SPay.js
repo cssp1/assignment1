@@ -100,14 +100,20 @@ SPay.microsoft_check_can_buy_sku = function(order_info) {
     });
 }
 
+/** @param {!Object} order_info
+    @return {!Promise} */
 SPay.microsoft_get_receipt = function (order_info) {
     // get_receipt and process it with server
 }
 
+/** @param {!Object} order_info
+    @return {!Promise} */
 SPay.microsoft_report_consumable_used = function(order_info) {
     // report consumable used after completing order and giving gold
 }
 
+/** @param {!Object} order_info
+    @return {!Promise} */
 SPay.microsoft_do_purchase = function(order_info) {
     // actually do the order
 }
