@@ -4330,6 +4330,22 @@ class Session(object):
 
         return d # for syntactic convenience only
 
+    def verify_ms_store_receipt(self, receipt):
+        # get Microsoft store receipt, certificate, and verify it before sending gold and ReportFulfilled command
+        ms_cert_url = "https://lic.apps.microsoft.com/licensing/certificateserver/?cid="
+        receipt = arg[1] # XXXXXX finalize this schema!
+        ms_cert_url += receipt.split('CertificateId="')[1].split('"')[0]
+        ms_certificate = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, ms_cert_url)
+        try:
+            # from signxml import XMLVerifier
+            # XMLVerifier().verify(receipt, x509_cert=ms_certificate)
+            # always throws exceptions if it doesn't sign. If no exception, it's valid. Send the gold and the ReportFulfilled command
+            return
+        except:
+            # do stuff to handle error
+            return
+        return
+
     def resource_allow_instant_upgrade(self, resdata):
         # allow if resource "allow_instant" setting is missing or True or if predicates are satisfied
         return Predicates.eval_pred_or_literal(resdata.get('allow_instant', 1), self, self.player)
@@ -31520,21 +31536,8 @@ class GAMEAPI(resource.Resource):
             pass
 
         elif arg[0] == "VERIFY_MICROSOFT_STORE_RECEIPT":
-            # get Microsoft store receipt, certificate, and verify it before sending gold and ReportFulfilled command
-            ms_cert_url = "https://lic.apps.microsoft.com/licensing/certificateserver/?cid="
-            receipt = arg[1] # XXXXXX finalize this schema!
-            ms_cert_url += receipt.split('CertificateId="')[1].split('"')[0]
-            ms_certificate = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(
-                server_time, ms_cert_url)
-            try:
-                # from signxml import XMLVerifier
-                # XMLVerifier().verify(receipt, x509_cert=ms_certificate)
-                # always throws exceptions if it doesn't sign. If no exception, it's valid. Send the gold and the ReportFulfilled command
-                pass
-            except:
-                # do stuff to handle error
-                pass
-            pass
+            receipt = arg[1]
+            return session.start_async_request(session.verify_ms_store_receipt)
 
         elif arg[0] == "CAST_SPELL":
             id, spellname, spellargs = arg[1], arg[2], arg[3:]
