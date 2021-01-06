@@ -81,6 +81,23 @@ SPay.place_order_microsoft = function (order_info) {
     });
 };
 
+/** @param {!Object} order_info
+    @return {!Promise} */
+SPay.get_microsoft_skus = function (order_info) {
+    var listen_tag = order_info['tag'];
+    return new Promise(function(resolve, reject) {
+        Battlehouse.postMessage_receiver.listenOnce(tag,
+                                                    function(event) { if(typeof(event) === 'object' && 'result' in event) {
+                                                        resolve(event['result']);
+                                                    } else if (typeof(event) === 'object' && 'error' in event) {
+                                                        reject(event['error']);
+                                                    } else {
+                                                        reject(event);
+                                                    } });
+        window.top.postMessage(order_info, '*');
+    });
+};
+
 /** @param {function(?)} callback */
 SPay.buy_more_credits = function(callback) {
     SPFB.ui({'method':'pay', 'credits_purchase':true}, callback);
