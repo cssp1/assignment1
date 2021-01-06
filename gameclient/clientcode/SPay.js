@@ -86,7 +86,7 @@ SPay.place_order_microsoft = function (order_info) {
 SPay.get_microsoft_skus = function (order_info) {
     var listen_tag = order_info['tag'];
     return new Promise(function(resolve, reject) {
-        Battlehouse.postMessage_receiver.listenOnce(tag,
+        Battlehouse.postMessage_receiver.listenOnce(listen_tag,
                                                     function(event) { if(typeof(event) === 'object' && 'result' in event) {
                                                         resolve(event['result']);
                                                     } else if (typeof(event) === 'object' && 'error' in event) {
