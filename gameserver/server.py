@@ -4332,19 +4332,7 @@ class Session(object):
 
     def verify_ms_store_receipt(self, receipt):
         # get Microsoft store receipt, certificate, and verify it before sending gold and ReportFulfilled command
-        ms_cert_url = "https://lic.apps.microsoft.com/licensing/certificateserver/?cid="
-        receipt = arg[1] # XXXXXX finalize this schema!
-        ms_cert_url += receipt.split('CertificateId="')[1].split('"')[0]
-        ms_certificate = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, ms_cert_url)
-        try:
-            # from signxml import XMLVerifier
-            # XMLVerifier().verify(receipt, x509_cert=ms_certificate)
-            # always throws exceptions if it doesn't sign. If no exception, it's valid. Send the gold and the ReportFulfilled command
-            return
-        except:
-            # do stuff to handle error
-            return
-        return
+        return validate_receipt(receipt, gamesite, server_time)
 
     def resource_allow_instant_upgrade(self, resdata):
         # allow if resource "allow_instant" setting is missing or True or if predicates are satisfied
