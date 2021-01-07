@@ -12056,7 +12056,7 @@ SPINPUNCHGAME.init = function() {
 var global_chat_frame = null; // same chat frame is re-used for entire session
 var global_spell_icon = null;
 
-async function refresh_microsoft_store_skus() {
+function refresh_microsoft_store_skus() {
     // if this is a Microsoft electron setup, get the valid and unfulfilled SKUs now.
     if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
         var sku_tag = Store.listen_for_order_ack('mssku', null);
