@@ -774,6 +774,8 @@ var canvas_is_fullscreen = false;
 // see http://www.html5rocks.com/en/tutorials/canvas/hidpi/ (but note backingStorePixelRatio should be just window.devicePixelRatio)
 var canvas_oversample = window['devicePixelRatio'] || 1;
 
+var microsoft_store_valid_skus = [];
+var microsoft_store_unfulfilled_skus = [];
 
 // server_time is our estimate of the server's clock, in (floating-point) seconds
 // NOTE: server_time may not be monotonically increasing, because we re-adjust it when we receive each AJAX message!
@@ -11975,6 +11977,21 @@ SPINPUNCHGAME.init = function() {
                              window['devicePixelRatio'] || 1,
                              spin_client_platform, spin_client_vendor, spin_client_version
                             ];
+
+    // if this is a Microsoft electron setup, get the valid and unfulfilled SKUs now.
+    if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
+        var sku_tag = Store.listen_for_order_ack('mssku', null);
+        var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':sku_tag};
+        var refresh_microsoft_skus = SPay.get_microsoft_skus(refresh_sku_order);
+        microsoft_store_valid_skus = [];
+        microsoft_store_unfulfilled_skus = [];
+        goog.array.forEach(refresh_microsoft_skus['valid_SKUs'], function(sku) {
+            microsoft_store_valid_skus.push(sku);
+        });
+        goog.array.forEach(refresh_microsoft_skus['unfulfilled_SKUs'], function(sku) {
+            microsoft_store_unfulfilled_skus.push(sku);
+        });
+    }
 
     // send browser caps metric
     var audio_context_works = false;
