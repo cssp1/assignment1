@@ -108,6 +108,9 @@ Session.Session = function() {
     this.viewing_isolate_pvp = 0; // isolate_pvp flag of base being viewed
     this.repeat_attack_cooldown_expire = 0; // repeat attack cooldown expiration time of base being viewed
 
+    this.microsoft_store_valid_skus = []; // holds Microsoft SKU data
+    this.microsoft_store_unfulfilled_skus = []; // holds Microsoft SKU data
+
     /** @type {!Array<!World.World>}
         Bottom-most element is the "real" world, replays push a "virtual" world on top */
     this.world_stack = [];
