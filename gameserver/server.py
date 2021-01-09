@@ -31525,7 +31525,9 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "VERIFY_MICROSOFT_STORE_RECEIPT":
             receipt = arg[1]
-            return session.start_async_request(session.verify_ms_store_receipt)
+            pass
+            # we'll do more work on this later
+            #return session.start_async_request(session.verify_ms_store_receipt)
 
         elif arg[0] == "CAST_SPELL":
             id, spellname, spellargs = arg[1], arg[2], arg[3:]
