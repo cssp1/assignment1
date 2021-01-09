@@ -10908,11 +10908,6 @@ function update_playfield_controls_bar(dialog) {
         LAST_ELECTRON_DEBUG_SYNC_TIME = client_time;
         if(!!player.preferences['electron_debugging_enabled']) {
             window.top.postMessage({'method': 'bh_electron_command', 'type':'APP_COMMAND', 'command':'ALLOW_DEBUG'}, '*');
-            // XXXXXX DELETE AFTER DEBUGGING!
-            console.log('Valid skus');
-            console.log(session.microsoft_store_valid_skus);
-            console.log('Unfulfilled Skus');
-            console.log(session.microsoft_store_unfulfilled_skus);
         } else {
             window.top.postMessage({'method': 'bh_electron_command', 'type':'APP_COMMAND', 'command':'NO_DEBUG'}, '*');
         }
@@ -12056,12 +12051,34 @@ SPINPUNCHGAME.init = function() {
 var global_chat_frame = null; // same chat frame is re-used for entire session
 var global_spell_icon = null;
 
+var microsoft_sku_serial = 9328;
+var microsoft_sku_receiver = new goog.events.EventTarget();
 function refresh_microsoft_store_skus() {
     // if this is a Microsoft electron setup, get the valid and unfulfilled SKUs now.
     if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
-        var sku_tag = Store.listen_for_order_ack('mssku', null);
-        var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':sku_tag};
-        SPay.get_microsoft_skus(refresh_sku_order, session);
+        microsoft_sku_serial += 1;
+        var tag = 'mssku' + microsoft_sku_serial.toString();
+        var on_finish = (function (_session) { return function(event) {
+            var sku_result = event.result['result'];
+            if(typeof(sku_result) === 'object' && 'result' in sku_result) {
+                var refresh_microsoft_skus = sku_result['result'];
+                if(refresh_microsoft_skus['valid_SKUs']){
+                    _session.microsoft_store_valid_skus = [];
+                    goog.array.forEach(refresh_microsoft_skus['valid_SKUs'], function(sku) {
+                        _session.microsoft_store_valid_skus.push(sku);
+                    });
+                }
+                if(refresh_microsoft_skus['unfulfilled_SKUs']) {
+                    _session.microsoft_store_unfulfilled_skus = [];
+                    goog.array.forEach(refresh_microsoft_skus['unfulfilled_SKUs'], function(sku) {
+                        _session.microsoft_store_unfulfilled_skus.push(sku);
+                    });
+                }
+            }
+        }; })(session)
+        Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
+        var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':tag};
+        window.top.postMessage(refresh_sku_order, '*');
     }
 }
 
