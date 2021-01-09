@@ -82,30 +82,6 @@ SPay.place_order_microsoft = function (order_info) {
     });
 };
 
-/** @param {!Object} order_info
-    @param {!Session.Session} session */
-SPay.get_microsoft_skus = function (order_info, session) {
-    var listen_tag = order_info['tag'];
-    var sku_message_receiver = new goog.events.EventTarget()
-    sku_message_receiver.listenOnce(listen_tag,
-                                    function(event) { if(typeof(event) === 'object' && 'result' in event) {
-                                        var refresh_microsoft_skus = event['result'];
-                                        if(refresh_microsoft_skus['valid_SKUs']){
-                                            session.microsoft_store_valid_skus = [];
-                                            goog.array.forEach(refresh_microsoft_skus['valid_SKUs'], function(sku) {
-                                                session.microsoft_store_valid_skus.push(sku);
-                                            });
-                                        }
-                                        if(refresh_microsoft_skus['unfulfilled_SKUs']){
-                                            session.microsoft_store_unfulfilled_skus = [];
-                                            goog.array.forEach(refresh_microsoft_skus['unfulfilled_SKUs'], function(sku) {
-                                                session.microsoft_store_unfulfilled_skus.push(sku);
-                                            });
-                                        }
-                                    }}) (session);
-    window.top.postMessage(order_info, '*');
-};
-
 /** @param {function(?)} callback */
 SPay.buy_more_credits = function(callback) {
     SPFB.ui({'method':'pay', 'credits_purchase':true}, callback);
