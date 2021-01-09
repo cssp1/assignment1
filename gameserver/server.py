@@ -4330,6 +4330,10 @@ class Session(object):
 
         return d # for syntactic convenience only
 
+    def verify_ms_store_receipt(self, receipt):
+        # get Microsoft store receipt, certificate, and verify it before sending gold and ReportFulfilled command
+        return validate_receipt(receipt, gamesite, server_time)
+
     def resource_allow_instant_upgrade(self, resdata):
         # allow if resource "allow_instant" setting is missing or True or if predicates are satisfied
         return Predicates.eval_pred_or_literal(resdata.get('allow_instant', 1), self, self.player)
@@ -31518,6 +31522,12 @@ class GAMEAPI(resource.Resource):
             pass
         elif arg[0] == "CLIENT_TRACKING_PIXEL_BH_RESULT":
             pass
+
+        elif arg[0] == "VERIFY_MICROSOFT_STORE_RECEIPT":
+            receipt = arg[1]
+            pass
+            # we'll do more work on this later
+            #return session.start_async_request(session.verify_ms_store_receipt)
 
         elif arg[0] == "CAST_SPELL":
             id, spellname, spellargs = arg[1], arg[2], arg[3:]

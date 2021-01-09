@@ -12,6 +12,7 @@ goog.provide('SPay');
 
 goog.require('goog.array');
 goog.require('SPFB');
+goog.require('World');
 goog.require('SPKongregate');
 goog.require('Battlehouse');
 
