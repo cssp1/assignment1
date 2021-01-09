@@ -12051,37 +12051,6 @@ SPINPUNCHGAME.init = function() {
 var global_chat_frame = null; // same chat frame is re-used for entire session
 var global_spell_icon = null;
 
-var microsoft_sku_serial = 9328;
-var microsoft_sku_receiver = new goog.events.EventTarget();
-function refresh_microsoft_store_skus() {
-    // if this is a Microsoft electron setup, get the valid and unfulfilled SKUs now.
-    if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
-        microsoft_sku_serial += 1;
-        var tag = 'mssku' + microsoft_sku_serial.toString();
-        var on_finish = (function (_session) { return function(event) {
-            var sku_result = event.result['result'];
-            if(typeof(sku_result) === 'object' && 'result' in sku_result) {
-                var refresh_microsoft_skus = sku_result['result'];
-                if(refresh_microsoft_skus['valid_SKUs']){
-                    _session.microsoft_store_valid_skus = [];
-                    goog.array.forEach(refresh_microsoft_skus['valid_SKUs'], function(sku) {
-                        _session.microsoft_store_valid_skus.push(sku);
-                    });
-                }
-                if(refresh_microsoft_skus['unfulfilled_SKUs']) {
-                    _session.microsoft_store_unfulfilled_skus = [];
-                    goog.array.forEach(refresh_microsoft_skus['unfulfilled_SKUs'], function(sku) {
-                        _session.microsoft_store_unfulfilled_skus.push(sku);
-                    });
-                }
-            }
-        }; })(session)
-        Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
-        var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':tag};
-        window.top.postMessage(refresh_sku_order, '*');
-    }
-}
-
 function init_desktop_dialogs() {
     // destroy the current desktop
     for(var name in desktop_dialogs) {
@@ -12392,7 +12361,7 @@ function init_desktop_dialogs() {
     }
 
     // get updates SKUs for Microsoft store
-    refresh_microsoft_store_skus();
+    Store.refresh_microsoft_store_skus();
 }
 
 function update_notification_jewel(dialog) {
@@ -49689,6 +49658,63 @@ Store.trialpay_callback = function(result, data) {
         send_to_server.func(["PING_CREDITS"]); // may not be necessary, but just in case.
     }
 };
+
+/** @param {string} tag_prefix
+    @param {function(boolean)|null} cb
+    @return {string} tag to send with the order */
+Store.listen_for_microsoft_ack = function(tag_prefix, cb) {
+    Store.order_serial += 1;
+    var tag = tag_prefix + Store.order_serial.toString();
+    if(cb) {
+        Battlehouse.postMessage_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.success); }; })(cb));
+    }
+    return tag;
+};
+
+Store.refresh_microsoft_store_skus = function() {
+    // do not proceed if this is not a Microsoft Electron client
+    if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
+        var on_finish = (function (_session) { return function(event) {
+            if(!(typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) { return; }
+            var refresh_microsoft_skus = event['result']['result'];
+            if(refresh_microsoft_skus['valid_SKUs']){
+                _session.microsoft_store_valid_skus = [];
+                goog.array.forEach(refresh_microsoft_skus['valid_SKUs'], function(sku) {
+                    _session.microsoft_store_valid_skus.push(sku);
+                });
+            }
+            if(refresh_microsoft_skus['unfulfilled_SKUs']) {
+                _session.microsoft_store_unfulfilled_skus = [];
+                goog.array.forEach(refresh_microsoft_skus['unfulfilled_SKUs'], function(sku) {
+                    _session.microsoft_store_unfulfilled_skus.push(sku);
+                });
+            }
+            if(_session.microsoft_store_unfulfilled_skus.length > 0) {
+                Store.get_microsoft_receipt();
+            }
+        }; })(session);
+        var tag = Store.listen_for_microsoft_ack('mssku', on_finish);
+        Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
+        var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':tag};
+        window.top.postMessage(refresh_sku_order, '*');
+    }
+}
+
+Store.get_microsoft_receipt = function() {
+    // do not proceed if this is not a Microsoft Electron client
+    if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
+        var on_finish = (function () { return function(event) {
+            if(!(typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) { return; }
+            var microsoft_receipt = event['result']['result'];
+            send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", microsoft_receipt]);
+        }; })();
+        var tag = Store.listen_for_microsoft_ack('msreceipt', on_finish);
+        Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
+        var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_RECEIPT', 'tag':tag};
+        window.top.postMessage(refresh_sku_order, '*');
+    }
+}
+
 
 // install a new dialog as a child of the current dialog (or at toplevel, if no UI is up)
 /** @param {SPUI.Dialog} dialog */
