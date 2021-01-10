@@ -49718,7 +49718,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
             } else if(microsoft_outcome == 5) {
                 msg = 'error code 5: possible Electron configuration error';
             }
-            console.log('Microsoft payments API ORDER PROBLEM: '+msg); // debugging message, remove 'Microsoft payments API' after testing
+            var error = 'Microsoft payments API ORDER PROBLEM: ' + msg;
             props['method'] = msg;
             log_exception(error, 'place_order');
             metric_event('4061_order_prompt_api_error', props);
