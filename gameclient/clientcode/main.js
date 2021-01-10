@@ -49231,67 +49231,6 @@ Store.place_kgcredits_order = function(price, unit_id, spellname, spellarg, on_f
     return true;
 };
 
-Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_finish, on_fail) {
-    var descr = spellname;
-    if(spellarg) {
-        descr += ','+spellarg;
-    }
-    if(unit_id && unit_id != GameObject.VIRTUAL_ID) {
-        var object = session.get_real_world().objects.get_object(unit_id);
-        descr += ','+object.spec['name'];
-    }
-    var tag = Store.listen_for_order_ack('mso', on_finish);
-    // this is arbitrary custom data for our server
-    var store_quantity = gamedata['spells'][spellname]['quantity'].toString();
-    var pretty_store_name = "%gamebuck_number %gamebuck_name".replace('%gamebuck_number', store_quantity).replace('%gamebuck_name', Store.gamebucks_ui_name());
-    var order_info = {
-        'session_id': session.session_id,
-        'unit_id': unit_id,
-        'client_unit_type': (object ? object.spec['name'] : null),
-        'server_time_according_to_client': Math.floor(server_time),
-        'spellname': spellname,
-        'sku': spellname,
-        'spellarg': spellarg,
-        'tag': tag,
-        'ui_name': pretty_store_name,
-        'client_price': price
-    };
-    // add a debug flag to the Microsoft payments API if debugging is enabled
-    // this will show the Microsoft Store payments browser window and console for debugging
-    if('enable_microsoft_payments_debug_if' in gamedata['store']) {
-        if(read_predicate(gamedata['store']['enable_microsoft_payments_debug_if']).is_satisfied(player)) {
-            order_info['debug'] = 1;
-        }
-    }
-    var props = {'currency': 'microsoft_store',
-                 'Billing Amount': price,
-                 'Billing Description': descr};
-    SPay.place_order_microsoft(order_info)
-                .then(function(result) {
-                    var receipt = result['result'];
-                    console.log('Microsoft payments API result received') // debugging message, remove after testing
-                    console.log(result) // debugging message, remove after testing
-                    // send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", receipt, "order_complete"]); // add back in when ready for server verification phase
-                    send_to_server.func(["PING_TECH"]);
-                    send_to_server.func(["PING_PLAYER"]);
-
-                    var msg = 'receipt: '+ receipt;
-                    props['receipt'] = receipt;
-                    metric_event('4070_order_prompt_success', props);
-                    console.log('ORDER SUCCESSFUL: '+msg);
-                },
-                      function(error) {
-                          var msg = 'unknown error';
-                          console.log('Microsoft payments API ORDER PROBLEM: '+msg); // debugging message, remove 'Microsoft payments API' after testing
-                          props['method'] = msg;
-                          log_exception(error, 'place_order');
-                          metric_event('4061_order_prompt_api_error', props);
-                          if(on_fail) { on_fail(); }
-                });
-    metric_event('4060_order_prompt', props);
-    return true;
-};
-
 Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spellname, spellarg, on_finish, options) {
     if(!options) { options = {}; }
     var on_fail = options['fail_cb'] || null;
@@ -49715,6 +49654,88 @@ Store.get_microsoft_receipt = function() {
     }
 }
 
+Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_finish, on_fail) {
+    var descr = spellname;
+    if(spellarg) {
+        descr += ','+spellarg;
+    }
+    if(unit_id && unit_id != GameObject.VIRTUAL_ID) {
+        var object = session.get_real_world().objects.get_object(unit_id);
+        descr += ','+object.spec['name'];
+    }
+    var tag = Store.listen_for_microsoft_ack('mso', on_finish);
+    // this is arbitrary custom data for our server
+    var store_quantity = gamedata['spells'][spellname]['quantity'].toString();
+    var pretty_store_name = "%gamebuck_number %gamebuck_name".replace('%gamebuck_number', store_quantity).replace('%gamebuck_name', Store.gamebucks_ui_name());
+    var order_info = {
+        'session_id': session.session_id,
+        'unit_id': unit_id,
+        'client_unit_type': (object ? object.spec['name'] : null),
+        'server_time_according_to_client': Math.floor(server_time),
+        'spellname': spellname,
+        'sku': spellname,
+        'spellarg': spellarg,
+        'tag': tag,
+        'ui_name': pretty_store_name,
+        'client_price': price
+    };
+    // add a debug flag to the Microsoft payments API if debugging is enabled
+    // this will show the Microsoft Store payments browser window and console for debugging
+    if('enable_microsoft_payments_debug_if' in gamedata['store']) {
+        if(read_predicate(gamedata['store']['enable_microsoft_payments_debug_if']).is_satisfied(player)) {
+            order_info['debug'] = 1;
+        }
+    }
+    var props = {'currency': 'microsoft_store',
+                 'Billing Amount': price,
+                 'Billing Description': descr};
+
+    var on_complete = (function (_on_finish, _on_fail) { return function(event) {
+        var microsoft_outcome = 5;
+        if((typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) {
+            microsoft_outcome = event['result']['result'];
+            // 0, 1, 2, 3, 4, 5
+        }
+        if(microsoft_outcome == 0) {
+            send_to_server.func(["PING_TECH"]);
+            send_to_server.func(["PING_PLAYER"]);
+            var msg = 'receipt: '+ tag;
+            props['receipt'] = tag + ' ' + microsoft_outcome.toString();
+            metric_event('4070_order_prompt_success', props);
+            console.log('ORDER SUCCESSFUL: '+msg);
+            Store.get_microsoft_receipt();
+            _on_finish();
+        } else {
+            var msg = 'unknown error';
+            if(microsoft_outcome == 1) {
+                msg = 'error code 1: alreadyPurchased';
+            } else if(microsoft_outcome == 2) {
+                msg = 'error code 2: notPurchased (reason unknown)';
+            } else if(microsoft_outcome == 3) {
+                msg = 'error code 3: networkError';
+            } else if(microsoft_outcome == 4) {
+                msg = 'error code 1: serverError';
+            } else if(microsoft_outcome == 5) {
+                msg = 'error code 5: possible Electron configuration error';
+            }
+            console.log('Microsoft payments API ORDER PROBLEM: '+msg); // debugging message, remove 'Microsoft payments API' after testing
+            props['method'] = msg;
+            log_exception(error, 'place_order');
+            metric_event('4061_order_prompt_api_error', props);
+            if(_on_fail) { _on_fail(); }
+        }
+    }; })(on_finish, on_fail);
+    Battlehouse.postMessage_receiver.listenOnce(tag, on_complete);
+    var place_credits_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'DO_PURCHASE', 'tag':tag};
+    window.top.postMessage(place_credits_order, '*');
+    metric_event('4060_order_prompt', props);
+    return true;
+};
+
+/** @param {string} sku */
+SPay.microsoft_report_consumable_used = function(sku) {
+    // report consumable used after completing order and giving gold
+}
 
 // install a new dialog as a child of the current dialog (or at toplevel, if no UI is up)
 /** @param {SPUI.Dialog} dialog */
@@ -50922,6 +50943,7 @@ function handle_server_message(data) {
         world.objects.get_object(id).receive_auras_update(world, state[1]);
     } else if(msg == "PLAYER_STATE_UPDATE") {
         update_resources(data[1], false);
+        Store.refresh_microsoft_store_skus();
         if(player.can_level_up()) {
             notification_queue.push_with_priority(invoke_level_up_dialog, -1);
         }

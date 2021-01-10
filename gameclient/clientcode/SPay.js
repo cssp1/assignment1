@@ -62,63 +62,6 @@ SPay.place_order_kgcredits = function (order_info, callback) {
     SPKongregate.purchaseItemsRemote(order_info, callback);
 };
 
-/** @param {!Object} order_info
-    @return {!Promise} */
-SPay.place_order_microsoft = function(order_info) {
-    var can_buy_sku = false;
-    SPay.microsoft_check_can_buy_sku(order_info).then(function(result) { can_buy_sku = result; },
-                                                      function(error) { return; } );
-    if(can_buy_sku) {
-        // do purchase
-    } else {
-        // microsoft_get_receipt
-        // validate receipt and wait for server to respond
-        // report fulfilled
-        // reprocess place_order
-    }
-};
-
-/** @param {!Object} order_info
-    @return {!Promise} */
-SPay.microsoft_check_can_buy_sku = function(order_info) {
-    // check if the user can buy the sku
-    var listen_tag = order_info['tag'];
-    order_info['method'] = 'bh_electron_command';
-    order_info['type'] = 'STORE_COMMAND';
-    order_info['command'] = 'CHECK_CAN_BUY_SKU';
-    return new Promise(function(resolve, reject) {
-        Battlehouse.postMessage_receiver.listenOnce(listen_tag,
-                                                    function(event) { if(typeof(event) === 'object' && 'result' in event) {
-                                                        resolve(event['result']);
-                                                    } else if (typeof(event) === 'object' && 'error' in event) {
-                                                        reject(event['error']);
-                                                    } else {
-                                                        reject(event);
-                                                    } });
-        window.top.postMessage(order_info, '*');
-        console.log('Sent order request from game client'); // remove when debugging is finished
-        console.log(order_info); // remove when debugging is finished
-    });
-}
-
-/** @param {!Object} order_info
-    @return {!Promise} */
-SPay.microsoft_get_receipt = function (order_info) {
-    // get_receipt and process it with server
-}
-
-/** @param {!Object} order_info
-    @return {!Promise} */
-SPay.microsoft_report_consumable_used = function(order_info) {
-    // report consumable used after completing order and giving gold
-}
-
-/** @param {!Object} order_info
-    @return {!Promise} */
-SPay.microsoft_do_purchase = function(order_info) {
-    // actually do the order
-}
-
 /** @param {function(?)} callback */
 SPay.buy_more_credits = function(callback) {
     SPFB.ui({'method':'pay', 'credits_purchase':true}, callback);
