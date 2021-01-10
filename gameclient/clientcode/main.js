@@ -49732,9 +49732,39 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
     return true;
 };
 
-/** @param {string} sku */
-SPay.microsoft_report_consumable_used = function(sku) {
-    // report consumable used after completing order and giving gold
+/** @param {string} sku
+    @param {string} transaction */
+SPay.microsoft_report_consumable_used = function(sku, transaction) {
+    // do not proceed if this is not a Microsoft Electron client
+    if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
+        var on_finish = (function (_transaction) { return function(event) {
+            if(!(typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) { return; }
+            var microsoft_tracking_id = event['result']['result']['tracking_id'];
+            var status = event['result']['result']['status'];
+            if(status == 0) {
+                send_to_server.func(["MICROSOFT_CONSUMABLE_FULFILLED", _transaction, microsoft_tracking_id]);
+            } else {
+                var msg = 'unknown error';
+                if(status == 1) {
+                    msg = 'error code 1: InsufficentQuantity. This should not happen!';
+                } else if(status == 2) {
+                    msg = 'error code 2: NetworkError';
+                } else if(status == 3) {
+                    msg = 'error code 3: ServerError';
+                } else if(status == 4) {
+                    msg = 'error code 4: possible Electron configuration error';
+                } else if(status == 5) {
+                    msg = 'error code 5: possible Electron configuration error';
+                }
+                var error = 'Microsoft payments API ORDER PROBLEM: ' + msg;
+                log_exception(error, 'microsoft_report_consumable_used');
+            }
+        }; })(transaction);
+        var tag = Store.listen_for_microsoft_ack('msreportconsumable', on_finish);
+        Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
+        var report_consumable_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'REPORT_CONSUMABLE_USED', 'sku':sku, 'tag':tag};
+        window.top.postMessage(report_consumable_order, '*');
+    }
 }
 
 // install a new dialog as a child of the current dialog (or at toplevel, if no UI is up)
