@@ -62,26 +62,6 @@ SPay.place_order_kgcredits = function (order_info, callback) {
     SPKongregate.purchaseItemsRemote(order_info, callback);
 };
 
-/** @param {!Object} order_info
-    @return {!Promise} */
-SPay.place_order_microsoft = function (order_info) {
-    var listen_tag = order_info['tag'];
-    order_info['method'] = 'bh_make_microsoft_store_purchase';
-    return new Promise(function(resolve, reject) {
-        Battlehouse.postMessage_receiver.listenOnce(listen_tag,
-                                                    function(event) { if(typeof(event) === 'object' && 'result' in event) {
-                                                        resolve(event['result']);
-                                                    } else if (typeof(event) === 'object' && 'error' in event) {
-                                                        reject(event['error']);
-                                                    } else {
-                                                        reject(event);
-                                                    } });
-        window.top.postMessage(order_info, '*');
-        console.log('Sent order request from game client'); // remove when debugging is finished
-        console.log(order_info); // remove when debugging is finished
-    });
-};
-
 /** @param {function(?)} callback */
 SPay.buy_more_credits = function(callback) {
     SPFB.ui({'method':'pay', 'credits_purchase':true}, callback);
