@@ -52649,6 +52649,8 @@ function handle_server_message(data) {
             user_log.msg('Error: '+display_string, new SPUI.Color(1,0,0,1));
         }
 
+    } else if(msg == "REPORT_MS_SKU_FULFILLED") {
+        Store.microsoft_report_consumable_used(data[0],data[1]);
     } else if(msg == "NOMESSAGE") {
     } else {
         document.write("AJAX error: "+data);

@@ -31525,9 +31525,100 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "VERIFY_MICROSOFT_STORE_RECEIPT":
             receipt = arg[1]
-            pass
-            # we'll do more work on this later
-            #return session.start_async_request(session.verify_ms_store_receipt)
+            ms_receipts = yield session.start_async_request(session.verify_ms_store_receipt(receipt))
+            if 'ms_store_purchase_history' not in session.player.history:
+                session.player.history['ms_store_purchase_history'] = []
+            for receipt in ms_receipts:
+                order_id, purchase_id = receipt['purchase_id']
+                already_processed = False
+                for old_purchase in session.player.history['ms_store_purchase_history']:
+                    if old_purchase['purchase_id'] == purchase_id
+                    already_processed = True
+                if already_processed: continue # don't process twice, that will result in double gamebucks
+                new_purchase['purchase_id'] = purchase_id
+                new_purchase['age'] = -1 if session.player.creation_time < 0 else (server_time - session.player.creation_time)
+                gamebucks_amount = gamedata['spells'][receipt['spellname']]['quantity']
+                new_purchase['gamebucks_amount'] = gamebucks_amount
+                new_purchase['gamebucks_balance'] = session.player.resources.gamebucks + gamebucks_amount
+                new_purchase['time'] = server_time
+                assert session
+                assert (not session.logout_in_progress)
+                spellarg = None
+                spellname = receipt['spellname']
+                unit_id = GameObject.VIRTUAL_ID
+                dollar_amount = receipt['price']
+                price_description, detail_props = Store.execute_order(gameapi, session, session.outgoing_messages,
+                                                                      receipt['currency'], gamebucks_amount,
+                                                                      unit_id, spellname, spellarg,
+                                                                      purchase['time'],
+                                                                      usd_equivalent = dollar_amount)
+                session.player.history['ms_store_purchase_history'].append(new_purchase) # add to history so it isn't double-processed
+                descr = Store.get_description(session, unit_id, spellname, spellarg, price_description)
+                admin_stats.add_revenue(session.user.user_id, dollar_amount, descr)
+
+                metric_event_coded(session.user.user_id, '1000_billed', {'Billing Amount': dollar_amount,
+                                                                         'Billing Description': descr,
+                                                                         'currency': currency,
+                                                                         'currency_amount': credits_amount,
+                                                                         'country_tier': session.player.country_tier,
+                                                                         'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                         'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                         'num_purchases': session.player.history.get('num_purchases',0),
+                                                                         'order_id': order_id})
+
+                gamesite.credits_log.event(server_time, {'user_id':session.user.user_id,
+                                                         'event_name':'1000_billed',
+                                                         'code':1000,
+                                                         'Billing Amount': dollar_amount,
+                                                         'Billing Description': descr,
+                                                         'currency': currency,
+                                                         'currency_amount': credits_amount,
+                                                         'summary': session.player.get_denormalized_summary_props('brief'),
+                                                         'country_tier': session.player.country_tier,
+                                                         'country': session.user.country,
+                                                         'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                         'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                         'num_purchases': session.player.history.get('num_purchases',0),
+                                                         'order_id': order_id})
+
+                session.activity_classifier.spent_money(dollar_amount, descr)
+
+                if session.player.history.get('money_spent', 0) == 0:
+                    session.player.history['time_of_first_purchase'] = server_time
+
+                if session.user.account_creation_time > 0:
+                    daynum = int((server_time - session.user.account_creation_time)/(60*60*24))
+                    if 'money_spent_by_day' not in session.player.history:
+                        session.player.history['money_spent_by_day'] = {}
+                    dict_increment(session.player.history['money_spent_by_day'], str(daynum), dollar_amount)
+                dict_setmax(session.player.history, 'last_purchase_time', server_time)
+
+                # new-style player metrics (redundant with old style above)
+                session.increment_player_metric('money_spent', dollar_amount)
+                session.increment_player_metric('num_purchases', 1)
+                session.setmax_player_metric('largest_purchase', dollar_amount)
+
+                if 'money_purchase_history' not in session.player.history:
+                    session.player.history['money_purchase_history'] = []
+
+                session.player.history['money_purchase_history'].append({'time': server_time,
+                                                                         'age': -1 if session.player.creation_time < 0 else (server_time - session.player.creation_time),
+                                                                         'dollar_amount': dollar_amount,
+                                                                         'credit_amount': credits_amount,
+                                                                         'currency': currency,
+                                                                         'order_id': order_id,
+                                                                         'description': descr})
+
+            for receipt in ms_receipts:
+                # report all SKUs in receipt as fulfilled now. They were skipped above if they were already fulfilled
+                retmsg.append(["REPORT_MS_SKU_FULFILLED", receipt['spellname'], receipt['purchase_id']])
+
+        elif arg[0] == "MICROSOFT_CONSUMABLE_FULFILLED":
+            purchase_id = arg[1]
+            if 'ms_store_purchase_history' not in session.player.history: return
+            for purchase in session.player.history['ms_store_purchase_history']:
+                if purchase['purchase_id'] == purchase_id:
+                    purchase['ms_tracking_id'] = arg[2]
 
         elif arg[0] == "CAST_SPELL":
             id, spellname, spellargs = arg[1], arg[2], arg[3:]
