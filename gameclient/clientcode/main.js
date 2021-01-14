@@ -49734,7 +49734,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
 
 /** @param {string} sku
     @param {string} transaction */
-SPay.microsoft_report_consumable_used = function(sku, transaction) {
+Store.microsoft_report_consumable_used = function(sku, transaction) {
     // do not proceed if this is not a Microsoft Electron client
     if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
         var on_finish = (function (_transaction) { return function(event) {
