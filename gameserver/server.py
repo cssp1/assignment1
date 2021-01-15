@@ -31524,34 +31524,44 @@ class GAMEAPI(resource.Resource):
             pass
 
         elif arg[0] == "VERIFY_MICROSOFT_STORE_RECEIPT":
+            if 'ms_store_purchase_history' not in session.player.history: session.player.history['ms_store_purchase_history'] = []
             receipt = arg[1]
             ms_receipts = yield session.start_async_request(session.verify_ms_store_receipt(receipt))
-            if 'ms_store_purchase_history' not in session.player.history:
-                session.player.history['ms_store_purchase_history'] = []
             for receipt in ms_receipts:
-                order_id, purchase_id = receipt['purchase_id']
+                purchase_id = receipt['purchase_id']
                 already_processed = False
-                for old_purchase in session.player.history['ms_store_purchase_history']:
-                    if old_purchase['purchase_id'] == purchase_id
-                    already_processed = True
-                if already_processed: continue # don't process twice, that will result in double gamebucks
-                new_purchase['purchase_id'] = purchase_id
+                if any(old_purchase['purchase_id'] == purchase_id for old_purchase in session.player.history['ms_store_purchase_history']): continue # purchase was already processed
+                new_purchase = {'purchase_id': purchase_id}
                 new_purchase['age'] = -1 if session.player.creation_time < 0 else (server_time - session.player.creation_time)
-                gamebucks_amount = gamedata['spells'][receipt['spellname']]['quantity']
+                spell = gamedata['spells'].get(receipt['spellname'], False)
+                gamebucks_amount = 0
+                if not spell:
+                    gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: cannot identify SKU spell %s. Player will receive no gamebucks. A CS ticket should be opened ASAP.' % (purchase_id, receipt['spellname']))
+                    new_purchase['force_fulfilled'] = 1
+                if spell:
+                    gamebucks_amount = spell.get('quantity', 0)
+                if gamebucks_amount == 0:
+                    gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: spell %s has no quantity value. Defaulting to 0, player will receive no gamebucks. A CS ticket should be opened ASAP.' % (purchase_id, receipt['spellname']))
+                    new_purchase['force_fulfilled'] = 1
                 new_purchase['gamebucks_amount'] = gamebucks_amount
                 new_purchase['gamebucks_balance'] = session.player.resources.gamebucks + gamebucks_amount
                 new_purchase['time'] = server_time
-                assert session
                 assert (not session.logout_in_progress)
-                spellarg = None
+                spellarg = None # Microsoft payments
                 spellname = receipt['spellname']
                 unit_id = GameObject.VIRTUAL_ID
                 dollar_amount = receipt['price']
-                price_description, detail_props = Store.execute_order(gameapi, session, session.outgoing_messages,
-                                                                      receipt['currency'], gamebucks_amount,
-                                                                      unit_id, spellname, spellarg,
-                                                                      purchase['time'],
-                                                                      usd_equivalent = dollar_amount)
+                try:
+                    price_description, detail_props = Store.execute_order(gameapi, session, session.outgoing_messages,
+                                                                          receipt['currency'], gamebucks_amount,
+                                                                          unit_id, spellname, spellarg,
+                                                                          purchase['time'],
+                                                                          usd_equivalent = dollar_amount)
+                except:
+                    gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: Store.execute_order failed. Player will receive no gamebucks. A CS ticket should be opened ASAP.' % (purchase_id, receipt['spellname']))
+                    new_purchase['force_fulfilled'] = 1
+                    session.player.history['ms_store_purchase_history'].append(new_purchase) # add to history so it isn't double-processed
+                    continue
                 session.player.history['ms_store_purchase_history'].append(new_purchase) # add to history so it isn't double-processed
                 descr = Store.get_description(session, unit_id, spellname, spellarg, price_description)
                 admin_stats.add_revenue(session.user.user_id, dollar_amount, descr)
@@ -31564,7 +31574,7 @@ class GAMEAPI(resource.Resource):
                                                                          'last_purchase_time': session.player.history.get('last_purchase_time',-1),
                                                                          'prev_largest_purchase': session.player.history.get('largest_purchase',0),
                                                                          'num_purchases': session.player.history.get('num_purchases',0),
-                                                                         'order_id': order_id})
+                                                                         'order_id': purchase_id})
 
                 gamesite.credits_log.event(server_time, {'user_id':session.user.user_id,
                                                          'event_name':'1000_billed',
@@ -31610,7 +31620,7 @@ class GAMEAPI(resource.Resource):
                                                                          'description': descr})
 
             for receipt in ms_receipts:
-                # report all SKUs in receipt as fulfilled now. They were skipped above if they were already fulfilled
+                # report all SKUs in receipt as fulfilled now.
                 retmsg.append(["REPORT_MS_SKU_FULFILLED", receipt['spellname'], receipt['purchase_id']])
 
         elif arg[0] == "MICROSOFT_CONSUMABLE_FULFILLED":
