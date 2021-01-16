@@ -12301,19 +12301,7 @@ function init_desktop_dialogs() {
             dialog.widgets['friend_bar'].widgets['scroll_left'].onclick = friend_bar_scroller(-1);
             dialog.widgets['friend_bar'].widgets['scroll_right'].onclick = friend_bar_scroller(1);
 
-            var can_show_friend_bar = false;
-            for(var i = 0; i < player.friends.length; i++) {
-                var friend = player.friends[i];
-                console.log(friend);
-                console.log(friend.is_real_friend)
-                if(friend.is_real_friend) {
-                    can_show_friend_bar = true;
-                }
-            }
-            console.log(player.friends)
-            console.log('Can show friend bar ' + can_show_friend_bar.toString())
-
-            dialog.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null) && can_show_friend_bar;
+            dialog.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null) && can_show_friend_bar(player);
 
             dialog.widgets['friend_bar'].user_data['transition_start_time'] = -1;
             dialog.widgets['friend_bar'].user_data['maximized'] = !('friend_bar_minimized' in player.preferences && player.preferences['friend_bar_minimized']);
@@ -12390,6 +12378,18 @@ function update_notification_jewel(dialog) {
         dialog.widgets['num_bg'].xy = dialog.widgets['num_bg'].data['xy' + suffix];
         dialog.widgets['num_bg'].wh = dialog.widgets['num_bg'].data['dimensions' + suffix];
     }
+}
+
+function can_show_friend_bar(player) {
+    console.log('Checking if can show friend bar')
+    console.log('Showing length of ' + player.friends.length.toString())
+    for(var i = 0; i < player.friends.length; i++) {
+        var friend = player.friends[i];
+        console.log('Checking friend ' + i.toString())
+        if(friend.is_real_friend) { return true; }
+    }
+    console.log('Could not find real friend, returning false')
+    return false;
 }
 
 function scroll_friend_bar(dialog, page) {
@@ -12589,6 +12589,7 @@ function scroll_friend_bar(dialog, page) {
 
 function update_friend_bar(dialog) {
     if(!dialog.parent) { return; } // dialog was closed
+    dialog.parent.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null) && can_show_friend_bar(player);
 
     var t = (dialog.user_data['transition_start_time'] > 0 ? clamp((client_time - dialog.user_data['transition_start_time']) / dialog.data['transition_time'], 0, 1) : 1);
     var base_xy_max = vec_add(dialog.parent.data['widgets']['friend_bar']['xy'], dialog.data['xy']);
