@@ -12301,17 +12301,19 @@ function init_desktop_dialogs() {
             dialog.widgets['friend_bar'].widgets['scroll_left'].onclick = friend_bar_scroller(-1);
             dialog.widgets['friend_bar'].widgets['scroll_right'].onclick = friend_bar_scroller(1);
 
-            var num_real_friends = 0;
+            var can_show_friend_bar = false;
             for(var i = 0; i < player.friends.length; i++) {
                 var friend = player.friends[i];
+                console.log(friend);
+                console.log(friend.is_real_friend)
                 if(friend.is_real_friend) {
-                    num_real_friends = num_real_friends + 1;
+                    can_show_friend_bar = true;
                 }
             }
             console.log(player.friends)
-            console.log('Number of friends ' + num_real_friends.toString())
+            console.log('Can show friend bar ' + can_show_friend_bar.toString())
 
-            dialog.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null) && num_real_friends > 0;
+            dialog.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null) && can_show_friend_bar;
 
             dialog.widgets['friend_bar'].user_data['transition_start_time'] = -1;
             dialog.widgets['friend_bar'].user_data['maximized'] = !('friend_bar_minimized' in player.preferences && player.preferences['friend_bar_minimized']);
