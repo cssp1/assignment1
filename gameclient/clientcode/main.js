@@ -12381,14 +12381,10 @@ function update_notification_jewel(dialog) {
 }
 
 function can_show_friend_bar(player) {
-    console.log('Checking if can show friend bar')
-    console.log('Showing length of ' + player.friends.length.toString())
     for(var i = 0; i < player.friends.length; i++) {
         var friend = player.friends[i];
-        console.log('Checking friend ' + i.toString())
         if(friend.is_real_friend) { return true; }
     }
-    console.log('Could not find real friend, returning false')
     return false;
 }
 
