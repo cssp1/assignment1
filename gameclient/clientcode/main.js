@@ -49734,7 +49734,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
 
 /** @param {string} sku
     @param {string} transaction */
-SPay.microsoft_report_consumable_used = function(sku, transaction) {
+Store.microsoft_report_consumable_used = function(sku, transaction) {
     // do not proceed if this is not a Microsoft Electron client
     if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
         var on_finish = (function (_transaction) { return function(event) {
@@ -52649,6 +52649,8 @@ function handle_server_message(data) {
             user_log.msg('Error: '+display_string, new SPUI.Color(1,0,0,1));
         }
 
+    } else if(msg == "REPORT_MS_SKU_FULFILLED") {
+        Store.microsoft_report_consumable_used(data[0],data[1]);
     } else if(msg == "NOMESSAGE") {
     } else {
         document.write("AJAX error: "+data);
