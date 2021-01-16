@@ -61,6 +61,7 @@ import SpinSSL
 import SpinFacebook
 import SpinKongregate
 import SpinXsolla
+import SpinMSReceiptParser
 import SpinAtomFeed
 import SpinGoogleAuth
 from spinlibs import SpinHTTP
@@ -2789,6 +2790,135 @@ class User:
 
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, on_success, error_callback = on_error)
 
+    @inlineCallbacks
+    def verify_ms_store_receipt_async(self, session, retmsg, receipts_xml):
+        if 'ms_store_purchase_history' not in session.player.history: session.player.history['ms_store_purchase_history'] = []
+
+        # Pull the certificate we need to verify the receipt XML.
+        # This involves an async HTTP request.
+        ms_cert_url = SpinMSReceiptParser.validate_receipt_request_url(receipts_xml)
+        cert = yield gamesite.AsyncHTTP_Microsoft.queue_request_deferred(server_time, ms_cert_url)
+
+        # Try to validate and parse the receipt XML
+        try:
+            ms_receipts = SpinMSReceiptParser.validate_receipt_response(receipts_xml, cert)
+        except:
+            # if there is an error verifying or parsing the receipt(s), stop and report the error now. Do not send acknowledgement (?).
+            gamesite.exception_log.event(server_time, 'Exception Microsoft receipt: %r could not be verified with certificate: %s' % (receipts_xml, traceback.format_exc().strip()))
+            returnValue()
+
+        for receipt in ms_receipts:
+            # execute the order, if possible
+            self.verify_ms_store_receipt_one(session, retmsg, receipt)
+
+            # report SKU as fulfilled
+            retmsg.append(["REPORT_MS_SKU_FULFILLED", receipt['spellname'], receipt['purchase_id']])
+
+    def verify_ms_store_receipt_one(self, session, retmsg, receipt):
+        purchase_id = receipt['purchase_id']
+
+        # skip purchase if it was already processed
+        if any(old_purchase['purchase_id'] == purchase_id for old_purchase in session.player.history['ms_store_purchase_history']):
+            return
+
+        new_purchase = {
+            'time': server_time,
+            'purchase_id': purchase_id,
+            'age': -1 if session.player.creation_time < 0 else (server_time - session.player.creation_time),
+            }
+        session.player.history['ms_store_purchase_history'].append(new_purchase) # add to history so it isn't double-processed
+
+        spell = gamedata['spells'].get(receipt['spellname'])
+        if not spell:
+            gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: cannot identify SKU spell %s. Player will receive no gamebucks. A CS ticket should be opened ASAP.' % (purchase_id, receipt['spellname']))
+            new_purchase['force_fulfilled'] = 1
+            return # skip any further processing of this receipt. Do acknowledge it and leave it in history['ms_store_purchase_history'].
+
+        gamebucks_amount = spell.get('quantity', 0)
+        if gamebucks_amount == 0:
+            gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: spell %s has no quantity value. Defaulting to 0, player will receive no gamebucks. A CS ticket should be opened ASAP.' % (purchase_id, receipt['spellname']))
+            new_purchase['force_fulfilled'] = 1
+            return # skip any further processing of this receipt. Do acknowledge it and leave it in history['ms_store_purchase_history'].
+
+        new_purchase['gamebucks_amount'] = gamebucks_amount
+        new_purchase['gamebucks_balance'] = session.player.resources.gamebucks + gamebucks_amount
+        assert (not session.logout_in_progress)
+        spellarg = None # Microsoft payments
+        spellname = receipt['spellname']
+        unit_id = GameObject.VIRTUAL_ID
+        currency = receipt['currency'] # e.g. "GBP"
+        currency_amount = receipt['price'] # floating-point price in local currency e.g. 9.99
+        dollar_amount = receipt['price'] # XXX use an approximate exchange rate here?
+        if currency != "USD":
+            gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: receipt price %s currency %s has no U.S. dollar equivalent. Metrics will be inaccurate.' % (purchase_id, receipt['price'], receipt['currency']))
+
+        try:
+            price_description, detail_props = Store.execute_order(gamesite.gameapi, session, retmsg,
+                                                                  currency, currency_amount,
+                                                                  unit_id, spellname, spellarg,
+                                                                  new_purchase['time'],
+                                                                  usd_equivalent = dollar_amount)
+        except:
+            gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: Store.execute_order failed. Player will receive no gamebucks. A CS ticket should be opened ASAP. %s' % (purchase_id, traceback.format_exc().strip()))
+            new_purchase['force_fulfilled'] = 1
+            return # skip any further processing of this receipt
+
+        descr = Store.get_description(session, unit_id, spellname, spellarg, price_description)
+        admin_stats.add_revenue(session.user.user_id, dollar_amount, descr)
+
+        metric_event_coded(session.user.user_id, '1000_billed', {'Billing Amount': dollar_amount,
+                                                                 'Billing Description': descr,
+                                                                 'currency': currency,
+                                                                 'currency_amount': currency_amount,
+                                                                 'country_tier': session.player.country_tier,
+                                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                 'num_purchases': session.player.history.get('num_purchases',0),
+                                                                 'order_id': purchase_id})
+
+        gamesite.credits_log.event(server_time, {'user_id':session.user.user_id,
+                                                 'event_name':'1000_billed',
+                                                 'code':1000,
+                                                 'Billing Amount': dollar_amount,
+                                                 'Billing Description': descr,
+                                                 'currency': currency,
+                                                 'currency_amount': currency_amount,
+                                                 'summary': session.player.get_denormalized_summary_props('brief'),
+                                                 'country_tier': session.player.country_tier,
+                                                 'country': session.user.country,
+                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                 'num_purchases': session.player.history.get('num_purchases',0),
+                                                 'order_id': purchase_id})
+
+        session.activity_classifier.spent_money(dollar_amount, descr)
+
+        if session.player.history.get('money_spent', 0) == 0:
+            session.player.history['time_of_first_purchase'] = server_time
+
+        if session.user.account_creation_time > 0:
+            daynum = int((server_time - session.user.account_creation_time)/(60*60*24))
+            if 'money_spent_by_day' not in session.player.history:
+                session.player.history['money_spent_by_day'] = {}
+            dict_increment(session.player.history['money_spent_by_day'], str(daynum), dollar_amount)
+        dict_setmax(session.player.history, 'last_purchase_time', server_time)
+
+        # new-style player metrics (redundant with old style above)
+        session.increment_player_metric('money_spent', dollar_amount)
+        session.increment_player_metric('num_purchases', 1)
+        session.setmax_player_metric('largest_purchase', dollar_amount)
+
+        if 'money_purchase_history' not in session.player.history:
+            session.player.history['money_purchase_history'] = []
+
+        session.player.history['money_purchase_history'].append({'time': server_time,
+                                                                 'age': -1 if session.player.creation_time < 0 else (server_time - session.player.creation_time),
+                                                                 'dollar_amount': dollar_amount,
+                                                                 'currency_amount': currency_amount,
+                                                                 'currency': currency,
+                                                                 'order_id': purchase_id,
+                                                                 'description': descr})
+
     @admin_stats.measure_latency('retrieve_facebook_credit_info_complete')
     def retrieve_facebook_credit_info_complete(self, result):
         dom = xml.dom.minidom.parseString(result)
@@ -4329,10 +4459,6 @@ class Session(object):
             self.async_ds_watchdog = reactor.callLater(timeout, self.async_ds_timeout)
 
         return d # for syntactic convenience only
-
-    def verify_ms_store_receipt(self, receipt):
-        # get Microsoft store receipt, certificate, and verify it before sending gold and ReportFulfilled command
-        return validate_receipt(receipt, gamesite, server_time)
 
     def resource_allow_instant_upgrade(self, resdata):
         # allow if resource "allow_instant" setting is missing or True or if predicates are satisfied
@@ -31524,111 +31650,16 @@ class GAMEAPI(resource.Resource):
             pass
 
         elif arg[0] == "VERIFY_MICROSOFT_STORE_RECEIPT":
-            if 'ms_store_purchase_history' not in session.player.history: session.player.history['ms_store_purchase_history'] = []
             receipt = arg[1]
-            ms_receipts = yield session.start_async_request(session.verify_ms_store_receipt(receipt))
-            for receipt in ms_receipts:
-                purchase_id = receipt['purchase_id']
-                already_processed = False
-                if any(old_purchase['purchase_id'] == purchase_id for old_purchase in session.player.history['ms_store_purchase_history']): continue # purchase was already processed
-                new_purchase = {'purchase_id': purchase_id}
-                new_purchase['age'] = -1 if session.player.creation_time < 0 else (server_time - session.player.creation_time)
-                spell = gamedata['spells'].get(receipt['spellname'], False)
-                gamebucks_amount = 0
-                if not spell:
-                    gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: cannot identify SKU spell %s. Player will receive no gamebucks. A CS ticket should be opened ASAP.' % (purchase_id, receipt['spellname']))
-                    new_purchase['force_fulfilled'] = 1
-                if spell:
-                    gamebucks_amount = spell.get('quantity', 0)
-                if gamebucks_amount == 0:
-                    gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: spell %s has no quantity value. Defaulting to 0, player will receive no gamebucks. A CS ticket should be opened ASAP.' % (purchase_id, receipt['spellname']))
-                    new_purchase['force_fulfilled'] = 1
-                new_purchase['gamebucks_amount'] = gamebucks_amount
-                new_purchase['gamebucks_balance'] = session.player.resources.gamebucks + gamebucks_amount
-                new_purchase['time'] = server_time
-                assert (not session.logout_in_progress)
-                spellarg = None # Microsoft payments
-                spellname = receipt['spellname']
-                unit_id = GameObject.VIRTUAL_ID
-                dollar_amount = receipt['price']
-                try:
-                    price_description, detail_props = Store.execute_order(gameapi, session, session.outgoing_messages,
-                                                                          receipt['currency'], gamebucks_amount,
-                                                                          unit_id, spellname, spellarg,
-                                                                          purchase['time'],
-                                                                          usd_equivalent = dollar_amount)
-                except:
-                    gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: Store.execute_order failed. Player will receive no gamebucks. A CS ticket should be opened ASAP.' % (purchase_id, receipt['spellname']))
-                    new_purchase['force_fulfilled'] = 1
-                    session.player.history['ms_store_purchase_history'].append(new_purchase) # add to history so it isn't double-processed
-                    continue
-                session.player.history['ms_store_purchase_history'].append(new_purchase) # add to history so it isn't double-processed
-                descr = Store.get_description(session, unit_id, spellname, spellarg, price_description)
-                admin_stats.add_revenue(session.user.user_id, dollar_amount, descr)
-
-                metric_event_coded(session.user.user_id, '1000_billed', {'Billing Amount': dollar_amount,
-                                                                         'Billing Description': descr,
-                                                                         'currency': currency,
-                                                                         'currency_amount': credits_amount,
-                                                                         'country_tier': session.player.country_tier,
-                                                                         'last_purchase_time': session.player.history.get('last_purchase_time',-1),
-                                                                         'prev_largest_purchase': session.player.history.get('largest_purchase',0),
-                                                                         'num_purchases': session.player.history.get('num_purchases',0),
-                                                                         'order_id': purchase_id})
-
-                gamesite.credits_log.event(server_time, {'user_id':session.user.user_id,
-                                                         'event_name':'1000_billed',
-                                                         'code':1000,
-                                                         'Billing Amount': dollar_amount,
-                                                         'Billing Description': descr,
-                                                         'currency': currency,
-                                                         'currency_amount': credits_amount,
-                                                         'summary': session.player.get_denormalized_summary_props('brief'),
-                                                         'country_tier': session.player.country_tier,
-                                                         'country': session.user.country,
-                                                         'last_purchase_time': session.player.history.get('last_purchase_time',-1),
-                                                         'prev_largest_purchase': session.player.history.get('largest_purchase',0),
-                                                         'num_purchases': session.player.history.get('num_purchases',0),
-                                                         'order_id': order_id})
-
-                session.activity_classifier.spent_money(dollar_amount, descr)
-
-                if session.player.history.get('money_spent', 0) == 0:
-                    session.player.history['time_of_first_purchase'] = server_time
-
-                if session.user.account_creation_time > 0:
-                    daynum = int((server_time - session.user.account_creation_time)/(60*60*24))
-                    if 'money_spent_by_day' not in session.player.history:
-                        session.player.history['money_spent_by_day'] = {}
-                    dict_increment(session.player.history['money_spent_by_day'], str(daynum), dollar_amount)
-                dict_setmax(session.player.history, 'last_purchase_time', server_time)
-
-                # new-style player metrics (redundant with old style above)
-                session.increment_player_metric('money_spent', dollar_amount)
-                session.increment_player_metric('num_purchases', 1)
-                session.setmax_player_metric('largest_purchase', dollar_amount)
-
-                if 'money_purchase_history' not in session.player.history:
-                    session.player.history['money_purchase_history'] = []
-
-                session.player.history['money_purchase_history'].append({'time': server_time,
-                                                                         'age': -1 if session.player.creation_time < 0 else (server_time - session.player.creation_time),
-                                                                         'dollar_amount': dollar_amount,
-                                                                         'credit_amount': credits_amount,
-                                                                         'currency': currency,
-                                                                         'order_id': order_id,
-                                                                         'description': descr})
-
-            for receipt in ms_receipts:
-                # report all SKUs in receipt as fulfilled now.
-                retmsg.append(["REPORT_MS_SKU_FULFILLED", receipt['spellname'], receipt['purchase_id']])
+            return session.start_async_request(session.user.verify_ms_store_receipt_async(session, retmsg, receipt))
 
         elif arg[0] == "MICROSOFT_CONSUMABLE_FULFILLED":
             purchase_id = arg[1]
+            tracking_id = arg[2]
             if 'ms_store_purchase_history' not in session.player.history: return
             for purchase in session.player.history['ms_store_purchase_history']:
                 if purchase['purchase_id'] == purchase_id:
-                    purchase['ms_tracking_id'] = arg[2]
+                    purchase['ms_tracking_id'] = tracking_id
 
         elif arg[0] == "CAST_SPELL":
             id, spellname, spellargs = arg[1], arg[2], arg[3:]
@@ -33348,6 +33379,14 @@ class GameSite(server.Site):
                                                                   self.log_battlehouse_exception,
                                                                   max_tries = data['max_tries'],
                                                                   retry_delay = data['retry_delay'])
+        data = gamedata['server'].get('AsyncHTTP_Microsoft', gamedata['server']['AsyncHTTP_Facebook'])
+        self.AsyncHTTP_Microsoft = AsyncHTTP.AsyncHTTPRequester(data['concurrent_request_limit'],
+                                                                  data['total_request_limit'],
+                                                                  data['request_timeout'],
+                                                                  spin_log_verbosity,
+                                                                  self.log_battlehouse_exception, # note: log microsoft API errors to the battlehouse API log for now
+                                                                  max_tries = data['max_tries'],
+                                                                  retry_delay = data['retry_delay'])
         data = gamedata['server'].get('AsyncHTTP_Mattermost', gamedata['server']['AsyncHTTP_Facebook'])
         self.AsyncHTTP_Mattermost = AsyncHTTP.AsyncHTTPRequester(data['concurrent_request_limit'],
                                                                  data['total_request_limit'],
@@ -34456,6 +34495,8 @@ class AdminResource(resource.Resource):
         if SpinConfig.config.get('enable_battlehouse',0):
             ret += '<hr><b>AsyncHTTP_Battlehouse</b><p>'
             ret += gamesite.AsyncHTTP_Battlehouse.get_stats_html(server_time)
+            ret += '<hr><b>AsyncHTTP_Microsoft</b><p>'
+            ret += gamesite.AsyncHTTP_Microsoft.get_stats_html(server_time)
         if SpinConfig.config.get('enable_mattermost',0):
             ret += '<hr><b>AsyncHTTP_Mattermost</b><p>'
             ret += gamesite.AsyncHTTP_Mattermost.get_stats_html(server_time)
