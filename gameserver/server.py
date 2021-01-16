@@ -2805,7 +2805,7 @@ class User:
         except:
             # if there is an error verifying or parsing the receipt(s), stop and report the error now. Do not send acknowledgement (?).
             gamesite.exception_log.event(server_time, 'Exception Microsoft receipt: %r could not be verified with certificate: %s' % (receipts_xml, traceback.format_exc().strip()))
-            returnValue()
+            returnValue(False)
 
         for receipt in ms_receipts:
             # execute the order, if possible
@@ -2813,6 +2813,8 @@ class User:
 
             # report SKU as fulfilled
             retmsg.append(["REPORT_MS_SKU_FULFILLED", receipt['spellname'], receipt['purchase_id']])
+
+        returnValue(True)
 
     def verify_ms_store_receipt_one(self, session, retmsg, receipt):
         purchase_id = receipt['purchase_id']
