@@ -12304,8 +12304,9 @@ function init_desktop_dialogs() {
             var num_real_friends = 0;
             for(var i = 0; i < player.friends.length; i++) {
                 var friend = player.friends[i];
-                if(friend.is_ai() || !friend.is_real_friend) { continue; }
-                num_real_friends = num_real_friends + 1;
+                if(friend.is_real_friend) {
+                    num_real_friends = num_real_friends + 1;
+                }
             }
             console.log(player.friends)
             console.log('Number of friends ' + num_real_friends.toString())
