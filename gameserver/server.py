@@ -19713,10 +19713,10 @@ class XSAPI(resource.Resource):
             if gamedata['store'].get('enable_refunds', True):
                 gift_refund = 0
                 if gift_order and (gamedata['store'].get('refund_gift_order_from','recipient') == 'recipient'):
-                    gift_refund += session.user.refund_gift_order(session, retmsg, time_struct, order_id, gift_order)
+                    gift_refund += session.user.refund_gift_order(session, session.outgoing_messages, time_struct, order_id, gift_order)
                 if gamebucks > gift_refund:
                     # refund any excess
-                    session.user.refund_gamebucks(session, retmsg, gamebucks - gift_refund, time_struct, order_id, refund_type)
+                    session.user.refund_gamebucks(session, session.outgoing_messages, gamebucks - gift_refund, time_struct, order_id, refund_type)
                 entry['refunded'] = 1
                 entry['refunded_at'] = server_time
 
@@ -19746,7 +19746,7 @@ class XSAPI(resource.Resource):
                 dry_run = '(dry run) '
 
                 gamesite.exception_log.event(server_time, '%sREFUND (%s) payment %s player %d amount %d gamebucks (balance %d) paid_amount %r (incl. %r tax) paid_currency %s refund_amount %f refund_currency %s gift_order %s' % \
-                                             (dry_run, refund_type, str(payment['id']), session.player.user_id, gamebucks, session.player.resources.gamebucks,
+                                             (dry_run, refund_type, order_id, session.player.user_id, gamebucks, session.player.resources.gamebucks,
                                               paid_amount, tax_amount, paid_currency, refund_amount, refund_currency, repr(gift_order)))
 
         except:
