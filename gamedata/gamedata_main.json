@@ -46,10 +46,7 @@
 
         // true if app is able to to send out social platform friend invitations
         "friend_invites_enabled": {"predicate": "AND", "subpredicates":[
-            {"predicate": "OR", "subpredicates": [
-                {"predicate": "FRAME_PLATFORM", "platform":"fb"},
-                {"predicate": "FRAME_PLATFORM", "platform":"bh"}
-                ]},
+            {"predicate": "FRAME_PLATFORM", "platform":"bh"},
             {"predicate": "NOT", "subpredicates": [{"predicate": "CLIENT_PLATFORM", "any_electron": 1}]}
             ]},
 

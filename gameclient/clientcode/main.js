@@ -12275,9 +12275,12 @@ function init_desktop_dialogs() {
                 }
             }
 
+            /*
+            old add friend buttons code, outdated since FB changed API
             for(var i = 0; i < dialog.widgets['friend_bar'].data['widgets']['friend_icon']['array'][0]; i++) {
                 dialog.widgets['friend_bar'].widgets['add_friend_button'+i.toString()].onclick = do_add_friend;
             }
+            */
 
             // last slot always shows add-friend button
             if(friend_invites_enabled()) {
@@ -12298,7 +12301,14 @@ function init_desktop_dialogs() {
             dialog.widgets['friend_bar'].widgets['scroll_left'].onclick = friend_bar_scroller(-1);
             dialog.widgets['friend_bar'].widgets['scroll_right'].onclick = friend_bar_scroller(1);
 
-            dialog.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null);
+            var num_real_friends = 0;
+            for(var i = 0; i < player.friends.length; i++) {
+                var friend = player.friends[i];
+                if(friend.is_ai() || !friend.is_real_friend) { continue; }
+                num_real_friends ++;
+            }
+
+            dialog.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null) && num_real_friends > 0;
 
             dialog.widgets['friend_bar'].user_data['transition_start_time'] = -1;
             dialog.widgets['friend_bar'].user_data['maximized'] = !('friend_bar_minimized' in player.preferences && player.preferences['friend_bar_minimized']);
