@@ -49630,6 +49630,8 @@ Store.refresh_microsoft_store_skus = function() {
         var on_finish = (function (_session) { return function(event) {
             if(!(typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) { return; }
             var refresh_microsoft_skus = event['result']['result'];
+            console.log('Got refreshed microsoft SKUs');
+            console.log(refresh_microsoft_skus)
             if(refresh_microsoft_skus['valid_SKUs']){
                 _session.microsoft_store_valid_skus = [];
                 goog.array.forEach(refresh_microsoft_skus['valid_SKUs'], function(sku) {
