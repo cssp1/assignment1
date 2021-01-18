@@ -31,11 +31,11 @@ def validate_receipt_response(receipt, cert):
         result.append(purchase)
     return result
 
-def get_currency(price, gamesite, server_time):
+def get_currency(price):
     for currency in ("NOK","SEK","GBP","EUR","QAR","BRL","AED","DKK","USD","AUD","NZD","CAD","ZAR","ISK","IDR"):
         if currency in price: return currency
-    raise Exception('%s could not be identified as a valid currency' % (price,))
+    raise Exception('%s could not be identified as a valid currency' % price)
 
-def get_purchase_time(purchase_time, gamesite, server_time):
+def get_purchase_time(purchase_time):
     # MS receipt timestamps are in the format '2021-01-01T18:34:35.231Z'
     return int(time.mktime(time.strptime(purchase_time, '%Y-%m-%dT%H:%M:%S.%fZ')))
