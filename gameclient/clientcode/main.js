@@ -49785,6 +49785,9 @@ Store.microsoft_report_consumable_used = function(sku, transaction) {
 Store.can_show_microsoft_sku = function(ms_sku) {
     // if this is not a Microsoft Electron client, we don't care. Return true
     if(!(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0)) { return true; }
+    console.log('Checking if ' + ms_sku ' is in microsoft_store_valid_skus');
+    console.log(session.microsoft_store_valid_skus);
+    console.log(goog.array.contains(session.microsoft_store_valid_skus, ms_sku));
     return goog.array.contains(session.microsoft_store_valid_skus, ms_sku);
 }
 
