@@ -41492,6 +41492,7 @@ function invoke_buy_gamebucks_dialog1(reason, amount, order, options) {
             if('requires' in spell && !read_predicate(spell['requires']).is_satisfied(player, null)) {
                 continue;
             }
+            if(!(Store.can_show_microsoft_sku(spellname))) { continue; }
             if(topup_bucks > 0) {
                 // don't show SKUs smaller than the topup
                 if(spell['quantity'] < topup_bucks) { continue; }
@@ -41988,6 +41989,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
             if('requires' in spell && !read_predicate(spell['requires']).is_satisfied(player, null)) {
                 continue;
             }
+            if(!(Store.can_show_microsoft_sku(spellname))) { continue; }
             if(topup_bucks > 0) {
                 // don't show SKUs smaller than the topup
                 if(spell['quantity'] < topup_bucks) { continue; }
@@ -49777,6 +49779,13 @@ Store.microsoft_report_consumable_used = function(sku, transaction) {
         var report_consumable_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'REPORT_CONSUMABLE_USED', 'sku':sku, 'tag':tag};
         window.top.postMessage(report_consumable_order, '*');
     }
+}
+
+/** @param {string} ms_sku  */
+Store.can_show_microsoft_sku = function(ms_sku) {
+    // if this is not a Microsoft Electron client, we don't care. Return true
+    if(!(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0)) { return true; }
+    return goog.array.contains(session.microsoft_store_valid_skus, ms_sku);
 }
 
 // install a new dialog as a child of the current dialog (or at toplevel, if no UI is up)
