@@ -49627,6 +49627,7 @@ Store.listen_for_microsoft_ack = function(tag_prefix, cb) {
 Store.refresh_microsoft_store_skus = function() {
     // do not proceed if this is not a Microsoft Electron client
     if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
+        console.log('Electron client is now attempting to refresh MS skus');
         var on_finish = (function (_session) { return function(event) {
             if(!(typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) { return; }
             var refresh_microsoft_skus = event['result']['result'];
@@ -49649,7 +49650,7 @@ Store.refresh_microsoft_store_skus = function() {
             }
         }; })(session);
         var tag = Store.listen_for_microsoft_ack('mssku', on_finish);
-        Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
+        //Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
         var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':tag};
         window.top.postMessage(refresh_sku_order, '*');
     }
@@ -50999,7 +51000,6 @@ function handle_server_message(data) {
         world.objects.get_object(id).receive_auras_update(world, state[1]);
     } else if(msg == "PLAYER_STATE_UPDATE") {
         update_resources(data[1], false);
-        Store.refresh_microsoft_store_skus();
         if(player.can_level_up()) {
             notification_queue.push_with_priority(invoke_level_up_dialog, -1);
         }
@@ -51021,6 +51021,7 @@ function handle_server_message(data) {
                 invoke_aura_context(dialog, null, -1, null, false);
             }
         }
+        Store.refresh_microsoft_store_skus();
     } else if(msg == "ENEMY_AURAS_UPDATE") {
         enemy.player_auras = data[1];
     } else if(msg == "PLAYER_STATTAB_UPDATE") {
