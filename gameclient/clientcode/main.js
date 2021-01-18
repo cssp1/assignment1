@@ -49652,6 +49652,9 @@ Store.refresh_microsoft_store_skus = function() {
         var tag = Store.listen_for_microsoft_ack('mssku', on_finish);
         //Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
         var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':tag};
+        if(!!player.preferences['electron_debugging_enabled']) {
+            refresh_sku_order['debug'] = 1;
+        }
         window.top.postMessage(refresh_sku_order, '*');
     }
 }
@@ -49666,8 +49669,11 @@ Store.get_microsoft_receipt = function() {
         }; })();
         var tag = Store.listen_for_microsoft_ack('msreceipt', on_finish);
         Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
-        var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_RECEIPT', 'tag':tag};
-        window.top.postMessage(refresh_sku_order, '*');
+        var get_receipt_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_RECEIPT', 'tag':tag};
+        if(!!player.preferences['electron_debugging_enabled']) {
+            get_receipt_order['debug'] = 1;
+        }
+        window.top.postMessage(get_receipt_order, '*');
     }
 }
 
@@ -49744,6 +49750,9 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
     }; })(on_finish, on_fail);
     Battlehouse.postMessage_receiver.listenOnce(tag, on_complete);
     var place_credits_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'DO_PURCHASE', 'tag':tag};
+    if(!!player.preferences['electron_debugging_enabled']) {
+        place_credits_order['debug'] = 1;
+    }
     window.top.postMessage(place_credits_order, '*');
     metric_event('4060_order_prompt', props);
     return true;
@@ -49780,6 +49789,9 @@ Store.microsoft_report_consumable_used = function(sku, transaction) {
         var tag = Store.listen_for_microsoft_ack('msreportconsumable', on_finish);
         Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
         var report_consumable_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'REPORT_CONSUMABLE_USED', 'sku':sku, 'tag':tag};
+        if(!!player.preferences['electron_debugging_enabled']) {
+            report_consumable_order['debug'] = 1;
+        }
         window.top.postMessage(report_consumable_order, '*');
     }
 }
