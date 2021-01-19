@@ -1376,7 +1376,7 @@ GameArt.make_tinted_image = function(img, origin, wh, tint, saturation, mask_img
         // XXX no this doesn't fix it ret.crossOrigin = ''; // might avoid the security exceptions we've been seeing?
         ret.src = data_url;
     } catch(e) {
-        log_exception(e, 'make_tinted_image: osc = '+(osc||'null').toString()+' con = '+(con||'null').toString()+' data = '+(data||'null').toString()+' pixels = '+(pixels||'null').toString()+' data_url = '+(data_url||'null').toString()+' ret = '+(ret||'null').toString());
+        log_exception(e, 'make_tinted_image: osc = '+(osc||'null').toString()+' con = '+(con||'null').toString()+' data = '+(data||'null').toString()+' pixels = '+(pixels||'null').toString()+' data_url = '+(data_url||'null').toString()+' ret = '+(ret||'null').toString(), true);
     }
     return ret;
 };

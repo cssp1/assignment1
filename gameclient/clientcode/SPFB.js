@@ -57,7 +57,7 @@ SPFB.run_queue = function() {
         try {
             cb();
         } catch (e) {
-            log_exception(e, 'SPFB.run_queue');
+            log_exception(e, 'SPFB.run_queue', true);
         }
     }
 };
@@ -100,7 +100,7 @@ SPFB.ui = function(props, callback) {
         try {
             FB.ui(_props, _callback);
         } catch(e) {
-            log_exception(e, 'SPFB.ui('+_props['method']+')');
+            log_exception(e, 'SPFB.ui('+_props['method']+')', true);
         }
     }; })(props, callback));
 };
@@ -116,7 +116,7 @@ SPFB.api = function(url, arg1, arg2, arg3) {
         try {
             FB.api(_url, _arg1, _arg2, _arg3);
         } catch(e) {
-            log_exception(e, 'SPFB.api('+_url+')');
+            log_exception(e, 'SPFB.api('+_url+')', true);
         }
     }; })(url, arg1, arg2, arg3));
 };
@@ -158,7 +158,7 @@ SPFB.getLoginStatus = function(cb, force) {
         try {
             FB.getLoginStatus(_cb, _force);
         } catch(e) {
-            log_exception(e, 'SPFB.getLoginStatus');
+            log_exception(e, 'SPFB.getLoginStatus', true);
         }
     }; })(cb, force));
 };
@@ -231,7 +231,7 @@ SPFB.XFBML_parse = function(element) {
             try {
                 FB.XFBML.parse(_element || null);
             } catch(e) {
-                log_exception(e, 'SPFB.XFBML_parse');
+                log_exception(e, 'SPFB.XFBML_parse', true);
             }
         }; })(element));
     }

@@ -33,7 +33,7 @@ Screenshot.toDataURL = function(canvas, codec) {
     try {
         return canvas.toDataURL(codec);
     } catch(e) {
-        //log_exception(e, 'Screenshot.toDataURL');
+        //log_exception(e, 'Screenshot.toDataURL', true);
         metric_event('7275_screenshot_failed', add_demographics({}));
         Screenshot.blacklisted = true;
         return null;
