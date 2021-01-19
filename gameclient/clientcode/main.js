@@ -49765,7 +49765,7 @@ Store.microsoft_report_consumable_used = function(sku, transaction) {
             } else {
                 var msg = 'unknown error. Client will automatically retry and this may disappear after Electron-side asynchronous function issues resolve.';
                 if(status == 1) {
-                    msg = 'error code 1: InsufficentQuantity. This should not happen!';
+                    msg = 'error code 1: InsufficentQuantity. This can happen if Store.microsoft_report_consumable_used is called twice due to Electron-side asynchronous function issues. It will self-correct.';
                 } else if(status == 2) {
                     msg = 'error code 2: NetworkError. Client will automatically retry.';
                 } else if(status == 3) {
