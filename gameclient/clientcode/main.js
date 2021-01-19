@@ -52682,7 +52682,7 @@ function handle_server_message(data) {
         }
 
     } else if(msg == "REPORT_MS_SKU_FULFILLED") {
-        Store.microsoft_report_consumable_used(data[0],data[1]);
+        Store.microsoft_report_consumable_used(data[1],data[2]);
     } else if(msg == "NOMESSAGE") {
     } else {
         document.write("AJAX error: "+data);
