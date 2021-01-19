@@ -49628,6 +49628,13 @@ Store.refresh_microsoft_store_skus = function() {
     // do not proceed if this is not a Microsoft Electron client
     if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
         console.log('Electron client is now attempting to refresh MS skus');
+        var done_now = (function () {
+            return function(event, result) {
+                console.log('Done now!');
+                console.log(event);
+                console.log(result);
+            }
+        })();
         var on_finish = (function (_session) { return function(event) {
             console.log('Got refreshed microsoft SKUs');
             console.log(event);
@@ -49651,8 +49658,8 @@ Store.refresh_microsoft_store_skus = function() {
                 Store.get_microsoft_receipt();
             }
         }; })(session);
-        var tag = Store.listen_for_microsoft_ack('mssku', null);
-        Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
+        var tag = Store.listen_for_microsoft_ack('mssku', done_now);
+        //Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
         var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':tag};
         if(!!player.preferences['electron_debugging_enabled']) {
             refresh_sku_order['debug'] = 1;
