@@ -2851,7 +2851,7 @@ class User:
         currency = receipt['currency'] # e.g. "GBP"
         currency_amount = receipt['price'] # floating-point price in local currency e.g. 9.99
         dollar_amount = receipt['price'] # XXX use an approximate exchange rate here?
-        if currency != "USD":
+        if currency != "microsoft:USD":
             gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: receipt price %s currency %s has no U.S. dollar equivalent. Metrics will be inaccurate.' % (purchase_id, receipt['price'], receipt['currency']))
 
         try:
@@ -18577,7 +18577,7 @@ class Store(object):
             record_spend_type = 'money'
             record_price_type = 'kg_price'
             record_amount = Store.kgcredits_to_dollars(amount_willing_to_pay)
-        elif currency.startswith('fbpayments:') or currency.startswith('xsolla:'):
+        elif currency.startswith('fbpayments:') or currency.startswith('xsolla:') or currency.startswith('microsoft:'):
             record_spend_type = 'money'
             record_price_type = 'price'
             record_amount = usd_equivalent
