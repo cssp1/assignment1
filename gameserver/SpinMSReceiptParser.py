@@ -20,14 +20,14 @@ def validate_receipt_request_url(receipt):
 # Return a list of valid receipts found in the response. Throws exception on error.
 def validate_receipt_response(receipt, cert):
     result = []
-    root = XMLVerifier().verify(receipt, x509_cert=cert).signed_xml # XXX James please check the docs for XMLVerifier, is this the best practice? Or should we just re-parse using root = ET.fromstring(receipt)?
+    root = XMLVerifier().verify(receipt, x509_cert=cert).signed_xml
     for product_receipt in root.findall('{http://schemas.microsoft.com/windows/2012/store/receipt}ProductReceipt'):
         purchase = {'spellname': product_receipt.get('ProductId'), 'purchase_id': product_receipt.get('Id')}
         purchase['time'] = get_purchase_time(product_receipt.get('PurchaseDate'))
         price = product_receipt.get('PurchasePrice')
         currency = get_currency(price)
         purchase['price'] = float(price.replace(currency,'')) # note: return as a floating-point number in the local currency
-        purchase['currency'] = currency
+        purchase['currency'] = 'microsoft:' + currency # note: prepend 'microsoft:' to fit spell currency requirements. See make_country_skus2.py
         result.append(purchase)
     return result
 
