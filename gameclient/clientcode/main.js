@@ -49623,21 +49623,9 @@ Store.listen_for_microsoft_ack = function(tag_prefix) {
 Store.refresh_microsoft_store_skus = function() {
     // do not proceed if this is not a Microsoft Electron client
     if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
-        console.log('Electron client is now attempting to refresh MS skus');
-        var done_now = (function () {
-            return function(event, result) {
-                console.log('Done now!');
-                console.log(event);
-                console.log(result);
-            }
-        })();
         var on_finish = (function (_session) { return function(event) {
-            console.log('Got refreshed microsoft SKUs');
-            console.log(event);
             if(!(typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) { return; }
             var refresh_microsoft_skus = event['result']['result'];
-            console.log('Got refreshed microsoft SKUs');
-            console.log(refresh_microsoft_skus)
             if(refresh_microsoft_skus['valid_SKUs']){
                 _session.microsoft_store_valid_skus = [];
                 goog.array.forEach(refresh_microsoft_skus['valid_SKUs'], function(sku) {
