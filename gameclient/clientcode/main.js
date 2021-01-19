@@ -49619,7 +49619,7 @@ Store.listen_for_microsoft_ack = function(tag_prefix, cb) {
     Store.order_serial += 1;
     var tag = tag_prefix + Store.order_serial.toString();
     if(cb) {
-        Battlehouse.postMessage_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.success); }; })(cb));
+        Battlehouse.postMessage_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event); }; })(cb));
     }
     return tag;
 };
@@ -49651,7 +49651,8 @@ Store.refresh_microsoft_store_skus = function() {
                 Store.get_microsoft_receipt();
             }
         }; })(session);
-        var tag = Store.listen_for_microsoft_ack('mssku', on_finish);
+        var tag = Store.listen_for_microsoft_ack('mssku', null);
+        Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
         var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':tag};
         if(!!player.preferences['electron_debugging_enabled']) {
             refresh_sku_order['debug'] = 1;
