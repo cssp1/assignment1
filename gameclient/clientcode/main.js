@@ -49659,6 +49659,8 @@ Store.get_microsoft_receipt = function() {
             if(!(typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) { return; }
             var microsoft_receipt = event['result']['result'];
             send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", microsoft_receipt]);
+            send_to_server.func(["PING_TECH"]);
+            send_to_server.func(["PING_PLAYER"]);
         }; })();
         var tag = Store.listen_for_microsoft_ack('msreceipt');
         Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
@@ -49709,19 +49711,9 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
     var on_complete = (function (_on_finish, _on_fail) { return function(event) {
         var microsoft_outcome = 5;
         if((typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) {
-            microsoft_outcome = event['result']['result'];
-            // 0, 1, 2, 3, 4, 5
+            microsoft_outcome = event['result']['result']; // 0, 1, 2, 3, 4, 5
         }
-        if(microsoft_outcome == 0) {
-            send_to_server.func(["PING_TECH"]);
-            send_to_server.func(["PING_PLAYER"]);
-            var msg = 'receipt: '+ tag;
-            props['receipt'] = tag + ' ' + microsoft_outcome.toString();
-            metric_event('4070_order_prompt_success', props);
-            console.log('ORDER SUCCESSFUL: '+msg);
-            Store.get_microsoft_receipt();
-            _on_finish();
-        } else {
+        if(microsoft_outcome == 1 || microsoft_outcome == 2 || microsoft_outcome == 3 || microsoft_outcome == 4) {
             var msg = 'unknown error';
             if(microsoft_outcome == 1) {
                 msg = 'error code 1: alreadyPurchased';
@@ -49731,18 +49723,25 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
                 msg = 'error code 3: networkError';
             } else if(microsoft_outcome == 4) {
                 msg = 'error code 1: serverError';
-            } else if(microsoft_outcome == 5) {
-                msg = 'error code 5: possible Electron configuration error';
             }
             var error = 'Microsoft payments API ORDER PROBLEM: ' + msg;
             props['method'] = msg;
             log_exception(error, 'Store.place_microsoft_order', false);
             metric_event('4061_order_prompt_api_error', props);
             if(_on_fail) { _on_fail(); }
+        } else {
+            send_to_server.func(["PING_TECH"]);
+            send_to_server.func(["PING_PLAYER"]);
+            var msg = 'receipt: '+ tag;
+            props['receipt'] = tag + ' ' + microsoft_outcome.toString();
+            metric_event('4070_order_prompt_success', props);
+            console.log('ORDER SUCCESSFUL: '+msg);
+            Store.get_microsoft_receipt();
+            _on_finish();
         }
     }; })(on_finish, on_fail);
     Battlehouse.postMessage_receiver.listenOnce(tag, on_complete);
-    var place_credits_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'DO_PURCHASE', 'tag':tag, 'sku':spellname};
+    var place_credits_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'DO_PURCHASE', 'tag':tag, 'sku':spellname, 'orderDisplayName':pretty_store_name};
     if(!!player.preferences['electron_debugging_enabled']) {
         place_credits_order['debug'] = 1;
     }
