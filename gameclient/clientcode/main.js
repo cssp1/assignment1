@@ -49629,6 +49629,8 @@ Store.refresh_microsoft_store_skus = function() {
     if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
         console.log('Electron client is now attempting to refresh MS skus');
         var on_finish = (function (_session) { return function(event) {
+            console.log('Got refreshed microsoft SKUs');
+            console.log(event);
             if(!(typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) { return; }
             var refresh_microsoft_skus = event['result']['result'];
             console.log('Got refreshed microsoft SKUs');
@@ -49650,7 +49652,6 @@ Store.refresh_microsoft_store_skus = function() {
             }
         }; })(session);
         var tag = Store.listen_for_microsoft_ack('mssku', on_finish);
-        //Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
         var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':tag};
         if(!!player.preferences['electron_debugging_enabled']) {
             refresh_sku_order['debug'] = 1;
