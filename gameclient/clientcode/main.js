@@ -49613,14 +49613,10 @@ Store.trialpay_callback = function(result, data) {
 };
 
 /** @param {string} tag_prefix
-    @param {function(boolean)|null} cb
     @return {string} tag to send with the order */
-Store.listen_for_microsoft_ack = function(tag_prefix, cb) {
+Store.listen_for_microsoft_ack = function(tag_prefix) {
     Store.order_serial += 1;
     var tag = tag_prefix + Store.order_serial.toString();
-    if(cb) {
-        Battlehouse.postMessage_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event); }; })(cb));
-    }
     return tag;
 };
 
@@ -49658,8 +49654,8 @@ Store.refresh_microsoft_store_skus = function() {
                 Store.get_microsoft_receipt();
             }
         }; })(session);
-        var tag = Store.listen_for_microsoft_ack('mssku', done_now);
-        //Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
+        var tag = Store.listen_for_microsoft_ack('mssku');
+        Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
         var refresh_sku_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_ALL_SKU_STATUS', 'tag':tag};
         if(!!player.preferences['electron_debugging_enabled']) {
             refresh_sku_order['debug'] = 1;
@@ -49676,7 +49672,7 @@ Store.get_microsoft_receipt = function() {
             var microsoft_receipt = event['result']['result'];
             send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", microsoft_receipt]);
         }; })();
-        var tag = Store.listen_for_microsoft_ack('msreceipt', on_finish);
+        var tag = Store.listen_for_microsoft_ack('msreceipt');
         Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
         var get_receipt_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_RECEIPT', 'tag':tag};
         if(!!player.preferences['electron_debugging_enabled']) {
@@ -49695,7 +49691,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
         var object = session.get_real_world().objects.get_object(unit_id);
         descr += ','+object.spec['name'];
     }
-    var tag = Store.listen_for_microsoft_ack('mso', on_finish);
+    var tag = Store.listen_for_microsoft_ack('mso');
     // this is arbitrary custom data for our server
     var store_quantity = gamedata['spells'][spellname]['quantity'].toString();
     var pretty_store_name = "%gamebuck_number %gamebuck_name".replace('%gamebuck_number', store_quantity).replace('%gamebuck_name', Store.gamebucks_ui_name());
@@ -49795,7 +49791,7 @@ Store.microsoft_report_consumable_used = function(sku, transaction) {
                 log_exception(error, 'microsoft_report_consumable_used');
             }
         }; })(transaction);
-        var tag = Store.listen_for_microsoft_ack('msreportconsumable', on_finish);
+        var tag = Store.listen_for_microsoft_ack('msreportconsumable');
         Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
         var report_consumable_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'REPORT_CONSUMABLE_USED', 'sku':sku, 'tag':tag};
         if(!!player.preferences['electron_debugging_enabled']) {
