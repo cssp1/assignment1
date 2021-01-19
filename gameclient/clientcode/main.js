@@ -49742,7 +49742,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
         }
     }; })(on_finish, on_fail);
     Battlehouse.postMessage_receiver.listenOnce(tag, on_complete);
-    var place_credits_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'DO_PURCHASE', 'tag':tag};
+    var place_credits_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'DO_PURCHASE', 'tag':tag, 'sku':spellname};
     if(!!player.preferences['electron_debugging_enabled']) {
         place_credits_order['debug'] = 1;
     }
