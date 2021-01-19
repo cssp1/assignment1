@@ -498,7 +498,7 @@ SPFX.Particles = function(fxworld, spawn_pos, when, duration, data, instance_dat
     } else if(col.length == 3) {
         col = [col[0],col[1],col[2],1];
     } else {
-        log_exception(null, 'SPFX particles with bad color length '+col.length.toString()+' value '+col[0].toString()+','+col[1].toString()+','+col[2].toString());
+        log_exception(null, 'SPFX particles with bad color length '+col.length.toString()+' value '+col[0].toString()+','+col[1].toString()+','+col[2].toString(), true);
         col = [1,1,1,1];
     }
 

@@ -10452,7 +10452,7 @@ function fb_iframe_update(cb) {
         return;
 
     } catch(e) {
-        log_exception(e, 'FB.Canvas.getPageInfo');
+        log_exception(e, 'FB.Canvas.getPageInfo', true);
     }
 
     // call the callback in the exception case
@@ -11520,7 +11520,7 @@ function metric_event(event_name, props) {
 
 // send exception info to server as a metric event
 SPINPUNCHGAME.client_exception_sent = false;
-function log_exception(e, where) {
+function log_exception(e, where, show_developer_alert) {
     if(SPINPUNCHGAME.client_exception_sent) { return; }
     SPINPUNCHGAME.client_exception_sent = true;
     var msg;
@@ -11552,7 +11552,7 @@ function log_exception(e, where) {
     var ui_tick = (session.has_world() && session.get_real_world().combat_engine ? session.get_real_world().combat_engine.cur_tick.get() : -1);
     console.log('Exception thrown in '+where+' at tick '+ui_tick.toString()+':\n'+msg);
 
-    if(player.is_developer()) {
+    if(player.is_developer() && show_developer_alert) {
         window.alert('SpinPunch CLIENT EXCEPTION in \"'+where+'\" (check JS Console for more detail):\n'+msg);
     }
 
@@ -16098,7 +16098,7 @@ BuildUICursor.prototype.draw = function(offset) {
         SPUI.ctx.fillStyle = text_style = (location_valid ? SPUI.default_text_color : SPUI.error_text_color).str();
         SPUI.ctx.fillText(text, text_pos[0], text_pos[1]);
     } catch(e) {
-        log_exception(e, 'BuildUICursor.draw(): text_pos = '+text_pos[0].toString()+','+text_pos[1].toString()+' text_style '+text_style+' text '+text);
+        log_exception(e, 'BuildUICursor.draw(): text_pos = '+text_pos[0].toString()+','+text_pos[1].toString()+' text_style '+text_style+' text '+text, true);
     }
 
     SPUI.ctx.restore();
@@ -41519,7 +41519,7 @@ function invoke_buy_gamebucks_dialog1(reason, amount, order, options) {
     }
 
     if(spell_list.length < 1 || spell_list.length > 6) {
-        log_exception(null, 'weird number of gamebucks SKUs ('+spell_list.length.toString()+')! region '+player.price_region+' country '+player.country+' SKUs: ['+spell_list.join(',')+'] in invoke_buy_gamebucks_dialog');
+        log_exception(null, 'weird number of gamebucks SKUs ('+spell_list.length.toString()+')! region '+player.price_region+' country '+player.country+' SKUs: ['+spell_list.join(',')+'] in invoke_buy_gamebucks_dialog', true);
     }
 
     if(spell_list.length > dialog.data['widgets']['radio']['array'][1]) {
@@ -42046,7 +42046,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
     }
 
     if(spell_list.length < 1) {
-        log_exception(null, 'no gamebucks SKUs ('+spell_list.length.toString()+')! region '+player.price_region+' country '+player.country + ' in invoke_buy_gamebucks_dialog2');
+        log_exception(null, 'no gamebucks SKUs ('+spell_list.length.toString()+')! region '+player.price_region+' country '+player.country + ' in invoke_buy_gamebucks_dialog2', true);
     }
 
     dialog.user_data['spell_list'] = spell_list;
@@ -49132,7 +49132,7 @@ Store.place_fbcredits_order = function(price, unit_id, spellname, spellarg, on_f
 
             SPay.place_order_fbcredits(order_info, order_complete, use_local_currency);
         } catch(e) {
-            log_exception(e, 'place_order');
+            log_exception(e, 'place_order', true);
             metric_event('4061_order_prompt_api_error', props);
             return false;
         }
@@ -49227,7 +49227,7 @@ Store.place_kgcredits_order = function(price, unit_id, spellname, spellarg, on_f
             if(get_query_string('simulate_cb_fail')) { order_complete = function() { console.log("SIMULATING KONGREGATE.MTX.PURCHASEITEMsREMOTE CALLBACK FAILURE"); }; }
             SPay.place_order_kgcredits(coded_order_info, order_complete);
         } catch(e) {
-            log_exception(e, 'place_order');
+            log_exception(e, 'place_order', true);
             metric_event('4061_order_prompt_api_error', props);
             return false;
         }
@@ -49337,7 +49337,7 @@ Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spe
             if(get_query_string('simulate_cb_fail')) { order_complete = function() { console.log("SIMULATING FB.PAY CALLBACK FAILURE"); }; }
             SPay.place_order_fbpayments(product_url, quantity, request_id, order_complete, test_currency);
         } catch(e) {
-            log_exception(e, 'place_order');
+            log_exception(e, 'place_order', true);
             metric_event('4072_fbpayments_order_prompt_api_error', props);
             return false;
         }
@@ -49501,7 +49501,7 @@ Store.buy_more_fbcredits = function() {
         try {
             SPay.buy_more_credits(order_complete);
         } catch(e) {
-            log_exception(e, 'buy_more_credits');
+            log_exception(e, 'buy_more_credits', true);
             metric_event('4201_buy_more_credits_api_error', {'method':'buy_more_credits'});
             return;
         }
@@ -49549,7 +49549,7 @@ Store.redeem_fb_gift_card = function(success_cb, fail_cb) {
         try {
             SPay.redeem_fb_gift_card(order_complete);
         } catch(e) {
-            log_exception(e, 'redeem_fb_gift_card');
+            log_exception(e, 'redeem_fb_gift_card', true);
             metric_event('4323_redeem_fb_gift_card_api_error', {'method':'redeem_fb_gift_card'});
             return;
         }
@@ -49736,7 +49736,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
             }
             var error = 'Microsoft payments API ORDER PROBLEM: ' + msg;
             props['method'] = msg;
-            log_exception(error, 'place_order');
+            log_exception(error, 'Store.place_microsoft_order', false);
             metric_event('4061_order_prompt_api_error', props);
             if(_on_fail) { _on_fail(); }
         }
@@ -49763,20 +49763,20 @@ Store.microsoft_report_consumable_used = function(sku, transaction) {
             if(status == 0) {
                 send_to_server.func(["MICROSOFT_CONSUMABLE_FULFILLED", _transaction, microsoft_tracking_id]);
             } else {
-                var msg = 'unknown error';
+                var msg = 'unknown error. Client will automatically retry and this may disappear after Electron-side asynchronous function issues resolve.';
                 if(status == 1) {
                     msg = 'error code 1: InsufficentQuantity. This should not happen!';
                 } else if(status == 2) {
-                    msg = 'error code 2: NetworkError';
+                    msg = 'error code 2: NetworkError. Client will automatically retry.';
                 } else if(status == 3) {
-                    msg = 'error code 3: ServerError';
+                    msg = 'error code 3: ServerError. Client will automatically retry.';
                 } else if(status == 4) {
-                    msg = 'error code 4: possible Electron configuration error';
+                    msg = 'error code 4: possible Electron configuration error. Client will automatically retry and this will probably disappear after Electron-side asynchronous function issues resolve.';
                 } else if(status == 5) {
-                    msg = 'error code 5: possible Electron configuration error';
+                    msg = 'error code 5: possible Electron configuration error. Client will automatically retry and this will probably disappear after Electron-side asynchronous function issues resolve.';
                 }
                 var error = 'Microsoft payments API ORDER PROBLEM: ' + msg;
-                log_exception(error, 'microsoft_report_consumable_used');
+                log_exception(error, 'Store.microsoft_report_consumable_used', false);
             }
         }; })(transaction);
         var tag = Store.listen_for_microsoft_ack('msreportconsumable');
@@ -50124,7 +50124,7 @@ function handle_server_message_bundle(serial, bundle) {
             }
             handle_server_message(msg);
         } catch(e) {
-            log_exception(e, 'handle_server_message');
+            log_exception(e, 'handle_server_message', true);
         }
     }
 }
@@ -53064,7 +53064,7 @@ function on_mouseup(e) {
    try {
        do_on_mouseup(e, false);
    } catch (ex) {
-       log_exception(ex, 'do_on_mouseup');
+       log_exception(ex, 'do_on_mouseup', true);
    }
 }
 
@@ -53445,7 +53445,7 @@ function on_mouseout(e) {
    try {
        do_on_mouseout(e);
    } catch (ex) {
-       log_exception(ex, 'do_on_mouseout');
+       log_exception(ex, 'do_on_mouseout', true);
    }
 }
 
@@ -53794,7 +53794,7 @@ function on_mousewheel(e) {
    try {
        do_on_mousewheel(e);
    } catch (ex) {
-       log_exception(ex, 'do_on_mousewheel');
+       log_exception(ex, 'do_on_mousewheel', true);
    }
 }
 
@@ -53829,7 +53829,7 @@ function on_mousemove(e) {
    try {
        do_on_mousemove(e);
     } catch (ex) {
-        log_exception(ex, 'do_on_mousemove');
+        log_exception(ex, 'do_on_mousemove', true);
     }
 }
 
@@ -53973,7 +53973,7 @@ function on_touchend(e) {
     try {
         return do_on_touchend(e);
     } catch (ex) {
-        log_exception(ex, 'do_on_touchend');
+        log_exception(ex, 'do_on_touchend', true);
     }
 }
 
@@ -54040,7 +54040,7 @@ function on_MSPointerUp(e) {
     try {
         return do_on_MSPointerUp(e);
     } catch (ex) {
-        log_exception(ex, 'do_on_MSPointerUp');
+        log_exception(ex, 'do_on_MSPointerUp', true);
     }
 }
 function do_on_MSPointerUp(e) {
@@ -54124,7 +54124,7 @@ function on_mousedown(e) {
    try {
        do_on_mousedown(e);
    } catch (ex) {
-       log_exception(ex, 'do_on_mousedown');
+       log_exception(ex, 'do_on_mousedown', true);
    }
 }
 
@@ -54883,7 +54883,7 @@ function draw() {
     } catch (e) {
         // kill any active dialogs, in case they are causing repeated errors
         change_selection(null);
-        log_exception(e, 'do_draw');
+        log_exception(e, 'do_draw', true);
     }
 
     flush_message_queue(false);

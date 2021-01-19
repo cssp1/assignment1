@@ -1035,7 +1035,7 @@ SPUI.Dialog.prototype.draw = function(offset) {
         try {
             this.ondraw(this);
         } catch(e) {
-            log_exception(e, 'bad ondraw: '+this.get_address());
+            log_exception(e, 'bad ondraw: '+this.get_address(), true);
             return;
         }
     }
@@ -1460,7 +1460,7 @@ SPUI.TextWidget.prototype.draw_text_core = function(offset) {
         var whs = (this.wh ? this.wh.toString() : 'BAD');
         var ofs = (offset ? offset.toString() : 'null_or_bad');
         var ctxs = (SPUI.ctx ? SPUI.ctx.toString() : 'null_or_bad');
-        log_exception(e, 'draw_text_core: widget = '+this.get_address()+' str = ' + this.str.toString() + ' offset = '+ ofs + ' text_scale = '+this.text_scale.toString() + ' this.xy = ' + txys + ' this.wh = ' + whs + ' text_xy = '+ xys + ' leading = '+this.font.leading.toString() + ' SPUI.ctx = ' + ctxs);
+        log_exception(e, 'draw_text_core: widget = '+this.get_address()+' str = ' + this.str.toString() + ' offset = '+ ofs + ' text_scale = '+this.text_scale.toString() + ' this.xy = ' + txys + ' this.wh = ' + whs + ' text_xy = '+ xys + ' leading = '+this.font.leading.toString() + ' SPUI.ctx = ' + ctxs, true);
     }
 };
 

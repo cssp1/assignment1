@@ -226,7 +226,7 @@ SPAudio.BuzzSample.prototype.play = function(time, volume) {
     try {
         this.buzz_sound.play();
     } catch (ex) {
-        log_exception(ex, 'buzz.play "'+this.url+'"');
+        log_exception(ex, 'buzz.play "'+this.url+'"', true);
     }
     return true;
 };
@@ -236,7 +236,7 @@ SPAudio.BuzzSample.prototype.fadeTo = function(v, start, t) {
     try {
         this.buzz_sound.fadeTo(100*v, 1000*t);
     } catch (ex) {
-        log_exception(ex, 'buzz.fadeTo "'+this.url+'"');
+        log_exception(ex, 'buzz.fadeTo "'+this.url+'"', true);
     }
 };
 
@@ -437,4 +437,3 @@ SPAudio.ACSample.prototype.fade_step = function(t) {
 };
 
 SPAudio.ACSample.prototype.setTime = function(t) { console.log('ACSample.setTime NOT IMPLEMENTED'); };
-
