@@ -49697,13 +49697,6 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
         'ui_name': pretty_store_name,
         'client_price': price
     };
-    // add a debug flag to the Microsoft payments API if debugging is enabled
-    // this will show the Microsoft Store payments browser window and console for debugging
-    if('enable_microsoft_payments_debug_if' in gamedata['store']) {
-        if(read_predicate(gamedata['store']['enable_microsoft_payments_debug_if']).is_satisfied(player)) {
-            order_info['debug'] = 1;
-        }
-    }
     var props = {'currency': 'microsoft_store',
                  'Billing Amount': price,
                  'Billing Description': descr};
