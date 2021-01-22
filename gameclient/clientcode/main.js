@@ -49721,7 +49721,6 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
             props['method'] = msg;
             log_exception(error, 'Store.place_microsoft_order', false);
             metric_event('4061_order_prompt_api_error', props);
-            if(_on_fail) { _on_fail(); }
         } else {
             send_to_server.func(["PING_TECH"]);
             send_to_server.func(["PING_PLAYER"]);
@@ -49729,9 +49728,9 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
             props['receipt'] = tag + ' ' + microsoft_outcome.toString();
             metric_event('4070_order_prompt_success', props);
             console.log('ORDER SUCCESSFUL: '+msg);
-            Store.get_microsoft_receipt();
-            _on_finish();
         }
+        Store.get_microsoft_receipt();
+        _on_finish();
     }; })(on_finish, on_fail);
     Battlehouse.postMessage_receiver.listenOnce(tag, on_complete);
     var place_credits_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'DO_PURCHASE', 'tag':tag, 'sku':spellname, 'orderDisplayName':pretty_store_name};
