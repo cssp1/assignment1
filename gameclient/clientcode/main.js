@@ -49701,7 +49701,7 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
                  'Billing Amount': price,
                  'Billing Description': descr};
 
-    var on_complete = (function (_on_finish, _on_fail) { return function(event) {
+    var on_complete = (function (_on_finish, _tag) { return function(event) {
         var microsoft_outcome = 5;
         if((typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) {
             microsoft_outcome = event['result']['result']; // 0, 1, 2, 3, 4, 5
@@ -49721,18 +49721,17 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
             props['method'] = msg;
             log_exception(error, 'Store.place_microsoft_order', false);
             metric_event('4061_order_prompt_api_error', props);
-            if(_on_fail) { _on_fail(); }
         } else {
             send_to_server.func(["PING_TECH"]);
             send_to_server.func(["PING_PLAYER"]);
-            var msg = 'receipt: '+ tag;
-            props['receipt'] = tag + ' ' + microsoft_outcome.toString();
+            var msg = 'receipt: '+ _tag;
+            props['receipt'] = _tag + ' ' + microsoft_outcome.toString();
             metric_event('4070_order_prompt_success', props);
             console.log('ORDER SUCCESSFUL: '+msg);
-            Store.get_microsoft_receipt();
-            _on_finish();
         }
-    }; })(on_finish, on_fail);
+        Store.get_microsoft_receipt();
+        _on_finish();
+    }; })(on_finish, tag);
     Battlehouse.postMessage_receiver.listenOnce(tag, on_complete);
     var place_credits_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'DO_PURCHASE', 'tag':tag, 'sku':spellname, 'orderDisplayName':pretty_store_name};
     if(!!player.preferences['electron_debugging_enabled']) {
