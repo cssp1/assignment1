@@ -12362,9 +12362,6 @@ function init_desktop_dialogs() {
             QuestBar.init();
         }
     }
-
-    // get updates SKUs for Microsoft store
-    Store.refresh_microsoft_store_skus();
 }
 
 function update_notification_jewel(dialog) {
@@ -49639,7 +49636,7 @@ Store.refresh_microsoft_store_skus = function() {
                 });
             }
             if(_session.microsoft_store_unfulfilled_skus.length > 0) {
-                Store.get_microsoft_receipt();
+                Store.get_microsoft_receipt('mso_null', -1); // call with a null tag and with any second variable other than 'send_server_ack' to avoid sending back an "order complete" tag
             }
         }; })(session);
         var tag = Store.listen_for_microsoft_ack('mssku');
@@ -49652,16 +49649,16 @@ Store.refresh_microsoft_store_skus = function() {
     }
 }
 
-Store.get_microsoft_receipt = function() {
+Store.get_microsoft_receipt = function(server_tag, microsoft_outcome) {
     // do not proceed if this is not a Microsoft Electron client
     if(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0) {
-        var on_finish = (function () { return function(event) {
+        var on_finish = (function (_server_tag, _microsoft_outcome) { return function(event) {
             if(!(typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) { return; }
             var microsoft_receipt = event['result']['result'];
-            send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", microsoft_receipt]);
+            send_to_server.func(["VERIFY_MICROSOFT_STORE_RECEIPT", microsoft_receipt, _server_tag, _microsoft_outcome]);
             send_to_server.func(["PING_TECH"]);
             send_to_server.func(["PING_PLAYER"]);
-        }; })();
+        }; })(server_tag, microsoft_outcome);
         var tag = Store.listen_for_microsoft_ack('msreceipt');
         Battlehouse.postMessage_receiver.listenOnce(tag, on_finish);
         var get_receipt_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'GET_RECEIPT', 'tag':tag};
@@ -49701,38 +49698,52 @@ Store.place_microsoft_order = function(price, unit_id, spellname, spellarg, on_f
                  'Billing Amount': price,
                  'Billing Description': descr};
 
-    var on_complete = (function (_on_finish, _tag) { return function(event) {
-        var microsoft_outcome = 5;
+    var on_success = (function (_on_finish, _props, _tag) { return function(event) {
+        send_to_server.func(["PING_TECH"]);
+        send_to_server.func(["PING_PLAYER"]);
+        var msg = 'receipt: '+ _tag;
+        _props['receipt'] = _tag;
+        metric_event('4070_order_prompt_success', props);
+        console.log('ORDER SUCCESSFUL: ' + msg);
+        _on_finish();
+    }; }) (on_finish, props, tag);
+
+    var server_tag = Store.listen_for_order_ack('mso', on_success);
+
+    var on_electron_complete = (function (_server_tag, _tag, _on_finish, _props) { return function(event) {
+        if(!!player.preferences['electron_debugging_enabled']) {
+            console.log('Got tag, ' + _tag + ', running on_complete')
+        }
+        var microsoft_outcome;
         if((typeof(event) === 'object' && 'result' in event && 'result' in event['result'])) {
-            microsoft_outcome = event['result']['result']; // 0, 1, 2, 3, 4, 5
+            microsoft_outcome = event['result']['result'];
+        }
+        if(!!player.preferences['electron_debugging_enabled']) {
+            console.log('Microsoft outcome:')
+            console.log(microsoft_outcome)
         }
         if(microsoft_outcome == 1 || microsoft_outcome == 2 || microsoft_outcome == 3 || microsoft_outcome == 4) {
             var msg = 'unknown error';
             if(microsoft_outcome == 1) {
                 msg = 'error code 1: alreadyPurchased';
             } else if(microsoft_outcome == 2) {
-                msg = 'error code 2: notPurchased (reason unknown)';
+                msg = 'error code 2: notPurchased (user cancelled purchase)';
             } else if(microsoft_outcome == 3) {
                 msg = 'error code 3: networkError';
             } else if(microsoft_outcome == 4) {
-                msg = 'error code 1: serverError';
+                msg = 'error code 4: serverError';
             }
             var error = 'Microsoft payments API ORDER PROBLEM: ' + msg;
-            props['method'] = msg;
+            _props['method'] = msg;
             log_exception(error, 'Store.place_microsoft_order', false);
-            metric_event('4061_order_prompt_api_error', props);
+            metric_event('4061_order_prompt_api_error', _props);
+            _on_finish();
         } else {
-            send_to_server.func(["PING_TECH"]);
-            send_to_server.func(["PING_PLAYER"]);
-            var msg = 'receipt: '+ _tag;
-            props['receipt'] = _tag + ' ' + microsoft_outcome.toString();
-            metric_event('4070_order_prompt_success', props);
-            console.log('ORDER SUCCESSFUL: '+msg);
+            microsoft_outcome = 'send_server_ack'; // flag for server to send acknowledgement so purchase stats can be recorded
         }
-        Store.get_microsoft_receipt();
-        _on_finish();
-    }; })(on_finish, tag);
-    Battlehouse.postMessage_receiver.listenOnce(tag, on_complete);
+        Store.get_microsoft_receipt(_server_tag, microsoft_outcome);
+    }; })(server_tag, tag, on_finish, props);
+    Battlehouse.postMessage_receiver.listenOnce(tag, on_electron_complete);
     var place_credits_order = {'method': 'bh_electron_command', 'type':'STORE_COMMAND', 'command':'DO_PURCHASE', 'tag':tag, 'sku':spellname, 'orderDisplayName':pretty_store_name};
     if(!!player.preferences['electron_debugging_enabled']) {
         place_credits_order['debug'] = 1;
@@ -49784,9 +49795,6 @@ Store.microsoft_report_consumable_used = function(sku, transaction) {
 Store.can_show_microsoft_sku = function(ms_sku) {
     // if this is not a Microsoft Electron client, we don't care. Return true
     if(!(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0)) { return true; }
-    console.log('Checking if ' + ms_sku + ' is in microsoft_store_valid_skus');
-    console.log(session.microsoft_store_valid_skus);
-    console.log(goog.array.contains(session.microsoft_store_valid_skus, ms_sku));
     return goog.array.contains(session.microsoft_store_valid_skus, ms_sku);
 }
 
@@ -52301,7 +52309,7 @@ function handle_server_message(data) {
             notification_queue.push(function() { invoke_ingame_tip('manufacture_overflow_to_reserves_tip', {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED}); });
         }
     } else if(msg == "GAMEBUCKS_ORDER_ACK" || msg == "ITEM_ORDER_ACK" || msg == "FUNGIBLE_ORDER_ACK" || msg == "SCORE_ORDER_ACK" ||
-              msg == "FBCREDITS_ORDER_ACK" || msg == "KGCREDITS_ORDER_ACK" || msg == "FBPAYMENT_ORDER_ACK") {
+              msg == "FBCREDITS_ORDER_ACK" || msg == "KGCREDITS_ORDER_ACK" || msg == "FBPAYMENT_ORDER_ACK" || msg == "MSSTORE_ORDER_ACK") {
         var tag = data[1], success = data[2];
         Store.order_receiver.dispatchEvent({type: tag, success: success});
     } else if(msg == "XSOLLA_GET_TOKEN_RESULT") {

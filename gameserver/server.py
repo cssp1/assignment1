@@ -2791,7 +2791,7 @@ class User:
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, on_success, error_callback = on_error)
 
     @inlineCallbacks
-    def verify_ms_store_receipt_async(self, session, retmsg, receipts_xml):
+    def verify_ms_store_receipt_async(self, session, retmsg, receipts_xml, server_tag, microsoft_outcome):
         if 'ms_store_purchase_history' not in session.player.history: session.player.history['ms_store_purchase_history'] = []
 
         # Pull the certificate we need to verify the receipt XML.
@@ -2813,6 +2813,9 @@ class User:
 
             # report SKU as fulfilled
             retmsg.append(["REPORT_MS_SKU_FULFILLED", receipt['spellname'], receipt['purchase_id']])
+
+        if server_tag != 'mso_null' and microsoft_outcome == 'send_server_ack':
+            retmsg.append(["MSSTORE_ORDER_ACK", server_tag, True])
 
         returnValue(True)
 
@@ -31653,7 +31656,9 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "VERIFY_MICROSOFT_STORE_RECEIPT":
             receipt = arg[1]
-            return session.start_async_request(session.user.verify_ms_store_receipt_async(session, retmsg, receipt))
+            server_tag = arg[2]
+            microsoft_outcome = arg[3]
+            return session.start_async_request(session.user.verify_ms_store_receipt_async(session, retmsg, receipt, server_tag, microsoft_outcome))
 
         elif arg[0] == "MICROSOFT_CONSUMABLE_FULFILLED":
             purchase_id = arg[1]
