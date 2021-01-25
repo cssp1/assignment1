@@ -12378,6 +12378,7 @@ function update_notification_jewel(dialog) {
 }
 
 function can_show_friend_bar(player) {
+    if(read_predicate(gamedata['client']['friend_invites_enabled']).is_satisfied(player, null)) { return true; }
     for(var i = 0; i < player.friends.length; i++) {
         var friend = player.friends[i];
         if(friend.is_real_friend) { return true; }
