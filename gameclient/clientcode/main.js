@@ -12275,12 +12275,12 @@ function init_desktop_dialogs() {
                 }
             }
 
-            /*
-            old add friend buttons code, outdated since FB changed API
-            for(var i = 0; i < dialog.widgets['friend_bar'].data['widgets']['friend_icon']['array'][0]; i++) {
-                dialog.widgets['friend_bar'].widgets['add_friend_button'+i.toString()].onclick = do_add_friend;
+            // this used to run no matter what, but FB API changes mean we need to require an enabled check now.
+            if(friend_invites_enabled()) {
+                for(var i = 0; i < dialog.widgets['friend_bar'].data['widgets']['friend_icon']['array'][0]; i++) {
+                    dialog.widgets['friend_bar'].widgets['add_friend_button'+i.toString()].onclick = do_add_friend;
+                }
             }
-            */
 
             // last slot always shows add-friend button
             if(friend_invites_enabled()) {
