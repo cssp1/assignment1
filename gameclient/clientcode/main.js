@@ -23356,6 +23356,15 @@ function invoke_building_context_menu(mouse_xy) {
                         which_buttons = buttons;
                     }
 
+                    // if always_allow_show_building_stats is enabled, show "View Stats";
+                    if(gamedata['always_allow_show_building_stats']) {
+                        var spell = gamedata['spells']['SHOW_UPGRADE']
+                        buttons.push(new ContextMenuButton({ui_name: spell['ui_name_maxlevel'],
+                                                            onclick: (function (_obj) { return function() { invoke_upgrade_building_dialog(_obj); }; })(obj),
+                                                            spellname: 'INVOKE_UPGRADE_DIALOG',
+                                                            asset: 'action_button_resizable'}));
+                    }
+
                     cat = gamedata['crafting']['categories'][gamedata['crafting']['recipes'][obj.is_crafting()]['crafting_category']];
                     if(player.crafting_speedups_enabled() && obj.crafting_progress_one() >= 0) {
                         if(('speedupable' in cat) && !cat['speedupable']) {
