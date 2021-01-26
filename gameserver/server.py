@@ -25821,13 +25821,13 @@ class GAMEAPI(resource.Resource):
 
             if session.has_object(obj_id):
                 # already deployed
-                retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION", obj_id, 'already deployed'])
+                retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION_ALREADY_DEPLOYED", obj_id, 'already deployed'])
                 continue
 
             if source == 'donated':
                 entry = session.player.donated_units.get(obj_id, None)
                 if not entry:
-                    retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION", obj_id, 'not found in donated_units'])
+                    retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION_MISSING_DONATED_UNIT", obj_id, 'not found in donated_units'])
                     continue
 
                 spec = session.player.get_abtest_spec(GameObjectSpec, entry['spec'])
@@ -25870,12 +25870,11 @@ class GAMEAPI(resource.Resource):
                 if (not unit) or (unit.hp <= 0) or (session.player.squad_base_id(unit.squad_id or 0) not in session.deployable_squads):
                     # unit might have been destroyed while message was in flight
                     if (not unit):
-                        err = 'not found'
+                        retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION_UNIT_NOT_FOUND", obj_id])
                     elif (unit.hp <= 0):
-                        err = 'dead'
+                        retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION_UNIT_DEAD", obj_id])
                     elif (session.player.squad_base_id(unit.squad_id or 0) not in session.deployable_squads):
-                        err = 'not deployable'
-                    retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION", obj_id, err])
+                        retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION_UNIT_NOT_DEPLOYABLE", obj_id])
                     continue
 
                 if (not session.viewing_base.can_deploy_unit(unit.spec)):
