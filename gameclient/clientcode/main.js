@@ -23291,6 +23291,15 @@ function invoke_building_context_menu(mouse_xy) {
             if(session.home_base && obj.is_researcher()) {
                 upgrade_is_active = false; // XXX check idle_state for things we can research
                 if(obj.is_researching()) {
+
+                    // if always_allow_show_building_stats is enabled, show "View Stats";
+                    if(gamedata['always_allow_show_building_stats']) {
+                        var spell = gamedata['spells']['SHOW_UPGRADE']
+                        buttons.push(new ContextMenuButton({ui_name: spell['ui_name_maxlevel'],
+                                                            onclick: (function (_obj) { return function() { invoke_upgrade_building_dialog(_obj); }; })(obj),
+                                                            spellname: 'INVOKE_UPGRADE_DIALOG',
+                                                            asset: 'action_button_resizable'}));
+                    }
                     buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
                                                         spellname: 'SPEEDUP_FOR_MONEY',
                                                         onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
