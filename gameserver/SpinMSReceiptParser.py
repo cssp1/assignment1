@@ -32,7 +32,10 @@ def validate_receipt_response(receipt, cert):
     return result
 
 def get_currency(price):
-    for currency in ("NOK","SEK","GBP","EUR","QAR","BRL","AED","DKK","USD","AUD","NZD","CAD","ZAR","ISK","IDR"):
+    for currency in ("ARS","AUD","BDT","BGN","BHD","BRL","CAD","CHF","CLP","CNY","COP","CRC","CZK","DKK","DZD",
+                     "EGP","EUR","GBP","GTQ","HKD","HUF","IDR","ILS","INR","IQD","ISK","JOD","JPY","KES","KRW",
+                     "KWD","KZT","LBP","MAD","MRO","MXN","MYR","NGN","NOK","NZD","OMR","PEN","PHP","PKR","PLN",
+                     "QAR","RON","RSD","SAR","SEK","SGD","THB","TND","TRY","TTD","TWD","UAH","USD","VND","ZAR"):
         if currency in price: return currency
     raise Exception('%s could not be identified as a valid currency' % price)
 
