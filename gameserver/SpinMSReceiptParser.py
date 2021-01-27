@@ -18,7 +18,8 @@ def validate_receipt_request_url(receipt):
 
 # After retrieving the certificate, parse and validate the response.
 # Return a list of valid receipts found in the response. Throws exception on error.
-def validate_receipt_response(receipt, cert):
+# Passes a deepcopy of gamedata['store'] for getting exchange rates
+def validate_receipt_response(receipt, cert, storedata):
     result = []
     root = XMLVerifier().verify(receipt, x509_cert=cert).signed_xml
     for product_receipt in root.findall('{http://schemas.microsoft.com/windows/2012/store/receipt}ProductReceipt'):
@@ -27,7 +28,8 @@ def validate_receipt_response(receipt, cert):
         price = product_receipt.get('PurchasePrice')
         currency = get_currency(price)
         purchase['price'] = float(price.replace(currency,'')) # note: return as a floating-point number in the local currency
-        purchase['currency'] = 'microsoft:' + currency # note: prepend 'microsoft:' to fit spell currency requirements. See make_country_skus2.py
+        purchase['currency'] = currency
+        purchase['dollar_amount'] = get_dollar_amount(purchase['price'], currency, storedata)
         result.append(purchase)
     return result
 
@@ -42,3 +44,11 @@ def get_currency(price):
 def get_purchase_time(purchase_time):
     # MS receipt timestamps are in the format '2021-01-01T18:34:35.231Z'
     return int(time.mktime(time.strptime(purchase_time, '%Y-%m-%dT%H:%M:%S.%fZ')))
+
+def get_dollar_amount(price, currency, storedata):
+    if currency == 'USD': return price
+    if 'microsoft_exchange_rates' not in storedata:
+        raise Exception('%s exchange rate cannot be determined because microsoft_exchange_rates is not set in store.json' % currency)
+    if currency not in storedata['microsoft_exchange_rates']:
+        raise Exception('%s exchange rate cannot be determined because currency was not found in gamedata["store"]["microsoft_exchange_rates"]' % currency)
+    return price * storedata['microsoft_exchange_rates'][currency]
