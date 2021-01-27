@@ -2801,7 +2801,9 @@ class User:
 
         # Try to validate and parse the receipt XML
         try:
-            ms_receipts = SpinMSReceiptParser.validate_receipt_response(receipts_xml, cert)
+            if 'microsoft_exchange_rates' not in storedata:
+                raise Exception('Cannot process microsoft receipt because microsoft_exchange_rates is not set in store.json')
+            ms_receipts = SpinMSReceiptParser.validate_receipt_response(receipts_xml, cert, gamedata['store']['microsoft_exchange_rates'])
         except:
             # if there is an error verifying or parsing the receipt(s), stop and report the error now. Do not send acknowledgement (?).
             gamesite.exception_log.event(server_time, 'Exception Microsoft receipt: %r could not be verified with certificate: %s' % (receipts_xml, traceback.format_exc().strip()))
@@ -2853,16 +2855,30 @@ class User:
         unit_id = GameObject.VIRTUAL_ID
         currency = receipt['currency'] # e.g. "GBP"
         currency_amount = receipt['price'] # floating-point price in local currency e.g. 9.99
-        dollar_amount = receipt['price'] # XXX use an approximate exchange rate here?
-        if currency != "microsoft:USD":
-            gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: receipt price %s currency %s has no U.S. dollar equivalent. Metrics will be inaccurate.' % (purchase_id, receipt['price'], receipt['currency']))
+        dollar_amount = receipt['dollar_amount']
+        if currency != "USD":
+            # SpinMSReceiptParser.py calculates the USD amount based on exchange rates set in store.json
+            # This does a sanity check on the actual exchange rate given by Microsoft and notes anything that
+            # exceeds a deviation threshold set in store.json (defaults to +- 10%)
+            expected_dollar_amount = gamedata['spells'][spellname]['price']
+            exchange_rate_deviation = dollar_amount / expected_dollar_amount
+            allowed_deviation = gamedata['store'].get("microsoft_exchange_deviation_threshold", 0.10)
+            last_exchange_rate_date = gamedata['store'].get("microsoft_exchange_date", 'date not set')
+            if exchange_rate_deviation > 1 + allowed_deviation or exchange_rate_deviation < 1 - allowed_deviation:
+                gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: receipt price %s currency %s exchange rate exceeded allowed threshold of %s set on %s. store.json may need to be updated with new exchange rates to keep our USD receipts accurate.' % (purchase_id, receipt['price'], currency, str(allowed_deviation), str(last_exchange_rate_date)))
+
+        # Microsoft store returns the local currency regardless of what we set for the price, so
+        # this forces Store.execute_order to accept payment by feeding it the price straight from gamedata
+        execute_order_currency = "microsoft:USD"
+        execute_order_currency_amount = gamedata['spells'][spellname]['price']
+        execute_order_dollar_amount = execute_order_currency_amount
 
         try:
             price_description, detail_props = Store.execute_order(gamesite.gameapi, session, retmsg,
-                                                                  currency, currency_amount,
+                                                                  execute_order_currency, execute_order_currency_amount,
                                                                   unit_id, spellname, spellarg,
                                                                   new_purchase['time'],
-                                                                  usd_equivalent = dollar_amount)
+                                                                  usd_equivalent = execute_order_dollar_amount)
         except:
             gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: Store.execute_order failed. Player will receive no gamebucks. A CS ticket should be opened ASAP. %s' % (purchase_id, traceback.format_exc().strip()))
             new_purchase['force_fulfilled'] = 1
