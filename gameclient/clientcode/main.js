@@ -13131,6 +13131,8 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
 
         if('resource_bar_fbcredits' in dialog.widgets) {
             dialog.widgets['resource_bar_fbcredits'].tooltip.str = Store.get_balance_tooltip();
+            // players can only buy if microsoft_store_valid_skus is populated or the aren't using the Microsoft payments API.
+            dialog.widgets['resource_bar_fbcredits_button'].state = (SPay.api != 'microsoft' || session.microsoft_store_valid_skus.length > 0 ? 'normal' : 'disabled');
             if(('fixed_tooltip_offset_'+currency) in dialog.data['widgets']['resource_bar_fbcredits']) {
                 var tipoff = dialog.data['widgets']['resource_bar_fbcredits']['fixed_tooltip_offset_'+currency];
                 dialog.widgets['resource_bar_fbcredits'].tooltip.xy = vec_add(shift, [dialog.xy[0]+tipoff[0], dialog.xy[1]+tipoff[1]]);
@@ -47542,6 +47544,12 @@ Store.get_balance_tooltip = function() {
     var tip;
     if(SPay.api == 'kgcredits') {
         tip = gamedata['dialogs']['desktop_top']['widgets']['resource_bar_fbcredits']['ui_tooltip_kgcredits'];
+    } else if (SPay.api == 'microsoft') {
+        if(session.microsoft_store_valid_skus.length == 0) {
+            tip = gamedata['dialogs']['desktop_top']['widgets']['resource_bar_fbcredits']['ui_tooltip_gamebucks_microsoft_skus_loading'];
+        } else {
+            tip = gamedata['dialogs']['desktop_top']['widgets']['resource_bar_fbcredits']['ui_tooltip_gamebucks_microsoft'];
+        }
     } else {
         tip = gamedata['dialogs']['desktop_top']['widgets']['resource_bar_fbcredits']['ui_tooltip_'+currency+(player.resource_state['facebook_credits'] < 0 ? '_badapi' : '')];
     }
@@ -47616,10 +47624,13 @@ Store.display_user_currency_price = function(price, format) {
 // display_currency = the currency in which to display the final amount
 // price_currency = must be either fbcredits (for the old FB Credits API) or fbpayments:display_currency (for the new FB Payments API) or xsolla:display_currency (for Xsolla)
 Store.display_real_currency_amount = function (display_currency, price, price_currency, abbreviate, spellname) {
-    // override for MS Electron clients - grabs microsoft_store_price_labels value, updated in Store.refresh_microsoft_store_skus()
+    // override for MS Electron clients - grabs microsoft_store_price_overrides value, updated in Store.refresh_microsoft_store_skus()
     if(SPay.api == 'microsoft') {
-        // check if key is in microsoft_store_price_labels. If not, continue with rest of function.
-        if(spellname in session.microsoft_store_price_labels) { return session.microsoft_store_price_labels[spellname]; }
+        // check if key is in microsoft_store_price_overrides. If not, continue with rest of function.
+        if(spellname in session.microsoft_store_price_overrides) { price = session.microsoft_store_price_overrides[spellname]; }
+        if(spellname in session.microsoft_store_currency_overrides) {
+            display_currency = session.microsoft_store_currency_overrides[spellname];
+        }
     }
     var curr_prefix, curr_suffix, curr_decimals;
     if(display_currency in gamedata['currencies']) {
@@ -47642,12 +47653,17 @@ Store.display_real_currency_amount = function (display_currency, price, price_cu
         curr_prefix = '';
         curr_suffix = (abbreviate ? '' : ' '+display_currency);
         curr_decimals = 2;
+        if(!!player.preferences['electron_debugging_enabled']) {
+            console.log('Currency ' + display_currency + ' not in gamedata[currencies]:');
+            console.log(gamedata['currencies']);
+        }
     }
 
     var display_price;
     if(price_currency == display_currency || ((price_currency.indexOf('fbpayments:') == 0 || price_currency.indexOf('xsolla:') == 0 || price_currency.indexOf('microsoft:') == 0) && price_currency.split(':')[1] == display_currency) ||
        (price_currency == 'fbcredits' && display_currency == 'Facebook Credits') ||
-       (price_currency == 'kgcredits' && display_currency == 'Kongregate Kreds')) {
+       (price_currency == 'kgcredits' && display_currency == 'Kongregate Kreds') ||
+       (SPay.api == 'microsoft')) {
         display_price = price;
     } else {
         if(price_currency != 'fbcredits') {
@@ -49659,11 +49675,18 @@ Store.refresh_microsoft_store_skus = function() {
                     _session.microsoft_store_unfulfilled_skus.push(sku);
                 });
             }
-            if(refresh_microsoft_skus['price_labels']) {
-                _session.microsoft_store_price_labels = refresh_microsoft_skus['price_labels'];
+            if(refresh_microsoft_skus['microsoft_store_price_overrides']) {
+                _session.microsoft_store_price_overrides = refresh_microsoft_skus['microsoft_store_price_overrides'];
                 if(!!player.preferences['electron_debugging_enabled']) {
-                    console.log('Updated microsoft_store_price_labels:');
-                    console.log(_session.microsoft_store_price_labels);
+                    console.log('Updated microsoft_store_price_overrides:');
+                    console.log(_session.microsoft_store_price_overrides);
+                }
+            }
+            if(refresh_microsoft_skus['microsoft_store_currency_overrides']) {
+                _session.microsoft_store_currency_overrides = refresh_microsoft_skus['microsoft_store_currency_overrides'];
+                if(!!player.preferences['electron_debugging_enabled']) {
+                    console.log('Updated microsoft_store_currency_overrides:');
+                    console.log(_session.microsoft_store_currency_overrides);
                 }
             }
             if(_session.microsoft_store_unfulfilled_skus.length > 0) {

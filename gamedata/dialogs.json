@@ -977,6 +977,8 @@
                                         "ui_tooltip_gamebucks": "%gamebucks provides speed-ups, resources,\nand instant upgrades and unlocks.\n\nClick \"+\" to purchase %gamebucks using\nFacebook Credits. (You currently\nhave %fbcredits Facebook Credits)",
                                         "ui_tooltip_gamebucks_badapi": "%gamebucks provides speed-ups, resources,\nand instant upgrades and unlocks.\n\nClick \"+\" to purchase %gamebucks.",
                                         "ui_tooltip_kgcredits": "%gamebucks provides speed-ups, resources,\nand instant upgrades and unlocks.\n\nClick \"+\" to purchase %gamebucks using\nKongregate Kreds.",
+                                        "ui_tooltip_gamebucks_microsoft": "%gamebucks provides speed-ups, resources,\nand instant upgrades and unlocks.\n\nClick \"+\" to purchase %gamebucks from the Microsoft Store.",
+                                        "ui_tooltip_gamebucks_microsoft_skus_loading": "%gamebucks provides speed-ups, resources,\nand instant upgrades and unlocks.\n\nPlease wait, updating available %gamebucks offers from the Microsoft Store.",
                                         "tooltip_delay": 0, "fixed_tooltip_offset": [601,45], "fixed_tooltip_offset_facebook_credits": [600,47], "fixed_tooltip_offset_gamebucks": [520,47] },
             "resource_bar_fbcredits_icon": { "show": 1, "kind": "StaticImage", "xy": [651,4], "dimensions": [21,21], "asset": "resource_icon_fbcredits" },
 
