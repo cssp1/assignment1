@@ -47662,8 +47662,8 @@ Store.display_real_currency_amount = function (display_currency, price, price_cu
     var display_price;
     if(price_currency == display_currency || ((price_currency.indexOf('fbpayments:') == 0 || price_currency.indexOf('xsolla:') == 0 || price_currency.indexOf('microsoft:') == 0) && price_currency.split(':')[1] == display_currency) ||
        (price_currency == 'fbcredits' && display_currency == 'Facebook Credits') ||
-       (price_currency == 'kgcredits' && display_currency == 'Kongregate Kreds')) ||
-       (SPay.api == 'microsoft') {
+       (price_currency == 'kgcredits' && display_currency == 'Kongregate Kreds') ||
+       (SPay.api == 'microsoft')) {
         display_price = price;
     } else {
         if(price_currency != 'fbcredits') {
