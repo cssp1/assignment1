@@ -2801,7 +2801,7 @@ class User:
 
         # Try to validate and parse the receipt XML
         try:
-            if 'microsoft_exchange_rates' not in storedata:
+            if 'microsoft_exchange_rates' not in gamedata['store']:
                 raise Exception('Cannot process microsoft receipt because microsoft_exchange_rates is not set in store.json')
             ms_receipts = SpinMSReceiptParser.validate_receipt_response(receipts_xml, cert, gamedata['store']['microsoft_exchange_rates'])
         except:
