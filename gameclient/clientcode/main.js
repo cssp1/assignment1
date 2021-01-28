@@ -47617,7 +47617,7 @@ Store.display_user_currency_price = function(price, format) {
 // price_currency = must be either fbcredits (for the old FB Credits API) or fbpayments:display_currency (for the new FB Payments API) or xsolla:display_currency (for Xsolla)
 Store.display_real_currency_amount = function (display_currency, price, price_currency, abbreviate, spellname) {
     // override for MS Electron clients - grabs microsoft_store_price_labels value, updated in Store.refresh_microsoft_store_skus()
-    if(!(spin_client_vendor === 'microsoft' && spin_client_platform.indexOf('electron') == 0)) {
+    if(SPay.api == 'microsoft') {
         // check if key is in microsoft_store_price_labels. If not, continue with rest of function.
         if(spellname in session.microsoft_store_price_labels) { return session.microsoft_store_price_labels[spellname]; }
     }
