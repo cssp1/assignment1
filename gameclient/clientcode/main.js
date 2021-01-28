@@ -47653,12 +47653,17 @@ Store.display_real_currency_amount = function (display_currency, price, price_cu
         curr_prefix = '';
         curr_suffix = (abbreviate ? '' : ' '+display_currency);
         curr_decimals = 2;
+        if(!!player.preferences['electron_debugging_enabled']) {
+            console.log('Currency ' + display_currency + ' not in gamedata[currencies]:');
+            console.log(gamedata['currencies']);
+        }
     }
 
     var display_price;
     if(price_currency == display_currency || ((price_currency.indexOf('fbpayments:') == 0 || price_currency.indexOf('xsolla:') == 0 || price_currency.indexOf('microsoft:') == 0) && price_currency.split(':')[1] == display_currency) ||
        (price_currency == 'fbcredits' && display_currency == 'Facebook Credits') ||
-       (price_currency == 'kgcredits' && display_currency == 'Kongregate Kreds')) {
+       (price_currency == 'kgcredits' && display_currency == 'Kongregate Kreds')) ||
+       (SPay.api == 'microsoft') {
         display_price = price;
     } else {
         if(price_currency != 'fbcredits') {
