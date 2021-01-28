@@ -47616,10 +47616,13 @@ Store.display_user_currency_price = function(price, format) {
 // display_currency = the currency in which to display the final amount
 // price_currency = must be either fbcredits (for the old FB Credits API) or fbpayments:display_currency (for the new FB Payments API) or xsolla:display_currency (for Xsolla)
 Store.display_real_currency_amount = function (display_currency, price, price_currency, abbreviate, spellname) {
-    // override for MS Electron clients - grabs microsoft_store_price_labels value, updated in Store.refresh_microsoft_store_skus()
+    // override for MS Electron clients - grabs microsoft_store_price_overrides value, updated in Store.refresh_microsoft_store_skus()
     if(SPay.api == 'microsoft') {
-        // check if key is in microsoft_store_price_labels. If not, continue with rest of function.
-        if(spellname in session.microsoft_store_price_labels) { return session.microsoft_store_price_labels[spellname]; }
+        // check if key is in microsoft_store_price_overrides. If not, continue with rest of function.
+        if(spellname in session.microsoft_store_price_overrides) { price = session.microsoft_store_price_overrides[spellname]; }
+        if(spellname in session.microsoft_store_currency_overrides) {
+            display_currency = price_currency = session.microsoft_store_price_overrides[spellname];
+        }
     }
     var curr_prefix, curr_suffix, curr_decimals;
     if(display_currency in gamedata['currencies']) {
@@ -49659,11 +49662,18 @@ Store.refresh_microsoft_store_skus = function() {
                     _session.microsoft_store_unfulfilled_skus.push(sku);
                 });
             }
-            if(refresh_microsoft_skus['price_labels']) {
-                _session.microsoft_store_price_labels = refresh_microsoft_skus['price_labels'];
+            if(refresh_microsoft_skus['microsoft_store_price_overrides']) {
+                _session.microsoft_store_price_overrides = refresh_microsoft_skus['microsoft_store_price_overrides'];
                 if(!!player.preferences['electron_debugging_enabled']) {
-                    console.log('Updated microsoft_store_price_labels:');
-                    console.log(_session.microsoft_store_price_labels);
+                    console.log('Updated microsoft_store_price_overrides:');
+                    console.log(_session.microsoft_store_price_overrides);
+                }
+            }
+            if(refresh_microsoft_skus['microsoft_store_price_overrides']) {
+                _session.microsoft_store_currency_overrides = refresh_microsoft_skus['microsoft_store_currency_overrides'];
+                if(!!player.preferences['electron_debugging_enabled']) {
+                    console.log('Updated microsoft_store_currency_overrides:');
+                    console.log(_session.microsoft_store_currency_overrides);
                 }
             }
             if(_session.microsoft_store_unfulfilled_skus.length > 0) {
