@@ -110,6 +110,7 @@ Session.Session = function() {
 
     this.microsoft_store_valid_skus = []; // holds Microsoft SKU data
     this.microsoft_store_unfulfilled_skus = []; // holds Microsoft SKU data
+    this.microsoft_store_price_labels = {}; // holds Microsoft local currency label overrides
 
     /** @type {!Array<!World.World>}
         Bottom-most element is the "real" world, replays push a "virtual" world on top */

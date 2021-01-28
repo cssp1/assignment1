@@ -41735,7 +41735,7 @@ function buy_gamebucks_dialog_select(dialog, num) {
             }; })(i, alloy_qty, payment_currency, payment_price);
         dialog.widgets['bucks'+i].str = dialog.data['widgets']['bucks']['ui_name'].replace('%d', Store.display_user_currency_amount(alloy_qty, 'full'));
 
-        dialog.widgets['credits'+i].str = Store.display_real_currency_amount(display_currency, payment_price, payment_currency, false);
+        dialog.widgets['credits'+i].str = Store.display_real_currency_amount(display_currency, payment_price, payment_currency, false, spellname);
         // manually add " Credits" suffix to Facebook Credits amounts in the list
         if(display_currency == 'Facebook Credits' && payment_currency == 'fbcredits') {
             dialog.widgets['credits'+i].str += ' Credits';
@@ -41805,7 +41805,7 @@ function buy_gamebucks_dialog_select(dialog, num) {
 
     // PRICE
     dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
-    dialog.widgets['price_display'].str = Store.display_real_currency_amount(display_currency, payment_price, payment_currency, true);
+    dialog.widgets['price_display'].str = Store.display_real_currency_amount(display_currency, payment_price, payment_currency, true, spellname);
     if(payment_currency == 'kgcredits') {
         dialog.widgets['price_display'].state = 'kgcredits';
     } else {
@@ -42492,7 +42492,7 @@ function update_buy_gamebucks_sku23(dialog) {
         var look_data = gamedata['store']['buy_gamebucks_dialog_looks'][dialog.user_data['look'] || 'default'];
         var currency = look_data['bundle_value_currency'] || 'gamebucks';
         var scale = eval_cond_or_literal(look_data['bundle_value_scale'] || 1, player, null);
-        bundle_value = buy_gamebucks_sku2_ui_bundle_value(spell, spellarg, scale, (currency === 'local'));
+        bundle_value = buy_gamebucks_sku2_ui_bundle_value(spell, spellarg, scale, (currency === 'local'), spellname);
     }
 
     if(bundle_value) {
@@ -42562,7 +42562,7 @@ function update_buy_gamebucks_sku23(dialog) {
     //}
 
     if(payment_price >= 0) {
-        dialog.widgets['price_display'].str = Store.display_real_currency_amount(display_currency, payment_price, payment_currency, false);
+        dialog.widgets['price_display'].str = Store.display_real_currency_amount(display_currency, payment_price, payment_currency, false, spellname);
         // manually add " Credits" suffix to Facebook Credits amounts in the list
         if(display_currency == 'Facebook Credits' && payment_currency == 'fbcredits') {
             dialog.widgets['price_display'].str += ' Credits';
@@ -42761,7 +42761,7 @@ function buy_gamebucks_sku2_ui_warning(spell, spellarg) {
     @param {number} scale_factor
     @param {boolean} use_local_currency
     @return {string|null} */
-function buy_gamebucks_sku2_ui_bundle_value(spell, spellarg, scale_factor, use_local_currency) {
+function buy_gamebucks_sku2_ui_bundle_value(spell, spellarg, scale_factor, use_local_currency, spellname) {
     var num_gamebucks = buy_gamebucks_sku2_get_loot_table_parameter(spell, spellarg, 'ui_gamebucks_value') || 0;
     if(num_gamebucks <= 0) { return null; }
     num_gamebucks *= scale_factor;
@@ -42776,7 +42776,7 @@ function buy_gamebucks_sku2_ui_bundle_value(spell, spellarg, scale_factor, use_l
             var cur_name = tbl[i][0], cur_rate = tbl[i][1];
             if(cur_name === real_currency) {
                 var real_amount = parseFloat(cur_rate) * num_gamebucks;
-                return Store.display_real_currency_amount(real_currency, real_amount, spell['currency'], true);
+                return Store.display_real_currency_amount(real_currency, real_amount, spell['currency'], true, spellname);
             }
         }
     }
@@ -47615,7 +47615,12 @@ Store.display_user_currency_price = function(price, format) {
 // display a real-world currency amount (also handles Facebook Credit prices)
 // display_currency = the currency in which to display the final amount
 // price_currency = must be either fbcredits (for the old FB Credits API) or fbpayments:display_currency (for the new FB Payments API) or xsolla:display_currency (for Xsolla)
-Store.display_real_currency_amount = function (display_currency, price, price_currency, abbreviate) {
+Store.display_real_currency_amount = function (display_currency, price, price_currency, abbreviate, spellname) {
+    // override for MS Electron clients - grabs microsoft_store_price_labels value, updated in Store.refresh_microsoft_store_skus()
+    if(SPay.api == 'microsoft') {
+        // check if key is in microsoft_store_price_labels. If not, continue with rest of function.
+        if(spellname in session.microsoft_store_price_labels) { return session.microsoft_store_price_labels[spellname]; }
+    }
     var curr_prefix, curr_suffix, curr_decimals;
     if(display_currency in gamedata['currencies']) {
         var template = gamedata['currencies'][display_currency];
@@ -49653,6 +49658,13 @@ Store.refresh_microsoft_store_skus = function() {
                 goog.array.forEach(refresh_microsoft_skus['unfulfilled_SKUs'], function(sku) {
                     _session.microsoft_store_unfulfilled_skus.push(sku);
                 });
+            }
+            if(refresh_microsoft_skus['price_labels']) {
+                _session.microsoft_store_price_labels = refresh_microsoft_skus['price_labels'];
+                if(!!player.preferences['electron_debugging_enabled']) {
+                    console.log('Updated microsoft_store_price_labels:');
+                    console.log(_session.microsoft_store_price_labels);
+                }
             }
             if(_session.microsoft_store_unfulfilled_skus.length > 0) {
                 Store.get_microsoft_receipt('mso_null', -1); // call with a null tag and with any second variable other than 'send_server_ack' to avoid sending back an "order complete" tag
