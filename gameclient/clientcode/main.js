@@ -47629,7 +47629,7 @@ Store.display_real_currency_amount = function (display_currency, price, price_cu
         // check if key is in microsoft_store_price_overrides. If not, continue with rest of function.
         if(spellname in session.microsoft_store_price_overrides) { price = session.microsoft_store_price_overrides[spellname]; }
         if(spellname in session.microsoft_store_currency_overrides) {
-            display_currency = price_currency = session.microsoft_store_price_overrides[spellname];
+            display_currency = session.microsoft_store_price_overrides[spellname];
         }
     }
     var curr_prefix, curr_suffix, curr_decimals;
