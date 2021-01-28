@@ -13132,8 +13132,7 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
         if('resource_bar_fbcredits' in dialog.widgets) {
             dialog.widgets['resource_bar_fbcredits'].tooltip.str = Store.get_balance_tooltip();
             // players can only buy if microsoft_store_valid_skus is populated or the aren't using the Microsoft payments API.
-            dialog.widgets['resource_bar_fbcredits_button'].state = (SPay.api != 'microsoft' || session.microsoft_store_valid_skus.length > 0 ? 'normal' : 'disabled')
-            if(session.microsoft_store_valid_skus.length == 0) {
+            dialog.widgets['resource_bar_fbcredits_button'].state = (SPay.api != 'microsoft' || session.microsoft_store_valid_skus.length > 0 ? 'normal' : 'disabled');
             if(('fixed_tooltip_offset_'+currency) in dialog.data['widgets']['resource_bar_fbcredits']) {
                 var tipoff = dialog.data['widgets']['resource_bar_fbcredits']['fixed_tooltip_offset_'+currency];
                 dialog.widgets['resource_bar_fbcredits'].tooltip.xy = vec_add(shift, [dialog.xy[0]+tipoff[0], dialog.xy[1]+tipoff[1]]);
