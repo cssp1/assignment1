@@ -88,5 +88,5 @@ class PostgreSQLUtil(SQLUtil):
             cur.execute("SELECT COUNT(*) FROM pg_class WHERE relname = %s", [index_name])
             if cur.fetchall()[0][0] == 0:
                 cur.execute("CREATE %s INDEX %s ON %s (" % ('UNIQUE' if idata.get('unique',False) else '', self.sym(index_name), self.sym(name)) + \
-                            ", ".join([(self.sym(key)+" "+order) for key, order in idata['keys']]) + \
+                            ", ".join([(key+" "+order) for key, order in idata['keys']]) + \
                             ")" + ((' WHERE '+idata['where']) if idata.get('where') else ''))

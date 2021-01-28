@@ -6,7 +6,7 @@
 
 # dump player_scores2 from MongoDB to SQL for warehousing
 
-import sys, time, getopt, re
+import sys, time, getopt, os
 import SpinConfig
 import SpinJSON
 import SpinNoSQL
@@ -33,9 +33,10 @@ def scores2_schema(id_field):
                         ('mtime', 'INT8 NOT NULL')
                         ],
              # note: index stat AFTER time so that we can do time range queries quickly
-             'indices': { 'by_id': {'unique':True, 'keys':[(id_field,'ASC'), ('time_scope','ASC'), ('time_loc','ASC'), ('stat','ASC'), ('space_scope','ASC'), ('space_loc','ASC'),
-                                                           ('extra_scope','ASC'), ('extra_loc','ASC')] },
-
+             'indices': { 'by_id_unique': {'unique':True,
+                                    'keys':[(id_field,'ASC'), ('time_scope','ASC'), ('time_loc','ASC'), ('stat','ASC'), ('space_scope','ASC'), ('space_loc','ASC'),
+                                            # extra_scope and extra_loc must be non-null in the index for the ON CONFLICT upsert to work
+                                            ("COALESCE(extra_scope, '')",'ASC'), ("COALESCE(extra_loc, '')",'ASC')] },
                           'by_stat': {'keys': [('time_scope','ASC'), ('time_loc','ASC'), ('stat','ASC'), ('space_scope','ASC'), ('space_loc','ASC'),
                                                ('extra_scope','ASC'), ('extra_loc','ASC'), ('val','DESC')]},
                           'by_mtime': {'keys': [('time_scope','ASC'), ('time_loc','ASC'), ('mtime','ASC')]},
@@ -92,43 +93,7 @@ if __name__ == '__main__':
             if do_reset and dry_run < 2:
                 cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(tbl[kind]))
             if dry_run < 2: sql_util.ensure_table(cur, tbl[kind], scores2_schema(Scores2.ID_FIELD[kind]))
-            replacements = { '%kind': kind, '%id_field': Scores2.ID_FIELD[kind], '%tbl': tbl[kind] }
-            replace_expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
 
-            if dry_run < 2: cur.execute(replace_expr.sub(lambda match: replacements[match.group(0)], """
-            CREATE OR REPLACE FUNCTION upsert_%kind_score (p%id_field INT4, pstat VARCHAR,
-                                                           ptime_scope VARCHAR, ptime_loc INT4,
-                                                           pspace_scope VARCHAR, pspace_loc VARCHAR,
-                                                           pextra_scope VARCHAR, pextra_loc VARCHAR,
-                                                           pval FLOAT8, pmtime INT8) RETURNS void as $$
-            BEGIN
-                IF pextra_scope IS NULL THEN
-                    UPDATE %tbl SET (val,mtime) = (pval,pmtime) WHERE (%id_field,stat,time_scope,time_loc,space_scope,space_loc) = (p%id_field,pstat,ptime_scope,ptime_loc,pspace_scope,pspace_loc);
-                ELSE
-                    UPDATE %tbl SET (val,mtime) = (pval,pmtime) WHERE (%id_field,stat,time_scope,time_loc,space_scope,space_loc,extra_scope,extra_loc) = (p%id_field,pstat,ptime_scope,ptime_loc,pspace_scope,pspace_loc,pextra_scope,pextra_loc);
-                END IF;
-
-                IF FOUND THEN
-                    RETURN;
-                END IF;
-
-                BEGIN
-                    IF pextra_scope IS NULL THEN
-                        INSERT INTO %tbl (%id_field,stat,val,mtime,time_scope,time_loc,space_scope,space_loc) VALUES (p%id_field,pstat,pval,pmtime,ptime_scope,ptime_loc,pspace_scope,pspace_loc);
-                    ELSE
-                        INSERT INTO %tbl (%id_field,stat,val,mtime,time_scope,time_loc,space_scope,space_loc,extra_scope,extra_loc) VALUES (p%id_field,pstat,pval,pmtime,ptime_scope,ptime_loc,pspace_scope,pspace_loc,pextra_scope,pextra_loc);
-                    END IF;
-                EXCEPTION WHEN OTHERS THEN
-                    IF pextra_scope IS NULL THEN
-                        UPDATE %tbl SET (val,mtime) = (pval,pmtime) WHERE (%id_field,stat,time_scope,time_loc,space_scope,space_loc) = (p%id_field,pstat,ptime_scope,ptime_loc,pspace_scope,pspace_loc);
-                ELSE
-                        UPDATE %tbl SET (val,mtime) = (pval,pmtime) WHERE (%id_field,stat,time_scope,time_loc,space_scope,space_loc,extra_scope,extra_loc) = (p%id_field,pstat,ptime_scope,ptime_loc,pspace_scope,pspace_loc,pextra_scope,pextra_loc);
-                    END IF;
-                END;
-                RETURN;
-            END
-            $$ language plpgsql;
-            """))
         con.commit()
 
         now_time_coords = Scores2.make_time_coords(time_now,
@@ -193,6 +158,7 @@ if __name__ == '__main__':
                             continue
 
                         if not has_extra:
+                            # ensure every keyvals[] list has extra_scope and extra_loc, even if they are null
                             keyvals += [('extra_scope',None), ('extra_loc',None)]
 
                         keyvals += [('val', float(row['val'])), ('mtime', int(row.get('mtime',-1)))]
@@ -200,7 +166,13 @@ if __name__ == '__main__':
                         n_updated += 1
 
                     if (not dry_run) and batch:
-                        cur.executemany("SELECT upsert_"+kind+"_score("+','.join(["%s"]*10)+")", [[v for k,v in keyvals2] for keyvals2 in batch])
+                        # note: keyvals2[-2] and [-1] are second copies of (val, mtime) for the DO UPDATE SET clause
+                        cur.executemany("""
+INSERT INTO """ + tbl[kind] + """ (""" + Scores2.ID_FIELD[kind] + """,stat,time_scope,time_loc,space_scope,space_loc,extra_scope,extra_loc,val,mtime)
+    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+ON CONFLICT (""" + Scores2.ID_FIELD[kind] + """,stat,time_scope,time_loc,space_scope,space_loc, COALESCE(extra_scope, ''), COALESCE(extra_loc, ''))
+DO UPDATE SET val = %s, mtime = %s
+""", [([v for k,v in keyvals2] + [keyvals2[-2][1], keyvals2[-1][1]]) for keyvals2 in batch])
                         con.commit() # new scores become permanent in SQL
 
                     if verbose:
