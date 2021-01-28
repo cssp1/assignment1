@@ -49677,7 +49677,7 @@ Store.refresh_microsoft_store_skus = function() {
                     console.log(_session.microsoft_store_price_overrides);
                 }
             }
-            if(refresh_microsoft_skus['microsoft_store_price_overrides']) {
+            if(refresh_microsoft_skus['microsoft_store_currency_overrides']) {
                 _session.microsoft_store_currency_overrides = refresh_microsoft_skus['microsoft_store_currency_overrides'];
                 if(!!player.preferences['electron_debugging_enabled']) {
                     console.log('Updated microsoft_store_currency_overrides:');
