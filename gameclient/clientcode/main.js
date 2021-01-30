@@ -17926,8 +17926,8 @@ function invoke_chat_player_context_menu(user_id, alliance_id, ui_name, report_a
                                                     hidden_message_body.select();
                                                     document.execCommand('copy');
                                                     document.body.removeChild(hidden_message_body);
-                                                    window.scrollTo(0,0);
                                                 }
+                                                window.scrollTo(0,0);
                                             }; })(report_args)
                                            }));
     }
