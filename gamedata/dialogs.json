@@ -919,6 +919,15 @@
             "developer_button": { "kind": "ActionButton", "xy": [4,230], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                   "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "DEVELOPER", "show": 0 },
 
+            "repair_base_for_gold": { "kind": "ActionButton", "xy": [4,262], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                      "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Repair Base",
+                                      "ui_name_free": "Free Repair!", "ui_tooltip": "Repair your base for %cost", "show": 0 },
+
+            "repair_base_for_free": { "kind": "ActionButton", "xy": [4,262], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                      "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Free Repair!",
+                                      "ui_tooltip": "Repair your base for free!", "show": 0 },
+
+
             "surrender_button": { "show": 0, "kind": "ActionButton", "xy": [327,0], "dimensions": [152,56], "bg_image": "attack_button",
                                   "ui_name": "Surrender", "ui_name_pending": "Surrendering...",
                                   "state": "end", "ui_tooltip": "Concede defeat",

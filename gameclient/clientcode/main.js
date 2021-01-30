@@ -12136,11 +12136,20 @@ function init_desktop_dialogs() {
     if(session.home_base) {
         // developer button
         if(!spin_secure_mode && player.is_developer() && !anon_mode) {
-            dialog.widgets['developer_button'].show = true;
+            dialog.widgets['developer_button'].show = false;
             dialog.widgets['developer_button'].onclick = invoke_cheat_menu;
         } else {
             dialog.widgets['developer_button'].show = false;
         }
+
+        dialog.widgets['repair_base_for_free'].onclick = function() {
+            session.for_each_real_object(function(obj) {
+                if(obj.team === 'player' && obj.is_building() && obj.is_damaged()) {
+                    send_to_server.func(["CAST_SPELL", obj.id, "SPEEDUP_FOR_FREE"]);
+                }
+            });
+        };
+        dialog.widgets['repair_base_for_gold'].onclick = function() { invoke_repair_dialog(); };
 
         dialog.widgets['skip_tutorial_button'].onclick = function() {
             var s = gamedata['strings']['skip_tutorial_confirm'];
@@ -14061,16 +14070,32 @@ function get_shifted_console_position() {
 // update data fields and centering of desktop dialogs
 function update_desktop_dialogs() {
     var droid_factory = null, robotics_lab = null;
+    var show_repair_base_for_gold = false;
+    var show_repair_base_for_free = true;
 
     var basic_manuf_category = goog.object.getKeys(gamedata['strings']['manufacture_categories'])[0]; // most basic manufacture category
     var basic_research_category = gamedata['strings']['research_categories']['army'][0]['name']; // most basic army research category
 
     if(session.home_base) {
         // scan player's buildings to find a few things
-
+        // also check if repair base button can be shown
         session.for_each_real_object(function(obj) {
             if(obj.is_building() && obj.is_manufacturer() && obj.spec['manufacture_category'] === basic_manuf_category) { droid_factory = obj; }
             if(obj.is_building() && obj.is_researcher() && obj.spec['research_categories'][0] === basic_research_category) { robotics_lab = obj; }
+            if(obj.team === 'player' && obj.is_building() && obj.is_damaged() && obj.is_repairing()) {
+                show_repair_base_for_gold = true;
+            }
+            if(show_repair_base_for_gold && 'free_speedup_time' in gamedata['store'] && obj.team === 'player' && obj.is_building() && obj.is_damaged() && obj.is_repairing()) {
+                if(obj.repair_finish_time && obj.repair_finish_time > 0) {
+                    var repair_time_remaining = obj.repair_finish_time - server_time;
+                    console.log('Checking if can repair ' + obj.spec['ui_name'] + ' for free');
+                    console.log(repair_time_remaining.toString() + ' seconds remaining')
+                    if(repair_time_remaining > gamedata['store']['free_speedup_time']) {
+                        show_repair_base_for_free = false;
+                        console.log('No, more than ' + gamedata['store']['free_speedup_time'].toString() + ' seconds remaining');
+                    }
+                }
+            }
         });
     }
 
@@ -14100,6 +14125,12 @@ function update_desktop_dialogs() {
 
     // process top dialog
     var dialog = desktop_dialogs['desktop_top'];
+
+    // check if can show repair base buttons, and update price in paid repair tooltip
+    dialog.widgets['repair_base_for_gold'].show = show_repair_base_for_gold && !show_repair_base_for_free;
+    dialog.widgets['repair_base_for_free'].show = show_repair_base_for_gold && show_repair_base_for_free;
+    dialog.widgets['repair_base_for_gold'].tooltip.str = dialog.data['widgets']['repair_base_for_gold']['ui_tooltip'].replace('%cost', Store.display_user_currency_price_tooltip(Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['REPAIR_ALL_FOR_MONEY'], session.viewing_base.base_id)).replace('Buy for ',''));
+
 
     // shift console horizontally to make room for chat and
     // center in game window (region to right of console_shift)
