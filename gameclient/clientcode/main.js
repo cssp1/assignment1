@@ -17908,6 +17908,30 @@ function invoke_chat_player_context_menu(user_id, alliance_id, ui_name, report_a
                                                }));
         }
     }
+    // && report_args.user_id !== session.user_id
+    if(report_args && report_args.ui_context) {
+        buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_copy'],
+                                            ui_tooltip: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_tooltip_copy'],
+                                            onclick: (function (/** !AdvancedChatReportArgs */ _report_args) { return function(w) {
+                                                var message_body = _report_args.ui_context;
+                                                if (navigator.clipboard) {
+                                                    navigator.clipboard.writeText(message_body);
+                                                } else if (window.clipboardData && window.clipboardData.setData) {
+                                                    window.clipboardData.setData('Text', message_body);
+                                                } else {
+                                                    var hidden_message_body = document.createElement('input');
+                                                    hidden_message_body.value = message_body;
+                                                    document.body.appendChild(hidden_message_body);
+                                                    hidden_message_body.focus();
+                                                    hidden_message_body.select();
+                                                    document.execCommand('copy');
+                                                    document.body.removeChild(hidden_message_body);
+                                                }
+                                                //close_parent_dialog(w); // change_selection_ui(null); safe?
+                                            }; })(report_args)
+                                           }));
+    }
+
 
     var dialog = invoke_generic_context_menu(vec_add(mloc, [0, 8]), buttons, 'chat_player_context_menu');
     dialog.widgets['title'].str = ui_name;
