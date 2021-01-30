@@ -17913,7 +17913,6 @@ function invoke_chat_player_context_menu(user_id, alliance_id, ui_name, report_a
         buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_copy'],
                                             ui_tooltip: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_tooltip_copy'],
                                             onclick: (function (/** !AdvancedChatReportArgs */ _report_args) { return function(w) {
-                                                var message_body = _report_args.ui_context;
                                                 if (navigator.clipboard) {
                                                     navigator.clipboard.writeText(message_body);
                                                 } else if (window.clipboardData && window.clipboardData.setData) {
@@ -17926,8 +17925,8 @@ function invoke_chat_player_context_menu(user_id, alliance_id, ui_name, report_a
                                                     hidden_message_body.select();
                                                     document.execCommand('copy');
                                                     document.body.removeChild(hidden_message_body);
+                                                    window.scrollTo(0,0);
                                                 }
-                                                //close_parent_dialog(w); // change_selection_ui(null); safe?
                                             }; })(report_args)
                                            }));
     }
