@@ -630,6 +630,7 @@
             "button": { "kind": "ActionButton", "xy": [9,31], "dimensions": [184,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
                         "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                         "ui_name_report": "Report Abuse", "ui_tooltip_report": "Report this player for inappropriate behavior",
+                        "ui_name_copy": "Copy to Clipboard", "ui_tooltip_copy": "Copy this message to the clipboard",
                         "ui_tooltip_already_reported": "Player has already been reported or blocked",
                         "ui_name_player_info": "Player Info",
                         "ui_name_alliance_info": "Alliance Info",
