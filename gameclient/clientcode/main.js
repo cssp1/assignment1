@@ -17919,15 +17919,18 @@ function invoke_chat_player_context_menu(user_id, alliance_id, ui_name, report_a
                                                 } else if (window.clipboardData && window.clipboardData.setData) {
                                                     window.clipboardData.setData('Text', message_body);
                                                 } else {
+                                                    var message_parent = document.getElementById('canvas_div');
+                                                    var canvas = document.getElementById('canvas');
                                                     var hidden_message_body = document.createElement('input');
                                                     hidden_message_body.value = message_body;
-                                                    document.body.appendChild(hidden_message_body);
+                                                    message_parent.appendChild(hidden_message_body);
                                                     hidden_message_body.focus();
                                                     hidden_message_body.select();
                                                     document.execCommand('copy');
-                                                    document.body.removeChild(hidden_message_body);
+                                                    message_parent.removeChild(hidden_message_body);
+                                                    canvas.focus();
+                                                    window.scrollTo(0,0);
                                                 }
-                                                window.scrollTo(0,0);
                                             }; })(report_args)
                                            }));
     }
