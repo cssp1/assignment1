@@ -10667,6 +10667,9 @@ function invoke_playfield_controls_bar() {
     };
 
     dialog.widgets['settings_button'].onclick = invoke_settings_dialog;
+    if(eval_cond_or_literal(gamedata['client']['show_electron_control_dialog'], player, null)) {
+        dialog.widgets['settings_button'].onclick = invoke_electron_menu_dialog;
+    }
 
     dialog.widgets['screenshot_button'].onclick = function(w) {
         var dialog = w.parent;
@@ -40886,6 +40889,31 @@ function update_sprobe_dialog(dialog) {
             w.text_color = SPUI.make_colorv(dialog.data['widgets']['result']['text_color_'+kind]);
         }
     }
+}
+
+function invoke_electron_menu_dialog() {
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['electron_menu_dialog']);
+    dialog.user_data['dialog'] = 'electron_menu_dialog';
+    install_child_dialog(dialog);
+    dialog.auto_center();
+    dialog.modal = true;
+    dialog.widgets['settings_button'].onclick = (function (_dialog) { return function() {
+        close_dialog(_dialog);
+        invoke_settings_dialog();
+    }; })(dialog);
+    dialog.widgets['account_button'].onclick = (function (_dialog) { return function() {
+        close_dialog(_dialog);
+        window.top.postMessage({'method': 'bh_electron_menu_command', 'command':'SHOW_ACCOUNT'}, '*');
+    }; })(dialog);
+    dialog.widgets['main_menu_button'].onclick = (function (_dialog) { return function() {
+        close_dialog(_dialog);
+        window.top.postMessage({'method': 'bh_electron_menu_command', 'command':'MAIN_MENU'}, '*');
+    }; })(dialog);
+    dialog.widgets['exit_button'].onclick = (function (_dialog) { return function() {
+        close_dialog(_dialog);
+        window.top.postMessage({'method': 'bh_electron_command', 'type':'APP_COMMAND', 'command':'EXIT'}, '*');
+    }; })(dialog);
+    return dialog;
 }
 
 function invoke_settings_dialog() {
