@@ -3004,8 +3004,11 @@
             "title_bold": { "kind": "TextField", "xy": [15,8], "dimensions": [123, 48], "text_size": 30, "text_style": "bold",
                             "text_hjustify": "left",
                             "ui_name": "Upgrade",
+                            "ui_name_upgrading": "Upgrading",
                             "ui_name_research": "Research",
+                            "ui_name_researching": "Researching",
                             "ui_name_unlock": "Unlock",
+                            "ui_name_unlocking": "Unlocking",
                             "ui_name_stats": "Stats" },
 
             "title": { "kind": "TextField", "xy": [156,8], "dimensions": [540, 48], "text_size": 30, "text_style": "thick",
@@ -3014,9 +3017,12 @@
                        "ui_name_max_length": 40,
                        "ui_name_short": ": %s to L%d",
                        "ui_name_xy": [140,8],
+                       "ui_name_upgrading_xy": [165,8],
                        "ui_name_research_xy": [145,8],
+                       "ui_name_researching_xy": [165,8],
                        "ui_name_unlock": ": %s", // Level %d",
                        "ui_name_unlock_xy": [115,8],
+                       "ui_name_unlocking_xy": [165,8],
                        "ui_name_stats": ": %s at Level %d",
                        "ui_name_stats_max_length": 50,
                        "ui_name_stats_short": ": %s at L%d",
@@ -3138,7 +3144,7 @@
                                          "show": 0
                                         },
 
-            "requirements": { "kind": "TextField", "xy": [588,75], "dimensions": [135,26], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "REQUIREMENTS" },
+            "requirements": { "kind": "TextField", "xy": [588,75], "dimensions": [135,26], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "REQUIREMENTS", "ui_tooltip": "Showing requirements for level %d" },
 
             "resource_water_button": { "kind": "ActionButton", "xy": [543,103], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
             "resource_water_icon": { "kind": "StaticImage", "xy": [578,102], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },

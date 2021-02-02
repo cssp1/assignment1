@@ -45799,8 +45799,14 @@ function update_upgrade_dialog(dialog) {
 
     // check if viewing a building and if always viewing stats is enabled
     var stats_when_busy = false;
+    dialog.widgets['requirements'].tooltip.str = dialog.data['widgets']['requirements']['ui_tooltip'].replace('%d', new_level.toString());
     if (builder && builder.is_building() && builder.time_until_finish() > 0 && gamedata['always_allow_show_building_stats']) {
         stats_when_busy = true;
+        if(new_level + 1 < max_level) {
+            dialog.widgets['requirements'].tooltip.str = dialog.data['widgets']['requirements']['ui_tooltip'].replace('%d', (new_level + 1).toString());
+        } else {
+            dialog.widgets['requirements'].tooltip.str = null;
+        }
     };
 
     // building is missing, damaged or busy with something, cannot
@@ -45835,9 +45841,15 @@ function update_upgrade_dialog(dialog) {
 
     if(tech) {
         if(old_level === 0) {
-            dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_unlock'];
-            widget.str = widget.data['ui_name_unlock'].replace('%s',tech['ui_name']).replace('%d', new_level.toString());
-            widget.xy = widget.data['ui_name_unlock_xy'];
+            if(stats_when_busy && builder.research_item == techname) {
+                dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_unlocking'];
+                widget.str = widget.data['ui_name_unlock'].replace('%s',tech['ui_name']).replace('%d', new_level.toString());
+                widget.xy = widget.data['ui_name_unlocking_xy'];
+            } else {
+                dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_unlock'];
+                widget.str = widget.data['ui_name_unlock'].replace('%s',tech['ui_name']).replace('%d', new_level.toString());
+                widget.xy = widget.data['ui_name_unlock_xy'];
+            }
         } else if(new_level > max_level) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
             widget.str = widget.data['ui_name_stats'].replace('%s',tech['ui_name']).replace('%d',max_level.toString());
@@ -45849,11 +45861,21 @@ function update_upgrade_dialog(dialog) {
             if(('update_unit_levels_on_tech_upgrade' in gamedata) &&
                !gamedata['update_unit_levels_on_tech_upgrade']) {
                 // call this "Research" instead of "Upgrade" when the new level isn't applied to existing units
-                dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_research'];
-                widget.xy = widget.data['ui_name_research_xy'];
+                if(stats_when_busy && builder.research_item == techname) {
+                    dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_researching'];
+                    widget.xy = widget.data['ui_name_researching_xy'];
+                } else {
+                    dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_research'];
+                    widget.xy = widget.data['ui_name_research_xy'];
+                }
             } else {
-                dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name'];
-                widget.xy = widget.data['ui_name_xy'];
+                if(stats_when_busy && builder.research_item == techname) {
+                    dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_upgrading'];
+                    widget.xy = widget.data['ui_name_upgrading_xy'];
+                } else {
+                    dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name'];
+                    widget.xy = widget.data['ui_name_xy'];
+                }
             }
             widget.str = widget.data['ui_name'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
             if(widget.str.length > widget.data['ui_name_max_length']) {
@@ -45861,16 +45883,27 @@ function update_upgrade_dialog(dialog) {
             }
         }
     } else {
-        if(new_level > max_level || stats_only || stats_when_busy) {
+        if(new_level > max_level || stats_only || (stats_when_busy && new_level + 1 > max_level)) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
             widget.str = widget.data['ui_name_stats'].replace('%s',unit.spec['ui_name']).replace('%d',old_level.toString());
             if(widget.str.length > widget.data['ui_name_stats_max_length']) {
                 widget.str = widget.data['ui_name_stats_short'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
             }
+            widget.xy = widget.data['ui_name_stats_xy'];
         } else {
-            widget.str = widget.data['ui_name'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
-            if(widget.str.length > widget.data['ui_name_max_length']) {
-                widget.str = widget.data['ui_name_short'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+            if(stats_when_busy) {
+                dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_upgrading'];
+                widget.str = widget.data['ui_name'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+                if(widget.str.length > widget.data['ui_name_max_length']) {
+                    widget.str = widget.data['ui_name_short'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+                }
+                widget.xy = widget.data['ui_name_upgrading_xy'];
+            } else {
+                widget.str = widget.data['ui_name'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+                if(widget.str.length > widget.data['ui_name_max_length']) {
+                    widget.str = widget.data['ui_name_short'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+                }
+                widget.xy = widget.data['ui_name_xy'];
             }
         }
     }
@@ -45926,9 +45959,12 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['icon'].bg_image_offset = vec_add(dialog.data['widgets']['icon']['bg_image_offset'], unit.spec['hero_icon_pos'] || [0,0]);
     }
 
-    dialog.widgets['cost_time'].show = (!stats_only && new_level <= max_level && !stats_when_busy);
+    dialog.widgets['cost_time'].show = (!stats_only && new_level <= max_level && (!stats_when_busy || (stats_when_busy && new_level + 1 < max_level)));
     for(var res in gamedata['resources']) {
         var show_res = (!stats_when_busy && !stats_only && new_level <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
+        if(stats_when_busy) {
+            show_res = (!stats_only && new_level + 1 <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
+        }
         if('resource_'+res+'_icon' in dialog.widgets) {
             dialog.widgets['resource_'+res+'_icon'].show = show_res;
             dialog.widgets['resource_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
@@ -45946,7 +45982,7 @@ function update_upgrade_dialog(dialog) {
         (!tech && (unit.spec['kind'] === 'building') && (get_leveled_quantity(unit.spec['consumes_power']||0, max_level) > 0));
 
     // resource costs
-    if(stats_only || new_level > max_level || stats_when_busy) {
+    if(stats_only || new_level > max_level || (stats_when_busy && new_level + 1 > max_level)) {
         // don't show resource costs if already at max level
         if(dialog.widgets['cost_power'].show) {
             dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip_maxlevel'] : null);
@@ -45962,10 +45998,14 @@ function update_upgrade_dialog(dialog) {
         for(var res in gamedata['resources']) {
             var resdata = gamedata['resources'][res];
 
-            if(tech) {
+            if(tech && !stats_when_busy) {
                 cost = get_leveled_quantity(tech['cost_'+res] || 0, new_level);
-            } else {
+            } else if (tech && stats_when_busy) {
+                cost = get_leveled_quantity(tech['cost_'+res] || 0, new_level + 1);
+            } else if (!tech && !stats_when_busy) {
                 cost = get_leveled_quantity(unit.spec['build_cost_'+res] || 0, new_level);
+            } else {
+                cost = get_leveled_quantity(unit.spec['build_cost_'+res] || 0, new_level + 1);
             }
 
             if(!player.is_cheater && cost > 0 && !resource_allow_instant_upgrade(resdata,player)) {
@@ -46054,6 +46094,9 @@ function update_upgrade_dialog(dialog) {
         }
 
         var cost_time = get_leveled_quantity(time_arr, new_level);
+        if(stats_when_busy && new_level + 1 < max_level) {
+            cost_time = get_leveled_quantity(time_arr, new_level + 1);
+        }
         if(tech_speed != 1) {
             cost_time = Math.floor(cost_time / tech_speed);
         } else if(!tech && unit && cost_time > 0) {
