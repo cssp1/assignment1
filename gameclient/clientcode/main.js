@@ -10717,6 +10717,14 @@ function invoke_playfield_controls_bar() {
             update_player_volume(dialog, 2);
         }
     }
+    dialog.widgets['repair_base_for_free'].onclick = function() {
+        session.for_each_real_object(function(obj) {
+            if(obj.team === 'player' && obj.is_building() && obj.is_damaged()) {
+                send_to_server.func(["CAST_SPELL", obj.id, "SPEEDUP_FOR_FREE"]);
+            }
+        });
+    };
+    dialog.widgets['repair_base_for_gold'].onclick = function() { invoke_repair_dialog(); };
     dialog.ondraw = update_playfield_controls_bar;
     return dialog;
 }
@@ -10825,6 +10833,29 @@ function update_playfield_controls_bar(dialog) {
         dialog.xy = dialog.data['xy'];
         dialog.on_mousewheel_function = null;
     }
+    var show_repair_base_for_gold = false;
+    var show_repair_base_for_free = true;
+    if(session.home_base) {
+        // check if repair base button can be shown
+        session.for_each_real_object(function(obj) {
+            if(obj.team === 'player' && obj.is_building() && obj.is_damaged() && obj.is_repairing()) {
+                show_repair_base_for_gold = true;
+            }
+            if(show_repair_base_for_gold && 'free_speedup_time' in gamedata['store'] && obj.team === 'player' && obj.is_building() && obj.is_damaged() && obj.is_repairing()) {
+                if(obj.repair_finish_time && obj.repair_finish_time > 0) {
+                    var repair_time_remaining = obj.repair_finish_time - server_time;
+                    if(repair_time_remaining > gamedata['store']['free_speedup_time']) { show_repair_base_for_free = false; }
+                }
+            }
+        });
+    }
+    // check if can show repair base buttons, and update price in paid repair tooltip
+    dialog.widgets['repair_base_for_free'].show = show_repair_base_for_gold && show_repair_base_for_free;
+    dialog.widgets['repair_base_for_gold'].show = !dialog.widgets['repair_base_for_free'].show;
+    dialog.widgets['repair_base_for_gold'].state = (show_repair_base_for_gold ? 'normal' : 'disabled');
+    var repair_base_for_gold_tooltip = dialog.data['widgets']['repair_base_for_gold']['ui_tooltip'].replace('%cost', Store.display_user_currency_price_tooltip(Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['REPAIR_ALL_FOR_MONEY'], session.viewing_base.base_id)).replace('Buy for ',''));
+    var repair_base_for_gold_disabled_tooltip = dialog.data['widgets']['repair_base_for_gold']['ui_tooltip_no_repair'];
+    dialog.widgets['repair_base_for_gold'].tooltip.str = (show_repair_base_for_gold ? repair_base_for_gold_tooltip : repair_base_for_gold_disabled_tooltip);
     goog.array.forEach(['', '_prog', '_amount','_button'], function(w) {
         if('volume_bar_sound'+w in dialog.widgets) {
             dialog.widgets['volume_bar_sound'+w].show = dialog.user_data['adjusting_sound'];
@@ -12136,7 +12167,7 @@ function init_desktop_dialogs() {
     if(session.home_base) {
         // developer button
         if(!spin_secure_mode && player.is_developer() && !anon_mode) {
-            dialog.widgets['developer_button'].show = true;
+            dialog.widgets['developer_button'].show = false;
             dialog.widgets['developer_button'].onclick = invoke_cheat_menu;
         } else {
             dialog.widgets['developer_button'].show = false;
@@ -14067,7 +14098,6 @@ function update_desktop_dialogs() {
 
     if(session.home_base) {
         // scan player's buildings to find a few things
-
         session.for_each_real_object(function(obj) {
             if(obj.is_building() && obj.is_manufacturer() && obj.spec['manufacture_category'] === basic_manuf_category) { droid_factory = obj; }
             if(obj.is_building() && obj.is_researcher() && obj.spec['research_categories'][0] === basic_research_category) { robotics_lab = obj; }
