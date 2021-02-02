@@ -7342,6 +7342,31 @@
         }
     },
 
+    "electron_menu_dialog": {
+        "dimensions": [202,485],
+        "default_button": "close_button",
+        "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[202,200], "asset":"dialog_resizable","bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[2,50], "dimensions":[198,170], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "title": { "kind": "TextField", "xy": [37,2], "dimensions": [123,48], "text_size": 30, "text_style": "bold",
+                        "text_hjustify": "center", "ui_name": "Menu" },
+            "separator": {"kind": "Line", "xy": [9,90], "dimensions": [184,0], "color":  [0.063,0.176,0.36,0.5], "stroke_width": 1,
+                          "array": [1,4], "array_offset": [0,40]},
+            "settings_button": { "kind": "ActionButton", "xy": [9,60], "dimensions": [184,28], "text_offset": [0,1], "tooltip_delay": 0,
+                                 "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
+                                 "ui_name": "Gameplay Settings", "ui_tooltip": "Adjust gameplay options and settings"},
+            "account_button": { "kind": "ActionButton", "xy": [9,100], "dimensions": [184,28], "text_offset": [0,1], "tooltip_delay": 0,
+                                 "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
+                                 "ui_name": "Account Settings", "ui_tooltip": "View account information and adjust notification settings"},
+            "main_menu_button": { "kind": "ActionButton", "xy": [9,140], "dimensions": [184,28], "text_offset": [0,1], "tooltip_delay": 0,
+                                  "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
+                                  "ui_name": "Main Menu", "ui_tooltip": "Exit to Main Menu"},
+            "exit_button": { "kind": "ActionButton", "xy": [9,180], "dimensions": [184,28], "text_offset": [0,1], "tooltip_delay": 0,
+                             "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
+                             "ui_name": "Exit", "ui_tooltip": "Exit to Operating System"}
+        }
+    },
+
     "settings_dialog": {
         "dimensions": [770,485],
         "default_button": "close_button",
