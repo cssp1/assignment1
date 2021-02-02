@@ -12167,7 +12167,7 @@ function init_desktop_dialogs() {
     if(session.home_base) {
         // developer button
         if(!spin_secure_mode && player.is_developer() && !anon_mode) {
-            dialog.widgets['developer_button'].show = false;
+            dialog.widgets['developer_button'].show = true;
             dialog.widgets['developer_button'].onclick = invoke_cheat_menu;
         } else {
             dialog.widgets['developer_button'].show = false;
