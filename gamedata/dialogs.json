@@ -743,7 +743,11 @@
             "volume_down_button": { "kind": "ActionButton", "xy": [0,29], "dimensions": [22,20], "bg_image": "map_minus_button", "dripper": {"rate": 3.0, "delay": 0},
                                     "ui_tooltip": "Volume Down", "tooltip_delay": 0, "fixed_tooltip_offset": [-55,31], "push_bg_image": 1 },
             "volume_up_button": { "kind": "ActionButton", "xy": [82,29], "dimensions": [22,20], "bg_image": "map_plus_button", "dripper": {"rate": 3.0, "delay": 0},
-                                  "ui_tooltip": "Volume Up", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 }
+                                  "ui_tooltip": "Volume Up", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 },
+            "repair_base_for_gold": { "kind": "ActionButton", "xy": [108,0], "dimensions": [23,23], "bg_image": "repair_base_button",
+                                      "ui_tooltip": "Repair your base for %cost", "ui_tooltip_no_repair": "Your base is fully repaired", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 },
+            "repair_base_for_free": { "kind": "ActionButton", "xy": [108,0], "dimensions": [23,23], "bg_image": "repair_base_free_button",
+                                      "ui_tooltip": "Repair your base for free!", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 }
         }
     },
 
@@ -751,15 +755,15 @@
     "playfield_controls_bar_vertical": {
         "xy": [0,180],
         "volume_xy": [-110,180],
-        "dimensions": [36,143], "spacing": [-5,-2],
-        "volume_dimensions": [146,143],
+        "dimensions": [36,172], "spacing": [-5,-2],
+        "volume_dimensions": [146,172],
         "widgets": {
-            "controls_bg": {"kind": "SolidRect", "xy":[3,-3], "dimensions":[33,146], "color":[0.066,0.066,0.066,0.86], "bevel":4 },
+            "controls_bg": {"kind": "SolidRect", "xy":[3,-3], "dimensions":[33,175], "color":[0.066,0.066,0.066,0.86], "bevel":4 },
             "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[8,0], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
                                   "ui_caption": "%PLAYER - Home Base",
                                   "ui_tooltip": "Post Screenshot", "tooltip_delay": 0, "fixed_tooltip_offset": [-118,0] },
             "sound_button": { "kind": "ActionButton", "xy": [8,29], "dimensions": [23,23], "bg_image": "audio_sound_button",
-                              "ui_tooltip": "Adjust Music Volume", "tooltip_delay": 0, "fixed_tooltip_offset": [-146,29], "push_bg_image": 1 },
+                              "ui_tooltip": "Adjust Sound Volume", "tooltip_delay": 0, "fixed_tooltip_offset": [-146,29], "push_bg_image": 1 },
             "music_button": { "kind": "ActionButton", "xy": [8,58], "dimensions": [23,23], "bg_image": "audio_music_button",
                               "ui_tooltip": "Music On/Off", "tooltip_delay": 0, "fixed_tooltip_offset": [-95,58], "push_bg_image": 1 },
             "fullscreen_button": { "kind": "ActionButton", "xy": [8,87], "dimensions": [23,23], "bg_image": "fullscreen_button",
@@ -787,7 +791,12 @@
             "volume_down_button": { "kind": "ActionButton", "xy": [35,29], "dimensions": [22,20], "bg_image": "map_minus_button", "dripper": {"rate": 3.0, "delay": 0},
                                     "ui_tooltip": "Volume Down", "tooltip_delay": 0, "fixed_tooltip_offset": [-55,31], "push_bg_image": 1 },
             "volume_up_button": { "kind": "ActionButton", "xy": [117,29], "dimensions": [22,20], "bg_image": "map_plus_button", "dripper": {"rate": 3.0, "delay": 0},
-                                  "ui_tooltip": "Volume Up", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 }
+                                  "ui_tooltip": "Volume Up", "tooltip_delay": 0, "fixed_tooltip_offset": [-5,31], "push_bg_image": 1 },
+            "repair_base_for_gold": { "kind": "ActionButton", "xy": [8,145], "dimensions": [23,23], "bg_image": "repair_base_button",
+                                      "ui_tooltip": "Repair your base for %cost", "ui_tooltip_no_repair": "Your base is fully repaired", "tooltip_delay": 0, "fixed_tooltip_offset": [-146,0], "push_bg_image": 1 },
+            "repair_base_for_free": { "kind": "ActionButton", "xy": [8,145], "dimensions": [23,23], "bg_image": "repair_base_free_button",
+                                      "ui_tooltip": "Repair your base for free!", "tooltip_delay": 0, "fixed_tooltip_offset": [-146,0], "push_bg_image": 1 }
+
         }
     },
 
@@ -927,7 +936,6 @@
             "repair_base_for_free": { "kind": "ActionButton", "xy": [4,262], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                       "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Free Repair!",
                                       "ui_tooltip": "Repair your base for free!", "show": 0 },
-
 
             "surrender_button": { "show": 0, "kind": "ActionButton", "xy": [327,0], "dimensions": [152,56], "bg_image": "attack_button",
                                   "ui_name": "Surrender", "ui_name_pending": "Surrendering...",
