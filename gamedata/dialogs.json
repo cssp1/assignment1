@@ -7360,10 +7360,10 @@
                                  "ui_name": "Account Settings", "ui_tooltip": "View account information and adjust notification settings"},
             "main_menu_button": { "kind": "ActionButton", "xy": [9,140], "dimensions": [184,28], "text_offset": [0,1], "tooltip_delay": 0,
                                   "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
-                                  "ui_name": "Main Menu", "ui_tooltip": "Exit to Main Menu"},
+                                  "ui_name": "Exit to Menu", "ui_tooltip": "Exit to Main Menu"},
             "exit_button": { "kind": "ActionButton", "xy": [9,180], "dimensions": [184,28], "text_offset": [0,1], "tooltip_delay": 0,
                              "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
-                             "ui_name": "Exit", "ui_tooltip": "Exit to Operating System"}
+                             "ui_name": "Exit to OS", "ui_tooltip": "Exit to Operating System"}
         }
     },
 
