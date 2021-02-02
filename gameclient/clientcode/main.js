@@ -10932,6 +10932,9 @@ function update_playfield_controls_bar(dialog) {
     }
     dialog.widgets['settings_button'].show = session.enable_combat_resource_bars && ((player.tutorial_state == "COMPLETE") ||
                                                                                      gamedata['tutorial'][player.tutorial_state]['enable_desktop_control_buttons']);
+    if(eval_cond_or_literal(gamedata['client']['show_electron_control_dialog'], player, null)) {
+        dialog.widgets['settings_button'].tooltip.str = dialog.data['widgets']['settings_button']['ui_tooltip_electron'];
+    }
     dialog.widgets['fullscreen_button'].state = canvas_is_fullscreen ? 'reverse' : 'normal';
     if(GameArt.enable_audio) {
         dialog.widgets['music_button'].state = GameArt.music_volume > 0 ? 'on' : 'off';
@@ -54700,6 +54703,8 @@ function on_keydown(e) {
                         }
                     }
                     btn.onclick(btn);
+                } else if (selection.ui.user_data['dialog'] === 'electron_menu_dialog') {
+                    close_dialog(selection.ui);
                 }
             } else if(selection.spellname) {
                 if(selection.spellname == "DEPLOY_UNITS" && !session.has_deployed) {
@@ -54710,8 +54715,10 @@ function on_keydown(e) {
                     selection.spellname = null;
                 }
             }
-        } else {
+        } else if(selection.item || selection.unit) {
             change_selection(null);
+        } else if(eval_cond_or_literal(gamedata['client']['show_electron_control_dialog'], player, null)) {
+            invoke_electron_menu_dialog();
         }
         if(global_chat_frame && global_chat_frame.is_visible()) {
             if(SPUI.keyboard_focus === global_chat_frame.widgets['input']) {
