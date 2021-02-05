@@ -9964,7 +9964,7 @@ class Player(AbstractPlayer):
 
     def cooldown_find(self, cd_name, match_data = None):
         if cd_name in self.cooldowns:
-            to_go = self.cooldowns[cd_name]['end'] - server_time
+            to_go = self.cooldowns[cd_name]['end'] - server_time_high
             if to_go > 0:
                 # cooldown has not expired yet
                 if match_data: # check metadata
@@ -11509,10 +11509,8 @@ class Player(AbstractPlayer):
             cdtime = self.get_territory_setting('squad_order_cooldown')
             if cdtime > 0:
                 cdname = 'squad_order:%d' % squad_id
-                if gamedata['server'].get('map_path_highres_time'):
-                    self.cooldown_trigger(cdname, new_path[-1]['eta'] + cdtime - server_time_high)
-                else:
-                    self.cooldown_trigger(cdname, new_path[-1]['eta'] + cdtime - server_time)
+                time_ref = server_time_high if gamedata['server'].get('map_path_highres_time') else server_time
+                self.cooldown_trigger(cdname,  new_path[-1]['eta'] + cdtime - time_ref)
                 session.deferred_player_cooldowns_update = True
 
         session.activity_classifier.set_flag('map_move')
