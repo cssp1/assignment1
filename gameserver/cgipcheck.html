@@ -199,6 +199,14 @@ var check_ui_reason = function(reason) {
     return reason;
 };
 
+var check_mandatory_input = function(input_value, input_field) {
+    if(!input_value || input_value.length < 1) {
+        display_error('Please enter a value in the ' + input_field ' field');
+        return null;
+    }
+    return input_value;
+};
+
 var send_request = function(path, method, args, cb, async, fail_cb) {
     args['spin_token'] = spin_token; args['method'] = method;
     $.ajax(spin_url+'/'+path, { data: args,
@@ -428,6 +436,26 @@ var method_demote_alliance_leader = function() {
         send_request('player', 'demote_alliance_leader', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success! The new Clan leader is user_id "+result['new_leader_id'].toString()); });
     }
 };
+var method_change_alliance_name = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#alliance_reason")[0].value);
+    var new_alliance_name = check_mandatory_input($("#alliance_new_value")[0].value, 'clan name or tag');
+    if(ident && ui_reason && new_alliance_name) {
+        send_request('player', 'change_alliance_name', $.extend(ident, {'ui_reason':ui_reason 'new_alliance_name':new_alliance_name}, ), function(result) { alert("Success! The new Clan name is "+result['new_alliance_name'].toString()); });
+    }
+}
+var method_change_alliance_tag = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#alliance_reason")[0].value);
+    var new_alliance_tag = check_mandatory_input($("#alliance_new_value")[0].value, 'clan name or tag');
+    if(new_alliance_tag.length != 3) {
+        display_error('Clan tags must be three characters in length');
+        return;
+    }
+    if(ident && ui_reason && new_alliance_tag) {
+        send_request('player', 'change_alliance_tag', $.extend(ident, {'ui_reason':ui_reason, 'new_alliance_tag':new_alliance_tag}, ), function(result) { alert("Success! The new Clan tag is "+result['new_alliance_tag'].toString()); });
+    }
+}
 var method_mark_uninstalled = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#privacy_reason")[0].value);
@@ -1972,6 +2000,12 @@ $(function() {
     <div id="player_tools_alliance">
       <button onclick="method_demote_alliance_leader()" class="spin_button">Demote Leader</button>
       <button onclick="method_kick_alliance_member()" class="spin_button">Kick from Clan</button>
+      <P>
+      Change clan name or tag:
+      <br>
+      <input type="text" id="alliance_new_value" style="width:500px;">
+      <button onclick="method_change_alliance_name()" class="spin_button">Change Name</button>
+      <button onclick="method_change_alliance_tag()" class="spin_button">Change Tag</button>
       <p>
       Reason for this action:
       <br>

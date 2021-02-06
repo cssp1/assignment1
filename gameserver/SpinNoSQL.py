@@ -2313,11 +2313,11 @@ class NoSQLClient (object):
         self.alliance_table('alliance_join_requests').delete_many({'alliance_id':id})
         # XXXXXX clear Scores2 data for this alliance
 
-    # note: modifications are rejected unless modifier_id has permission
-    def modify_alliance(self, alliance_id, modifier_id, ui_name = None, ui_description = None, join_type = None, logo = None, leader_id = None, continent = None, chat_motd = None, chat_tag = None, reason = ''):
-        return self.instrument('modify_alliance(%s)'%reason, self._modify_alliance, (alliance_id, modifier_id, ui_name, ui_description, join_type, logo, leader_id, continent, chat_motd, chat_tag))
-    def _modify_alliance(self, alliance_id, modifier_id, ui_name, ui_description, join_type, logo, leader_id, continent, chat_motd, chat_tag):
-        if (not self._check_alliance_member_perm(alliance_id, modifier_id, 'admin')): return False, None
+    # note: modifications are rejected unless modifier_id has permission or force = True
+    def modify_alliance(self, alliance_id, modifier_id, ui_name = None, ui_description = None, join_type = None, logo = None, leader_id = None, continent = None, chat_motd = None, chat_tag = None, force = False, reason = ''):
+        return self.instrument('modify_alliance(%s)'%reason, self._modify_alliance, (alliance_id, modifier_id, ui_name, ui_description, join_type, logo, leader_id, continent, chat_motd, chat_tag, force))
+    def _modify_alliance(self, alliance_id, modifier_id, ui_name, ui_description, join_type, logo, leader_id, continent, chat_motd, chat_tag, force):
+        if (not self._check_alliance_member_perm(alliance_id, modifier_id, 'admin')) and not force: return False, None
 
         props = {'last_active_time': self.time}
         unset = {}
