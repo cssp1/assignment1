@@ -701,9 +701,9 @@ if __name__ == '__main__':
                 elif 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and entry.get('logins',1) < 100:
                     continue
                 alt_filename = '%d_%s.txt' % (s_other_id, game_id)
-                alt_player = SpinJSON.load(open(alt_player))
+                alt_player = SpinJSON.load(open(alt_filename))
                 if 'customer_support' in alt_player['history']:
-                    for entry in player['history']['customer_support']:
+                    for entry in alt_player['history']['customer_support']:
                         entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "chat_abuse_violation": prior_chat_violations += 1
                         entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "alt_account_violation": prior_alt_violations += 1
                         entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "vpn_login_violation": prior_vpn_violations += 1
@@ -811,9 +811,19 @@ if __name__ == '__main__':
                         ui_last_ip += ' *** VPN risk *** ' + ip_rep
                 else:
                     ui_last_ip = 'Unknown'
-                print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
+                prior_chat_violations = 0
+                prior_alt_violations = 0
+                prior_vpn_violations = 0
+                alt_filename = '%d_%s.txt' % (s_other_id, game_id)
+                alt_player = SpinJSON.load(open(alt_filename))
+                if 'customer_support' in alt_player['history']:
+                    for entry in alt_player['history']['customer_support']:
+                        entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "chat_abuse_violation": prior_chat_violations += 1
+                        entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "alt_account_violation": prior_alt_violations += 1
+                        entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "vpn_login_violation": prior_vpn_violations += 1
+                print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat violations %d, Alt violations %d, VPN violations %d)' % (int(s_other_id), entry.get('logins',1),
                                                                                                 pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
-                                                                                                ui_last_ip))
+                                                                                                ui_last_ip, prior_chat_violations, prior_alt_violations, prior_vpn_violations))
 
         if 'customer_support' in player['history']:
             print fmt % ('Customer Support history', '')
