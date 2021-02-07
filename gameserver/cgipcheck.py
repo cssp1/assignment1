@@ -320,7 +320,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             elif method == 'chat_abuse_clear':
                 result = {'result':chat_abuse_clear(control_args)}
             elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','ban','unban','vpn_excuse','vpn_unexcuse',
-                            'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','change_region','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member','change_alliance_name','change_alliance_tag','add_note'):
+                            'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','change_region','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member','change_alliance_info','add_note'):
                 result = do_CONTROLAPI(control_args)
             else:
                 raise Exception('unknown player method '+method)

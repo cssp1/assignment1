@@ -1712,65 +1712,43 @@ class HandleKickAllianceMember(Handler):
                                                             'reason':'CustomerSupport'})
         return ReturnValue(result = 'ok')
 
-class HandleChangeAllianceName(Handler):
+class HandleChangeAllianceInfo(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
-        self.new_alliance_name = self.args.get('new_alliance_name', None)
+        self.info_type = self.args.get('info_type', None)
+        self.new_alliance_info = self.args.get('new_alliance_info', None)
 
     def do_exec_online(self, session, retmsg): return self.do_exec_both()
     def do_exec_offline(self, user, player): return self.do_exec_both()
     def do_exec_both(self):
-        if not self.new_alliance_name:
-            return ReturnValue(error = 'change_alliance_name failed: new alliance name not provided')
+        if not self.info_type:
+            return ReturnValue(error = 'change_alliance_info failed: info type not provided')
+        if not self.new_alliance_info:
+            return ReturnValue(error = 'change_alliance_info failed: new alliance info not provided')
         alliance_membership = self.gamesite.sql_client.get_users_alliance_membership(self.user_id, reason = 'CustomerSupport')
         if not alliance_membership:
-            return ReturnValue(error = 'change_alliance_name failed: user %d is not in an alliance' % (self.user_id,))
+            return ReturnValue(error = 'change_alliance_info failed: user %d is not in an alliance' % (self.user_id,))
         alliance_id = alliance_membership['alliance_id']
         alliance_info = self.gamesite.sql_client.get_alliance_info(alliance_id, member_access = True, reason = 'CustomerSupport')
-        success, err_reason = self.gamesite.sql_client.modify_alliance(alliance_id, self.user_id, ui_name = self.new_alliance_name, ui_description = alliance_info['ui_descr'],
-                                                                                  join_type = alliance_info['join_type'], logo = alliance_info['logo'],
-                                                                                  chat_motd = alliance_info['chat_motd'], chat_tag = alliance_info['chat_tag'], force = True,
-                                                                                  reason = 'CustomerSupport')
-
+        new_ui_name = alliance_info['ui_name']
+        new_chat_tag = alliance_info['chat_tag']
+        event_name = None
+        if self.info_type == 'name':
+            new_ui_name = self.new_alliance_info
+            event_name = '4631_alliance_renamed_by_customer_support'
+        elif self.info_type == 'tag':
+            new_chat_tag = self.new_alliance_info
+            event_name = '4631_alliance_tag_changed_by_customer_support'
+        success, err_reason = self.gamesite.sql_client.modify_alliance(alliance_id, self.user_id, ui_name = new_ui_name, chat_tag = new_chat_tag, force = True, reason = 'CustomerSupport')
         if success:
-            self.gamesite.pcache_client.player_cache_update(self.user_id, {'alliance_id': -1}, reason = 'CustomerSupport')
-            self.gamesite.metrics_log.event(self.time_now, {'user_id': self.user_id,
-                                                            'event_name': '4631_alliance_renamed_by_customer_support',
-                                                            'alliance_id': alliance_id, 'target_id': self.user_id,
-                                                            'reason':'CustomerSupport'})
+            if event_name:
+                self.gamesite.metrics_log.event(self.time_now, {'user_id': self.user_id,
+                                                                'event_name': event_name,
+                                                                'alliance_id': alliance_id, 'target_id': self.user_id,
+                                                                'reason':'CustomerSupport'})
             return ReturnValue(result = 'ok')
         else:
-            return ReturnValue(error = 'change_alliance_name failed: %s' % (err_reason))
-
-class HandleChangeAllianceTag(Handler):
-    def __init__(self, *args, **kwargs):
-        Handler.__init__(self, *args, **kwargs)
-        self.new_alliance_tag = self.args.get('new_alliance_tag', None)
-
-    def do_exec_online(self, session, retmsg): return self.do_exec_both()
-    def do_exec_offline(self, user, player): return self.do_exec_both()
-    def do_exec_both(self):
-        if not self.new_alliance_tag:
-            return ReturnValue(error = 'change_alliance_tag failed: new alliance tag not provided')
-        alliance_membership = self.gamesite.sql_client.get_users_alliance_membership(self.user_id, reason = 'CustomerSupport')
-        if not alliance_membership:
-            return ReturnValue(error = 'change_alliance_tag failed: user %d is not in an alliance' % (self.user_id,))
-        alliance_id = alliance_membership['alliance_id']
-        alliance_info = self.gamesite.sql_client.get_alliance_info(alliance_id, member_access = True, reason = 'CustomerSupport')
-        success, err_reason = self.gamesite.sql_client.modify_alliance(alliance_id, self.user_id, ui_name = alliance_info['ui_name'], ui_description = alliance_info['ui_descr'],
-                                                                                  join_type = alliance_info['join_type'], logo = alliance_info['logo'],
-                                                                                  chat_motd = alliance_info['chat_motd'], chat_tag = self.new_alliance_tag, force = True,
-                                                                                  reason = 'CustomerSupport')
-
-        if success:
-            self.gamesite.pcache_client.player_cache_update(self.user_id, {'alliance_id': -1}, reason = 'CustomerSupport')
-            self.gamesite.metrics_log.event(self.time_now, {'user_id': self.user_id,
-                                                            'event_name': '4631_alliance_tag_changed_by_customer_support',
-                                                            'alliance_id': alliance_id, 'target_id': self.user_id,
-                                                            'reason':'CustomerSupport'})
-            return ReturnValue(result = 'ok')
-        else:
-            return ReturnValue(error = 'change_alliance_name failed: %s' % (err_reason))
+            return ReturnValue(error = 'change_alliance_info failed: %s' % (err_reason))
 
 class HandleResetIdleCheckState(Handler):
     # note: no logging, directly override exec()
@@ -2205,8 +2183,7 @@ methods = {
     'change_region': HandleChangeRegion,
     'demote_alliance_leader': HandleDemoteAllianceLeader,
     'kick_alliance_member': HandleKickAllianceMember,
-    'change_alliance_name': HandleChangeAllianceName,
-    'change_alliance_tag': HandleChangeAllianceTag,
+    'change_alliance_info': HandleChangeAllianceInfo,
     'reset_idle_check_state': HandleResetIdleCheckState,
     'repopulate_friends': HandleRepopulateFriends,
     'help_response': HandleHelpResponse,

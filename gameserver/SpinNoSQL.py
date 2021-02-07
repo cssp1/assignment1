@@ -2317,7 +2317,7 @@ class NoSQLClient (object):
     def modify_alliance(self, alliance_id, modifier_id, ui_name = None, ui_description = None, join_type = None, logo = None, leader_id = None, continent = None, chat_motd = None, chat_tag = None, force = False, reason = ''):
         return self.instrument('modify_alliance(%s)'%reason, self._modify_alliance, (alliance_id, modifier_id, ui_name, ui_description, join_type, logo, leader_id, continent, chat_motd, chat_tag, force))
     def _modify_alliance(self, alliance_id, modifier_id, ui_name, ui_description, join_type, logo, leader_id, continent, chat_motd, chat_tag, force):
-        if (not self._check_alliance_member_perm(alliance_id, modifier_id, 'admin')) and not force: return False, None
+        if not force and (not self._check_alliance_member_perm(alliance_id, modifier_id, 'admin')): return False, None
 
         props = {'last_active_time': self.time}
         unset = {}

@@ -436,24 +436,18 @@ var method_demote_alliance_leader = function() {
         send_request('player', 'demote_alliance_leader', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success! The new Clan leader is user_id "+result['new_leader_id'].toString()); });
     }
 };
-var method_change_alliance_name = function() {
+var method_change_alliance_name = function() { method_change_alliance_info('name'); }
+var method_change_alliance_tag = function() { method_change_alliance_info('tag'); }
+var method_change_alliance_info = function(info_type) {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#alliance_reason")[0].value);
-    var new_alliance_name = check_mandatory_input($("#alliance_new_value")[0].value, 'clan name or tag');
-    if(ident && ui_reason && new_alliance_name) {
-        send_request('player', 'change_alliance_name', $.extend(ident, {'ui_reason':ui_reason 'new_alliance_name':new_alliance_name}, ), function(result) { alert("Success! The new Clan name is "+result['new_alliance_name'].toString()); });
-    }
-}
-var method_change_alliance_tag = function() {
-    var ident = get_ident();
-    var ui_reason = check_ui_reason($("#alliance_reason")[0].value);
-    var new_alliance_tag = check_mandatory_input($("#alliance_new_value")[0].value, 'clan name or tag');
-    if(new_alliance_tag.length != 3) {
+    var new_alliance_info = check_mandatory_input($("#alliance_new_value")[0].value, 'clan name or tag');
+    if(info_type === 'tag' && new_alliance_info.length != 3) {
         display_error('Clan tags must be three characters in length');
         return;
     }
-    if(ident && ui_reason && new_alliance_tag) {
-        send_request('player', 'change_alliance_tag', $.extend(ident, {'ui_reason':ui_reason, 'new_alliance_tag':new_alliance_tag}, ), function(result) { alert("Success! The new Clan tag is "+result['new_alliance_tag'].toString()); });
+    if(ident && ui_reason && new_alliance_name) {
+        send_request('player', 'change_alliance_info', $.extend(ident, {'ui_reason':ui_reason 'info_type': info_type, 'new_alliance_info':new_alliance_info}, ), function(result) { alert("Success! The new Clan name is "+result['new_alliance_name'].toString()); });
     }
 }
 var method_mark_uninstalled = function() {
