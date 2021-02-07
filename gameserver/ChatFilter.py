@@ -214,6 +214,7 @@ class ChatFilter(object):
                              0x589, # ARMENIAN FULL STOP
                              0x5c0, 0x5c3, 0x5c6, 0x5f3, 0x5f4, # Hebrew punctuation
                              0x640, # Arabic Tatweel (this is debatable)
+                             0x489, # Combining Cyrillic Millions Sign
                              ):
                 return True
 
@@ -242,7 +243,7 @@ class ChatFilter(object):
                 return True
             if codepoint >= 0x1d000 and codepoint <= 0x1f2ff:
                 return True
-            if codepoint >= 0x1f300 and codepoint <= 0x1f9ff:
+            if codepoint >= 0x1f300 and codepoint <= 0x1faff:
                 return True
 
         return False

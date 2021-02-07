@@ -243,10 +243,11 @@ def is_valid_alias(name):
     assert type(name) is unicode # make sure we're given Unicode input
     if len(name) < 4 or len(name) > 15: return False
     if chat_filter.is_bad(name): return False
-    # note: we should have disallowed - and = here, but it's too late for legacy games (--==MegaDeath==--)
-    if chat_filter.is_graphical(name, allow_chars = ['-','=']): return False
+    if chat_filter.is_graphical(name): return False
     if chat_filter.is_ugly(name): return False
     if 'spinpunch' in name.lower(): return False
+    if 'battlehouse' in name.lower(): return False
+    if 'bh-' in name.lower(): return False
     return True
 
 # recognize obsolete time-series history fields for deletion
