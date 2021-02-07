@@ -679,9 +679,9 @@ if __name__ == '__main__':
             prior_alt_violations = 0
             prior_vpn_violations = 0
             for entry in player['history']['customer_support']:
-                entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "chat_abuse_violation": prior_chat_violations += 1
-                entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "alt_account_violation": prior_alt_violations += 1
-                entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "vpn_login_violation": prior_vpn_violations += 1
+                if entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "chat_abuse_violation": prior_chat_violations += 1
+                if entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "alt_account_violation": prior_alt_violations += 1
+                if entry['method'] == 'TRIGGER_COOLDOWN' and entry.get('name') == "vpn_login_violation": prior_vpn_violations += 1
             if prior_chat_violations > 0 or prior_alt_violations > 0 or prior_vpn_violations > 0:
                 print '---Prior Violations---'
                 print 'Chat Abuse: %d' % prior_chat_violations
