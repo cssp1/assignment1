@@ -446,7 +446,7 @@ var method_change_alliance_info = function(info_type) {
         display_error('Clan tags must be three characters in length');
         return;
     }
-    if(ident && ui_reason && new_alliance_name) {
+    if(ident && ui_reason && new_alliance_info) {
         send_request('player', 'change_alliance_info', $.extend(ident, {'ui_reason':ui_reason, 'info_type': info_type, 'new_alliance_info':new_alliance_info}, ), function(result) { alert("Success! The new Clan" + info_type + " is " + result['new_alliance_info'].toString()); });
     }
 }
