@@ -679,13 +679,9 @@ if __name__ == '__main__':
             prior_alt_violations = 0
             prior_vpn_violations = 0
             for entry in player['history']['customer_support']:
-                if entry['method'].upper() == 'TRIGGER_COOLDOWN':
-                    print '---DEBUG HISTORY OUTPUT---'
-                    print entry
-                    break
-                if entry['method'].upper() == 'TRIGGER_COOLDOWN' and entry.get('name') == "chat_abuse_violation": prior_chat_violations += 1
-                if entry['method'].upper() == 'TRIGGER_COOLDOWN' and entry.get('name') == "alt_account_violation": prior_alt_violations += 1
-                if entry['method'].upper() == 'TRIGGER_COOLDOWN' and entry.get('name') == "vpn_login_violation": prior_vpn_violations += 1
+                if entry['method'].upper() == 'TRIGGER_COOLDOWN' and and 'args' in entry and entry['args'].get('name') == "chat_abuse_violation": prior_chat_violations += 1
+                if entry['method'].upper() == 'TRIGGER_COOLDOWN' and and 'args' in entry and entry['args'].get('name') == "alt_account_violation": prior_alt_violations += 1
+                if entry['method'].upper() == 'TRIGGER_COOLDOWN' and and 'args' in entry and entry['args'].get('name') == "vpn_login_violation": prior_vpn_violations += 1
             if prior_chat_violations > 0 or prior_alt_violations > 0 or prior_vpn_violations > 0:
                 print '---Prior Violations---'
                 print 'Chat Abuse: %d' % prior_chat_violations
@@ -721,13 +717,13 @@ if __name__ == '__main__':
                     continue
                 if 'customer_support' in alt_player['history']:
                     for entry in alt_player['history']['customer_support']:
-                        if entry['method'].upper() == 'TRIGGER_COOLDOWN' and entry.get('name') == "chat_abuse_violation":
+                        if entry['method'].upper() == 'TRIGGER_COOLDOWN' and and 'args' in entry and entry['args'].get('name') == "chat_abuse_violation":
                             total_alt_prior_chat_violations += 1
                             alt_prior_chat_violations[s_other_id] += 1
-                        if entry['method'].upper() == 'TRIGGER_COOLDOWN' and entry.get('name') == "alt_account_violation":
+                        if entry['method'].upper() == 'TRIGGER_COOLDOWN' and and 'args' in entry and entry['args'].get('name') == "alt_account_violation":
                             total_alt_prior_alt_violations += 1
                             alt_prior_alt_violations[s_other_id] += 1
-                        if entry['method'].upper() == 'TRIGGER_COOLDOWN' and entry.get('name') == "vpn_login_violation":
+                        if entry['method'].upper() == 'TRIGGER_COOLDOWN' and and 'args' in entry and entry['args'].get('name') == "vpn_login_violation":
                             total_alt_prior_vpn_violations += 1
                             alt_prior_vpn_violations[s_other_id] += 1
 
