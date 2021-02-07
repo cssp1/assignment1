@@ -679,6 +679,10 @@ if __name__ == '__main__':
             prior_alt_violations = 0
             prior_vpn_violations = 0
             for entry in player['history']['customer_support']:
+                print
+                print '---DEBUG HISTORY OUTPUT---'
+                print entry
+                break
                 if entry['method'] == 'TRIGGER_COOLDOWN':
                     print '---DEBUG HISTORY OUTPUT---'
                     print entry
