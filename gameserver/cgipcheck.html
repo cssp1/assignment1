@@ -447,7 +447,7 @@ var method_change_alliance_info = function(info_type) {
         return;
     }
     if(ident && ui_reason && new_alliance_name) {
-        send_request('player', 'change_alliance_info', $.extend(ident, {'ui_reason':ui_reason 'info_type': info_type, 'new_alliance_info':new_alliance_info}, ), function(result) { alert("Success! The new Clan name is "+result['new_alliance_name'].toString()); });
+        send_request('player', 'change_alliance_info', $.extend(ident, {'ui_reason':ui_reason, 'info_type': info_type, 'new_alliance_info':new_alliance_info}, ), function(result) { alert("Success! The new Clan" + info_type + " is " + result['new_alliance_info'].toString()); });
     }
 }
 var method_mark_uninstalled = function() {
