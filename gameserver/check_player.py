@@ -675,23 +675,28 @@ if __name__ == '__main__':
             print fmt % ('BANNED for:', '%.1f hrs' % ( (player['banned_until']-time_now)/3600.0))
 
         if 'customer_support' in player['history']:
+            prior_chat_warnings = 0
             prior_chat_violations = 0
             prior_alt_violations = 0
             prior_vpn_violations = 0
             for entry in player['history']['customer_support']:
+                if entry['method'].upper() == 'SEND_MESSAGE' and 'args' in entry and entry['args'].get('message_subject') == "Chat Warning": prior_chat_warnings += 1
                 if entry['method'].upper() == 'TRIGGER_COOLDOWN' and 'args' in entry and entry['args'].get('name') == "chat_abuse_violation": prior_chat_violations += 1
                 if entry['method'].upper() == 'TRIGGER_COOLDOWN' and 'args' in entry and entry['args'].get('name') == "alt_account_violation": prior_alt_violations += 1
                 if entry['method'].upper() == 'TRIGGER_COOLDOWN' and 'args' in entry and entry['args'].get('name') == "vpn_login_violation": prior_vpn_violations += 1
             if prior_chat_violations > 0 or prior_alt_violations > 0 or prior_vpn_violations > 0:
                 print '---Prior Violations---'
-                print 'Chat Abuse: %d' % prior_chat_violations
+                print 'Chat Warnings: %d' % prior_chat_violations
+                print 'Chat Abuse: %d' % prior_chat_warnings
                 print 'Alt Account Violations: %d' % prior_alt_violations
                 print 'VPN Login Violations: %d' % prior_vpn_violations
 
         if 'known_alt_accounts' in player and player['known_alt_accounts']:
+            alt_prior_chat_warnings = {}
             alt_prior_chat_violations = {}
             alt_prior_alt_violations = {}
             alt_prior_vpn_violations = {}
+            total_alt_prior_chat_warnings = 0
             total_alt_prior_chat_violations = 0
             total_alt_prior_alt_violations = 0
             total_alt_prior_vpn_violations = 0
@@ -703,6 +708,7 @@ if __name__ == '__main__':
                     continue
                 elif 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and entry.get('logins',1) < 100:
                     continue
+                alt_prior_chat_warnings[s_other_id] = 0
                 alt_prior_chat_violations[s_other_id] = 0
                 alt_prior_alt_violations[s_other_id] = 0
                 alt_prior_vpn_violations[s_other_id] = 0
@@ -717,6 +723,9 @@ if __name__ == '__main__':
                     continue
                 if 'customer_support' in alt_player['history']:
                     for entry in alt_player['history']['customer_support']:
+                        if entry['method'].upper() == 'SEND_MESSAGE' and 'args' in entry and entry['args'].get('message_subject') == "Chat Warning":
+                            total_alt_prior_chat_warnings += 1
+                            alt_prior_chat_warnings[s_other_id] += 1
                         if entry['method'].upper() == 'TRIGGER_COOLDOWN' and 'args' in entry and entry['args'].get('name') == "chat_abuse_violation":
                             total_alt_prior_chat_violations += 1
                             alt_prior_chat_violations[s_other_id] += 1
@@ -729,6 +738,7 @@ if __name__ == '__main__':
 
             if total_alt_prior_chat_violations > 0 or total_alt_prior_alt_violations > 0 or total_alt_prior_vpn_violations > 0:
                 print '---Prior Violations on Alt Accounts---'
+                print 'Chat Warnings: %d' % total_alt_prior_chat_warnings
                 print 'Chat Abuse: %d' % total_alt_prior_chat_violations
                 print 'Alt Account Violations: %d' % total_alt_prior_alt_violations
                 print 'VPN Login Violations: %d' % total_alt_prior_vpn_violations
@@ -830,9 +840,9 @@ if __name__ == '__main__':
                         ui_last_ip += ' *** VPN risk *** ' + ip_rep
                 else:
                     ui_last_ip = 'Unknown'
-                print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat violations %d, Alt violations %d, VPN violations %d)' % (int(s_other_id), entry.get('logins',1),
+                print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Alt violations %d, VPN violations %d)' % (int(s_other_id), entry.get('logins',1),
                                                                                                 pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
-                                                                                                ui_last_ip, alt_prior_chat_violations[s_other_id], alt_prior_alt_violations[s_other_id], alt_prior_vpn_violations[s_other_id]))
+                                                                                                ui_last_ip, alt_prior_chat_warnings[s_other_id], alt_prior_chat_violations[s_other_id], alt_prior_alt_violations[s_other_id], alt_prior_vpn_violations[s_other_id]))
 
         if 'customer_support' in player['history']:
             print fmt % ('Customer Support history', '')
