@@ -1746,7 +1746,8 @@ class HandleChangeAllianceInfo(Handler):
                                                                 'event_name': event_name,
                                                                 'alliance_id': alliance_id, 'target_id': self.user_id,
                                                                 'reason':'CustomerSupport'})
-            return ReturnValue(result = 'ok')
+            formatted_result  = {'new_alliance_info': self.new_alliance_info}
+            return ReturnValue(result = formatted_result)
         else:
             return ReturnValue(error = 'change_alliance_info failed: %s' % (err_reason))
 
