@@ -863,7 +863,7 @@ if __name__ == '__main__':
                 if entry['spin_user'] == 'unknown' and entry['method'].upper() == 'MARK_UNINSTALLED': continue # skip mark uninstall notices. It clutters customer history on elder players
                 print '    At %s by %s: %s %s' % (time.strftime('%Y%m%d %H:%M GMT', time.gmtime(entry['time'])), entry['spin_user'], entry['method'].upper(), SpinJSON.dumps(entry.get('args',{})))
                 if 'ui_reason' in entry:
-                    print '        Reason: %s' % entry['ui_reason']
+                    print '        Reason: %s' % entry['ui_reason'].replace('\n','\n                ')
 
         if bloat:
             # check for bloat
