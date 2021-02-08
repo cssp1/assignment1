@@ -850,6 +850,10 @@ if __name__ == '__main__':
                     print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (BANNED!)' % (int(s_other_id), entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip))
+                elif violation_history['chat_warnings'] == 0 and violation_history['chat_violations'] == 0 and violation_history['alt_violations'] == 0 and violation_history['vpn_violations'] == 0:
+                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
+                                                                                                    pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
+                                                                                                    ui_last_ip))
                 else:
                     print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Alt violations %d, VPN violations %d)' % (int(s_other_id), entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
