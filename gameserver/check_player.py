@@ -694,10 +694,10 @@ if __name__ == '__main__':
         violation_history = get_prior_violations(player)
         if violation_history['chat_warnings'] > 0 or violation_history['chat_violations'] > 0 or violation_history['alt_violations'] > 0 or violation_history['vpn_violations'] > 0:
             print '---Prior Violations---'
-            print 'Chat Warnings: %d' % violation_history['chat_warnings']
-            print 'Chat Abuse: %d' % violation_history['chat_violations']
+            print 'Chat Warnings:          %d' % violation_history['chat_warnings']
+            print 'Chat Abuse:             %d' % violation_history['chat_violations']
             print 'Alt Account Violations: %d' % violation_history['alt_violations']
-            print 'VPN Login Violations: %d' % violation_history['vpn_violations']
+            print 'VPN Login Violations:   %d' % violation_history['vpn_violations']
 
         if 'known_alt_accounts' in player and player['known_alt_accounts']:
             total_alt_prior_chat_warnings = 0
@@ -730,13 +730,13 @@ if __name__ == '__main__':
                 total_alts_banned += violation_history['banned']
 
             if total_alt_prior_chat_violations > 0 or total_alt_prior_alt_violations > 0 or total_alt_prior_vpn_violations > 0:
-                print '---Prior Violations on Alt Accounts---'
-                print 'Chat Warnings: %d' % total_alt_prior_chat_warnings
-                print 'Chat Abuse: %d' % total_alt_prior_chat_violations
+                print '---Violations on Alts---'
+                print 'Chat Warnings:          %d' % total_alt_prior_chat_warnings
+                print 'Chat Abuse:             %d' % total_alt_prior_chat_violations
                 print 'Alt Account Violations: %d' % total_alt_prior_alt_violations
-                print 'VPN Login Violations: %d' % total_alt_prior_vpn_violations
+                print 'VPN Login Violations:   %d' % total_alt_prior_vpn_violations
                 if total_alts_banned > 0:
-                    print 'Number of Banned Alts: %d' % total_alts_banned
+                    print 'Number of Banned Alts:  %d' % total_alts_banned
 
         if player.get('lockout_until', -1) > time_now:
             print fmt % ('Locked out for:', '%.1f hrs' % ( (player['lockout_until']-time_now)/3600.0))
