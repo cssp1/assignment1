@@ -1712,6 +1712,45 @@ class HandleKickAllianceMember(Handler):
                                                             'reason':'CustomerSupport'})
         return ReturnValue(result = 'ok')
 
+class HandleChangeAllianceInfo(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.info_type = self.args.get('info_type', None)
+        self.new_alliance_info = self.args.get('new_alliance_info', None)
+
+    def do_exec_online(self, session, retmsg): return self.do_exec_both()
+    def do_exec_offline(self, user, player): return self.do_exec_both()
+    def do_exec_both(self):
+        if not self.info_type:
+            return ReturnValue(error = 'change_alliance_info failed: info type not provided')
+        if not self.new_alliance_info:
+            return ReturnValue(error = 'change_alliance_info failed: new alliance info not provided')
+        alliance_membership = self.gamesite.sql_client.get_users_alliance_membership(self.user_id, reason = 'CustomerSupport')
+        if not alliance_membership:
+            return ReturnValue(error = 'change_alliance_info failed: user %d is not in an alliance' % (self.user_id,))
+        alliance_id = alliance_membership['alliance_id']
+        alliance_info = self.gamesite.sql_client.get_alliance_info(alliance_id, member_access = True, reason = 'CustomerSupport')
+        new_ui_name = alliance_info['ui_name']
+        new_chat_tag = alliance_info['chat_tag']
+        event_name = None
+        if self.info_type == 'name':
+            new_ui_name = self.new_alliance_info
+            event_name = '4631_alliance_renamed_by_customer_support'
+        elif self.info_type == 'tag':
+            new_chat_tag = self.new_alliance_info
+            event_name = '4631_alliance_tag_changed_by_customer_support'
+        success, err_reason = self.gamesite.sql_client.modify_alliance(alliance_id, self.user_id, ui_name = new_ui_name, chat_tag = new_chat_tag, force = True, reason = 'CustomerSupport')
+        if success:
+            if event_name:
+                self.gamesite.metrics_log.event(self.time_now, {'user_id': self.user_id,
+                                                                'event_name': event_name,
+                                                                'alliance_id': alliance_id, 'target_id': self.user_id,
+                                                                'reason':'CustomerSupport'})
+            formatted_result  = {'new_alliance_info': self.new_alliance_info}
+            return ReturnValue(result = formatted_result)
+        else:
+            return ReturnValue(error = 'change_alliance_info failed: %s' % (err_reason))
+
 class HandleResetIdleCheckState(Handler):
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
@@ -2145,6 +2184,7 @@ methods = {
     'change_region': HandleChangeRegion,
     'demote_alliance_leader': HandleDemoteAllianceLeader,
     'kick_alliance_member': HandleKickAllianceMember,
+    'change_alliance_info': HandleChangeAllianceInfo,
     'reset_idle_check_state': HandleResetIdleCheckState,
     'repopulate_friends': HandleRepopulateFriends,
     'help_response': HandleHelpResponse,
