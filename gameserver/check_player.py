@@ -266,6 +266,23 @@ def get_ip_reputation(ip):
 
     return ''
 
+def get_prior_violations(player):
+    result = {'chat_warnings':0, 'chat_violations':0, 'alt_violations':0, 'vpn_violations':0, 'banned':0}
+    if player.get('banned_until',-1) > time_now:
+        result['banned'] = 1
+    if 'customer_support' not in player['history']:
+        return result
+    for entry in player['history']['customer_support']:
+        if entry['method'].upper() == 'SEND_MESSAGE' and 'args' in entry and entry['args'].get('message_subject') == "Chat Warning":
+            result['chat_warnings'] += 1
+        if entry['method'].upper() == 'TRIGGER_COOLDOWN' and 'args' in entry and entry['args'].get('name') == "chat_abuse_violation":
+            result['chat_violations'] += 1
+        if entry['method'].upper() == 'TRIGGER_COOLDOWN' and 'args' in entry and entry['args'].get('name') == "alt_account_violation":
+            result['alt_violations'] += 1
+        if entry['method'].upper() == 'TRIGGER_COOLDOWN' and 'args' in entry and entry['args'].get('name') == "vpn_login_violation":
+            result['vpn_violations'] += 1
+    return result
+
 # main program
 if __name__ == '__main__':
     import codecs
@@ -673,6 +690,54 @@ if __name__ == '__main__':
 
         if player.get('banned_until',-1) > time_now:
             print fmt % ('BANNED for:', '%.1f hrs' % ( (player['banned_until']-time_now)/3600.0))
+
+        violation_history = get_prior_violations(player)
+        if violation_history['chat_warnings'] > 0 or violation_history['chat_violations'] > 0 or violation_history['alt_violations'] > 0 or violation_history['vpn_violations'] > 0:
+            print '---Prior Violations---'
+            print 'Chat Warnings:          %d' % violation_history['chat_warnings']
+            print 'Chat Abuse:             %d' % violation_history['chat_violations']
+            print 'Alt Account Violations: %d' % violation_history['alt_violations']
+            print 'VPN Login Violations:   %d' % violation_history['vpn_violations']
+
+        if 'known_alt_accounts' in player and player['known_alt_accounts']:
+            total_alt_prior_chat_warnings = 0
+            total_alt_prior_chat_violations = 0
+            total_alt_prior_alt_violations = 0
+            total_alt_prior_vpn_violations = 0
+            total_alts_banned = 0
+            for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
+                                     key = lambda id_entry: -id_entry[1].get('logins',1)):
+                if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',1) == 0:
+                    continue
+                elif entry.get('logins',1) < 0 or entry.get('ignore',False): # marked non-alt
+                    continue
+                elif 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and entry.get('logins',1) < 100:
+                    continue
+                try:
+                    if use_controlapi:
+                        # requesting "stringify" is faster in the logged-out case (since the server doesn't parse/unparse) and probably same speed in logged-in case
+                        alt_player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': s_other_id}))
+                    else:
+                        alt_player = SpinJSON.loads(driver.sync_download_player(s_other_id))
+                except Exception as e:
+                    # don't worry about error handling for reading alts, just ignore this alt's violation history and continue
+                    continue
+                violation_history = get_prior_violations(alt_player)
+                total_alt_prior_chat_warnings += violation_history['chat_warnings']
+                total_alt_prior_chat_violations += violation_history['chat_violations']
+                total_alt_prior_alt_violations += violation_history['alt_violations']
+                total_alt_prior_vpn_violations += violation_history['vpn_violations']
+                total_alts_banned += violation_history['banned']
+
+            if total_alt_prior_chat_violations > 0 or total_alt_prior_alt_violations > 0 or total_alt_prior_vpn_violations > 0:
+                print '---Violations on Alts---'
+                print 'Chat Warnings:          %d' % total_alt_prior_chat_warnings
+                print 'Chat Abuse:             %d' % total_alt_prior_chat_violations
+                print 'Alt Account Violations: %d' % total_alt_prior_alt_violations
+                print 'VPN Login Violations:   %d' % total_alt_prior_vpn_violations
+                if total_alts_banned > 0:
+                    print 'Number of Banned Alts:  %d' % total_alts_banned
+
         if player.get('lockout_until', -1) > time_now:
             print fmt % ('Locked out for:', '%.1f hrs' % ( (player['lockout_until']-time_now)/3600.0))
         if player.get('login_pardoned_until', -1) > time_now:
@@ -770,17 +835,39 @@ if __name__ == '__main__':
                         ui_last_ip += ' *** VPN risk *** ' + ip_rep
                 else:
                     ui_last_ip = 'Unknown'
-                print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
-                                                                                                pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
-                                                                                                ui_last_ip))
+
+                try:
+                    if use_controlapi:
+                        # requesting "stringify" is faster in the logged-out case (since the server doesn't parse/unparse) and probably same speed in logged-in case
+                        alt_player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': s_other_id}))
+                    else:
+                        alt_player = SpinJSON.loads(driver.sync_download_player(s_other_id))
+                    violation_history = get_prior_violations(alt_player)
+                except Exception as e:
+                    # don't worry about error handling for reading alts, just zero out alt's violation history and continue
+                    violation_history = {'chat_warnings':0, 'chat_violations':0, 'alt_violations':0, 'vpn_violations':0, 'banned':0}
+                if violation_history['banned']:
+                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (BANNED!)' % (int(s_other_id), entry.get('logins',1),
+                                                                                                    pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
+                                                                                                    ui_last_ip))
+                elif violation_history['chat_warnings'] == 0 and violation_history['chat_violations'] == 0 and violation_history['alt_violations'] == 0 and violation_history['vpn_violations'] == 0:
+                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
+                                                                                                    pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
+                                                                                                    ui_last_ip))
+                else:
+                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Alt violations %d, VPN violations %d)' % (int(s_other_id), entry.get('logins',1),
+                                                                                                    pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
+                                                                                                    ui_last_ip, violation_history['chat_warnings'], violation_history['chat_violations'], violation_history['alt_violations'], violation_history['vpn_violations']))
 
         if 'customer_support' in player['history']:
             print fmt % ('Customer Support history', '')
             for entry in player['history']['customer_support']:
                 if entry['method'] in ('record_alt_login', 'reset_idle_check_state'): continue # don't bother printing these
+                if entry['spin_user'] == 'maptool' and entry['method'] == 'repair_base': continue # skip maptool repairs. It clutters customer history on elder players
+                if entry['spin_user'] == 'unknown' and entry['method'].upper() == 'MARK_UNINSTALLED': continue # skip mark uninstall notices. It clutters customer history on elder players
                 print '    At %s by %s: %s %s' % (time.strftime('%Y%m%d %H:%M GMT', time.gmtime(entry['time'])), entry['spin_user'], entry['method'].upper(), SpinJSON.dumps(entry.get('args',{})))
                 if 'ui_reason' in entry:
-                    print '        Reason: %s' % entry['ui_reason']
+                    print '        Reason: %s' % entry['ui_reason'].replace('\n','\n                ')
 
         if bloat:
             # check for bloat
@@ -880,4 +967,3 @@ if __name__ == '__main__':
     finally:
         if locked:
             db_client.player_lock_release(user_id, generation, 2)
-
