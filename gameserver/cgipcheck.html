@@ -553,9 +553,10 @@ var method_chat_unblock = function(other_id) { method_chat_block_or_unblock(othe
 
 var method_chat_get = function() {
     var ident = get_ident();
+    var chat_message_count = $("#chat_message_count")[0].value;
     if(ident) {
         var time_now = (new Date()).getTime()/1000;
-        send_request('chat', 'get', $.extend(ident, {'start_time':Math.floor(time_now - 7*86400)}), (function (ui_ident) { return function(result) {
+        send_request('chat', 'get', $.extend(ident, {'start_time':Math.floor(time_now - 7*86400), 'chat_message_count':chat_message_count}), (function (ui_ident) { return function(result) {
             display_chat_messages(ui_ident, result);
         }; })(pretty_ident(ident)));
     }
@@ -1858,7 +1859,7 @@ $(function() {
 
     </div>
     <div id="player_tools_chat_gag">
-      <button onclick="method_chat_get()" class="spin_button" style="width:200px;">Get Recent Messages</button><p>
+      <button onclick="method_chat_get()" class="spin_button" style="width:200px;">Get Recent Messages</button> Include Up To <input type="text" id="chat_message_count" name="chat_message_count" value="1000"> messages<p>
       <button onclick="method_chat_ungag()" class="spin_button">Unmute</button>
       Duration: <input type="text" id="chat_gag_duration" name="chat_gag_duration" value="12"> Hours
       <button onclick="method_chat_gag($('#chat_gag_duration').spinner('value')*3600)" class="spin_button">Mute (Temporary)</button>
