@@ -860,6 +860,7 @@ if __name__ == '__main__':
             for entry in player['history']['customer_support']:
                 if entry['method'] in ('record_alt_login', 'reset_idle_check_state'): continue # don't bother printing these
                 if entry['spin_user'] == 'maptool' and entry['method'] == 'repair_base': continue # skip maptool repairs. It clutters customer history on elder players
+                if entry['spin_user'] == 'unknown' and entry['method'].upper() == 'MARK_UNINSTALLED': continue # skip mark uninstall notices. It clutters customer history on elder players
                 print '    At %s by %s: %s %s' % (time.strftime('%Y%m%d %H:%M GMT', time.gmtime(entry['time'])), entry['spin_user'], entry['method'].upper(), SpinJSON.dumps(entry.get('args',{})))
                 if 'ui_reason' in entry:
                     print '        Reason: %s' % entry['ui_reason']
