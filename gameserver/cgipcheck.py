@@ -460,8 +460,10 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                       }
                 if 'end_time' in args:
                     qs['time']['$lt'] = int(args['end_time'])
-
-                result = {'result': list(nosql_client.chat_buffer_table().find(qs, {'_id':0,'channel':1,'sender':1,'text':1,'time':1}).sort([('time',-1)]).limit(1000))}
+                chat_message_count = 1000
+                if 'chat_message_count' in args:
+                    chat_message_count = int(args['chat_message_count'])
+                result = {'result': list(nosql_client.chat_buffer_table().find(qs, {'_id':0,'channel':1,'sender':1,'text':1,'time':1}).sort([('time',-1)]).limit(chat_message_count))}
             elif method == 'get_reports':
                 report_list = list(nosql_client.chat_reports_get(args['start_time'], args['end_time']))
                 show_automated = False
