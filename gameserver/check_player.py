@@ -696,7 +696,7 @@ if __name__ == '__main__':
             print fmt % ('---Prior Violations---', '')
             print fmt % ('Chat Warnings:',violation_history['chat_warnings'])
             print fmt % ('Chat Abuse:', violation_history['chat_violations'])
-            print fmt % ('Alt Account Violations:', violation_history['alt_violations'])
+            print fmt % ('Anti-Alt Violations:', violation_history['alt_violations'])
             print fmt % ('VPN Login Violations:', violation_history['vpn_violations'])
 
         if 'known_alt_accounts' in player and player['known_alt_accounts']:
@@ -733,7 +733,7 @@ if __name__ == '__main__':
                 print fmt % ('---Violations on Alts---','')
                 print fmt % ('Chat Warnings:', total_alt_prior_chat_warnings)
                 print fmt % ('Chat Abuse:', total_alt_prior_chat_violations)
-                print fmt % ('Alt Account Violations:', total_alt_prior_alt_violations)
+                print fmt % ('Anti-Alt Violations:', total_alt_prior_alt_violations)
                 print fmt % ('VPN Login Violations:', total_alt_prior_vpn_violations)
                 if total_alts_banned > 0:
                     print fmt % ('Number of Banned Alts:', total_alts_banned)
@@ -855,7 +855,7 @@ if __name__ == '__main__':
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip))
                 else:
-                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Alt violations %d, VPN violations %d)' % (int(s_other_id), entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Anti-Alt violations %d, VPN violations %d)' % (int(s_other_id), entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip, violation_history['chat_warnings'], violation_history['chat_violations'], violation_history['alt_violations'], violation_history['vpn_violations']))
 
