@@ -707,11 +707,11 @@ if __name__ == '__main__':
             total_alts_banned = 0
             for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                                      key = lambda id_entry: -id_entry[1].get('logins',1)):
-                if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',1) == 0:
+                if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) == 0:
                     continue
-                elif entry.get('logins',1) < 0 or entry.get('ignore',False): # marked non-alt
+                if entry.get('ignore',False): # marked non-alt
                     continue
-                elif 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and entry.get('logins',1) < 100:
+                if 'last_login' in entry and entry['last_login'] < (time_now - 90*86400):
                     continue
                 try:
                     if use_controlapi:
@@ -820,13 +820,13 @@ if __name__ == '__main__':
                                      key = lambda id_entry: -id_entry[1].get('logins',1)):
                 if private_ip_re.match(entry.get('last_ip', 'Unknown')):
                     continue # invalid entry
-                if entry.get('logins',1) == 0:
+                if entry.get('logins',0) == 0:
                     continue # ignore
-                elif entry.get('logins',1) < 0 or entry.get('ignore',False): # marked non-alt
+                if entry.get('ignore', False): # marked non-alt
                     print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt)' % (int(s_other_id)))
                     continue
-                elif 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and entry.get('logins',1) < 100:
-                    # ignore logins more than 90d ago
+                if 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and entry.get('logins',1) < 100:
+                    # ignore logins more than 90d ago if there are fewer than 100 logins
                     continue
                 if entry.get('last_ip'):
                     ui_last_ip = entry['last_ip']
