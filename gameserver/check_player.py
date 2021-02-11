@@ -266,13 +266,15 @@ def get_ip_reputation(ip):
 
     return ''
 
-def get_prior_violations(player):
+def get_prior_violations(player, oldest_violation = 0):
     result = {'chat_warnings':0, 'chat_violations':0, 'alt_violations':0, 'vpn_violations':0, 'banned':0}
     if player.get('banned_until',-1) > time_now:
         result['banned'] = 1
-    if 'customer_support' not in player['history']:
+        return result # if player is banned, don't bother tabulating other violations to save processing time
+    if 'history' not in player or 'customer_support' not in player['history']:
         return result
     for entry in player['history']['customer_support']:
+        if entry['time'] < oldest_violation: continue
         if entry['method'].upper() == 'SEND_MESSAGE' and 'args' in entry and entry['args'].get('message_subject') == "Chat Warning":
             result['chat_warnings'] += 1
         if entry['method'].upper() == 'TRIGGER_COOLDOWN' and 'args' in entry and entry['args'].get('name') == "chat_abuse_violation":
