@@ -640,7 +640,13 @@ def do_remove_mentor(args):
     bh_id = user.get('bh_id')
     if not bh_id:
         return 'This is not a Battlehouse account.'
-    return BHAPI.BHAPI('/invite_delete/', args = {'user_id':bh_id})
+    result = BHAPI.BHAPI('/invite_delete/', args = {'user_id':bh_id})
+    if result.get('result') == 'ok':
+        history_args = copy.deepcopy(args)
+        history_args['method'] = 'add_note'
+        history_args['ui_reason'] = 'Removed mentor: %s' % args['ui_reason']
+        result = do_CONTROLAPI(history_args)
+    return result
 
 def get_server_latency_series(server_name, rows):
     return {'label':server_name,
