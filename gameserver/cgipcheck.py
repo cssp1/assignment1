@@ -18,6 +18,7 @@ import SpinGoogleAuth
 import SpinLog
 import FastGzipFile
 import ControlAPI
+from check_player import get_prior_violations
 
 time_now = int(time.time())
 
@@ -291,6 +292,17 @@ def filter_chat_report_list_drop_automated(reports):
 def filter_chat_report_list_drop_tier34(reports):
     return filter(lambda x: x.get('channel').startswith('r:') or x.get('channel') in ('global_english','global_t123'), reports)
 
+def get_violation_history_for_chat_report(reports, violations_first_date):
+    for report in reports: # get past violations and spend for players that need moderation
+        player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': report['target_id']})['result'])
+        violations = get_prior_violations(player, oldest_violation = violations_first_date)
+        history = player.get('history', {})
+        spend = history.get('money_spent',0)
+        report['target_warnings'] = str(violations.get('chat_warnings', 0))
+        report['target_violations'] = str(violations.get('chat_violations', 0))
+        report['target_receipts'] = '$%0.2f' % spend
+    return reports
+
 def do_action(path, method, args, spin_token_data, nosql_client):
     try:
         do_log = False
@@ -477,6 +489,9 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     if f == 'unresolved': show_resolved = False
                     elif f == 'automated': show_automated = True
                     elif f == 'tier12': show_tier34 = False
+                violations_first_date = -1
+                if 'violation_limit' in args and args['violation_limit'] == 'year':
+                    violations_first_date = time_now - 31536000 # only show one year of violations if button is checked
 
                 if not show_resolved: # always do this first, since it needs access to all reports
                     report_list = filter_chat_report_list_for_enforcement(report_list)
@@ -484,6 +499,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     report_list = filter_chat_report_list_drop_tier34(report_list)
                 if not show_automated:
                     report_list = filter_chat_report_list_drop_automated(report_list)
+                report_list = get_violation_history_for_chat_report(report_list, violations_first_date) # update violations before displaying
                 result = {'result': report_list }
             elif method == 'resolve_report':
                 assert args['action'] in ('ignore', 'violate', 'warn')

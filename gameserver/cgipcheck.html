@@ -1485,7 +1485,11 @@ var refresh_chat = function() {
         if(! $("#chat_show_tier34")[0].checked) {
             filter += ',tier12';
         }
-        send_request('chat', 'get_reports', {'start_time':time_now - 2*86400, 'end_time':time_now, 'filter': filter}, function(result) {
+        var violation_limit = 'none'
+        if($("#chat_show_one_year_violations")[0].checked) {
+            violation_limit = 'year';
+        }
+        send_request('chat', 'get_reports', {'start_time':time_now - 2*86400, 'end_time':time_now, 'filter': filter, 'violation_limit':violation_limit}, function(result) {
             chat_pending = false;
             $('#chat_show_automated').removeAttr('disabled');
             $('#chat_show_tier34').removeAttr('disabled');
@@ -1547,10 +1551,27 @@ var refresh_chat_report_row = function(row, item, time_now) {
     } else {
         reporter_ui_name = 'player %reporter_id <b>%ui_name</b>'.replace('%reporter_id', item['reporter_id'].toString()).replace('%ui_name', item['reporter_ui_name'] || 'unknown');
     }
-    var s = '%abstime (%relhoursh ago), player %target_id <b>%target_ui_name</b> said in channel <tt>%channel</tt>:<br><pre>%context</pre>and was reported by %reporter_ui_name at %report_time';
+    var s = '%abstime (%relhoursh ago), player %target_id <b>%target_ui_name</b> (%target_receipts Receipts, %warnings_header%target_warnings Warnings%warnings_footer, %violations_header%target_violations Violations%violations_footer) said in channel <tt>%channel</tt>:<br><pre>%context</pre>and was reported by %reporter_ui_name at %report_time';
     s = s.replace('%abstime', pretty_print_ts(item['time']));
     s = s.replace('%relhours', ((time_now - item['time'])/3600.0).toFixed(1));
     s = s.replace('%target_id', item['target_id'].toString());
+    s = s.replace('%target_receipts', item['target_receipts'].toString());
+    s = s.replace('%target_warnings', item['target_warnings'].toString());
+    if(parseInt(item['target_warnings']) >= 20) {
+        s = s.replace('%warnings_header','<span style="font-weight: bold;color:red">');
+        s = s.replace('%warnings_footer','</span>');
+    } else {
+        s = s.replace('%warnings_header','');
+        s = s.replace('%warnings_footer','');
+    }
+    s = s.replace('%target_violations', item['target_violations'].toString());
+    if(parseInt(item['target_violations']) >= 20) {
+        s = s.replace('%violations_header','<span style="font-weight: bold;color:red">');
+        s = s.replace('%violations_footer','</span>');
+    } else {
+        s = s.replace('%violations_header','');
+        s = s.replace('%violations_footer','');
+    }
     s = s.replace('%reporter_id', item['reporter_id'].toString());
     s = s.replace('%target_ui_name', target_ui_name);
     s = s.replace('%reporter_ui_name', reporter_ui_name);
@@ -2063,6 +2084,7 @@ Status: <span id="payment_status"></span>
 <p>
 <label><input id="chat_show_automated" type="checkbox" checked="1" style="height:initial;" onclick="refresh_chat();">Show automated reports</label>
 <label><input id="chat_show_tier34" type="checkbox" style="height:initial;" onclick="refresh_chat();">Show Tier 3/4 channels</label>
+<label><input id="chat_show_one_year_violations" type="checkbox" style="height:initial;" onclick="refresh_chat();">Show only 1 year of violations</label>
 <p>
 <table id="chat_table" width="100%" style="font-size:12px;"></table>
 <br>
