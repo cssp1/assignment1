@@ -756,9 +756,11 @@ function QuestCompletedPredicate(data) {
     goog.base(this, data);
     this.quest = gamedata['quests'][data['quest_name']];
     this.must_claim = data['must_claim'] || false;
+    this.history_only = data['history_only'] || false;
 }
 goog.inherits(QuestCompletedPredicate, Predicate);
 QuestCompletedPredicate.prototype.is_satisfied = function(player, qdata) {
+    if(this.history_only) { return (this.quest['name'] in player.completed_quests); }
     if(!this.must_claim && !this.quest['force_claim']) {
         // check recursively without requiring the other quest to be claimed
 

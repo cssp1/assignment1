@@ -399,7 +399,9 @@ class QuestCompletedPredicate(Predicate):
         Predicate.__init__(self, data)
         self.quest_name = data['quest_name']
         self.must_claim = bool(data.get('must_claim', False))
+        self.history_only = bool(data.get('history_only', False))
     def is_satisfied2(self, session, player, qdata, override_time = None):
+        if self.history_only: return (self.quest_name in player.completed_quests)
         target_quest = player.get_abtest_quest(self.quest_name)
         # new skip_quest_claim behavior - don't require quest to have been claimed
         # (if this becomes a performance problem, may need to cache the player's satisfied quests)
@@ -410,6 +412,7 @@ class QuestCompletedPredicate(Predicate):
             return (self.quest_name in player.completed_quests)
 
     def is_satisfied(self, player, qdata): # XXXXXX remove when safe
+        if self.history_only: return (self.quest_name in player.completed_quests)
         target_quest = player.get_abtest_quest(self.quest_name)
         # new skip_quest_claim behavior - don't require quest to have been claimed
         # (if this becomes a performance problem, may need to cache the player's satisfied quests)
