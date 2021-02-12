@@ -399,7 +399,7 @@ class QuestCompletedPredicate(Predicate):
         Predicate.__init__(self, data)
         self.quest_name = data['quest_name']
         self.must_claim = bool(data.get('must_claim', False))
-        self.history_only = bool(data.get('history_only'), False)
+        self.history_only = bool(data.get('history_only', False))
     def is_satisfied2(self, session, player, qdata, override_time = None):
         if self.history_only: return (self.quest_name in player.completed_quests)
         target_quest = player.get_abtest_quest(self.quest_name)
