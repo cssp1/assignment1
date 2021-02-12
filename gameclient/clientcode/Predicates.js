@@ -756,9 +756,11 @@ function QuestCompletedPredicate(data) {
     goog.base(this, data);
     this.quest = gamedata['quests'][data['quest_name']];
     this.must_claim = data['must_claim'] || false;
+    this.history_only = data['history_only'] || false;
 }
 goog.inherits(QuestCompletedPredicate, Predicate);
 QuestCompletedPredicate.prototype.is_satisfied = function(player, qdata) {
+    if(this.history_only) { return (this.quest['name'] in player.completed_quests); }
     if(!this.must_claim && !this.quest['force_claim']) {
         // check recursively without requiring the other quest to be claimed
 
@@ -791,6 +793,48 @@ QuestCompletedPredicate.prototype.do_ui_describe = function(player) {
 };
 /** @override */
 QuestCompletedPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+/** @constructor @struct
+  * @extends Predicate */
+function QuestCompletedPredicate(data) {
+    goog.base(this, data);
+    this.quest = gamedata['quests'][data['quest_name']];
+    this.must_claim = data['must_claim'] || false;
+}
+goog.inherits(QuestCompleteInHistoryPredicate, Predicate);
+QuestCompleteInHistoryPredicate.prototype.is_satisfied = function(player, qdata) {
+    if(!this.must_claim && !this.quest['force_claim']) {
+        // check recursively without requiring the other quest to be claimed
+
+        if(quest_completed_predicate_cache !== null && (this.quest['name'] in quest_completed_predicate_cache)) {
+            //console.log('HIT '+this.quest['name']);
+            return quest_completed_predicate_cache[this.quest['name']];
+        } else {
+            //console.log('MISS '+this.quest['name']);
+        }
+
+        var ret = true;
+        if(('activation' in this.quest) && !read_predicate(this.quest['activation']).is_satisfied(player, null)) {
+            ret = false;
+        }
+        if(ret && !read_predicate(this.quest['goal']).is_satisfied(player, null)) {
+            ret = false;
+        }
+        if(quest_completed_predicate_cache !== null) {
+            quest_completed_predicate_cache[this.quest['name']] = ret;
+        }
+        return ret;
+    } else {
+        return (this.quest['name'] in player.completed_quests);
+    }
+};
+QuestCompleteInHistoryPredicate.prototype.do_ui_describe = function(player) {
+    var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
+    ret = ret.replace('%s', this.quest['ui_name']);
+    return new PredicateUIDescription(ret);
+};
+/** @override */
+QuestCompleteInHistoryPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor @struct
   * @extends Predicate */
