@@ -665,6 +665,14 @@ var method_get_raw_player = function() {
         }
     }
 };
+var method_remove_mentor = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#player_updates_reason")[0].value);
+    var args = {'ui_reason': ui_reason, 'method':'remove_mentor'}
+    if(ident && ui_reason) {
+        send_request('player', 'remove_mentor', $.extend(ident, args), function(result) { display_response("Success!"); });
+    }
+}
 var method_get_personal_info = function() {
     var ident = get_ident();
     if(ident) {
@@ -1846,6 +1854,7 @@ $(function() {
 <hr>
 <div id="player_tools" style="display:none;">
   <ul>
+    <li><a href="#player_tools_player_updates" id="player_tools_player_updates">Player Updates</a></li>
     <li><a href="#player_tools_add_note" id="player_tools_add_note_header">Add Note</a></li>
     <li><a href="#player_tools_give_item" id="player_tools_give_item_header">Give Item</a></li>
     <li><a href="#player_tools_give_gamebucks" id="player_tools_give_gamebucks_header">Give $GAMEBUCKS_NAME$</a></li>
@@ -1861,6 +1870,14 @@ $(function() {
     <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
     <li><a href="#player_tools_developer" id="player_tools_developer_header">Developer</a></li>
   </ul>
+    <div id="player_tools_player_updates">
+      <button onclick="method_remove_mentor()" class="spin_button">Remove Mentor</button></p>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="player_updates_reason" style="width:500px;">
+      <p>
+    </div>
     <div id="player_tools_add_note">
       Add an internal note to this account:
       <br>

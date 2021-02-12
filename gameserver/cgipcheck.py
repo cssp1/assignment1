@@ -19,6 +19,7 @@ import SpinLog
 import FastGzipFile
 import ControlAPI
 from check_player import get_prior_violations
+import BHAPI
 
 time_now = int(time.time())
 
@@ -326,6 +327,8 @@ def do_action(path, method, args, spin_token_data, nosql_client):
 
             if method == 'lookup':
                 result = {'result':do_lookup(control_args)}
+            elif method == 'remove_mentor':
+                result = do_remove_mentor(control_args)
             # chat abuse handling doesn't map 1-to-1 with CONTROLAPI calls, so handle them specially
             elif method == 'chat_abuse_violate':
                 result = {'result':chat_abuse_violate(control_args, 'violate', control_args['ui_player_reason'], None, None)}
@@ -631,6 +634,13 @@ def do_lookup(args):
     if p.returncode != 0:
         raise Exception(out)
     return out
+
+def do_remove_mentor(args):
+    player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': args['user_id']})['result'])
+    bh_id = session.user.get('bh_id')
+    if not bh_id:
+        return 'This is not a Battlehouse account.'
+    return BHAPI.BHAPI('/invite_delete/', args = {'user_id':bh_id})
 
 def get_server_latency_series(server_name, rows):
     return {'label':server_name,
