@@ -636,8 +636,8 @@ def do_lookup(args):
     return out
 
 def do_remove_mentor(args):
-    player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': args['user_id']})['result'])
-    bh_id = session.user.get('bh_id')
+    user = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_user', 'stringify': '1', 'user_id': args['user_id']})['result'])
+    bh_id = user.get('bh_id')
     if not bh_id:
         return 'This is not a Battlehouse account.'
     return BHAPI.BHAPI('/invite_delete/', args = {'user_id':bh_id})
