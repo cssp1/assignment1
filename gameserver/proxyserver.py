@@ -2162,6 +2162,10 @@ class GameProxy(proxy.ReverseProxyResource):
         redirect_url = SpinConfig.config['proxyserver']['account_banned_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
+    def index_visit_vpn_forbidden(self, request, visitor):
+        redirect_url = SpinConfig.config['proxyserver']['disallowed_proxy_landing']
+        return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
+
     def index_visit_authorized(self, request, visitor):
         if not visitor.social_id:
             # this can happen when the Facebook fetch_oauth_token API fails
@@ -2283,9 +2287,8 @@ class GameProxy(proxy.ReverseProxyResource):
             # no servers available
             return self.index_visit_go_away(request, visitor, 'index_visit_game:no_servers')
 
-        # create and insert user_id
-        user_id = social_id_table.social_id_to_spinpunch(visitor.social_id, True)
-        visitor.demographics['user_id'] = user_id
+        # check user_id to determine if we're going to VPN or toxic player bounce, but don't create if there isn't one
+        user_id = social_id_table.social_id_to_spinpunch(visitor.social_id, False)
 
         # check IP reputation
         # (potentially this could be moved up earlier, to avoid creating a new user_id if we're going to block)
@@ -2301,9 +2304,18 @@ class GameProxy(proxy.ReverseProxyResource):
             if rep_result:
                 raw_log.event(proxy_time, 'SpinIPReputation hit for user_id %d IP %r: %r' % (user_id, ip, rep_result))
 
-                # don't let known toxic people play
+                # don't let known toxic people play at all
                 if rep_result.is_toxic():
                     return self.index_visit_banned(request, visitor)
+
+                # optionally don't let VPN users create new accounts
+                if user_id == -1 and not SpinConfig.config['proxyserver'].get('allow_new_vpn_accounts', 1):
+                    exception_log.event(proxy_time, 'Blocked account creation for social ID %r because of SpinIPReputation on IP %r: %r' % (visitor.social_id, ip, rep_result))
+                    return self.index_visit_vpn_forbidden(request, visitor)
+
+        # re-check user_id now, and create a new one since IP checks are complete
+        user_id = social_id_table.social_id_to_spinpunch(visitor.social_id, True)
+        visitor.demographics['user_id'] = user_id
 
         # note: we're remembering the gameserver's HTTP port no matter what protocol the client is using,
         # since this is for proxy forwarding
