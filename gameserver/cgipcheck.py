@@ -96,7 +96,7 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_h
     gamedata['ai_bases_server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_server.json"))
 
     ssl_available = SpinConfig.config['proxyserver'].get('external_ssl_port',-1) > 0
-    visit_base_namespace = SpinConfig.config.get('battlehouse_app_namespace')
+    visit_base_namespace = SpinConfig.config.get('facebook_app_namespace')
     if visit_base_namespace:
         visit_base_url = 'https://apps.facebook.com/%s/?visit_base=' % visit_base_namespace
     else: visit_base_url = ''
