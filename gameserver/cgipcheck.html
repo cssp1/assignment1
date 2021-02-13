@@ -667,7 +667,7 @@ var method_get_raw_player = function() {
     }
 };
 var method_visit_player_base = function () {
-    var base_id = $('#lookup_output')[0].value.split('\n')[0].replace('User ID:','').replace(' ','');
+    var base_id = $('#lookup_output')[0].value.split('\n')[0].replace('User ID:','').replace(/\s+/g, '');
     console.log(base_id);
     var visit_player_base_url = visit_base_url + base_id;
     window.open(visit_player_base_url, '_blank');
