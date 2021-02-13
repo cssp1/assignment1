@@ -672,9 +672,7 @@ var method_visit_player_base = function () {
         return;
     }
     var base_id = $('#lookup_output')[0].value.split('\n')[0].replace('User ID:','').replace(/\s+/g, '');
-    console.log(base_id);
     var visit_player_base_url = visit_base_url + base_id;
-    console.log(visit_player_base_url);
     window.open(visit_player_base_url, '_blank');
 }
 var method_remove_mentor = function() {
