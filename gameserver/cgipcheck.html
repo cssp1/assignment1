@@ -673,6 +673,19 @@ var method_remove_mentor = function() {
         send_request('player', 'remove_mentor', $.extend(ident, args), function(result) { display_response("Success!"); });
     }
 }
+var method_change_player_alias = function() {
+    var ident = get_ident();
+    var new_alias = check_mandatory_input($("#player_updates_new_alias")[0].value, 'new callsign (name)');
+    if(new_alias.length < 4 || new_alias.length > 15) {
+        display_error('New callsign must be at least 4 characters and less than 15 characters');
+        return;
+    }
+    var ui_reason = check_ui_reason($("#player_updates_reason")[0].value);
+    var args = {'ui_reason': ui_reason, 'method':'change_player_alias', 'user_id':user_id, 'new_alias':new_alias};
+    if(ident && ui_reason) {
+        send_request('player', 'change_player_alias', $.extend(ident, args), function(result) { display_response("Success!"); });
+    }
+}
 var method_get_personal_info = function() {
     var ident = get_ident();
     if(ident) {
@@ -1872,6 +1885,10 @@ $(function() {
   </ul>
     <div id="player_tools_player_updates">
       <button onclick="method_remove_mentor()" class="spin_button">Remove Mentor</button></p>
+      <p>
+      Rename player:
+      <br>
+      New Call Sign/Name: <input type="text" id="player_updates_new_alias" name="battlehouse_id"> <button onclick="method_change_player_alias()" class="spin_button">Rename</button></p>
       <p>
       Reason for this action:
       <br>
