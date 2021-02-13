@@ -117,7 +117,7 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_h
         '$SPIN_LOG_BOOKMARK$': str(log_bookmark or -1),
         '$GAMEBUCKS_NAME$': gamedata['store']['gamebucks_ui_name'],
         '$GAMEBUCKS_ITEM$': 'alloy' if SpinConfig.game() == 'mf' else 'gamebucks',
-        '$VISIT_BASE_URL$': 'https://apps.facebook.com/' + SpinConfig.config['battlehouse_app_namespace'] + '/?visit_base=',
+        '$VISIT_BASE_URL$': visit_base_url,
         '$SPIN_GIVEABLE_ITEMS$': SpinJSON.dumps(sorted([{'name':name, 'ui_name':data['ui_name']} for name, data in gamedata['items'].iteritems() if item_is_giveable(gamedata, data)], key = lambda x: x['ui_name'])),
         '$SPIN_REGIONS$': SpinJSON.dumps(get_regions(gamedata)),
         '$SPIN_AI_BASE_IDS$': SpinJSON.dumps(sorted([int(strid) for strid in gamedata['ai_bases_server']['bases'].iterkeys()])),
