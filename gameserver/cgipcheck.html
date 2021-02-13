@@ -53,6 +53,7 @@ var spin_log_bookmark = $SPIN_LOG_BOOKMARK$;
 var spin_log_bookmark_dirty = true;
 var spin_ssl_available = $SPIN_SSL_AVAILABLE$;
 var spin_wss_available = $SPIN_WSS_AVAILABLE$;
+var visit_base_url = '$VISIT_BASE_URL$';
 
 var delete_cookie = function() {
     document.cookie = spin_token_cookie_name+'=;path=/;domain=.'+spin_token_domain+';expires=Thu, 01 Jan 1970 00:00:01 GMT;';
@@ -665,6 +666,12 @@ var method_get_raw_player = function() {
         }
     }
 };
+var method_visit_player_base = function () {
+    var base_id = $('#lookup_output')[0].value.split('\n')[0].replace('User ID:','').replace(' ','');
+    console.log(base_id);
+    var visit_player_base_url = visit_base_url + base_id;
+    window.open(visit_player_base_url, '_blank');
+}
 var method_remove_mentor = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#player_updates_reason")[0].value);
@@ -1849,6 +1856,7 @@ $(function() {
 <div id="per_player" style="position:relative;display:none;">
 
 <div style="position:absolute;top:5px;right:5px;"><button onclick="method_get_raw_player()" style="width:200px;height:30px;">Get PlayerDB File</button></div>
+<div style="position:absolute;top:40px;right:5px;"><button onclick="method_visit_player_base()" style="width:200px;height:30px;">Visit Player Base</button></div>
 <textarea id="lookup_output" readonly style="width:100%;height:10%;border-style:inset;border-width:2px;font-family:monospace;font-size:11px;"></textarea>
 
 <hr>
