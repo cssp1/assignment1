@@ -409,7 +409,7 @@ var method_unban = function() {
 };
 var method_vpn_excuse = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#vpn_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alts_vpn_reason")[0].value);
     args = {'ui_reason': ui_reason};
 
     if(ident && ui_reason) {
@@ -418,21 +418,21 @@ var method_vpn_excuse = function() {
 };
 var method_vpn_unexcuse = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#vpn_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alts_vpn_reason")[0].value);
     if(ident && ui_reason) {
         send_request('player', 'vpn_unexcuse', $.extend(ident, {'ui_reason':ui_reason}), function(result) { display_response("Success!"); });
     }
 };
 var method_kick_alliance_member = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#alliance_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alliance_player_reason")[0].value);
     if(ident && ui_reason) {
         send_request('player', 'kick_alliance_member', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
 var method_demote_alliance_leader = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#alliance_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alliance_player_reason")[0].value);
     if(ident && ui_reason) {
         send_request('player', 'demote_alliance_leader', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success! The new Clan leader is user_id "+result['new_leader_id'].toString()); });
     }
@@ -441,7 +441,7 @@ var method_change_alliance_name = function() { method_change_alliance_info('name
 var method_change_alliance_tag = function() { method_change_alliance_info('tag'); }
 var method_change_alliance_info = function(info_type) {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#alliance_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alliance_player_reason")[0].value);
     var new_alliance_info = check_mandatory_input($("#alliance_new_value")[0].value, 'clan name or tag');
     if(info_type === 'tag' && new_alliance_info.length != 3) {
         display_error('Clan tags must be three characters in length');
@@ -475,7 +475,7 @@ var method_unmake_developer = function() {
 
 var method_ignore_or_unignore_alt = function(other_id, method_name) {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#alts_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alts_vpn_reason")[0].value);
     if(ident && ui_reason) {
         if(!ident['user_id']) {
             display_error('Please look up this player by User ID');
@@ -677,7 +677,7 @@ var method_visit_player_base = function () {
 }
 var method_remove_mentor = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#player_updates_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alliance_player_reason")[0].value);
     var args = {'ui_reason': ui_reason, 'method':'remove_mentor'}
     if(ident && ui_reason) {
         send_request('player', 'remove_mentor', $.extend(ident, args), function(result) { display_response("Success!"); });
@@ -690,7 +690,7 @@ var method_change_player_alias = function() {
         display_error('New callsign must be at least 4 characters and less than 15 characters');
         return;
     }
-    var ui_reason = check_ui_reason($("#player_updates_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alliance_player_reason")[0].value);
     var args = {'ui_reason': ui_reason, 'method':'change_player_alias', 'user_id':user_id, 'new_alias':new_alias};
     if(ident && ui_reason) {
         send_request('player', 'change_player_alias', $.extend(ident, args), function(result) { display_response("Success!"); });
@@ -1748,7 +1748,7 @@ $(function() {
         $('#player_tools_change_region').remove();
         $('#player_tools_change_region_header').remove();
         $('#player_tools_alliance').remove();
-        $('#player_tools_alliance_header').remove();
+        $('#player_tools_alliance_player_header').remove();
         $('#player_tools_privacy').remove();
         $('#player_tools_privacy_header').remove();
     }
@@ -1878,7 +1878,6 @@ $(function() {
 <hr>
 <div id="player_tools" style="display:none;">
   <ul>
-    <li><a href="#player_tools_player_updates" id="player_tools_player_updates">Player Updates</a></li>
     <li><a href="#player_tools_add_note" id="player_tools_add_note_header">Add Note</a></li>
     <li><a href="#player_tools_give_item" id="player_tools_give_item_header">Give Item</a></li>
     <li><a href="#player_tools_give_gamebucks" id="player_tools_give_gamebucks_header">Give $GAMEBUCKS_NAME$</a></li>
@@ -1886,26 +1885,13 @@ $(function() {
     <li><a href="#player_tools_chat_abuse" id="player_tools_chat_abuse_header">Chat Abuse</a></li>
     <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
     <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
-    <li><a href="#player_tools_alts" id="player_tools_alts_header">Alts</a></li>
-    <li><a href="#player_tools_vpn" id="player_tools_vpn_header">VPN</a></li>
+    <li><a href="#player_tools_alts_vpn" id="player_tools_alts_vpn_header">Alts/VPN</a></li>
     <li><a href="#player_tools_change_region" id="player_tools_change_region_header">Map Region</a></li>
-    <li><a href="#player_tools_alliance" id="player_tools_alliance_header">Clan</a></li>
+    <li><a href="#player_tools_alliance_player" id="player_tools_alliance_player_header">Player/Clan</a></li>
     <li><a href="#player_tools_privacy" id="player_tools_privacy_header">Privacy</a></li>
     <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
     <li><a href="#player_tools_developer" id="player_tools_developer_header">Developer</a></li>
   </ul>
-    <div id="player_tools_player_updates">
-      <button onclick="method_remove_mentor()" class="spin_button">Remove Mentor</button></p>
-      <p>
-      Rename player:
-      <br>
-      New Call Sign/Name: <input type="text" id="player_updates_new_alias"> <button onclick="method_change_player_alias()" class="spin_button">Rename</button></p>
-      <p>
-      Reason for this action:
-      <br>
-      <input type="text" id="player_updates_reason" style="width:500px;">
-      <p>
-    </div>
     <div id="player_tools_add_note">
       Add an internal note to this account:
       <br>
@@ -2025,25 +2011,22 @@ $(function() {
       <input type="text" id="change_region_reason" style="width:500px;">
     </div>
 
-    <div id="player_tools_alts">
-      Other Player ID: <input type="text" id="ignore_alt_other_id" name="ignore_alt_other_id">
-      <button onclick="method_ignore_alt($('#ignore_alt_other_id').spinner('value'))" class="spin_button" style="width:250px;">Ignore (mark as non-alt)</button>
-    <button onclick="method_unignore_alt($('#ignore_alt_other_id').spinner('value'))" class="spin_button" style="width:180px;">Un-ignore</button>
-      <p>
-      Reason for this action:
-      <br>
-      <input type="text" id="alts_reason" style="width:500px;">
+    <div id="player_tools_alts_vpn">
+        <p>
+            Other Player ID: <input type="text" id="ignore_alt_other_id" name="ignore_alt_other_id">
+            <button onclick="method_ignore_alt($('#ignore_alt_other_id').spinner('value'))" class="spin_button" style="width:250px;">Ignore (mark as non-alt)</button>
+            <button onclick="method_unignore_alt($('#ignore_alt_other_id').spinner('value'))" class="spin_button" style="width:180px;">Un-ignore</button>
+        </p>
+        <p>
+            <button onclick="method_vpn_excuse()" class="spin_button">Allow VPN</button>
+            <button onclick="method_vpn_unexcuse()" class="spin_button">Disallow VPN</button>
+        </p>
+        <p>
+            Reason for this action:
+            <br>
+            <input type="text" id="alts_vpn_reason" style="width:500px;">
+        </p>
     </div>
-
-    <div id="player_tools_vpn">
-      <button onclick="method_vpn_excuse()" class="spin_button">Allow VPN</button>
-      <button onclick="method_vpn_unexcuse()" class="spin_button">Disallow VPN</button>
-      <p>
-    Reason for this action:
-      <br>
-      <input type="text" id="vpn_reason" style="width:500px;">
-    </div>
-
     <div id="player_tools_ban">
       <button onclick="method_ban()" class="spin_button">Ban</button>
       <button onclick="method_unban()" class="spin_button">Unban</button>
@@ -2058,19 +2041,31 @@ $(function() {
       <input type="text" id="ban_public_message" style="width:800px;" disabled="disabled" value="%player_name in region %region_name has been banned for hacking. Have a nice day!"></input>
     </div>
 
-    <div id="player_tools_alliance">
-      <button onclick="method_demote_alliance_leader()" class="spin_button">Demote Leader</button>
-      <button onclick="method_kick_alliance_member()" class="spin_button">Kick from Clan</button>
-      <P>
-      Change clan name or tag:
-      <br>
-      <input type="text" id="alliance_new_value" style="width:500px;">
-      <button onclick="method_change_alliance_name()" class="spin_button">Change Name</button>
-      <button onclick="method_change_alliance_tag()" class="spin_button">Change Tag</button>
-      <p>
-      Reason for this action:
-      <br>
-      <input type="text" id="alliance_reason" style="width:500px;">
+    <div id="player_tools_alliance_player">
+        <p>
+            <button onclick="method_demote_alliance_leader()" class="spin_button">Demote Leader</button>
+            <button onclick="method_kick_alliance_member()" class="spin_button">Kick from Clan</button>
+        </p>
+        <p>
+            Change clan name or tag:
+            <br>
+            <input type="text" id="alliance_new_value" style="width:500px;">
+            <button onclick="method_change_alliance_name()" class="spin_button">Change Name</button>
+            <button onclick="method_change_alliance_tag()" class="spin_button">Change Tag</button>
+        </p>
+        <p>
+            <button onclick="method_remove_mentor()" class="spin_button">Remove Mentor</button>
+        </p>
+        <p>
+            Rename player:
+            <br>
+            New Call Sign/Name: <input type="text" id="player_updates_new_alias"> <button onclick="method_change_player_alias()" class="spin_button">Rename</button>
+        </p>
+        <p>
+            Reason for this action:
+            <br>
+            <input type="text" id="alliance_player_reason" style="width:500px;">
+        </p>
     </div>
 
     <div id="player_tools_privacy">
