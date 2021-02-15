@@ -2166,7 +2166,7 @@ class HandleRenamePlayer(Handler):
             self.gamesite.nosql_client.player_alias_release(self.old_alias.lower())
 
     def do_exec_online(self, session, retmsg):
-        if self.callsign_status != 'ok': return ReturnValue(result = { 'result': self.callsign_status })
+        if self.callsign_status != 'ok': return ReturnValue(error = self.callsign_status)
         self.old_alias = session.player.alias
         self.release_old_alias()
         old_name = session.user.get_ui_name(session.player)
@@ -2178,19 +2178,19 @@ class HandleRenamePlayer(Handler):
                                          'I have a new Call Sign!',
                                          bypass_gag = True, props = {'type':'changed_alias',
                                                                      'old_name': old_name})
+            return ReturnValue(result = 'ok')
         else:
-            self.callsign_status = 'New Call Sign is already taken. Enter a new one.'
-        return ReturnValue(result = { 'result': self.callsign_status })
+            return ReturnValue(error = 'New Call Sign is already taken. Enter a new one.')
 
     def do_exec_offline(self, user, player):
-        if self.callsign_status != 'ok': return ReturnValue(result = { 'result': self.callsign_status })
+        if self.callsign_status != 'ok': return ReturnValue(error = self.callsign_status)
         self.old_alias = player.get('alias')
         self.release_old_alias()
         if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower()):
             player['alias'] = self.new_alias
+            return ReturnValue(result = 'ok')
         else:
-            self.callsign_status = 'New Call Sign is already taken. Enter a new one.'
-        return ReturnValue(result = { 'result':self.callsign_status })
+            return ReturnValue(error = 'New Call Sign is already taken. Enter a new one.')
 
 methods = {
     'get_raw_player': HandleGetRawPlayer,
