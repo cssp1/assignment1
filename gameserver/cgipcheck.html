@@ -691,7 +691,7 @@ var method_change_player_alias = function() {
         return;
     }
     var ui_reason = check_ui_reason($("#alliance_player_reason")[0].value);
-    var args = {'ui_reason': ui_reason, 'method':'change_player_alias', 'user_id':user_id, 'new_alias':new_alias};
+    var args = {'ui_reason': ui_reason, 'method':'change_player_alias', 'new_alias':new_alias};
     if(ident && ui_reason) {
         send_request('player', 'change_player_alias', $.extend(ident, args), function(result) { display_response("Success!"); });
     }
