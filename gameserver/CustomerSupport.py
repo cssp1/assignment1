@@ -2168,9 +2168,10 @@ class HandleRenamePlayer(Handler):
     def do_exec_online(self, session, retmsg):
         if self.callsign_status != 'ok': return ReturnValue(error = self.callsign_status)
         self.old_alias = session.player.alias
-        self.release_old_alias()
         old_name = session.user.get_ui_name(session.player)
         if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower()):
+            if self.old_alias:
+                self.release_old_alias()
             session.player.alias = self.new_alias
             session.deferred_player_name_update = True
             if session.alliance_chat_channel:
@@ -2185,8 +2186,9 @@ class HandleRenamePlayer(Handler):
     def do_exec_offline(self, user, player):
         if self.callsign_status != 'ok': return ReturnValue(error = self.callsign_status)
         self.old_alias = player.get('alias')
-        self.release_old_alias()
         if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower()):
+            if self.old_alias:
+                self.release_old_alias()
             player['alias'] = self.new_alias
             return ReturnValue(result = 'ok')
         else:
