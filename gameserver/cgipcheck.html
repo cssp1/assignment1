@@ -371,14 +371,14 @@ var method_chat_ungag = function() {
 };
 var method_chat_abuse_clear = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#chat_abuse_reason")[0].value);
+    var ui_reason = check_ui_reason($("#chat_reason")[0].value);
     if(ident && ui_reason) {
         send_request('player', 'chat_abuse_clear', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!\n"+result.toString()); });
     }
 };
 var method_chat_abuse_violate = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#chat_abuse_reason")[0].value);
+    var ui_reason = check_ui_reason($("#chat_reason")[0].value);
     var ui_player_reason = check_ui_reason($("#chat_abuse_player_reason")[0].value);
     if(ident && ui_reason && ui_player_reason) {
         send_request('player', 'chat_abuse_violate', $.extend(ident, {'ui_reason':ui_reason, 'ui_player_reason':ui_player_reason}), function(result) { alert("Success!\n"+result.toString()); });
@@ -1881,8 +1881,7 @@ $(function() {
     <li><a href="#player_tools_add_note" id="player_tools_add_note_header">Add Note</a></li>
     <li><a href="#player_tools_give_item" id="player_tools_give_item_header">Give Item</a></li>
     <li><a href="#player_tools_give_gamebucks" id="player_tools_give_gamebucks_header">Give $GAMEBUCKS_NAME$</a></li>
-    <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Tools</a></li>
-    <li><a href="#player_tools_chat_abuse" id="player_tools_chat_abuse_header">Chat Abuse</a></li>
+    <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Tools/Abuse</a></li>
     <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
     <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
     <li><a href="#player_tools_alts_vpn" id="player_tools_alts_vpn_header">Alts/VPN</a></li>
@@ -1911,36 +1910,37 @@ $(function() {
 
     </div>
     <div id="player_tools_chat_gag">
-      <button onclick="method_chat_get()" class="spin_button" style="width:200px;">Get Recent Messages</button> Include Up To <input type="text" id="chat_message_count" name="chat_message_count" value="1000"> messages<p>
-      <button onclick="method_chat_ungag()" class="spin_button">Unmute</button>
-      Duration: <input type="text" id="chat_gag_duration" name="chat_gag_duration" value="12"> Hours
-      <button onclick="method_chat_gag($('#chat_gag_duration').spinner('value')*3600)" class="spin_button">Mute (Temporary)</button>
-      <button onclick="method_chat_gag(-1)" class="spin_button">Mute (Permanent)</button><p>
-      Other Player ID: <input type="text" id="chat_block_other_id" name="chat_block_other_id">
-        <button onclick="method_chat_block($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Block Communication</button>
-        <button onclick="method_chat_unblock($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Unblock Communication</button>
-      <p>
-      <button onclick="method_clear_alias($('#clear_alias_duration').spinner('value')*3600)" class="spin_button" style="width:300px;">Remove Alias (Call Sign/Nickname)</button>
-      Cooldown until new Alias: <input type="text" id="clear_alias_duration" name="clear_alias_duration" value="12"> Hours
-      <button onclick="method_remove_aura('alias_gagged')" class="spin_button" style="width:180px;">Undo Alias Cooldown</button>
-      <p>
-      Reason for this action:
-      <br>
-      <input type="text" id="chat_reason" style="width:500px;">
-    </div>
-    <div id="player_tools_chat_abuse">
-      <button onclick="method_chat_get()" class="spin_button" style="width:250px;">Get Recent Messages</button>
-      <p>
-      <button onclick="method_chat_abuse_violate()" class="spin_button" style="width:250px;">Add Offense</button>
-      <button onclick="method_chat_abuse_clear()" class="spin_button" style="width:300px;">Unmute and Remove 1 Offense</button>
-      <p>
-      Tell the player what they are being muted for:
-      <br>
-      <input type="text" id="chat_abuse_player_reason" style="width:500px;">
-      <p>
-      Reason for this action:
-      <br>
-      <input type="text" id="chat_abuse_reason" style="width:500px;">
+        <p>
+            <button onclick="method_chat_get()" class="spin_button" style="width:200px;">Get Recent Messages</button> Include Up To <input type="text" id="chat_message_count" name="chat_message_count" value="1000"> messages
+        </p>
+        <p>
+            <button onclick="method_chat_ungag()" class="spin_button">Unmute</button>
+            Duration: <input type="text" id="chat_gag_duration" name="chat_gag_duration" value="12"> Hours
+            <button onclick="method_chat_gag($('#chat_gag_duration').spinner('value')*3600)" class="spin_button">Mute (Temporary)</button>
+            <button onclick="method_chat_gag(-1)" class="spin_button">Mute (Permanent)</button>
+        </p>
+        <p>
+            Other Player ID: <input type="text" id="chat_block_other_id" name="chat_block_other_id">
+            <button onclick="method_chat_block($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Block Communication</button>
+            <button onclick="method_chat_unblock($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Unblock Communication</button>
+        </p>
+        <p>
+            <button onclick="method_clear_alias($('#clear_alias_duration').spinner('value')*3600)" class="spin_button" style="width:300px;">Remove Alias (Call Sign/Nickname)</button>
+            Cooldown until new Alias: <input type="text" id="clear_alias_duration" name="clear_alias_duration" value="12"> Hours
+            <button onclick="method_remove_aura('alias_gagged')" class="spin_button" style="width:180px;">Undo Alias Cooldown</button>
+        </p>
+        <p>
+            <button onclick="method_chat_abuse_violate()" class="spin_button" style="width:250px;">Add Offense</button>
+            <button onclick="method_chat_abuse_clear()" class="spin_button" style="width:300px;">Unmute and Remove 1 Offense</button>
+            Tell the player what they are being muted for:
+            <br>
+            <input type="text" id="chat_abuse_player_reason" style="width:500px;">
+        </p>
+        <p>
+            Reason for this action:
+            <br>
+            <input type="text" id="chat_reason" style="width:500px;">
+        </p>
     </div>
     <div id="player_tools_give_item">
       Pick an item from the list:
