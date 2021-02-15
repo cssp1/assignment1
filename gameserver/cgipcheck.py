@@ -335,9 +335,53 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result':chat_abuse_violate(control_args, 'violate', control_args['ui_player_reason'], None, None)}
             elif method == 'chat_abuse_clear':
                 result = {'result':chat_abuse_clear(control_args)}
-            elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','ban','unban','vpn_excuse','vpn_unexcuse',
-                            'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','change_region','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member','change_alliance_info','change_player_alias','add_note'):
+            elif method in ('give_item','send_message','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','unban','vpn_excuse','vpn_unexcuse','make_developer','unmake_developer',
+                            'clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member','change_alliance_info','change_player_alias','add_note'):
                 result = do_CONTROLAPI(control_args)
+            elif method in ('chat_gag','chat_ungag','ban','change_region'):
+                if 'include_alts' in control_args and control_args['include_alts'] == 1:
+                    if 'user_id' in control_args:
+                        user_id = control_args['user_id']
+                    elif 'facebook_id' in control_args:
+                        sid = 'fb' + control_args['facebook_id']
+                        user_id = nosql_client.social_id_to_spinpunch_single(sid, False)
+                        del control_args['facebook_id']
+                        control_args['user_id'] = str(user_id)
+                    elif 'battlehouse_id' in control_args:
+                        sid = 'fb' + control_args['facebook_id']
+                        user_id = nosql_client.social_id_to_spinpunch_single(sid, False)
+                        del control_args['battlehouse_id']
+                        control_args['user_id'] = str(user_id)
+                    player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': user_id})['result'])
+                    alt_list = []
+                    for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
+                                             key = lambda id_entry: -id_entry[1].get('logins',1)):
+                        if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) == 0:
+                            continue
+                        if entry.get('ignore',False): # marked non-alt
+                            continue
+                        if 'last_login' in entry and entry['last_login'] < (time_now - 90*86400):
+                            continue
+                        alt_list.append(str(s_other_id))
+                    errors = []
+                    for alt_id in alt_list:
+                        alt_args = copy.deepcopy(control_args)
+                        alt_args['user_id'] = str(alt_id)
+                        alt_args['ui_reason'] = 'Alt account of %s, action taken on that account due to %s' % (str(user_id), control_args['ui_reason'])
+                        alt_result = do_CONTROLAPI(alt_args)
+                        if 'error' in alt_result:
+                            errors.append(alt_result['error'])
+                    result = do_CONTROLAPI(control_args)
+                    if len(errors) > 0:
+                        error_string = 'Experienced errors while processing alts:'
+                        for error in errors:
+                            error_string += '\n%s' % error
+                        if 'error' in result:
+                            result['error'] += '\n%s' % error_string
+                        else:
+                            result['error'] = '\n%s' % error_string
+                else:
+                    result = do_CONTROLAPI(control_args)
             else:
                 raise Exception('unknown player method '+method)
 
