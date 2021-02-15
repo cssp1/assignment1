@@ -2144,6 +2144,56 @@ class HandlePlayerBatch(Handler):
                            kill_session = any(x.kill_session for x in retlist),
                            async = False)
 
+class HandleRenamePlayer(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.new_alias = self.args['new_alias']
+        self.old_alias = None
+        self.callsign_status = 'ok'
+
+    def check_callsign_status(self):
+        import ChatFilter
+        chat_filter = ChatFilter.ChatFilter(self.gamedata['client']['chat_filter'])
+        if chat_filter.is_bad(self.new_alias): self.callsign_status = 'ChatFilter reports new Call Sign is bad. Enter a new one.'
+        if chat_filter.is_graphical(self.new_alias): self.callsign_status = 'ChatFilter reports new Call Sign is graphical. Enter a new one.'
+        if chat_filter.is_ugly(self.new_alias): self.callsign_status = 'ChatFilter reports new Call Sign is ugly. Enter a new one.'
+        if self.new_alias == session.player.alias: self.callsign_status = 'New callsign matches old Call Sign. Enter a new one.'
+        if self.gamesite.nosql_client.player_alias_exists(self.new_alias): self.callsign_status = 'New Call Sign is already taken. Enter a new one.'
+
+    def release_old_alias(self):
+        if self.old_alias:
+            self.gamesite.nosql_client.player_alias_release(self.old_alias)
+            self.gamesite.nosql_client.player_alias_release(self.old_alias.lower())
+
+    def do_exec_online(self, session, retmsg):
+        if self.callsign_status != 'ok': return ReturnValue(error = self.callsign_status)
+        self.old_alias = session.player.alias
+        old_name = session.user.get_ui_name(session.player)
+        if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower()):
+            if self.old_alias:
+                self.release_old_alias()
+            session.player.alias = self.new_alias
+            session.deferred_player_name_update = True
+            if session.alliance_chat_channel:
+                session.do_chat_send(session.alliance_chat_channel,
+                                         'I have a new Call Sign!',
+                                         bypass_gag = True, props = {'type':'changed_alias',
+                                                                     'old_name': old_name})
+            return ReturnValue(result = 'ok')
+        else:
+            return ReturnValue(error = 'New Call Sign is already taken. Enter a new one.')
+
+    def do_exec_offline(self, user, player):
+        if self.callsign_status != 'ok': return ReturnValue(error = self.callsign_status)
+        self.old_alias = player.get('alias')
+        if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower()):
+            if self.old_alias:
+                self.release_old_alias()
+            player['alias'] = self.new_alias
+            return ReturnValue(result = 'ok')
+        else:
+            return ReturnValue(error = 'New Call Sign is already taken. Enter a new one.')
+
 methods = {
     'get_raw_player': HandleGetRawPlayer,
     'get_raw_user': HandleGetRawUser,
@@ -2200,5 +2250,6 @@ methods = {
     'apply_alliance_leave_point_loss': HandleApplyAllianceLeavePointLoss,
     'modify_scores': HandleModifyScores,
     'player_batch': HandlePlayerBatch,
+    'change_player_alias': HandleRenamePlayer,
     # not implemented yet: join_abtest, clear_abtest
 }
