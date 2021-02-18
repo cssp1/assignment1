@@ -90,6 +90,24 @@ def item_is_giveable(gamedata, spec):
                 return True
     return False
 
+def get_alt_list_recursive(user_id, alt_list, aggressive):
+    player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': user_id})['result'])
+    for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
+                             key = lambda id_entry: -id_entry[1].get('logins',1)):
+        if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) == 0:
+            continue
+        # don't include non-alts approved by customer support
+        if entry.get('ignore',False):
+            continue
+        # ignore alts that haven't logged in for 90+ days unless the aggressive check-mark is checked
+        if 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and not aggressive:
+            continue
+        if s_other_id not in alt_list:
+            alt_list.append(s_other_id)
+            alt_list.extend(get_alt_list_recursive(s_other_id, alt_list, aggressive))
+            alt_list = list(dict.fromkeys(alt_list))
+    return alt_list
+
 def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_hint_cookie_name, my_endpoint, nosql_client):
     log_bookmark = nosql_client.log_bookmark_get(spin_token_data['spin_user'], 'ALL')
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
@@ -339,7 +357,10 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                             'clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member','change_alliance_info','change_player_alias','add_note'):
                 result = do_CONTROLAPI(control_args)
             elif method in ('chat_gag','chat_ungag','ban','change_region'):
-                if 'include_alts' in control_args and control_args['include_alts'] == 1:
+                if 'include_alts' in control_args and control_args['include_alts'] == '1':
+                    aggressive_alt_identification = False
+                    if 'aggressive_alt_identification' in control_args and control_args['aggressive_alt_identification'] == '1':
+                        aggressive_alt_identification = True
                     if 'user_id' in control_args:
                         user_id = control_args['user_id']
                     elif 'facebook_id' in control_args:
@@ -352,17 +373,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                         user_id = nosql_client.social_id_to_spinpunch_single(sid, False)
                         del control_args['battlehouse_id']
                         control_args['user_id'] = str(user_id)
-                    player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': user_id})['result'])
-                    alt_list = []
-                    for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
-                                             key = lambda id_entry: -id_entry[1].get('logins',1)):
-                        if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) == 0:
-                            continue
-                        if entry.get('ignore',False): # marked non-alt
-                            continue
-                        if 'last_login' in entry and entry['last_login'] < (time_now - 90*86400):
-                            continue
-                        alt_list.append(str(s_other_id))
+                    alt_list = get_alt_list_recursive(user_id,[user_id],aggressive_alt_identification)
                     errors = []
                     for alt_id in alt_list:
                         alt_args = copy.deepcopy(control_args)

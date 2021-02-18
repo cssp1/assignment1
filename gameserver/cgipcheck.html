@@ -308,6 +308,7 @@ var method_change_region = function() {
     var alt_banish_duration = (has_anti_alt_regions() && $("#change_region_do_alt_banish")[0].checked) ? ($("#region_alt_banish_duration").spinner("value") * 3600) : 0;
     var refresh_banish_duration = (has_anti_refresh_regions() && $("#change_region_do_refresh_banish")[0].checked) ? ($("#region_refresh_banish_duration").spinner("value") * 3600) : 0;
     var include_alts = $("#region_include_alts")[0].checked ? '1' : '0';
+    var aggressive_alt_identification = $("#region_aggressive_alt_identification")[0].checked ? '1' : '0';
 
     var on_complete = function(result) {
         alert("Success! Remember to send the player a message explaining what happened!");
@@ -324,7 +325,7 @@ var method_change_region = function() {
                                               if(__refresh_banish_duration === 0) {
                                                   __on_complete(result);
                                               } else {
-                                                  send_request('player', 'apply_aura', $.extend({}, __ident, {'include_alts':include_alts, 'aura_name':'region_banished','duration':__refresh_banish_duration,'data':JSON.stringify({'tag':'anti_refresh'})}), __on_complete);
+                                                  send_request('player', 'apply_aura', $.extend({}, __ident, {'include_alts':include_alts, 'aggressive_alt_identification': aggressive_alt_identification, 'aura_name':'region_banished','duration':__refresh_banish_duration,'data':JSON.stringify({'tag':'anti_refresh'})}), __on_complete);
                                               }
                                           }; })(_ident, _on_complete, _refresh_banish_duration));
                          }
@@ -356,8 +357,9 @@ var method_chat_gag = function(duration) {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#chat_reason")[0].value);
     var include_alts = $("#chat_gag_ungag_include_alts")[0].checked ? '1' : '0';
+    var aggressive_alt_identification = $("#chat_gag_ungag_aggressive_alt_identification")[0].checked ? '1' : '0';
     if(ident && ui_reason) {
-        var args = $.extend(ident, {'ui_reason':ui_reason, 'include_alts':include_alts});
+        var args = $.extend(ident, {'ui_reason':ui_reason, 'include_alts':include_alts, 'aggressive_alt_identification':aggressive_alt_identification});
         if(duration > 0) {
             args['duration'] = duration;
         }
@@ -368,8 +370,9 @@ var method_chat_ungag = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#chat_reason")[0].value);
     var include_alts = $("#chat_gag_ungag_include_alts")[0].checked ? '1' : '0';
+    var aggressive_alt_identification = $("#chat_gag_ungag_aggressive_alt_identification")[0].checked ? '1' : '0';
     if(ident && ui_reason) {
-        send_request('player', 'chat_ungag', $.extend(ident, {'ui_reason':ui_reason, 'include_alts':include_alts}), function(result) { alert("Success!"); });
+        send_request('player', 'chat_ungag', $.extend(ident, {'ui_reason':ui_reason, 'include_alts':include_alts, 'aggressive_alt_identification':aggressive_alt_identification}), function(result) { alert("Success!"); });
     }
 };
 var method_chat_abuse_clear = function() {
@@ -391,7 +394,8 @@ var method_ban = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#ban_reason")[0].value);
     args = {'ui_reason': ui_reason,
-            'include_alts': $("#ban_include_alts")[0].checked ? '1' : '0'
+            'include_alts': $("#ban_include_alts")[0].checked ? '1' : '0',
+            'aggressive_alt_identification': $("#ban_aggressive_alt_identification")[0].checked ? '1' : '0',
             'remove_from_map': $("#ban_remove_from_map")[0].checked ? '1' : '0'
            };
 
@@ -1924,6 +1928,8 @@ $(function() {
             <button onclick="method_chat_gag(-1)" class="spin_button">Mute (Permanent)</button>
             <br>
             <input id="chat_gag_ungag_include_alts" type="checkbox" style="height:initial;" checked="1"></input>Also mute/unmute all alts (will not affect ignored alts)
+            <br>
+            <input id="chat_gag_ungag_aggressive_alt_identification" type="checkbox" style="height:initial;" checked="1"></input>Aggressively identify alts (check to include alts that last logged in 90+ days ago)
         </p>
         <p>
             Other Player ID: <input type="text" id="chat_block_other_id" name="chat_block_other_id">
@@ -2017,6 +2023,8 @@ $(function() {
             <br>
             <br>
             <input id="region_include_alts" type="checkbox" style="height:initial;" checked="1"></input>Also banish all alts (will not banish ignored alts)
+            <br>
+            <input id="region_aggressive_alt_identification" type="checkbox" style="height:initial;" checked="1"></input>Aggressively identify alts (check to include alts that last logged in 90+ days ago)
         </p>
         <p>
             Reason for this action:
@@ -2049,6 +2057,8 @@ $(function() {
             <input id="ban_remove_from_map" type="checkbox" style="height:initial;" checked="1"></input>Also remove home base and all quarries from regional map
             <br>
             <input id="ban_include_alts" type="checkbox" style="height:initial;" checked="1"></input>Also ban all alts. Will not ban ignored alts. Will not batch unban alts. Alt accounts must be individually unbanned.
+            <br>
+            <input id="ban_aggressive_alt_identification" type="checkbox" style="height:initial;" checked="1"></input>Aggressively identify alts (check to include alts that last logged in 90+ days ago)
         </p>
         <p>
             Reason for this action:
