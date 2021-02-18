@@ -2277,9 +2277,9 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
             error |= check_consequent(c, reason = reason, context = context, context_data = context_data)
     elif cons['consequent'] == "GIVE_LOOT":
         error |= check_loot_table(cons['loot'], reason = reason, expire_time = cons.get('item_expire_at',-1), duration = cons.get('item_duration',-1))
-        if cons.get('reason',None) != context and cons.get('reason',None) not in ('special', 'promo_code', 'login_incentive'):
+        if (cons.get('reason',None) != context and cons.get('reason',None) not in ('special', 'promo_code', 'login_incentive')) or ('reason' not in cons and 'context' not in cons):
             error |= 1
-            print '%s: GIVE_LOOT consequent has bad "reason", it should be "%s"' % (reason, context)
+            print '%s: GIVE_LOOT consequent has bad "reason", it should match the "context" or be either "special", "promo_code", or "login_incentive". It cannot be blank unless "context" is set!' % (reason, context)
         if 'mail_template' in cons:
             error |= check_mail_template(cons['mail_template'], reason = reason + ':mail_template')
     elif cons['consequent'] == "IF":
