@@ -375,7 +375,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                         control_args['user_id'] = user_id
                     alt_set = get_alt_set_recursive(user_id, set([user_id]), aggressive_alt_identification)
                     errors = []
-                    for alt_id in alt_list:
+                    for alt_id in alt_set:
                         alt_args = copy.deepcopy(control_args)
                         alt_args['user_id'] = str(alt_id)
                         alt_args['ui_reason'] = 'Alt account of %s, action taken on that account due to %s' % (str(user_id), control_args['ui_reason'])
