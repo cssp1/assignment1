@@ -90,7 +90,7 @@ def item_is_giveable(gamedata, spec):
                 return True
     return False
 
-def get_alt_list_recursive(user_id, alt_list, aggressive):
+def get_alt_set_recursive(user_id, alt_set, aggressive):
     player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': user_id})['result'])
     for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                              key = lambda id_entry: -id_entry[1].get('logins',1)):
@@ -102,10 +102,10 @@ def get_alt_list_recursive(user_id, alt_list, aggressive):
         # ignore alts that haven't logged in for 90+ days unless the aggressive check-mark is checked
         if 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and not aggressive:
             continue
-        if s_other_id not in alt_list:
-            alt_list.append(s_other_id)
-            alt_list.extend(get_alt_list_recursive(s_other_id, alt_list, aggressive))
-            alt_list = list(dict.fromkeys(alt_list))
+        other_id = int(s_other_id)
+        if other_id not in alt_set:
+            alt_set.add(other_id)
+            alt_set = get_alt_set_recursive(other_id, alt_set, aggressive)
     return alt_list
 
 def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_hint_cookie_name, my_endpoint, nosql_client):
@@ -362,18 +362,18 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     if 'aggressive_alt_identification' in control_args and control_args['aggressive_alt_identification'] == '1':
                         aggressive_alt_identification = True
                     if 'user_id' in control_args:
-                        user_id = control_args['user_id']
+                        user_id = int(control_args['user_id'])
                     elif 'facebook_id' in control_args:
                         sid = 'fb' + control_args['facebook_id']
-                        user_id = nosql_client.social_id_to_spinpunch_single(sid, False)
+                        user_id = int(nosql_client.social_id_to_spinpunch_single(sid, False))
                         del control_args['facebook_id']
-                        control_args['user_id'] = str(user_id)
+                        control_args['user_id'] = user_id
                     elif 'battlehouse_id' in control_args:
                         sid = 'fb' + control_args['facebook_id']
-                        user_id = nosql_client.social_id_to_spinpunch_single(sid, False)
+                        user_id = int(nosql_client.social_id_to_spinpunch_single(sid, False))
                         del control_args['battlehouse_id']
-                        control_args['user_id'] = str(user_id)
-                    alt_list = get_alt_list_recursive(user_id,[user_id],aggressive_alt_identification)
+                        control_args['user_id'] = user_id
+                    alt_set = get_alt_set_recursive(user_id, set([user_id]), aggressive_alt_identification)
                     errors = []
                     for alt_id in alt_list:
                         alt_args = copy.deepcopy(control_args)
