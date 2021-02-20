@@ -421,6 +421,7 @@ var method_unban = function() {
 };
 var method_identify_accounts_to_reban = function() {
     var ident = get_ident();
+    var ui_reson = '';
     if(ident && ui_reason) {
         send_request('player', 'identify_accounts_to_reban', $.extend(ident, {'ui_reason':ui_reason}), function(result) { console.log(result); display_response(result.toString()); });
     }
