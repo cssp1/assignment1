@@ -412,7 +412,7 @@ var method_unban = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#ban_reason")[0].value);
     if(ident && ui_reason) {
-        send_request('player', 'unban', $.extend(ident, {'ui_reason':ui_reason}), function(result) { display_response("Success!"); });
+        send_request('player', 'unban', $.extend(ident, {'ui_reason':ui_reason, 'include_alts': $("#ban_include_alts")[0].checked ? '1' : '0', 'aggressive_alt_identification': $("#ban_aggressive_alt_identification")[0].checked ? '1' : '0'}), function(result) { display_response("Success!"); });
     }
 };
 var method_vpn_excuse = function() {
