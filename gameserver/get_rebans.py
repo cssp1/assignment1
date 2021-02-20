@@ -31,7 +31,7 @@ if __name__ == "__main__":
         if 'history' not in player:
             print 'No need to reban ' + str(user_id)
             continue
-        if 'customer_support' in not in player['history']:
+        if 'customer_support' not in player['history']:
             print 'No need to reban ' + str(user_id)
             continue
         ban_count = 0
