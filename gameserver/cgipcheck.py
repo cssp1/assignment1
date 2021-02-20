@@ -141,9 +141,8 @@ def identify_accounts_to_reban():
             elif entry['method'].upper() == 'UNBAN':
                 unban_count += 1
         if ban_count > unban_count:
-            reban_accounts.append(user_id)
-    with open('james_reban.txt','w') as reban_result:
-        reban_result.write(str(reban_accounts))
+            with open('james_reban.txt','a') as reban_result:
+                reban_result.write(str(user_id))
 
 def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_hint_cookie_name, my_endpoint, nosql_client):
     log_bookmark = nosql_client.log_bookmark_get(spin_token_data['spin_user'], 'ALL')
