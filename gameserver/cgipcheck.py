@@ -106,7 +106,7 @@ def get_alt_set_recursive(user_id, alt_set, aggressive):
         if other_id not in alt_set:
             alt_set.add(other_id)
             alt_set = get_alt_set_recursive(other_id, alt_set, aggressive)
-    return alt_list
+    return alt_set
 
 def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_hint_cookie_name, my_endpoint, nosql_client):
     log_bookmark = nosql_client.log_bookmark_get(spin_token_data['spin_user'], 'ALL')
