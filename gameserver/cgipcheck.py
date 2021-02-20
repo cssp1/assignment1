@@ -101,7 +101,7 @@ def get_alt_set(user_id, alt_set, aggressive):
         if entry.get('ignore',False):
             continue
         # ignore alts that haven't logged in for 90+ days unless the aggressive check-mark is checked
-        if 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and not aggressive:
+        if entry.get('logins',1) < 100 and 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and not aggressive:
             continue
         other_id = int(s_other_id)
         if other_id not in alt_set:
@@ -118,7 +118,7 @@ def get_alt_set_recursive(user_id, alt_set, aggressive):
         if entry.get('ignore',False):
             continue
         # ignore alts that haven't logged in for 90+ days unless the aggressive check-mark is checked
-        if 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and not aggressive:
+        if entry.get('logins',1) < 100 and 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and not aggressive:
             continue
         other_id = int(s_other_id)
         if other_id not in alt_set:
