@@ -16369,10 +16369,9 @@ class OGPAPI(resource.Resource):
             #my_ui_description = 'For '+category
 
         elif type == OGPAPI.object_type('literal'):
-            for MANDATORY_ARG in ('spin_ref', 'ui_name'):
-                if MANDATORY_ARG not in request.args:
-                    request.setResponseCode(http.BAD_REQUEST)
-                    return 'missing %s' % MANDATORY_ARG
+            if 'ui_name' not in request.args:
+                request.setResponseCode(http.BAD_REQUEST)
+                return 'missing ui_name'
 
             my_ui_name = request.args['ui_name'][0].decode('utf-8')
             if ('ui_description' in request.args):
@@ -33652,7 +33651,7 @@ class GameSite(server.Site):
                 pg = AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_battles'),
                                                  verbosity = 0,
                                                  log_exception_func = self.log_exception_func)
-            self.sql_battles_client = SpinSQLBattles.SQLBattlesClient(pg, timeout = SpinConfig.config['pgsql_servers'][game_id+'_battles'].get('timeout', 10))
+            self.sql_battles_client = SpinSQLBattles.SQLBattlesClient(pg, timeout = SpinConfig.config['pgsql_servers'][game_id+'_battles'].get('timeout', 20))
 
     def sql_shutdown(self):
         self.sql_scores2_client = None

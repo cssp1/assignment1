@@ -60,12 +60,17 @@ FBShare.invoke_share = function(options) {
         // these are the properties of the OGPAPI object we'll create (server-side)
         if(!options.name) { throw Error('mandatory parameter "name" missing'); }
         if(!options.ref) { throw Error('mandatory parameter "ref" missing'); }
+        /*
+        Old version of props changed on 2021-02-20 due to OGPAPI truncating posted URLs and throwing errors.
+        Reducing sent parameters to eliminate truncation
         var props = {'type':'literal', // note: no game_id prefix on this OG object
                      'frame_platform': spin_frame_platform,
                      'ui_name': options.name,
                      'spin_ref': options.ref,
                      'spin_ref_user_id': spin_user_id.toString(),
-                     'image_url': options.picture || FBShare.default_picture()};
+                     'image_url': options.picture || FBShare.default_picture()}; */
+        var props = {'type':'literal', // note: no game_id prefix on this OG object
+                     'ui_name': options.name};
         if(options.description) {
             props['ui_description'] = options.description;
         }
