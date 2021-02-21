@@ -16378,7 +16378,8 @@ class OGPAPI(resource.Resource):
                 my_ui_description = request.args['ui_description'][0].decode('utf-8')
             else:
                 my_ui_description = SpinConfig.config['proxyserver'].get('fbexternalhit_description', '')
-            my_spin_ref = str(request.args['spin_ref'][0])
+            if ('spin_ref' in request.args):
+                my_spin_ref = str(request.args['spin_ref'][0])
             if ('spin_ref_user_id' in request.args):
                 my_spin_ref_user_id = str(request.args['spin_ref_user_id'][0])
             if ('spin_link_qs' in request.args):
