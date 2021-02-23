@@ -33652,7 +33652,7 @@ class GameSite(server.Site):
                 pg = AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_battles'),
                                                  verbosity = 0,
                                                  log_exception_func = self.log_exception_func)
-            self.sql_battles_client = SpinSQLBattles.SQLBattlesClient(pg, timeout = SpinConfig.config['pgsql_servers'][game_id+'_battles'].get('timeout', 20))
+            self.sql_battles_client = SpinSQLBattles.SQLBattlesClient(pg, timeout = SpinConfig.config['pgsql_servers'][game_id+'_battles'].get('timeout', 30))
 
     def sql_shutdown(self):
         self.sql_scores2_client = None
