@@ -54862,6 +54862,9 @@ function on_keyup(e) {
                     selection.multi[i].ai_threatlist = null; selection.multi[i].ai_threatlist_dirty = true;
                 }
             } else if(cmd === 'MAKE_AGGRESSIVE' && selection.unit.can_accept_commands()) {
+                // can't do relentless during tutorial, it will break the game
+                // can't be part of the above check or it will throw an error
+                if(player.tutorial_state != "COMPLETE") { return; }
                 unit_command_make_aggressive(world);
             } else if(cmd === 'REMOVE_OBJECT') {
                 if(player.is_cheater) {
