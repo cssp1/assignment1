@@ -307,6 +307,9 @@ var method_change_region = function() {
     var ui_reason = check_ui_reason($("#change_region_reason")[0].value);
     var alt_banish_duration = (has_anti_alt_regions() && $("#change_region_do_alt_banish")[0].checked) ? ($("#region_alt_banish_duration").spinner("value") * 3600) : 0;
     var refresh_banish_duration = (has_anti_refresh_regions() && $("#change_region_do_refresh_banish")[0].checked) ? ($("#region_refresh_banish_duration").spinner("value") * 3600) : 0;
+    var include_alts = $("#region_include_alts")[0].checked ? '1' : '0';
+    var include_alts_recursive = $("#region_include_alts_recursive")[0].checked ? '1' : '0';
+    var aggressive_alt_identification = $("#region_aggressive_alt_identification")[0].checked ? '1' : '0';
 
     var on_complete = function(result) {
         alert("Success! Remember to send the player a message explaining what happened!");
@@ -323,7 +326,7 @@ var method_change_region = function() {
                                               if(__refresh_banish_duration === 0) {
                                                   __on_complete(result);
                                               } else {
-                                                  send_request('player', 'apply_aura', $.extend({}, __ident, {'aura_name':'region_banished','duration':__refresh_banish_duration,'data':JSON.stringify({'tag':'anti_refresh'})}), __on_complete);
+                                                  send_request('player', 'apply_aura', $.extend({}, __ident, {'include_alts':include_alts, 'include_alts_recursive': include_alts_recursive, 'aggressive_alt_identification': aggressive_alt_identification, 'aura_name':'region_banished','duration':__refresh_banish_duration,'data':JSON.stringify({'tag':'anti_refresh'})}), __on_complete);
                                               }
                                           }; })(_ident, _on_complete, _refresh_banish_duration));
                          }
@@ -354,8 +357,11 @@ var method_give_item = function() {
 var method_chat_gag = function(duration) {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#chat_reason")[0].value);
+    var include_alts = $("#chat_gag_ungag_include_alts")[0].checked ? '1' : '0';
+    var include_alts_recursive = $("#chat_gag_ungag_include_alts_recursive")[0].checked ? '1' : '0';
+    var aggressive_alt_identification = $("#chat_gag_ungag_aggressive_alt_identification")[0].checked ? '1' : '0';
     if(ident && ui_reason) {
-        var args = $.extend(ident, {'ui_reason':ui_reason});
+        var args = $.extend(ident, {'ui_reason':ui_reason, 'include_alts':include_alts, 'include_alts_recursive': include_alts_recursive, 'aggressive_alt_identification':aggressive_alt_identification});
         if(duration > 0) {
             args['duration'] = duration;
         }
@@ -365,8 +371,11 @@ var method_chat_gag = function(duration) {
 var method_chat_ungag = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#chat_reason")[0].value);
+    var include_alts = $("#chat_gag_ungag_include_alts")[0].checked ? '1' : '0';
+    var include_alts_recursive = $("#chat_gag_ungag_include_alts_recursive")[0].checked ? '1' : '0';
+    var aggressive_alt_identification = $("#chat_gag_ungag_aggressive_alt_identification")[0].checked ? '1' : '0';
     if(ident && ui_reason) {
-        send_request('player', 'chat_ungag', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+        send_request('player', 'chat_ungag', $.extend(ident, {'ui_reason':ui_reason, 'include_alts':include_alts, 'include_alts_recursive': include_alts_recursive, 'aggressive_alt_identification':aggressive_alt_identification}), function(result) { alert("Success!"); });
     }
 };
 var method_chat_abuse_clear = function() {
@@ -388,6 +397,9 @@ var method_ban = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#ban_reason")[0].value);
     args = {'ui_reason': ui_reason,
+            'include_alts': $("#ban_include_alts")[0].checked ? '1' : '0',
+            'include_alts_recursive': $("#ban_include_alts_recursive")[0].checked ? '1' : '0',
+            'aggressive_alt_identification': $("#ban_aggressive_alt_identification")[0].checked ? '1' : '0',
             'remove_from_map': $("#ban_remove_from_map")[0].checked ? '1' : '0'
            };
 
@@ -1918,6 +1930,12 @@ $(function() {
             Duration: <input type="text" id="chat_gag_duration" name="chat_gag_duration" value="12"> Hours
             <button onclick="method_chat_gag($('#chat_gag_duration').spinner('value')*3600)" class="spin_button">Mute (Temporary)</button>
             <button onclick="method_chat_gag(-1)" class="spin_button">Mute (Permanent)</button>
+            <br>
+            <input id="chat_gag_ungag_include_alts" type="checkbox" style="height:initial;" checked="1"></input>Also mute/unmute all alts (will not affect ignored alts)
+            <br>
+            <input id="chat_gag_ungag_include_alts_recursive" type="checkbox" style="height:initial;"></input>Recursively include alts of alts.
+            <br>
+            <input id="chat_gag_ungag_aggressive_alt_identification" type="checkbox" style="height:initial;"></input>Aggressively identify alts (check to include alts that last logged in 90+ days ago)
         </p>
         <p>
             Other Player ID: <input type="text" id="chat_block_other_id" name="chat_block_other_id">
@@ -1989,26 +2007,38 @@ $(function() {
     </div>
 
     <div id="player_tools_change_region">
-      Force player to move to region:
-      <p>
-      <select id="change_region_destination" name="change_region_destination" class="spin_select"></select>
-      <button onclick="method_change_region()" class="spin_button">Apply</button>
-      <span id="change_region_alt_banishment_controls">
         <p>
-        <input id="change_region_do_alt_banish" type="checkbox" checked="1" style="height:initial;"></input>Also banish from anti-alt regions for:
-        <input type="text" id="region_alt_banish_duration" name="region_alt_banish_duration" value="720" style="width:100px"> Hours
-        <button onclick="method_remove_aura('region_banished', {'tag': 'anti_alt'})" class="spin_button" style="width:260px;">Undo Anti-Alt Banishment</button>
-      </span>
-      <span id="change_region_refresh_banishment_controls">
-        <br>
-        <input id="change_region_do_refresh_banish" type="checkbox" style="height:initial;"></input>Also banish from anti-refresh regions for:
-        <input type="text" id="region_refresh_banish_duration" name="region_refresh_banish_duration" value="720" style="width:100px"> Hours
-        <button onclick="method_remove_aura('region_banished', {'tag': 'anti_refresh'})" class="spin_button" style="width:260px;">Undo Anti-Refresh Banishment</button>
-      </span>
-      <p>
-      Reason for this action:
-      <br>
-      <input type="text" id="change_region_reason" style="width:500px;">
+            Force player to move to region:
+            <br><br>
+            <select id="change_region_destination" name="change_region_destination" class="spin_select"></select>
+            <button onclick="method_change_region()" class="spin_button">Apply</button>
+            <span id="change_region_alt_banishment_controls">
+                <p>
+                    <input id="change_region_do_alt_banish" type="checkbox" checked="1" style="height:initial;"></input>Also banish from anti-alt regions for:
+                    <input type="text" id="region_alt_banish_duration" name="region_alt_banish_duration" value="720" style="width:100px"> Hours
+                    <button onclick="method_remove_aura('region_banished', {'tag': 'anti_alt'})" class="spin_button" style="width:260px;">Undo Anti-Alt Banishment</button>
+                </p>
+            </span>
+            <span id="change_region_refresh_banishment_controls">
+                <p>
+                    <input id="change_region_do_refresh_banish" type="checkbox" style="height:initial;"></input>Also banish from anti-refresh regions for:
+                    <input type="text" id="region_refresh_banish_duration" name="region_refresh_banish_duration" value="720" style="width:100px"> Hours
+                    <button onclick="method_remove_aura('region_banished', {'tag': 'anti_refresh'})" class="spin_button" style="width:260px;">Undo Anti-Refresh Banishment</button>
+                </p>
+            </span>
+            <br>
+            <br>
+            <input id="region_include_alts" type="checkbox" style="height:initial;" checked="1"></input>Also banish all alts (will not banish ignored alts)
+            <br>
+            <input id="region_include_alts_recursive" type="checkbox" style="height:initial;"></input>Recursively include alts of alts.
+            <br>
+            <input id="region_aggressive_alt_identification" type="checkbox" style="height:initial;"></input>Aggressively identify alts (check to include alts that last logged in 90+ days ago and alts of alts)
+        </p>
+        <p>
+            Reason for this action:
+            <br>
+            <input type="text" id="change_region_reason" style="width:500px;">
+        </p>
     </div>
 
     <div id="player_tools_alts_vpn">
@@ -2028,17 +2058,28 @@ $(function() {
         </p>
     </div>
     <div id="player_tools_ban">
-      <button onclick="method_ban()" class="spin_button">Ban</button>
-      <button onclick="method_unban()" class="spin_button">Unban</button>
-      <br>
-      <input id="ban_remove_from_map" type="checkbox" style="height:initial;" checked="1"></input>Also remove home base and all quarries from regional map
-      <p>
-    Reason for this action:
-      <br>
-      <input type="text" id="ban_reason" style="width:500px;">
-      <p>
-      <input id="ban_public_announce" type="checkbox" style="height:initial;" onclick="if(this.checked) { $('#ban_public_message').removeAttr('disabled'); } else { $('#ban_public_message').attr('disabled', 'disabled'); }"></input>Announce the ban in public chat:<br>
-      <input type="text" id="ban_public_message" style="width:800px;" disabled="disabled" value="%player_name in region %region_name has been banned for hacking. Have a nice day!"></input>
+        <p>
+            <button onclick="method_ban()" class="spin_button">Ban</button>
+            <button onclick="method_unban()" class="spin_button">Unban</button>
+            <br>
+            <input id="ban_remove_from_map" type="checkbox" style="height:initial;" checked="1"></input>Also remove home base and all quarries from regional map
+            <br>
+            <input id="ban_include_alts" type="checkbox" style="height:initial;"></input>Also ban all alts. Will not ban ignored alts. Alt accounts must be individually unbanned.
+            <br>
+            <input id="ban_include_alts_recursive" type="checkbox" style="height:initial;"></input>Recursively include alts of alts. Will not ban ignored alts. Alt accounts must be individually unbanned.
+            <br>
+            <input id="ban_aggressive_alt_identification" type="checkbox" style="height:initial;"></input>Aggressively identify alts (check to include alts that last logged in 90+ days ago)
+        </p>
+        <p>
+            Reason for this action:
+            <br>
+            <input type="text" id="ban_reason" style="width:500px;">
+        </p>
+        <p>
+            <input id="ban_public_announce" type="checkbox" style="height:initial;" onclick="if(this.checked) { $('#ban_public_message').removeAttr('disabled'); } else { $('#ban_public_message').attr('disabled', 'disabled'); }"></input>
+            Announce the ban in public chat:
+            <br>
+            <input type="text" id="ban_public_message" style="width:800px;" disabled="disabled" value="%player_name in region %region_name has been banned for hacking. Have a nice day!"></input>
     </div>
 
     <div id="player_tools_alliance_player">

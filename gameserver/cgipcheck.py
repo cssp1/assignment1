@@ -18,6 +18,7 @@ import SpinGoogleAuth
 import SpinLog
 import FastGzipFile
 import ControlAPI
+from spinlibs.SpinHTTP import private_ip_re
 from check_player import get_prior_violations
 import BHAPI
 
@@ -89,6 +90,41 @@ def item_is_giveable(gamedata, spec):
             if spellname.startswith('BUY_PROTECTION') or spellname.startswith('TACTICAL_'):
                 return True
     return False
+
+def get_alt_set(user_id, alt_set, aggressive):
+    player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': user_id})['result'])
+    for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
+                             key = lambda id_entry: -id_entry[1].get('logins',1)):
+        if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) == 0:
+            continue
+        # don't include non-alts approved by customer support
+        if entry.get('ignore',False):
+            continue
+        # ignore alts that haven't logged in for 90+ days unless the aggressive check-mark is checked
+        if entry.get('logins',1) < 100 and 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and not aggressive:
+            continue
+        other_id = int(s_other_id)
+        if other_id not in alt_set:
+            alt_set.add(other_id)
+    return alt_set
+
+def get_alt_set_recursive(user_id, alt_set, aggressive):
+    player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': user_id})['result'])
+    for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
+                             key = lambda id_entry: -id_entry[1].get('logins',1)):
+        if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) == 0:
+            continue
+        # don't include non-alts approved by customer support
+        if entry.get('ignore',False):
+            continue
+        # ignore alts that haven't logged in for 90+ days unless the aggressive check-mark is checked
+        if entry.get('logins',1) < 100 and 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and not aggressive:
+            continue
+        other_id = int(s_other_id)
+        if other_id not in alt_set:
+            alt_set.add(other_id)
+            alt_set = get_alt_set_recursive(other_id, alt_set, aggressive)
+    return alt_set
 
 def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_hint_cookie_name, my_endpoint, nosql_client):
     log_bookmark = nosql_client.log_bookmark_get(spin_token_data['spin_user'], 'ALL')
@@ -316,7 +352,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 do_log = True # log all write activity
 
             # require special role for writes, except for chat, aura, and alt actions
-            if (method not in ('lookup','get_raw_player','get_personal_info','chat_gag','chat_ungag','chat_block','chat_unblock','chat_abuse_violate','chat_abuse_clear','apply_aura','remove_aura','ignore_alt','unignore_alt','vpn_excuse','vpn_unexcuse','add_note')):
+            if (method not in ('lookup','get_raw_player','get_personal_info','chat_gag','chat_ungag','chat_block','chat_unblock','chat_abuse_violate','chat_abuse_clear','apply_aura','remove_aura','ignore_alt','unignore_alt','vpn_excuse','vpn_unexcuse','add_note','identify_accounts_to_reban')):
                 check_role(spin_token_data, 'PCHECK-WRITE')
                 if method in ('ban','unban'):
                     check_role(spin_token_data, 'PCHECK-BAN')
@@ -335,9 +371,49 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result':chat_abuse_violate(control_args, 'violate', control_args['ui_player_reason'], None, None)}
             elif method == 'chat_abuse_clear':
                 result = {'result':chat_abuse_clear(control_args)}
-            elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','ban','unban','vpn_excuse','vpn_unexcuse',
-                            'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','change_region','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member','change_alliance_info','change_player_alias','add_note'):
+            elif method in ('give_item','send_message','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','unban','vpn_excuse','vpn_unexcuse','make_developer','unmake_developer',
+                            'clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member','change_alliance_info','change_player_alias','add_note'):
                 result = do_CONTROLAPI(control_args)
+            elif method in ('chat_gag','chat_ungag','ban','change_region'):
+                if ('include_alts' in control_args and control_args['include_alts'] == '1') or ('include_alts_recursive' in control_args and control_args['include_alts_recursive'] == '1'):
+                    aggressive_alt_identification = False
+                    if 'aggressive_alt_identification' in control_args and control_args['aggressive_alt_identification'] == '1':
+                        aggressive_alt_identification = True
+                    if 'user_id' in control_args:
+                        user_id = int(control_args['user_id'])
+                    elif 'facebook_id' in control_args:
+                        sid = 'fb' + control_args['facebook_id']
+                        user_id = int(nosql_client.social_id_to_spinpunch_single(sid, False))
+                        del control_args['facebook_id']
+                        control_args['user_id'] = user_id
+                    elif 'battlehouse_id' in control_args:
+                        sid = 'fb' + control_args['facebook_id']
+                        user_id = int(nosql_client.social_id_to_spinpunch_single(sid, False))
+                        del control_args['battlehouse_id']
+                        control_args['user_id'] = user_id
+                    if control_args['include_alts'] == '1':
+                        alt_set = get_alt_set(user_id, set([user_id]), aggressive_alt_identification)
+                    if control_args['include_alts_recursive'] == '1':
+                        alt_set = get_alt_set_recursive(user_id, set([user_id]), aggressive_alt_identification)
+                    errors = []
+                    for alt_id in alt_set:
+                        alt_args = copy.deepcopy(control_args)
+                        alt_args['user_id'] = str(alt_id)
+                        alt_args['ui_reason'] = 'Alt account of %s, action taken on that account due to %s' % (str(user_id), control_args['ui_reason'])
+                        alt_result = do_CONTROLAPI(alt_args)
+                        if 'error' in alt_result:
+                            errors.append(alt_result['error'])
+                    result = do_CONTROLAPI(control_args)
+                    if len(errors) > 0:
+                        error_string = 'Experienced errors while processing alts:'
+                        for error in errors:
+                            error_string += '\n%s' % error
+                        if 'error' in result:
+                            result['error'] += '\n%s' % error_string
+                        else:
+                            result['error'] = '\n%s' % error_string
+                else:
+                    result = do_CONTROLAPI(control_args)
             else:
                 raise Exception('unknown player method '+method)
 
