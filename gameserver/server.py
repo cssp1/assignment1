@@ -21862,7 +21862,7 @@ class GAMEAPI(resource.Resource):
                 # cold query
                 cold_limit = gamedata['server'].get('sql_battle_history_limit', 150)
                 cold_time_range = [gamedata.get('replay_oldest_timestamp', -1), server_time]
-                if time_range and time_range[0] > gamedata.get('replay_oldest_timestamp', 0):
+                if time_range and time_range[0] > cold_time_range[0]:
                     cold_time_range[0] = time_range[0]
                 if time_range and time_range[1] > 0:
                     cold_time_range[1] = time_range[1]
