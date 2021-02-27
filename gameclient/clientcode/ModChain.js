@@ -878,6 +878,13 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
         color = (is_worse ? SPUI.make_colorv([1,1,0,1]) : SPUI.good_text_color);
     }
 
+    if((stat === 'on_destroy' || stat === 'on_approach' || stat === 'on_damage') && modchain['mods'].length > 1) {
+        for(var i = 0; i < modchain['mods'].length; i ++) {
+            var mod = modchain['mods'][i];
+            if(mod.method && mod.method === 'replace') { show_base = false; }
+        }
+    }
+
     return {str: ModChain.display_value(modchain['val'], ui_data['display']||null, 'widget', ModChain.get_ui_mod_level(modchain)),
             value: modchain['val'],
             tooltip: gamedata['strings']['modstats']['tooltip_'+(!show_base && (modchain['mods'].length<2) ? 'base':'mods')].replace('%NAME', ui_data['ui_name']).replace('%DESCRIPTION', ui_data['ui_tooltip']).replace('%MODS', ModChain.display_tooltip(stat, modchain, show_base, ui_data)) + (extra ? '\n\n'+extra : ''),
