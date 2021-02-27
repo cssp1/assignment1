@@ -2002,6 +2002,8 @@ RegionPropertyPredicate.prototype.is_satisfied = function(player, qdata) {
     var val = (this.key in session.region.data ? session.region.data[this.key] : this.def);
     return val == this.value;
 };
+/** @override */
+RegionPropertyPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor @struct
   * @extends Predicate */
