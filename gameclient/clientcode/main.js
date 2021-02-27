@@ -29929,7 +29929,17 @@ function set_up_replay_sharing_button(dialog, battle_summary, replay_signature, 
     dialog.widgets['fb_share_button'].show =
         dialog.widgets['fb_share_icon'].show = true;
 
-    var text = gamedata['virals']['replay']['ui_post_headline'].replace('%ATTACKER', attacker_name).replace('%DEFENDER', defender_name);
+    var squad_suffix = "'s " + gamedata['strings']['squads']['squad']
+    var attacker_headline_name = attacker_name.replace(squad_suffix,'');
+    if(encodeURIComponent(attacker_headline_name).length > 18) { attacker_headline_name = gamedata['virals']['replay']['alt_player_ui_name']; }
+    var defender_headline_name = defender_name.replace(squad_suffix,'');
+    if(encodeURIComponent(defender_headline_name).length > 18) { defender_headline_name = gamedata['virals']['replay']['alt_player_ui_name']; }
+
+    var text = gamedata['virals']['replay']['ui_post_headline'].replace('%ATTACKER', attacker_headline_name).replace('%DEFENDER', defender_headline_name);
+
+    if(attacker_headline_name === defender_headline_name) {
+        text = gamedata['virals']['replay']['ui_post_alt_headline'];
+    }
 
     dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
         FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
