@@ -15704,8 +15704,7 @@ class LivePlayer(Player):
 
                 old_is_ladder = gamedata['regions'][old_region].get('ladder_pvp', gamedata.get('ladder_pvp', False))
                 new_is_ladder = self.my_home.base_region and gamedata['regions'][self.my_home.base_region].get('ladder_pvp', gamedata.get('ladder_pvp', False))
-                new_zero_points = self.my_home.base_region and gamedata['regions'][self.my_home.base_region].get('zero_points_on_entry', False)
-                new_zero_points = self.my_home.base_region and gamedata['regions'][self.my_home.base_region].get('zero_points_on_entry_if', False) and Predicates.read_predicate(session.player.home_region]['zero_points_on_entry_if'].is_satisfied(self,None)
+                new_zero_points = self.my_home.base_region and gamedata['regions'][self.my_home.base_region].get('zero_points_on_entry', False) or Predicates.read_predicate(gamedata['regions'][self.my_home.base_region].get('zero_points_on_entry_if',{'predicate':'ALWAYS_FALSE'}).is_satisfied(self,None)
 
                 if (old_is_ladder and (not new_is_ladder) and gamedata['matchmaking']['zero_points_on_ladder_exit']) or \
                    new_zero_points:
@@ -28821,7 +28820,7 @@ class GAMEAPI(resource.Resource):
             # optional zero out trophy points if predicate is met, ensure we're at zero here.
             if session.player.home_region in gamedata['regions'] and \
                gamedata['regions'][session.player.home_region].get('zero_points_on_entry_if', False) and \
-               Predicates.read_predicate(session.player.home_region]['zero_points_on_entry_if'].is_satisfied(session.player,None) and \
+               Predicates.read_predicate(session.player.home_region]['zero_points_on_entry_if'].is_satisfied(session.player,None)) and \
                session.player.ladder_points() != gamedata['trophy_floor']['pvp']:
                 session.player.modify_scores({'trophies_pvp':gamedata['trophy_floor']['pvp']}, method='=', reason = 'zero_points_on_entry_if_login')
 
