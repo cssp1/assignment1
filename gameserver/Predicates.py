@@ -872,6 +872,11 @@ class RegionPropertyPredicate(Predicate):
         data = player.get_abtest_region(player.home_region)
         if not data: return False
         return data.get(self.key, self.default) == self.value
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        if (not session.player.home_region): return False
+        data = session.player.get_abtest_region(session.player.home_region)
+        if not data: return False
+        return data.get(self.key, self.default) == self.value
 
 class GamebucksBalancePredicate(Predicate):
     def __init__(self, data):
