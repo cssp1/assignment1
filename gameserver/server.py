@@ -28819,7 +28819,7 @@ class GAMEAPI(resource.Resource):
 
             # optional zero out trophy points if predicate is met, ensure we're at zero here.
             if session.player.home_region in gamedata['regions'] and \
-               Predicates.read_predicate(gamedata['regions'][session.player.home_region].get('zero_points_on_entry_if',{'predicate':'ALWAYS_FALSE'})).is_satisfied2(self,None) and \
+               Predicates.read_predicate(gamedata['regions'][session.player.home_region].get('zero_points_on_entry_if',{'predicate':'ALWAYS_FALSE'})).is_satisfied2(session, session.player, None, override_time = None) and \
                session.player.ladder_points() != gamedata['trophy_floor']['pvp']:
                 session.player.modify_scores({'trophies_pvp':gamedata['trophy_floor']['pvp']}, method='=', reason = 'zero_points_on_entry_if_login')
 
