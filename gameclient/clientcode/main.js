@@ -36879,10 +36879,12 @@ function update_crafting_dialog(dialog) {
     } else {
         dialog.widgets["disable_minefields"].str = dialog.data['widgets']['disable_minefields']['ui_name_disable'];
         dialog.widgets["disable_minefields"].tooltip.str = dialog.data['widgets']['disable_minefields']['ui_tooltip_disable'];
-        dialog.widgets["disable_minefields"].onclick = (function (_builder_id) { return function(w) {
-            send_to_server.func(["CAST_SPELL", _builder_id, 'DISABLE_MINEFIELDS', 'player', 'disable_minefields', 1, -1]);
-            disable_minefields_sync_marker = synchronizer.request_sync();
-        }; })(builder.id);
+        if(builder) {
+            dialog.widgets["disable_minefields"].onclick = (function (_builder_id) { return function(w) {
+                send_to_server.func(["CAST_SPELL", _builder_id, 'DISABLE_MINEFIELDS', 'player', 'disable_minefields', 1, -1]);
+                disable_minefields_sync_marker = synchronizer.request_sync();
+            }; })(builder.id);
+        }
     }
 
     if(builder && builder.is_damaged()) {
