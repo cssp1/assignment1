@@ -16208,7 +16208,7 @@ class OGPAPI(resource.Resource):
         try:
             ret = catch_all('OGPAPI request %s args %r' % (request.uri.decode('utf-8'), dict((k,v[0].decode('utf-8')) for k,v in request.args.iteritems())))(self.handle_request)(request)
         except UnicodeDecodeError:
-            gamesite.exception_log.event(server_time, 'OGPAPI call with invalid Unicode request: %s' % (str(request.args))
+            gamesite.exception_log.event(server_time, 'OGPAPI call with invalid Unicode request: %s' % (str(request.args)))
             ret = None
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
