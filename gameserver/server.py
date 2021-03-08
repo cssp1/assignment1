@@ -244,6 +244,8 @@ def is_valid_alias(name):
     if len(name) < 4 or len(name) > 15: return False
     if chat_filter.is_bad(name): return False
     if chat_filter.is_graphical(name): return False
+    if chat_filter.is_too_long_for_url(name): return False
+    if chat_filter.switches_charsets_or_blacklisted_chars(name): return False
     if chat_filter.is_ugly(name): return False
     if 'spinpunch' in name.lower(): return False
     if 'battlehouse' in name.lower(): return False
@@ -28811,6 +28813,11 @@ class GAMEAPI(resource.Resource):
             session.player.recent_attacks = []
         if show_battle_history:
             retmsg.append(["SHOW_BATTLE_HISTORY"])
+
+        if Predicates.read_predicate(gamedata['server'].get('reset_invalid_alias_on_login',{'predicate':'ALWAYS_FALSE'})).is_satisfied2(session, session.player, None, override_time = None) and not is_valid_alias(session.player.alias):
+            session.player.alias = None
+            new_ui_name = session.user.get_real_name()
+            self.update_player_cache_ui_name(new_ui_name)
 
         if session.player.is_on_map():
             assert session.player.home_region and (session.player.my_home.base_region == session.player.home_region)
