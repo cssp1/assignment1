@@ -244,7 +244,6 @@ def is_valid_alias(name):
     if len(name) < 4 or len(name) > 15: return False
     if chat_filter.is_bad(name): return False
     if chat_filter.is_graphical(name): return False
-    if chat_filter.is_too_long_for_url(name): return False
     if chat_filter.switches_charsets_or_blacklisted_chars(name): return False
     if chat_filter.is_ugly(name): return False
     if 'spinpunch' in name.lower(): return False

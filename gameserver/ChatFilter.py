@@ -92,12 +92,6 @@ class ChatFilter(object):
 
         return r, index_map
 
-    # Check if a URL-encoded string is too long
-    def is_too_long_for_url(self, input):
-        if len(urllib.quote(input.encode("utf-8"))) > 18:
-            return True
-        return False
-
     # Check if a string contains offensive language
     # This checks the *meaning* of the words, not any technical aspects like graphical symbols
     def is_bad(self, input):
@@ -665,9 +659,6 @@ if __name__ == '__main__':
     assert not cf.is_spammy('<======== IWC')
     assert cf.is_spammy('656456456564')
     assert not cf.is_spammy('65645645')
-
-    assert cf.is_too_long_for_url(u'\u0627\u0628\u0631\u0627\u0647\u064a\u0645 \u0627\u0644\u0633\u064a\u062f')
-    assert not cf.is_too_long_for_url('Nirgal')
 
     assert not cf.is_ugly(u'aaabcd')
     assert not cf.is_graphical(u'aaabcd')
