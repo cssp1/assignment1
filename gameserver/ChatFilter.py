@@ -215,6 +215,7 @@ class ChatFilter(object):
                              0x589, # ARMENIAN FULL STOP
                              0x5c0, 0x5c3, 0x5c6, 0x5f3, 0x5f4, # Hebrew punctuation
                              0x640, # Arabic Tatweel (this is debatable)
+                             0xd83d, # Samaritan Sof Mashfaat
                              0x489, # Combining Cyrillic Millions Sign
                              ):
                 return True
@@ -252,321 +253,118 @@ class ChatFilter(object):
     # Check for switching charsets in a potential alias, a tactic players have used to make strange spellings of names
     # Also allows blacklisting of large groups of Unicode
     def switches_charsets_or_blacklisted_chars(self, input):
-        first_charset = codepoints.from_unicode(input[0])
-        if first_charset == 'Alias Blacklisted': return True
+        first_charset = self.check_charset(codepoints.from_unicode(input)[0])
+        if not first_charset: return True
 
         for codepoint in codepoints.from_unicode(input):
-            if check_charset(codepoint) != first_charset: return True
+            if self.check_charset(codepoint) != first_charset: return True
         return False
 
     def check_charset(self, codepoint):
         # takes single character and returns the language group,
         # sourced from https://en.wikipedia.org/wiki/Unicode_block
-        if codepoint >= 0x00 and codepoint <= 0x2af: return 'Latin'
-        elif codepoint >= 0x1e00 and codepoint <= 0x1eff: return 'Latin'
-        elif codepoint >= 0x2c60 and codepoint <= 0x2c7f: return 'Latin'
-        elif codepoint >= 0xa720 and codepoint <= 0xa7ff: return 'Latin'
-        elif codepoint >= 0xab30 and codepoint <= 0xab6f: return 'Latin'
-        elif codepoint >= 0x0370 and codepoint <= 0x03ff: return 'Greek'
-        elif codepoint >= 0x1f00 and codepoint <= 0x1fff: return 'Greek'
-        elif codepoint >= 0x0f00 and codepoint <= 0x04ff: return 'Cyrillic'
-        elif codepoint >= 0x0500 and codepoint <= 0x052f: return 'Cyrillic'
-        elif codepoint >= 0x1c80 and codepoint <= 0x1c8f: return 'Cyrillic'
-        elif codepoint >= 0x2de0 and codepoint <= 0x2dff: return 'Cyrillic'
-        elif codepoint >= 0xa640 and codepoint <= 0x169f: return 'Cyrillic'
-        elif codepoint >= 0x0530 and codepoint <= 0x058f: return 'Armenian'
-        elif codepoint >= 0x0590 and codepoint <= 0x05FF: return 'Hebrew'
-        elif codepoint >= 0x0600 and codepoint <= 0x06FF: return 'Arabic'
-        elif codepoint >= 0x0700 and codepoint <= 0x074F: return 'Syriac'
-        elif codepoint >= 0x0750 and codepoint <= 0x077F: return 'Arabic'
-        elif codepoint >= 0x0780 and codepoint <= 0x07BF: return 'Thaana'
-        elif codepoint >= 0x07C0 and codepoint <= 0x07FF: return 'NKo'
-        elif codepoint >= 0x0800 and codepoint <= 0x083F: return 'Samaritan'
-        elif codepoint >= 0x0840 and codepoint <= 0x085F: return 'Mandaic'
-        elif codepoint >= 0x0860 and codepoint <= 0x086F: return 'Syriac'
-        elif codepoint >= 0x08A0 and codepoint <= 0x08FF: return 'Arabic'
-        elif codepoint >= 0x0900 and codepoint <= 0x097F: return 'Devanagari'
-        elif codepoint >= 0x0980 and codepoint <= 0x09FF: return 'Bengali'
-        elif codepoint >= 0x0A00 and codepoint <= 0x0A7F: return 'Gurmukhi'
-        elif codepoint >= 0x0A80 and codepoint <= 0x0AFF: return 'Gujarati'
-        elif codepoint >= 0x0B00 and codepoint <= 0x0B7F: return 'Oriya'
-        elif codepoint >= 0x0B80 and codepoint <= 0x0BFF: return 'Tamil'
-        elif codepoint >= 0x0C00 and codepoint <= 0x0C7F: return 'Telugu'
-        elif codepoint >= 0x0C80 and codepoint <= 0x0CFF: return 'Kannada'
-        elif codepoint >= 0x0D00 and codepoint <= 0x0D7F: return 'Malayalam'
-        elif codepoint >= 0x0D80 and codepoint <= 0x0DFF: return 'Sinhala'
-        elif codepoint >= 0x0E00 and codepoint <= 0x0E7F: return 'Thai'
-        elif codepoint >= 0x0E80 and codepoint <= 0x0EFF: return 'Lao'
-        elif codepoint >= 0x0F00 and codepoint <= 0x0FFF: return 'Tibetan'
-        elif codepoint >= 0x1000 and codepoint <= 0x109F: return 'Myanmar'
-        elif codepoint >= 0x10A0 and codepoint <= 0x10FF: return 'Georgian'
-        elif codepoint >= 0x1100 and codepoint <= 0x11FF: return 'Hangul'
-        elif codepoint >= 0x1200 and codepoint <= 0x137F: return 'Ethiopic'
-        elif codepoint >= 0x1380 and codepoint <= 0x139F: return 'Ethiopic'
-        elif codepoint >= 0x2D80 and codepoint <= 0x2DDF: return 'Ethiopic'
-        elif codepoint >= 0xAB00 and codepoint <= 0xAB2F: return 'Ethiopic'
-        elif codepoint >= 0x13A0 and codepoint <= 0x13FF: return 'Cherokee'
-        elif codepoint >= 0xAB70 and codepoint <= 0xABBF: return 'Cherokee'
-        elif codepoint >= 0x1400 and codepoint <= 0x167F: return 'Canadian Aboriginal'
-        elif codepoint >= 0x18B0 and codepoint <= 0x18FF: return 'Canadian Aboriginal'
-        elif codepoint >= 0x1680 and codepoint <= 0x169F: return 'Ogham'
-        elif codepoint >= 0x16A0 and codepoint <= 0x16FF: return 'Runic'
-        elif codepoint >= 0x1700 and codepoint <= 0x171F: return 'Tagalog'
-        elif codepoint >= 0x1720 and codepoint <= 0x173F: return 'Hanunoo'
-        elif codepoint >= 0x1740 and codepoint <= 0x175F: return 'Buhid'
-        elif codepoint >= 0x1760 and codepoint <= 0x177F: return 'Tagbanwa'
-        elif codepoint >= 0x1780 and codepoint <= 0x17FF: return 'Khmer'
-        elif codepoint >= 0x1800 and codepoint <= 0x18AF: return 'Mongolian'
-        elif codepoint >= 0x1900 and codepoint <= 0x194F: return 'Limbu'
-        elif codepoint >= 0x1950 and codepoint <= 0x197F: return 'Tai Le'
-        elif codepoint >= 0x1980 and codepoint <= 0x19DF: return 'New Tai Lue'
-        elif codepoint >= 0x19E0 and codepoint <= 0x19FF: return 'Khmer'
-        elif codepoint >= 0x1A00 and codepoint <= 0x1A1F: return 'Buginese'
-        elif codepoint >= 0x1A20 and codepoint <= 0x1AAF: return 'Tai Tham'
-        elif codepoint >= 0x1B00 and codepoint <= 0x1B7F: return 'Balinese'
-        elif codepoint >= 0x1B80 and codepoint <= 0x1BBF: return 'Sundanese'
-        elif codepoint >= 0x1BC0 and codepoint <= 0x1BFF: return 'Batak'
-        elif codepoint >= 0x1C00 and codepoint <= 0x1C4F: return 'Lepcha'
-        elif codepoint >= 0x1C50 and codepoint <= 0x1C7F: return 'Ol Chiki'
-        elif codepoint >= 0x1C90 and codepoint <= 0x1CBF: return 'Georgian'
-        elif codepoint >= 0x1CC0 and codepoint <= 0x1CCF: return 'Sundanese'
-        elif codepoint >= 0x1CD0 and codepoint <= 0x1CFF: return 'Vedic'
-        elif codepoint >= 0x2C00 and codepoint <= 0x2C5F: return 'Glagolitic'
-        elif codepoint >= 0x2C80 and codepoint <= 0x2CFF: return 'Coptic'
-        elif codepoint >= 0x2D00 and codepoint <= 0x2D2F: return 'Georgian'
-        elif codepoint >= 0x2D30 and codepoint <= 0x2D7F: return 'Tifinagh'
-        elif codepoint >= 0x3040 and codepoint <= 0x309F: return 'Hiragana'
-        elif codepoint >= 0x30A0 and codepoint <= 0x30FF: return 'Katakana'
-        elif codepoint >= 0x3100 and codepoint <= 0x312F: return 'Bopomofo'
-        elif codepoint >= 0x31A0 and codepoint <= 0x31BF: return 'Bopomofo'
-        elif codepoint >= 0x3130 and codepoint <= 0x318F: return 'Hangul'
-        elif codepoint >= 0x3190 and codepoint <= 0x319F: return 'Kanbun'
-        elif codepoint >= 0xA4D0 and codepoint <= 0xA4FF: return 'Lisu'
-        elif codepoint >= 0xA500 and codepoint <= 0xA63F: return 'Vai'
-        elif codepoint >= 0xA6A0 and codepoint <= 0xA6FF: return 'Bamum'
-        elif codepoint >= 0xA800 and codepoint <= 0xA82F: return 'Syloti Nagri'
-        elif codepoint >= 0xA840 and codepoint <= 0xA87F: return 'Phags-pa'
-        elif codepoint >= 0xA880 and codepoint <= 0xA8DF: return 'Saurashtra'
-        elif codepoint >= 0xA8E0 and codepoint <= 0xA8FF: return 'Devanagari'
-        elif codepoint >= 0xA900 and codepoint <= 0xA92F: return 'Kayah Li'
-        elif codepoint >= 0xA930 and codepoint <= 0xA95F: return 'Rejang'
-        elif codepoint >= 0xA980 and codepoint <= 0xA9DF: return 'Javanese'
-        elif codepoint >= 0xA9E0 and codepoint <= 0xA9FF: return 'Myanmar'
-        elif codepoint >= 0xAA60 and codepoint <= 0xAA7F: return 'Myanmar'
-        elif codepoint >= 0xAA00 and codepoint <= 0xAA5F: return 'Cham'
-        elif codepoint >= 0xAA80 and codepoint <= 0xAADF: return 'Tai Viet'
-        elif codepoint >= 0xAAE0 and codepoint <= 0xAAFF: return 'Meetei Mayek'
-        elif codepoint >= 0xABC0 and codepoint <= 0xABFF: return 'Meetei Mayek'
-        elif codepoint >= 0xA960 and codepoint <= 0xA97F: return 'Alias Blacklisted'
-        elif codepoint >= 0x31F0 and codepoint <= 0x31FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x3300 and codepoint <= 0x33FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x4DC0 and codepoint <= 0x4DFF: return 'Alias Blacklisted'
-        elif codepoint >= 0xA000 and codepoint <= 0xA48F: return 'Alias Blacklisted'
-        elif codepoint >= 0xA490 and codepoint <= 0xA4CF: return 'Alias Blacklisted'
-        elif codepoint >= 0xAC00 and codepoint <= 0xD7AF: return 'Alias Blacklisted'
-        elif codepoint >= 0xD7B0 and codepoint <= 0xD7FF: return 'Alias Blacklisted'
-        elif codepoint >= 0xA700 and codepoint <= 0xA71F: return 'Alias Blacklisted'
-        elif codepoint >= 0xA830 and codepoint <= 0xA83F: return 'Alias Blacklisted'
-        elif codepoint >= 0x31C0 and codepoint <= 0x31EF: return 'Alias Blacklisted'
-        elif codepoint >= 0x3400 and codepoint <= 0x4DBF: return 'Alias Blacklisted'
-        elif codepoint >= 0x4E00 and codepoint <= 0x9FFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2E80 and codepoint <= 0x2EFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2F00 and codepoint <= 0x2FDF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2150 and codepoint <= 0x218F: return 'Alias Blacklisted'
-        elif codepoint >= 0x02B0 and codepoint <= 0x02FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x0300 and codepoint <= 0x036F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1AB0 and codepoint <= 0x1AFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1D00 and codepoint <= 0x1D7F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1D80 and codepoint <= 0x1DBF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1DC0 and codepoint <= 0x1DFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2000 and codepoint <= 0x206F: return 'Alias Blacklisted'
-        elif codepoint >= 0x2070 and codepoint <= 0x209F: return 'Alias Blacklisted'
-        elif codepoint >= 0x20A0 and codepoint <= 0x20CF: return 'Alias Blacklisted'
-        elif codepoint >= 0x20D0 and codepoint <= 0x20FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2100 and codepoint <= 0x214F: return 'Alias Blacklisted'
-        elif codepoint >= 0x2190 and codepoint <= 0x21FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2200 and codepoint <= 0x22FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2300 and codepoint <= 0x23FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2400 and codepoint <= 0x243F: return 'Alias Blacklisted'
-        elif codepoint >= 0x2440 and codepoint <= 0x245F: return 'Alias Blacklisted'
-        elif codepoint >= 0x2460 and codepoint <= 0x24FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2500 and codepoint <= 0x257F: return 'Alias Blacklisted'
-        elif codepoint >= 0x2580 and codepoint <= 0x259F: return 'Alias Blacklisted'
-        elif codepoint >= 0x25A0 and codepoint <= 0x25FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2600 and codepoint <= 0x26FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2700 and codepoint <= 0x27BF: return 'Alias Blacklisted'
-        elif codepoint >= 0x27C0 and codepoint <= 0x27EF: return 'Alias Blacklisted'
-        elif codepoint >= 0x27F0 and codepoint <= 0x27FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2800 and codepoint <= 0x28FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2900 and codepoint <= 0x297F: return 'Alias Blacklisted'
-        elif codepoint >= 0x2980 and codepoint <= 0x29FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2A00 and codepoint <= 0x2AFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2B00 and codepoint <= 0x2BFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2FF0 and codepoint <= 0x2FFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x3000 and codepoint <= 0x303F: return 'Alias Blacklisted'
-        elif codepoint >= 0x2E00 and codepoint <= 0x2E7F: return 'Alias Blacklisted'
-        elif codepoint >= 0xD800 and codepoint <= 0xDB7F: return 'Alias Blacklisted'
-        elif codepoint >= 0xDB80 and codepoint <= 0xDBFF: return 'Alias Blacklisted'
-        elif codepoint >= 0xE000 and codepoint <= 0xF8FF: return 'Alias Blacklisted'
-        elif codepoint >= 0xDC00 and codepoint <= 0xDFFF: return 'Alias Blacklisted'
-        elif codepoint >= 0xF900 and codepoint <= 0xFAFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1EC70 and codepoint <= 0x1ECBF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1ED00 and codepoint <= 0x1ED4F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1EE00 and codepoint <= 0x1EEFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F000 and codepoint <= 0x1F02F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F030 and codepoint <= 0x1F09F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F0A0 and codepoint <= 0x1F0FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F100 and codepoint <= 0x1F1FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F200 and codepoint <= 0x1F2FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F300 and codepoint <= 0x1F5FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F600 and codepoint <= 0x1F64F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F650 and codepoint <= 0x1F67F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F680 and codepoint <= 0x1F6FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F700 and codepoint <= 0x1F77F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F780 and codepoint <= 0x1F7FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F800 and codepoint <= 0x1F8FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1F900 and codepoint <= 0x1F9FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1FA00 and codepoint <= 0x1FA6F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1FA70 and codepoint <= 0x1FAFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1FB00 and codepoint <= 0x1FBFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x20000 and codepoint <= 0x2A6DF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2A700 and codepoint <= 0x2B73F: return 'Alias Blacklisted'
-        elif codepoint >= 0x2B740 and codepoint <= 0x2B81F: return 'Alias Blacklisted'
-        elif codepoint >= 0x2B820 and codepoint <= 0x2CEAF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2CEB0 and codepoint <= 0x2EBEF: return 'Alias Blacklisted'
-        elif codepoint >= 0x2F800 and codepoint <= 0x2FA1F: return 'Alias Blacklisted'
-        elif codepoint >= 0x30000 and codepoint <= 0x3134F: return 'Alias Blacklisted'
-        elif codepoint >= 0xE0000 and codepoint <= 0xE007F: return 'Alias Blacklisted'
-        elif codepoint >= 0xE0100 and codepoint <= 0xE01EF: return 'Alias Blacklisted'
-        elif codepoint >= 0xF0000 and codepoint <= 0xFFFFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x3200 and codepoint <= 0x32FF: return 'Alias Blacklisted'
-        elif codepoint >= 0xFB00 and codepoint <= 0xFB4F: return 'Alias Blacklisted'
-        elif codepoint >= 0xFB50 and codepoint <= 0xFDFF: return 'Alias Blacklisted'
-        elif codepoint >= 0xFE00 and codepoint <= 0xFE0F: return 'Alias Blacklisted'
-        elif codepoint >= 0xFE10 and codepoint <= 0xFE1F: return 'Alias Blacklisted'
-        elif codepoint >= 0xFE20 and codepoint <= 0xFE2F: return 'Alias Blacklisted'
-        elif codepoint >= 0xFE30 and codepoint <= 0xFE4F: return 'Alias Blacklisted'
-        elif codepoint >= 0xFE50 and codepoint <= 0xFE6F: return 'Alias Blacklisted'
-        elif codepoint >= 0xFE70 and codepoint <= 0xFEFF: return 'Alias Blacklisted'
-        elif codepoint >= 0xFF00 and codepoint <= 0xFFEF: return 'Alias Blacklisted'
-        elif codepoint >= 0xFFF0 and codepoint <= 0xFFFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10000 and codepoint <= 0x1007F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10080 and codepoint <= 0x100FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10100 and codepoint <= 0x1013F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10140 and codepoint <= 0x1018F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10190 and codepoint <= 0x101CF: return 'Alias Blacklisted'
-        elif codepoint >= 0x101D0 and codepoint <= 0x101FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10280 and codepoint <= 0x1029F: return 'Alias Blacklisted'
-        elif codepoint >= 0x102A0 and codepoint <= 0x102DF: return 'Alias Blacklisted'
-        elif codepoint >= 0x102E0 and codepoint <= 0x102FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10300 and codepoint <= 0x1032F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10330 and codepoint <= 0x1034F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10350 and codepoint <= 0x1037F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10380 and codepoint <= 0x1039F: return 'Alias Blacklisted'
-        elif codepoint >= 0x103A0 and codepoint <= 0x103DF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10400 and codepoint <= 0x1044F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10450 and codepoint <= 0x1047F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10480 and codepoint <= 0x104AF: return 'Alias Blacklisted'
-        elif codepoint >= 0x104B0 and codepoint <= 0x104FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10500 and codepoint <= 0x1052F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10530 and codepoint <= 0x1056F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10600 and codepoint <= 0x1077F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10800 and codepoint <= 0x1083F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10840 and codepoint <= 0x1085F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10860 and codepoint <= 0x1087F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10880 and codepoint <= 0x108AF: return 'Alias Blacklisted'
-        elif codepoint >= 0x108E0 and codepoint <= 0x108FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10900 and codepoint <= 0x1091F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10920 and codepoint <= 0x1093F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10980 and codepoint <= 0x1099F: return 'Alias Blacklisted'
-        elif codepoint >= 0x109A0 and codepoint <= 0x109FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10A00 and codepoint <= 0x10A5F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10A60 and codepoint <= 0x10A7F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10A80 and codepoint <= 0x10A9F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10AC0 and codepoint <= 0x10AFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10B00 and codepoint <= 0x10B3F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10B40 and codepoint <= 0x10B5F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10B60 and codepoint <= 0x10B7F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10B80 and codepoint <= 0x10BAF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10C00 and codepoint <= 0x10C4F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10C80 and codepoint <= 0x10CFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10D00 and codepoint <= 0x10D3F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10E60 and codepoint <= 0x10E7F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10E80 and codepoint <= 0x10EBF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10F00 and codepoint <= 0x10F2F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10F30 and codepoint <= 0x10F6F: return 'Alias Blacklisted'
-        elif codepoint >= 0x10FB0 and codepoint <= 0x10FDF: return 'Alias Blacklisted'
-        elif codepoint >= 0x10FE0 and codepoint <= 0x10FFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11000 and codepoint <= 0x1107F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11080 and codepoint <= 0x110CF: return 'Alias Blacklisted'
-        elif codepoint >= 0x110D0 and codepoint <= 0x110FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11100 and codepoint <= 0x1114F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11150 and codepoint <= 0x1117F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11180 and codepoint <= 0x111DF: return 'Alias Blacklisted'
-        elif codepoint >= 0x111E0 and codepoint <= 0x111FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11200 and codepoint <= 0x1124F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11280 and codepoint <= 0x112AF: return 'Alias Blacklisted'
-        elif codepoint >= 0x112B0 and codepoint <= 0x112FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11300 and codepoint <= 0x1137F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11400 and codepoint <= 0x1147F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11480 and codepoint <= 0x114DF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11580 and codepoint <= 0x115FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11600 and codepoint <= 0x1165F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11660 and codepoint <= 0x1167F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11680 and codepoint <= 0x116CF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11700 and codepoint <= 0x1173F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11800 and codepoint <= 0x1184F: return 'Alias Blacklisted'
-        elif codepoint >= 0x118A0 and codepoint <= 0x118FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11900 and codepoint <= 0x1195F: return 'Alias Blacklisted'
-        elif codepoint >= 0x119A0 and codepoint <= 0x119FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11A00 and codepoint <= 0x11A4F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11A50 and codepoint <= 0x11AAF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11AC0 and codepoint <= 0x11AFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11C00 and codepoint <= 0x11C6F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11C70 and codepoint <= 0x11CBF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11D00 and codepoint <= 0x11D5F: return 'Alias Blacklisted'
-        elif codepoint >= 0x11D60 and codepoint <= 0x11DAF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11EE0 and codepoint <= 0x11EFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11FB0 and codepoint <= 0x11FBF: return 'Alias Blacklisted'
-        elif codepoint >= 0x11FC0 and codepoint <= 0x11FFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x12000 and codepoint <= 0x123FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x12400 and codepoint <= 0x1247F: return 'Alias Blacklisted'
-        elif codepoint >= 0x12480 and codepoint <= 0x1254F: return 'Alias Blacklisted'
-        elif codepoint >= 0x13000 and codepoint <= 0x1342F: return 'Alias Blacklisted'
-        elif codepoint >= 0x13430 and codepoint <= 0x1343F: return 'Alias Blacklisted'
-        elif codepoint >= 0x14400 and codepoint <= 0x1467F: return 'Alias Blacklisted'
-        elif codepoint >= 0x16800 and codepoint <= 0x16A3F: return 'Alias Blacklisted'
-        elif codepoint >= 0x16A40 and codepoint <= 0x16A6F: return 'Alias Blacklisted'
-        elif codepoint >= 0x16AD0 and codepoint <= 0x16AFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x16B00 and codepoint <= 0x16B8F: return 'Alias Blacklisted'
-        elif codepoint >= 0x16E40 and codepoint <= 0x16E9F: return 'Alias Blacklisted'
-        elif codepoint >= 0x16F00 and codepoint <= 0x16F9F: return 'Alias Blacklisted'
-        elif codepoint >= 0x16FE0 and codepoint <= 0x16FFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x17000 and codepoint <= 0x187FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x18800 and codepoint <= 0x18AFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x18B00 and codepoint <= 0x18CFF: return 'Alias Blacklisted'
-        elif codepoint >= 0x18D00 and codepoint <= 0x18D8F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1B000 and codepoint <= 0x1B0FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1B100 and codepoint <= 0x1B12F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1B130 and codepoint <= 0x1B16F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1B170 and codepoint <= 0x1B2FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1BC00 and codepoint <= 0x1BC9F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1BCA0 and codepoint <= 0x1BCAF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1D000 and codepoint <= 0x1D0FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1D100 and codepoint <= 0x1D1FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1D200 and codepoint <= 0x1D24F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1D2E0 and codepoint <= 0x1D2FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1D300 and codepoint <= 0x1D35F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1D360 and codepoint <= 0x1D37F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1D400 and codepoint <= 0x1D7FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1D800 and codepoint <= 0x1DAAF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1E000 and codepoint <= 0x1E02F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1E100 and codepoint <= 0x1E14F: return 'Alias Blacklisted'
-        elif codepoint >= 0x1E2C0 and codepoint <= 0x1E2FF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1E800 and codepoint <= 0x1E8DF: return 'Alias Blacklisted'
-        elif codepoint >= 0x1E900 and codepoint <= 0x1E95F: return 'Alias Blacklisted'
-        elif codepoint >= 0x100000 and codepoint <= 0x10FFFF: return 'Alias Blacklisted'
-        else: return 'Alias Blacklisted'
+        charset_ranges = [
+        [(0x00, 0x2af), 'Latin'],
+        [(0x1e00, 0x1eff), 'Latin'],
+        [(0x1e00, 0x1eff), 'Latin'],
+        [(0x2c60, 0x2c7f), 'Latin'],
+        [(0xa720, 0xa7ff), 'Latin'],
+        [(0xab30, 0xab6f), 'Latin'],
+        [(0x0370, 0x03ff), 'Greek'],
+        [(0x1f00, 0x1fff), 'Greek'],
+        [(0x0f00, 0x04ff), 'Cyrillic'],
+        [(0x0500, 0x052f), 'Cyrillic'],
+        [(0x1c80, 0x1c8f), 'Cyrillic'],
+        [(0x2de0, 0x2dff), 'Cyrillic'],
+        [(0xa640, 0x169f), 'Cyrillic'],
+        [(0x0530, 0x058f), 'Armenian'],
+        [(0x0590, 0x05FF), 'Hebrew'],
+        [(0x0600, 0x06FF), 'Arabic'],
+        [(0x0700, 0x074F), 'Syriac'],
+        [(0x0750, 0x077F), 'Arabic'],
+        [(0x0780, 0x07BF), 'Thaana'],
+        [(0x07C0, 0x07FF), 'NKo'],
+        [(0x0800, 0x083F), 'Samaritan'],
+        [(0x0840, 0x085F), 'Mandaic'],
+        [(0x0860, 0x086F), 'Syriac'],
+        [(0x08A0, 0x08FF), 'Arabic'],
+        [(0x0900, 0x097F), 'Devanagari'],
+        [(0x0980, 0x09FF), 'Bengali'],
+        [(0x0A00, 0x0A7F), 'Gurmukhi'],
+        [(0x0A80, 0x0AFF), 'Gujarati'],
+        [(0x0B00, 0x0B7F), 'Oriya'],
+        [(0x0B80, 0x0BFF), 'Tamil'],
+        [(0x0C00, 0x0C7F), 'Telugu'],
+        [(0x0C80, 0x0CFF), 'Kannada'],
+        [(0x0D00, 0x0D7F), 'Malayalam'],
+        [(0x0D80, 0x0DFF), 'Sinhala'],
+        [(0x0E00, 0x0E7F), 'Thai'],
+        [(0x0E80, 0x0EFF), 'Lao'],
+        [(0x0F00, 0x0FFF), 'Tibetan'],
+        [(0x1000, 0x109F), 'Myanmar'],
+        [(0x10A0, 0x10FF), 'Georgian'],
+        [(0x1100, 0x11FF), 'Hangul'],
+        [(0x1200, 0x137F), 'Ethiopic'],
+        [(0x1380, 0x139F), 'Ethiopic'],
+        [(0x2D80, 0x2DDF), 'Ethiopic'],
+        [(0xAB00, 0xAB2F), 'Ethiopic'],
+        [(0x13A0, 0x13FF), 'Cherokee'],
+        [(0xAB70, 0xABBF), 'Cherokee'],
+        [(0x1400, 0x167F), 'Canadian Aboriginal'],
+        [(0x18B0, 0x18FF), 'Canadian Aboriginal'],
+        [(0x1680, 0x169F), 'Ogham'],
+        [(0x16A0, 0x16FF), 'Runic'],
+        [(0x1700, 0x171F), 'Tagalog'],
+        [(0x1720, 0x173F), 'Hanunoo'],
+        [(0x1740, 0x175F), 'Buhid'],
+        [(0x1760, 0x177F), 'Tagbanwa'],
+        [(0x1780, 0x17FF), 'Khmer'],
+        [(0x1800, 0x18AF), 'Mongolian'],
+        [(0x1900, 0x194F), 'Limbu'],
+        [(0x1950, 0x197F), 'Tai Le'],
+        [(0x1980, 0x19DF), 'New Tai Lue'],
+        [(0x19E0, 0x19FF), 'Khmer'],
+        [(0x1A00, 0x1A1F), 'Buginese'],
+        [(0x1A20, 0x1AAF), 'Tai Tham'],
+        [(0x1B00, 0x1B7F), 'Balinese'],
+        [(0x1B80, 0x1BBF), 'Sundanese'],
+        [(0x1BC0, 0x1BFF), 'Batak'],
+        [(0x1C00, 0x1C4F), 'Lepcha'],
+        [(0x1C50, 0x1C7F), 'Ol Chiki'],
+        [(0x1C90, 0x1CBF), 'Georgian'],
+        [(0x1CC0, 0x1CCF), 'Sundanese'],
+        [(0x1CD0, 0x1CFF), 'Vedic'],
+        [(0x2C00, 0x2C5F), 'Glagolitic'],
+        [(0x2C80, 0x2CFF), 'Coptic'],
+        [(0x2D00, 0x2D2F), 'Georgian'],
+        [(0x2D30, 0x2D7F), 'Tifinagh'],
+        [(0x3040, 0x309F), 'Hiragana'],
+        [(0x30A0, 0x30FF), 'Katakana'],
+        [(0x3100, 0x312F), 'Bopomofo'],
+        [(0x31A0, 0x31BF), 'Bopomofo'],
+        [(0x3130, 0x318F), 'Hangul'],
+        [(0x3190, 0x319F), 'Kanbun'],
+        [(0xA4D0, 0xA4FF), 'Lisu'],
+        [(0xA500, 0xA63F), 'Vai'],
+        [(0xA6A0, 0xA6FF), 'Bamum'],
+        [(0xA800, 0xA82F), 'Syloti Nagri'],
+        [(0xA840, 0xA87F), 'Phags-pa'],
+        [(0xA880, 0xA8DF), 'Saurashtra'],
+        [(0xA8E0, 0xA8FF), 'Devanagari'],
+        [(0xA900, 0xA92F), 'Kayah Li'],
+        [(0xA930, 0xA95F), 'Rejang'],
+        [(0xA980, 0xA9DF), 'Javanese'],
+        [(0xA9E0, 0xA9FF), 'Myanmar'],
+        [(0xAA60, 0xAA7F), 'Myanmar'],
+        [(0xAA00, 0xAA5F), 'Cham'],
+        [(0xAA80, 0xAADF), 'Tai Viet'],
+        [(0xAAE0, 0xAAFF), 'Meetei Mayek'],
+        [(0xABC0, 0xABFF), 'Meetei Mayek']
+        ]
+        for rng, charset in charset_ranges:
+            if codepoint >= rng[0] and codepoint <= rng[1]:
+                return charset
+        return None # no match found or blacklisted
 
     # Check for abuse of Unicode special characters to create text that renders improperly
     # This should always be blocked, even in routine chat messages, because it leads to corrupt text display.
@@ -659,6 +457,9 @@ if __name__ == '__main__':
     assert not cf.is_spammy('<======== IWC')
     assert cf.is_spammy('656456456564')
     assert not cf.is_spammy('65645645')
+
+    assert cf.switches_charsets_or_blacklisted_chars(u'乂卄乇尺ㄖ乂')
+    assert not cf.switches_charsets_or_blacklisted_chars(u'Nirgal')
 
     assert not cf.is_ugly(u'aaabcd')
     assert not cf.is_graphical(u'aaabcd')
