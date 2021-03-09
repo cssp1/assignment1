@@ -246,6 +246,7 @@ def is_valid_alias(name):
     if chat_filter.is_graphical(name): return False
     if chat_filter.switches_charsets_or_blacklisted_chars(name): return False
     if chat_filter.is_ugly(name): return False
+    if chat_filter.has_repeating_characters(name): return False
     if 'spinpunch' in name.lower(): return False
     if 'battlehouse' in name.lower(): return False
     if 'bh-' in name.lower(): return False

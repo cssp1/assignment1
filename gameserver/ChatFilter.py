@@ -250,6 +250,21 @@ class ChatFilter(object):
 
         return False
 
+    # block aliases with more than 3 characters repeating
+    # prevents names like xXxXNirgalXxXx
+    def has_repeating_characters(self, input, repeat_limit = 3):
+        previous_character = ''
+        repeat_count = 0
+        for character in input.lower():
+            if character == previous_character:
+                repeat_count += 1
+                if repeat_count >= repeat_limit:
+                    return True
+            else:
+                repeat_count = 0
+                previous_character = character
+        return False
+
     # Check for switching charsets in a potential alias, a tactic players have used to make strange spellings of names
     # Also allows blacklisting of large groups of Unicode
     def switches_charsets_or_blacklisted_chars(self, input):
@@ -460,6 +475,9 @@ if __name__ == '__main__':
 
     assert cf.switches_charsets_or_blacklisted_chars(u'乂卄乇尺ㄖ乂')
     assert not cf.switches_charsets_or_blacklisted_chars(u'Nirgal')
+
+    assert cf.has_repeating_characters('xXxXNirgalXxXx')
+    assert not cf.has_repeating_characters('xXNirgalXx')
 
     assert not cf.is_ugly(u'aaabcd')
     assert not cf.is_graphical(u'aaabcd')
