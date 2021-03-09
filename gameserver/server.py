@@ -28826,9 +28826,15 @@ class GAMEAPI(resource.Resource):
                                                                                        'receipts': session.player.history.get('money_spent', 0.00)})
 
         if session.player.alias and Predicates.read_predicate(gamedata['server'].get('reset_invalid_alias_on_login',{'predicate':'ALWAYS_FALSE'})).is_satisfied2(session, session.player, None, override_time = None) and not is_valid_alias(session.player.alias):
+            old_ui_name = str(session.player.alias)
             session.player.alias = None
             new_ui_name = session.user.get_real_name()
             self.update_player_cache_ui_name(new_ui_name)
+            if gamedata['strings'].get('notify_invalid_alias_reset_mail'):
+                session.player.mailbox_append(session.player.make_system_mail(gamedata['strings']['notify_invalid_alias_reset_mail'], replace_s = '%s' % old_ui_name))
+                gamesite.exception_log.event(server_time, 'Invalid alias, %s, detected for player ID %d. Reset alias to none and notified player via game message.' % (old_ui_name, session.player.user_id))
+            else:
+                gamesite.exception_log.event(server_time, 'Invalid alias, %s, detected for player ID %d. Reset alias to none. Warning: player notification message not found in gamedata["strings"]["notify_invalid_alias_reset_mail"].' % (old_ui_name, session.player.user_id))
             metric_event_coded(session.player.user_id, '0992_invalid_alias_reset', {'alias': session.player.alias,
                                                                                     'receipts': session.player.history.get('money_spent', 0.00)})
 
