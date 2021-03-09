@@ -28820,7 +28820,7 @@ class GAMEAPI(resource.Resource):
             self.update_player_cache_ui_name(new_ui_name)
 
         if Predicates.read_predicate(gamedata['server'].get('warn_invalid_alias_on_login',{'predicate':'ALWAYS_FALSE'})).is_satisfied2(session, session.player, None, override_time = None) and gamedata['strings'].get('warn_invalid_alias_mail', False) and not is_valid_alias(session.player.alias):
-            self.mailbox_append(self.make_system_mail(gamedata['strings']['warn_invalid_alias_mail'], replace_s = '%s' % session.player.alias))
+            session.player.mailbox_append(session.player.make_system_mail(gamedata['strings']['warn_invalid_alias_mail'], replace_s = '%s' % session.player.alias))
             gamesite.exception_log.event(server_time, 'Invalid alias, %s, detected for player ID %d. Sending warning email.' % (session.player.alias, session.player.user_id ))
 
         if session.player.is_on_map():
