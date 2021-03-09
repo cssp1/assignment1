@@ -12,6 +12,7 @@ import re
 import collections
 import unicodedata
 import codepoints
+import urllib
 
 class ChatFilter(object):
     def __init__(self, config):
@@ -214,6 +215,7 @@ class ChatFilter(object):
                              0x589, # ARMENIAN FULL STOP
                              0x5c0, 0x5c3, 0x5c6, 0x5f3, 0x5f4, # Hebrew punctuation
                              0x640, # Arabic Tatweel (this is debatable)
+                             0xd83d, # Samaritan Sof Mashfaat
                              0x489, # Combining Cyrillic Millions Sign
                              ):
                 return True
@@ -247,6 +249,137 @@ class ChatFilter(object):
                 return True
 
         return False
+
+    # block aliases with more than 3 characters repeating
+    # prevents names like xXxXNirgalXxXx
+    def has_repeating_characters(self, input, repeat_limit = 3):
+        previous_character = ''
+        repeat_count = 0
+        for character in input.lower():
+            if character == previous_character:
+                repeat_count += 1
+                if repeat_count >= repeat_limit:
+                    return True
+            else:
+                repeat_count = 0
+                previous_character = character
+        return False
+
+    # Check for switching charsets in a potential alias, a tactic players have used to make strange spellings of names
+    # Also allows blacklisting of large groups of Unicode
+    def switches_charsets_or_blacklisted_chars(self, input):
+        first_charset = self.check_charset(codepoints.from_unicode(input)[0])
+        if not first_charset: return True
+
+        for codepoint in codepoints.from_unicode(input):
+            if self.check_charset(codepoint) != first_charset: return True
+        return False
+
+    def check_charset(self, codepoint):
+        # takes single character and returns the language group,
+        # sourced from https://en.wikipedia.org/wiki/Unicode_block
+        charset_ranges = [
+        [(0x00, 0x2af), 'Latin'],
+        [(0x1e00, 0x1eff), 'Latin'],
+        [(0x1e00, 0x1eff), 'Latin'],
+        [(0x2c60, 0x2c7f), 'Latin'],
+        [(0xa720, 0xa7ff), 'Latin'],
+        [(0xab30, 0xab6f), 'Latin'],
+        [(0x0370, 0x03ff), 'Greek'],
+        [(0x1f00, 0x1fff), 'Greek'],
+        [(0x0f00, 0x04ff), 'Cyrillic'],
+        [(0x0500, 0x052f), 'Cyrillic'],
+        [(0x1c80, 0x1c8f), 'Cyrillic'],
+        [(0x2de0, 0x2dff), 'Cyrillic'],
+        [(0xa640, 0x169f), 'Cyrillic'],
+        [(0x0530, 0x058f), 'Armenian'],
+        [(0x0590, 0x05FF), 'Hebrew'],
+        [(0x0600, 0x06FF), 'Arabic'],
+        [(0x0700, 0x074F), 'Syriac'],
+        [(0x0750, 0x077F), 'Arabic'],
+        [(0x0780, 0x07BF), 'Thaana'],
+        [(0x07C0, 0x07FF), 'NKo'],
+        [(0x0800, 0x083F), 'Samaritan'],
+        [(0x0840, 0x085F), 'Mandaic'],
+        [(0x0860, 0x086F), 'Syriac'],
+        [(0x08A0, 0x08FF), 'Arabic'],
+        [(0x0900, 0x097F), 'Devanagari'],
+        [(0x0980, 0x09FF), 'Bengali'],
+        [(0x0A00, 0x0A7F), 'Gurmukhi'],
+        [(0x0A80, 0x0AFF), 'Gujarati'],
+        [(0x0B00, 0x0B7F), 'Oriya'],
+        [(0x0B80, 0x0BFF), 'Tamil'],
+        [(0x0C00, 0x0C7F), 'Telugu'],
+        [(0x0C80, 0x0CFF), 'Kannada'],
+        [(0x0D00, 0x0D7F), 'Malayalam'],
+        [(0x0D80, 0x0DFF), 'Sinhala'],
+        [(0x0E00, 0x0E7F), 'Thai'],
+        [(0x0E80, 0x0EFF), 'Lao'],
+        [(0x0F00, 0x0FFF), 'Tibetan'],
+        [(0x1000, 0x109F), 'Myanmar'],
+        [(0x10A0, 0x10FF), 'Georgian'],
+        [(0x1100, 0x11FF), 'Hangul'],
+        [(0x1200, 0x137F), 'Ethiopic'],
+        [(0x1380, 0x139F), 'Ethiopic'],
+        [(0x2D80, 0x2DDF), 'Ethiopic'],
+        [(0xAB00, 0xAB2F), 'Ethiopic'],
+        [(0x13A0, 0x13FF), 'Cherokee'],
+        [(0xAB70, 0xABBF), 'Cherokee'],
+        [(0x1400, 0x167F), 'Canadian Aboriginal'],
+        [(0x18B0, 0x18FF), 'Canadian Aboriginal'],
+        [(0x1680, 0x169F), 'Ogham'],
+        [(0x16A0, 0x16FF), 'Runic'],
+        [(0x1700, 0x171F), 'Tagalog'],
+        [(0x1720, 0x173F), 'Hanunoo'],
+        [(0x1740, 0x175F), 'Buhid'],
+        [(0x1760, 0x177F), 'Tagbanwa'],
+        [(0x1780, 0x17FF), 'Khmer'],
+        [(0x1800, 0x18AF), 'Mongolian'],
+        [(0x1900, 0x194F), 'Limbu'],
+        [(0x1950, 0x197F), 'Tai Le'],
+        [(0x1980, 0x19DF), 'New Tai Lue'],
+        [(0x19E0, 0x19FF), 'Khmer'],
+        [(0x1A00, 0x1A1F), 'Buginese'],
+        [(0x1A20, 0x1AAF), 'Tai Tham'],
+        [(0x1B00, 0x1B7F), 'Balinese'],
+        [(0x1B80, 0x1BBF), 'Sundanese'],
+        [(0x1BC0, 0x1BFF), 'Batak'],
+        [(0x1C00, 0x1C4F), 'Lepcha'],
+        [(0x1C50, 0x1C7F), 'Ol Chiki'],
+        [(0x1C90, 0x1CBF), 'Georgian'],
+        [(0x1CC0, 0x1CCF), 'Sundanese'],
+        [(0x1CD0, 0x1CFF), 'Vedic'],
+        [(0x2C00, 0x2C5F), 'Glagolitic'],
+        [(0x2C80, 0x2CFF), 'Coptic'],
+        [(0x2D00, 0x2D2F), 'Georgian'],
+        [(0x2D30, 0x2D7F), 'Tifinagh'],
+        [(0x3040, 0x309F), 'Hiragana'],
+        [(0x30A0, 0x30FF), 'Katakana'],
+        [(0x3100, 0x312F), 'Bopomofo'],
+        [(0x31A0, 0x31BF), 'Bopomofo'],
+        [(0x3130, 0x318F), 'Hangul'],
+        [(0x3190, 0x319F), 'Kanbun'],
+        [(0xA4D0, 0xA4FF), 'Lisu'],
+        [(0xA500, 0xA63F), 'Vai'],
+        [(0xA6A0, 0xA6FF), 'Bamum'],
+        [(0xA800, 0xA82F), 'Syloti Nagri'],
+        [(0xA840, 0xA87F), 'Phags-pa'],
+        [(0xA880, 0xA8DF), 'Saurashtra'],
+        [(0xA8E0, 0xA8FF), 'Devanagari'],
+        [(0xA900, 0xA92F), 'Kayah Li'],
+        [(0xA930, 0xA95F), 'Rejang'],
+        [(0xA980, 0xA9DF), 'Javanese'],
+        [(0xA9E0, 0xA9FF), 'Myanmar'],
+        [(0xAA60, 0xAA7F), 'Myanmar'],
+        [(0xAA00, 0xAA5F), 'Cham'],
+        [(0xAA80, 0xAADF), 'Tai Viet'],
+        [(0xAAE0, 0xAAFF), 'Meetei Mayek'],
+        [(0xABC0, 0xABFF), 'Meetei Mayek']
+        ]
+        for rng, charset in charset_ranges:
+            if codepoint >= rng[0] and codepoint <= rng[1]:
+                return charset
+        return None # no match found or blacklisted
 
     # Check for abuse of Unicode special characters to create text that renders improperly
     # This should always be blocked, even in routine chat messages, because it leads to corrupt text display.
@@ -339,6 +472,12 @@ if __name__ == '__main__':
     assert not cf.is_spammy('<======== IWC')
     assert cf.is_spammy('656456456564')
     assert not cf.is_spammy('65645645')
+
+    assert cf.switches_charsets_or_blacklisted_chars(u'乂卄乇尺ㄖ乂')
+    assert not cf.switches_charsets_or_blacklisted_chars(u'Nirgal')
+
+    assert cf.has_repeating_characters('xXxXNirgalXxXx')
+    assert not cf.has_repeating_characters('xXNirgalXx')
 
     assert not cf.is_ugly(u'aaabcd')
     assert not cf.is_graphical(u'aaabcd')
