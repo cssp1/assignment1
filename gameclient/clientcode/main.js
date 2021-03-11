@@ -29930,10 +29930,10 @@ function set_up_replay_sharing_button(dialog, battle_summary, replay_signature, 
         dialog.widgets['fb_share_icon'].show = true;
 
     var attacker_headline_name = attacker_name.replace("'s Battalion'",'');
-    var attacker_headline_name = attacker_name.replace("'s Squad'",'');
+    attacker_headline_name = attacker_headline_name.replace("'s Squad'",'');
     if(encodeURIComponent(attacker_headline_name).toString().length > 18) { attacker_headline_name = gamedata['virals']['replay']['alt_player_ui_name']; }
     var defender_headline_name = defender_name.replace("'s Battalion'",'');
-    var defender_headline_name = defender_name.replace("'s Squad'",'');
+    defender_headline_name = defender_headline_name.replace("'s Squad'",'');
     if(encodeURIComponent(defender_headline_name).toString().length > 18) { defender_headline_name = gamedata['virals']['replay']['alt_player_ui_name']; }
 
     var text = gamedata['virals']['replay']['ui_post_headline'].replace('%ATTACKER', attacker_headline_name).replace('%DEFENDER', defender_headline_name);
