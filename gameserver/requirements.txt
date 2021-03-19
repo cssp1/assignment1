@@ -29,7 +29,7 @@ PyMySQL==0.10.1 # pure-Python implementation
 
 Pillow==6.2.2
 psycopg2-binary==2.8.6
-py-vapid==1.7.1
+py-vapid==1.8.0
 pyasn1>=0.4.8
 pyasn1-modules>=0.2.8
 pyflakes==2.2.0
