@@ -28833,6 +28833,10 @@ class GAMEAPI(resource.Resource):
             session.player.alias = None
             new_ui_name = session.user.get_real_name()
             self.update_player_cache_ui_name(new_ui_name)
+            change_alias_log = {'time':server_time, 'spin_user':'login_process', 'method':'clear_alias', 'ui_reason':'Invalid alias, met requirements for reset_invalid_alias_on_login in game settings.'}
+            if 'customer_support' not in session.player.history:
+                session.player.history['customer_support'] = []
+            session.player.history['customer_support'].append(change_alias_log)
             if gamedata['strings'].get('notify_invalid_alias_reset_mail'):
                 session.player.mailbox_append(session.player.make_system_mail(gamedata['strings']['notify_invalid_alias_reset_mail'], replace_s = '%s' % old_ui_name))
                 gamesite.exception_log.event(server_time, 'Invalid alias, %s, detected for player ID %d. Reset alias to none and notified player via game message.' % (old_ui_name, session.player.user_id))
