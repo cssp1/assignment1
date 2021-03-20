@@ -19031,7 +19031,6 @@ function invoke_say_thanks(recipient_ui_name, loot) {
 
     FBShare.invoke({name:viral['ui_post_headline'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_ui_name),
                     description:viral['ui_post_description'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_ui_name),
-                    picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
                     ref:'feed_thanks'});
 };
 
@@ -19645,7 +19644,6 @@ function invoke_leaderboard_brag(rank, pct, ui_reason) {
     var ui_rank = percentile_ui_status(rank+1, pct, true);
 
     FBShare.invoke({name: viral['ui_post_headline'].replace('%PLAYER',player.facebook_name).replace('%RANK',ui_rank).replace('%REASON',ui_reason),
-                    picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
                     ref: 'leaderboard'});
 }
 
@@ -31039,7 +31037,6 @@ function invoke_achievement_brag(ach) {
 
     FBShare.invoke({name: viral['ui_post_headline'].replace('%PLAYER',player.facebook_name).replace('%ACHIEVEMENT',ach['ui_name']),
                     description: ach['ui_description'],
-                    picture: picture_url,
                     ref:'cheeve'});
 }
 
