@@ -45779,6 +45779,27 @@ function update_upgrade_dialog(dialog) {
     }
     dialog.auto_center();
 
+    // flag that we can't do any upgrades, and this is just for showing stats
+    var stats_only = (techname === 'BUILDING' && !session.home_base && !unit.spec['quarry_upgradable']);
+
+    // is the appropriate building busy?
+    var builder;
+    if(tech && ('research_category' in tech)) {
+        var builder_type = get_lab_for(tech['research_category']);
+        builder = find_object_by_type(builder_type);
+        if(!builder && !player.is_cheater) {
+            console.log('opened upgrade dialog but research lab was not present: '+techname+' '+tech['research_category']);
+            invoke_research_dialog(null, tech['research_category']);
+            return;
+        }
+        //change_selection_unit(builder);
+    } else {
+        builder = unit;
+    }
+    dialog.user_data['builder'] = builder;
+
+    // check if viewing a building and if always viewing stats is enabled
+    var stats_when_busy = (builder && builder.is_building() && builder.time_until_finish() > 0 && gamedata['always_allow_show_building_stats']);
     var old_level, max_level;
 
     if(techname === 'BUILDING') {
@@ -45793,11 +45814,11 @@ function update_upgrade_dialog(dialog) {
     } else {
         throw Error('unhandled case');
     }
+    if(stats_when_busy) {
+        old_level += 1;
+    }
 
     var new_level = old_level + 1;
-
-    // flag that we can't do any upgrades, and this is just for showing stats
-    var stats_only = (techname === 'BUILDING' && !session.home_base && !unit.spec['quarry_upgradable']);
 
     // whether it is possible to perform the upgrade using resources (vs. instant purchase)
     var use_resources_offered = true;
@@ -45821,34 +45842,6 @@ function update_upgrade_dialog(dialog) {
     if(new_level > max_level) {
         use_resources_requirements_ok = instant_requirements_ok = false;
     }
-
-    // is the appropriate building busy?
-    var builder;
-    if(tech && ('research_category' in tech)) {
-        var builder_type = get_lab_for(tech['research_category']);
-        builder = find_object_by_type(builder_type);
-        if(!builder && !player.is_cheater) {
-            console.log('opened upgrade dialog but research lab was not present: '+techname+' '+tech['research_category']);
-            invoke_research_dialog(null, tech['research_category']);
-            return;
-        }
-        //change_selection_unit(builder);
-    } else {
-        builder = unit;
-    }
-    dialog.user_data['builder'] = builder;
-
-    // check if viewing a building and if always viewing stats is enabled
-    var stats_when_busy = false;
-    dialog.widgets['requirements'].tooltip.str = dialog.data['widgets']['requirements']['ui_tooltip'].replace('%d', new_level.toString());
-    if (builder && builder.is_building() && builder.time_until_finish() > 0 && gamedata['always_allow_show_building_stats']) {
-        stats_when_busy = true;
-        if(new_level + 1 < max_level) {
-            dialog.widgets['requirements'].tooltip.str = dialog.data['widgets']['requirements']['ui_tooltip'].replace('%d', (new_level + 1).toString());
-        } else {
-            dialog.widgets['requirements'].tooltip.str = null;
-        }
-    };
 
     // building is missing, damaged or busy with something, cannot
     // perform upgrade/research
@@ -45884,7 +45877,7 @@ function update_upgrade_dialog(dialog) {
         if(old_level === 0) {
             if(stats_when_busy && builder.research_item == techname) {
                 dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_unlocking'];
-                widget.str = widget.data['ui_name_unlock'].replace('%s',tech['ui_name']).replace('%d', new_level.toString());
+                widget.str = widget.data['ui_name_unlock'].replace('%s',tech['ui_name']).replace('%d', old_level.toString());
                 widget.xy = widget.data['ui_name_unlocking_xy'];
             } else {
                 dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_unlock'];
@@ -45896,7 +45889,7 @@ function update_upgrade_dialog(dialog) {
             widget.str = widget.data['ui_name_stats'].replace('%s',tech['ui_name']).replace('%d',max_level.toString());
             widget.xy = widget.data['ui_name_stats_xy'];
             if(widget.str.length > widget.data['ui_name_stats_max_length']) {
-                widget.str = widget.data['ui_name_stats_short'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
+                widget.str = widget.data['ui_name_stats_short'].replace('%s', tech['ui_name']).replace('%d', max_level.toString());
             }
         } else {
             if(('update_unit_levels_on_tech_upgrade' in gamedata) &&
@@ -45919,24 +45912,30 @@ function update_upgrade_dialog(dialog) {
                 }
             }
             widget.str = widget.data['ui_name'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
+            if(stats_when_busy) {
+                widget.str = widget.data['ui_name'].replace('%s', tech['ui_name']).replace('%d', old_level.toString());
+            }
             if(widget.str.length > widget.data['ui_name_max_length']) {
                 widget.str = widget.data['ui_name_short'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
+                if(stats_when_busy) {
+                    widget.str = widget.data['ui_name_short'].replace('%s', tech['ui_name']).replace('%d', old_level.toString());
+                }
             }
         }
     } else {
-        if(new_level > max_level || stats_only || (stats_when_busy && new_level + 1 > max_level)) {
+        if(new_level > max_level || stats_only) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
             widget.str = widget.data['ui_name_stats'].replace('%s',unit.spec['ui_name']).replace('%d',old_level.toString());
             if(widget.str.length > widget.data['ui_name_stats_max_length']) {
-                widget.str = widget.data['ui_name_stats_short'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+                widget.str = widget.data['ui_name_stats_short'].replace('%s', unit.spec['ui_name']).replace('%d', old_level.toString());
             }
             widget.xy = widget.data['ui_name_stats_xy'];
         } else {
             if(stats_when_busy) {
                 dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_upgrading'];
-                widget.str = widget.data['ui_name'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+                widget.str = widget.data['ui_name'].replace('%s', unit.spec['ui_name']).replace('%d', old_level.toString());
                 if(widget.str.length > widget.data['ui_name_max_length']) {
-                    widget.str = widget.data['ui_name_short'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
+                    widget.str = widget.data['ui_name_short'].replace('%s', unit.spec['ui_name']).replace('%d', old_level.toString());
                 }
                 widget.xy = widget.data['ui_name_upgrading_xy'];
             } else {
@@ -46000,12 +45999,9 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['icon'].bg_image_offset = vec_add(dialog.data['widgets']['icon']['bg_image_offset'], unit.spec['hero_icon_pos'] || [0,0]);
     }
 
-    dialog.widgets['cost_time'].show = (!stats_only && new_level <= max_level && (!stats_when_busy || (stats_when_busy && new_level + 1 < max_level)));
+    dialog.widgets['cost_time'].show = (!stats_only && new_level <= max_level);
     for(var res in gamedata['resources']) {
-        var show_res = (!stats_when_busy && !stats_only && new_level <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
-        if(stats_when_busy) {
-            show_res = (!stats_only && new_level + 1 <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
-        }
+        var show_res = (!stats_only && new_level <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
         if('resource_'+res+'_icon' in dialog.widgets) {
             dialog.widgets['resource_'+res+'_icon'].show = show_res;
             dialog.widgets['resource_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
@@ -46023,7 +46019,7 @@ function update_upgrade_dialog(dialog) {
         (!tech && (unit.spec['kind'] === 'building') && (get_leveled_quantity(unit.spec['consumes_power']||0, max_level) > 0));
 
     // resource costs
-    if(stats_only || new_level > max_level || (stats_when_busy && new_level + 1 > max_level)) {
+    if(stats_only || new_level > max_level) {
         // don't show resource costs if already at max level
         if(dialog.widgets['cost_power'].show) {
             dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip_maxlevel'] : null);
@@ -46039,14 +46035,10 @@ function update_upgrade_dialog(dialog) {
         for(var res in gamedata['resources']) {
             var resdata = gamedata['resources'][res];
 
-            if(tech && !stats_when_busy) {
+            if(tech) {
                 cost = get_leveled_quantity(tech['cost_'+res] || 0, new_level);
-            } else if (tech && stats_when_busy) {
-                cost = get_leveled_quantity(tech['cost_'+res] || 0, new_level + 1);
-            } else if (!tech && !stats_when_busy) {
-                cost = get_leveled_quantity(unit.spec['build_cost_'+res] || 0, new_level);
             } else {
-                cost = get_leveled_quantity(unit.spec['build_cost_'+res] || 0, new_level + 1);
+                cost = get_leveled_quantity(unit.spec['build_cost_'+res] || 0, new_level);
             }
 
             if(!player.is_cheater && cost > 0 && !resource_allow_instant_upgrade(resdata,player)) {
@@ -46135,9 +46127,6 @@ function update_upgrade_dialog(dialog) {
         }
 
         var cost_time = get_leveled_quantity(time_arr, new_level);
-        if(stats_when_busy && new_level + 1 < max_level) {
-            cost_time = get_leveled_quantity(time_arr, new_level + 1);
-        }
         if(tech_speed != 1) {
             cost_time = Math.floor(cost_time / tech_speed);
         } else if(!tech && unit && cost_time > 0) {
@@ -46510,17 +46499,11 @@ function update_upgrade_dialog(dialog) {
         if(stat_name == 'xp') {
             // special case for XP gain
             feature_widget(dialog, grid_y, 0).show = true;
-            if (stats_when_busy) {
-                feature_widget(dialog, grid_y, 0).show = false;
-            }
             feature_widget(dialog, grid_y, 0).str = gamedata['strings']['modstats']['stats']['xp']['ui_name'];
             feature_widget(dialog, grid_y, 0).tooltip.str = (enable_tooltip ? gamedata['strings']['modstats']['stats']['xp']['ui_tooltip'] : null);
             var xp_col = (new_level == 1 ? 1 : 2);
             feature_widget(dialog, grid_y, (xp_col == 1 ? 2 : 1)).show = false;
             feature_widget(dialog, grid_y, xp_col).show = true;
-            if (stats_when_busy) {
-                feature_widget(dialog, grid_y, xp_col).show = false;
-            }
             feature_widget(dialog, grid_y, xp_col).str = '+'+pretty_print_number(xp_amount)+' XP';
             feature_widget(dialog, grid_y, xp_col).text_color = delta_color;
             feature_widget(dialog, grid_y, xp_col).tooltip.str = (enable_tooltip ? gamedata['strings']['modstats']['stats']['xp']['ui_tooltip'] : null);
@@ -46696,7 +46679,7 @@ function update_upgrade_dialog(dialog) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
             ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, new_chain, spec, new_chain_level, new_auto_spell, new_spell_level, enable_tooltip);
-        } else if(stats_only || new_level > max_level || stats_when_busy) {
+        } else if(stats_only || new_level > max_level) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
             ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
@@ -46830,7 +46813,7 @@ function update_upgrade_dialog(dialog) {
     } else if(old_level <= 0 && !show_level_0) {
         dialog.widgets['header0'].str = dialog.widgets['header0'].data[(tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name'].replace('%d', new_level);
         dialog.widgets['header1'].show = false;
-    } else if(stats_only || new_level > max_level || stats_when_busy) {
+    } else if(stats_only || new_level > max_level) {
         dialog.widgets['header0'].str = dialog.widgets['header0'].data[(old_level <= 0 ? 'ui_name_unmodified' : (tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name')].replace('%d', old_level);
         dialog.widgets['header1'].show = false;
     } else {
@@ -47000,12 +46983,16 @@ function update_upgrade_dialog(dialog) {
         // do nothing
         show_complete_reqs = false;
     }
-    if(show_complete_reqs && new_level > max_level) {
+    if(show_complete_reqs && new_level > max_level && !stats_when_busy) {
         req.push(gamedata['errors']['MAX_LEVEL_REACHED']['ui_name']);
         show_complete_reqs = false;
     }
-    if(show_complete_reqs && stats_when_busy) {
+    if(show_complete_reqs && stats_when_busy && new_level <= max_level) {
         req.push(gamedata['errors']['STATS_WHILE_UPGRADING']['ui_name']);
+        show_complete_reqs = false;
+    }
+    if(show_complete_reqs && stats_when_busy && new_level > max_level) {
+        req.push(gamedata['errors']['UPGRADING_TO_MAX_LEVEL']['ui_name']);
         show_complete_reqs = false;
     }
     if(!builder_blocks_upgrade && show_complete_reqs && builder && builder.is_damaged()) {
@@ -47145,11 +47132,8 @@ function update_upgrade_dialog(dialog) {
         // note: timer bar already hidden above
     } else if (stats_when_busy) {
         // hide resources, but show instant buy button
-        dialog.widgets['use_resources_button'].show = false;
-        dialog.widgets['instant_button'].show = dialog.widgets['instant_credits'].show = true;
-        dialog.widgets['instant_button']['ui_name'] = gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'];
-        dialog.widgets['instant_button'].spellname = 'SPEEDUP_FOR_MONEY';
-        dialog.widgets['instant_button'].onclick = (function (_builder) { return function() {change_selection_unit(_builder); invoke_speedup_dialog('speedup');}; })(builder)
+        dialog.widgets['instant_button'].show = dialog.widgets['use_resources_button'].show = false;
+        dialog.widgets['instant_credits'].show = true;
         var instant_price = Store.get_user_currency_price(builder.id, gamedata['spells']['SPEEDUP_FOR_MONEY'], null)
         dialog.widgets['instant_credits'].str = Store.display_user_currency_price(instant_price);
         dialog.widgets['instant_credits'].tooltip.str = Store.display_user_currency_price_tooltip(instant_price);
