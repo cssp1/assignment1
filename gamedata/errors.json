@@ -70,6 +70,7 @@
     "FACTORY_IS_UPGRADING": { "ui_name": "Cannot build because the factory is upgrading" },
     "MAX_LEVEL_REACHED": { "ui_name": "Already at maximum level, cannot upgrade further" },
     "STATS_WHILE_UPGRADING": { "ui_name": "Viewing stats while upgrading, cannot upgrade further until upgrade is complete" },
+    "UPGRADING_TO_MAX_LEVEL": { "ui_name": "Viewing stats while upgrading to max level, cannot upgrade further" },
     "BUILDING_NOT_FOUND": { "ui_name": "No building of this type was found" },
     "BUILDING_LIMIT_EXCEEDED": { "ui_name": "Maximum number of this building already built",
                                  "ui_name_detailed": "Maximum number already built for %townhall1 Level %lev:\nUpgrade %townhall2 to build more" },
