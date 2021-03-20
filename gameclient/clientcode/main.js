@@ -45814,7 +45814,7 @@ function update_upgrade_dialog(dialog) {
     } else {
         throw Error('unhandled case');
     }
-    if(stats_when_busy) {
+    if(stats_when_busy && builder.research_item === techname && old_level < max_level) {
         old_level += 1;
     }
 
@@ -46983,7 +46983,7 @@ function update_upgrade_dialog(dialog) {
         // do nothing
         show_complete_reqs = false;
     }
-    if(show_complete_reqs && new_level > max_level && !stats_when_busy) {
+    if(show_complete_reqs && new_level > max_level && (!stats_when_busy || builder.research_item != techname)) {
         req.push(gamedata['errors']['MAX_LEVEL_REACHED']['ui_name']);
         show_complete_reqs = false;
     }
@@ -46991,7 +46991,7 @@ function update_upgrade_dialog(dialog) {
         req.push(gamedata['errors']['STATS_WHILE_UPGRADING']['ui_name']);
         show_complete_reqs = false;
     }
-    if(show_complete_reqs && stats_when_busy && new_level > max_level) {
+    if(show_complete_reqs && stats_when_busy && new_level > max_level && builder.research_item === techname) {
         req.push(gamedata['errors']['UPGRADING_TO_MAX_LEVEL']['ui_name']);
         show_complete_reqs = false;
     }
