@@ -45812,7 +45812,7 @@ function update_upgrade_dialog(dialog) {
         old_level = (unit.enhancements ? unit.enhancements[techname] || 0 : 0);
         max_level = get_max_ui_level(tech);
     } else {
-        throw Error('unhandled case');
+        throw Error('unhandled case: ' + techname);
     }
     if(stats_when_busy && builder.research_item === techname && old_level < max_level) {
         old_level += 1;
