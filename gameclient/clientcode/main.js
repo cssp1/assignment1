@@ -36351,12 +36351,11 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
 /** @param {SPUI.Dialog} dialog */
 function crafting_dialog_init_status_missiles(dialog) {
     var dims = dialog.data['widgets']['missile_slot']['array'];
-    dialog.user_data['wname_to_tag'] = {};
+    dialog.user_data['missiles_page'] = 0;
+    dialog.on_mousewheel_function = scroll_dialog_status_missiles;
     for(var y = 0; y < dims[1]; y++) {
         for(var x = 0; x < dims[0]; x++) {
             var wname = x.toString()+','+y.toString();
-            var tag = wname;
-            dialog.user_data['wname_to_tag'][wname] = tag; // not sure we need this for missile slots
             dialog.widgets['missile_slot'+wname].show = true; // update_status_missiles() takes care of hiding slots beyond the max available number
         }
     }
@@ -37159,22 +37158,50 @@ function scroll_crafting_dialog_status_grid_weapons(dialog, delta) {
     }
 }
 
+/** @param {SPUI.Dialog} dialog
+    @param {number} delta */
+function scroll_dialog_status_missiles(dialog, delta) {
+    var page = dialog.user_data['missiles_page'];
+    var max_page = dialog.user_data['max_page'];
+    if(delta > 0) { delta = 1; }
+    if(delta < 0) { delta = -1; }
+    if(page + delta < 1) { return; }
+    if(page + delta > max_page) { return; }
+    page += delta;
+    dialog.user_data['missiles_page'] = page;
+}
+
 /** @param {SPUI.Dialog} dialog */
 function update_crafting_dialog_status_missiles(dialog) {
     var dims = dialog.data['widgets']['missile_slot']['array'];
     var builder = dialog.parent.user_data['builder'];
+    if(!builder) { throw Error('Reached update_crafting_dialog_status_missiles without a valid builder'); }
     var category = dialog.parent.user_data['category'];
+    if(category !== 'missiles') { throw Error('Reached update_crafting_dialog_status_missiles with invalid category ' + category); }
     var catspec = gamedata['crafting']['categories'][category];
+    var obj = find_object_by_type(catspec['delivery_building_for_ui']); // object for this delivery slot
+    if(!obj) { throw Error ('Reached update_crafting_dialog_status_missiles without a valid delivery object')}
+    var delivery_slot_type = catspec['delivery_slot_type'];
+    var delivery_building_spec = gamedata['buildings'][catspec['delivery_building_for_ui']];
     var selected_rec = dialog.parent.user_data['selected_recipe'];
     var selected_recipe = (selected_rec ? dialog.parent.user_data['selected_recipe']['spec'] : null);
     var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
-    var selected_mine = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec)['name'] : null);
-    var selected_mine_spec = (selected_mine ? ItemDisplay.get_inventory_item_spec(selected_mine) : null);
-    var selected_mine_level = (selected_mine ? player.tech[selected_mine_spec['associated_tech']] || 1 : null);
+    var selected_missile = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec)['name'] : null);
+    var selected_missile_spec = (selected_missile ? ItemDisplay.get_inventory_item_spec(selected_missile) : null);
+    var selected_missile_level = (selected_missile ? player.tech[selected_missile_spec['associated_tech']] || 1 : null);
+    var page = dialog.user_data['missiles_page'];
+    var delivery_slot_offset = dims[0] * page;
 
     var craft_queue = (builder ? builder.get_crafting_queue() : []);
-    var num_slots = 0; // number of slots we currently have
-    var max_slots = 0; // max number of slots we could have if FULLY upgraded
+    var num_slots = get_leveled_quantity(delivery_building_spec['equip_slots'][delivery_slot_type], obj.level); // number of slots we currently have
+    var max_slots = get_leveled_quantity(delivery_building_spec['equip_slots'][delivery_slot_type], get_max_level(delivery_building_spec)); // max number of slots we could have if FULLY upgraded
+    var max_page = Math.floor(num_slots / (dims[0] * dims[1]));
+    dialog.user_data['max_page'] = max_page;
+    dialog.widgets['scroll_up'].show = dialog.widgets['scroll_down'].show = max_page > 1;
+    dialog.widgets['scroll_up'].state = (page === 1 ? 'normal' : 'disabled');
+    dialog.widgets['scroll_up'].onclick = function() { scroll_dialog_status_missiles(dialog, -1); };
+    dialog.widgets['scroll_down'].state = (page === max_page ? 'disabled' : 'normal');
+    dialog.widgets['scroll_down'].onclick = function() { scroll_dialog_status_missiles(dialog, 1); };
     var num_ready = 0; // number of slots that have an item completed and equipped
 
     dialog.parent.user_data['on_use_recipe'] = null; // default action when clicking the recipe on the left
@@ -37182,35 +37209,16 @@ function update_crafting_dialog_status_missiles(dialog) {
     for(var y = 0; y < dims[1]; y++) {
         for(var x = 0; x < dims[0]; x++) {
             var wname = x.toString()+','+y.toString();
-            var obj = null; // object for this delivery slot
-            var delivery_slot_type = catspec['delivery_slot_type'];
-            var delivery_slot_index;
-            var multiple_delivery_slots;
+            var delivery_slot_index = y * dims[0] + x + delivery_slot_offset;
             var pending = false;
-            var cur_mine_item = null;
+            var cur_missile_item = null;
             var cur_config = null;
             var cur_config_level = null;
+            cur_missile_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > delivery_slot_index ? player.decode_equipped_item(obj.equipment[delivery_slot_type][delivery_slot_index]) : null);
+            cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type].length > delivery_slot_index && (obj.config[delivery_slot_type][delivery_slot_index] in gamedata['items']) ? obj.config[delivery_slot_type][delivery_slot_index] : null);
 
-            if(builder) {
-                if(category == 'missiles') {
-                    obj = find_object_by_type(catspec['delivery_building_for_ui']);
-                    multiple_delivery_slots = true;
-                    delivery_slot_index = y*dims[0] + x; // XXX assumes you only have one delivery building
-                    var delivery_building_spec = gamedata['buildings'][catspec['delivery_building_for_ui']];
-                    max_slots = get_leveled_quantity(delivery_building_spec['equip_slots'][delivery_slot_type], get_max_level(delivery_building_spec));
-                    if(obj) {
-                        cur_mine_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > delivery_slot_index ? player.decode_equipped_item(obj.equipment[delivery_slot_type][delivery_slot_index]) : null);
-                        cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type].length > delivery_slot_index && (obj.config[delivery_slot_type][delivery_slot_index] in gamedata['items']) ? obj.config[delivery_slot_type][delivery_slot_index] : null);
-                    }
-                } else {
-                    throw Error('unhandled category '+category);
-                }
-            }
-            if(obj && (!multiple_delivery_slots || (delivery_slot_index <= max_slots-1))) {
-                // slot exists (now, or if fully upgraded)
-                num_slots += 1;
-
-                pending = !obj.is_in_sync(); // || !builder.is_in_sync();
+            if(delivery_slot_index <= num_slots - 1) {
+                pending = !obj.is_in_sync();
                 dialog.widgets['missile_slot'+wname].state = 'normal';
 
                 var in_progress_recipe = null, in_progress_level = null, in_progress_bus = null, in_progress_togo = -1;
@@ -37237,16 +37245,16 @@ function update_crafting_dialog_status_missiles(dialog) {
                 dialog.widgets['missile_skull'+wname].show =
                     dialog.widgets['missile_timer'+wname].show = false;
 
-                var build_mine = cur_config || selected_mine || null;
+                var build_missile = cur_config || selected_missile || null;
                 var build_recipe = null;
-                if(build_mine) {
-                    if(build_mine == selected_mine) {
+                if(build_missile) {
+                    if(build_missile == selected_missile) {
                         build_recipe = selected_recipe;
                     } else {
-                        // look up the recipe for a DIFFERENT mine
+                        // look up the recipe for a DIFFERENT missile
                         for(var n in gamedata['crafting']['recipes']) {
                             var rec = gamedata['crafting']['recipes'][n];
-                            if(rec['crafting_category'] == category && ItemDisplay.get_crafting_recipe_product_spec(rec)['name'] == build_mine) {
+                            if(rec['crafting_category'] == category && ItemDisplay.get_crafting_recipe_product_spec(rec)['name'] == build_missile) {
                                 build_recipe = n; break;
                             }
                         }
@@ -37303,24 +37311,24 @@ function update_crafting_dialog_status_missiles(dialog) {
                     // client-side predict
                     _obj.config = new_config;
                     _obj.request_sync();
-                }; })(obj, delivery_slot_type, delivery_slot_index, multiple_delivery_slots);
+                }; })(obj, delivery_slot_type, delivery_slot_index, true);
 
-                if(cur_mine_item) {
-                    var cur_mine_spec = ItemDisplay.get_inventory_item_spec(cur_mine_item['spec']);
-                    var cur_mine_level = cur_mine_item['level'] || 1;
+                if(cur_missile_item) {
+                    var cur_missile_spec = ItemDisplay.get_inventory_item_spec(cur_missile_item['spec']);
+                    var cur_missile_level = cur_missile_item['level'] || 1;
                     num_ready += 1;
                     dialog.widgets['missile_icon'+wname].alpha = 1;
-                    dialog.widgets['missile_icon'+wname].asset = get_leveled_quantity(cur_mine_spec['icon'], cur_mine_level);
+                    dialog.widgets['missile_icon'+wname].asset = get_leveled_quantity(cur_missile_spec['icon'], cur_missile_level);
                     dialog.widgets['missile_frame'+wname].onclick = null;
-                    dialog.widgets['missile_frame'+wname].tooltip.str = dialog.data['widgets']['missile_frame']['ui_tooltip_armed'].replace('%s', cur_mine_spec['ui_name']);
-                    dialog.widgets['missile_cancel'+wname].show = !(('can_unequip' in cur_mine_spec) && !cur_mine_spec['can_unequip']);
-                    dialog.widgets['missile_cancel'+wname].tooltip.str = dialog.data['widgets']['missile_cancel']['ui_tooltip_discard'].replace('%s', cur_mine_spec['ui_name']);
-                    dialog.widgets['missile_cancel'+wname].onclick = (function (_obj, _cur_mine_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb) { return function(w) {
-                        send_to_server.func(["EQUIP_BUILDING", _obj.id, [_delivery_slot_type,_delivery_slot_index], -1, null, _cur_mine_item, -1]);
+                    dialog.widgets['missile_frame'+wname].tooltip.str = dialog.data['widgets']['missile_frame']['ui_tooltip_armed'].replace('%s', cur_missile_spec['ui_name']);
+                    dialog.widgets['missile_cancel'+wname].show = !(('can_unequip' in cur_missile_spec) && !cur_missile_spec['can_unequip']);
+                    dialog.widgets['missile_cancel'+wname].tooltip.str = dialog.data['widgets']['missile_cancel']['ui_tooltip_discard'].replace('%s', cur_missile_spec['ui_name']);
+                    dialog.widgets['missile_cancel'+wname].onclick = (function (_obj, _cur_missile_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb) { return function(w) {
+                        send_to_server.func(["EQUIP_BUILDING", _obj.id, [_delivery_slot_type,_delivery_slot_index], -1, null, _cur_missile_item, -1]);
                         // maybe put a confirmation dialog here?
                         invoke_ui_locker();
                         _unconfig_cb();
-                    }; })(obj, cur_mine_item, delivery_slot_type, delivery_slot_index, unconfig_cb);
+                    }; })(obj, cur_missile_item, delivery_slot_type, delivery_slot_index, unconfig_cb);
                 } else if(in_progress_recipe) {
                     dialog.widgets['missile_icon'+wname].asset = get_leveled_quantity(get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]), in_progress_level);
                     dialog.widgets['missile_icon'+wname].alpha = 1;
@@ -37343,20 +37351,20 @@ function update_crafting_dialog_status_missiles(dialog) {
                     dialog.widgets['missile_frame'+wname].tooltip.str = dialog.data['widgets']['missile_frame']['ui_tooltip_produce'].replace('%s', cur_config_spec['ui_name']);
                     dialog.widgets['missile_cancel'+wname].onclick = unconfig_cb;
 
-                    if(!dialog.parent.user_data['on_use_recipe'] && selected_mine_spec == cur_config_spec) {
+                    if(!dialog.parent.user_data['on_use_recipe'] && selected_missile_spec == cur_config_spec) {
                         dialog.parent.user_data['on_use_recipe'] = build_cb;
                     }
 
-                } else if(selected_mine_spec) {
+                } else if(selected_missile_spec) {
                     dialog.widgets['missile_icon'+wname].alpha = 0.33;
-                    dialog.widgets['missile_icon'+wname].asset = get_leveled_quantity(selected_mine_spec['icon'], selected_mine_level);
+                    dialog.widgets['missile_icon'+wname].asset = get_leveled_quantity(selected_missile_spec['icon'], selected_missile_level);
                     dialog.widgets['missile_icon'+wname].show = (dialog.widgets['missile_frame'+wname].mouse_enter_time > 0) && (dialog.widgets['missile_cancel'+wname].mouse_enter_time < 0);
-                    dialog.widgets['missile_frame'+wname].tooltip.str = dialog.data['widgets']['missile_frame']['ui_tooltip_produce'].replace('%s', selected_mine_spec['ui_name']);
+                    dialog.widgets['missile_frame'+wname].tooltip.str = dialog.data['widgets']['missile_frame']['ui_tooltip_produce'].replace('%s', selected_missile_spec['ui_name']);
                     var build_and_config_cb;
                     if(('persist_config' in catspec) && !catspec['persist_config']) {
                         build_and_config_cb = build_cb; // no persistence
                     } else {
-                        build_and_config_cb = (function (_obj, _selected_mine_spec, _delivery_slot_type, _delivery_slot_index, _multiple, _build_cb) { return function(w) {
+                        build_and_config_cb = (function (_obj, _selected_missile_spec, _delivery_slot_type, _delivery_slot_index, _multiple, _build_cb) { return function(w) {
                         if(_build_cb && _build_cb()) {
                             var new_config = _obj.config || {};
                             if(_multiple) {
@@ -37364,16 +37372,16 @@ function update_crafting_dialog_status_missiles(dialog) {
                                 while(new_config[_delivery_slot_type].length < _delivery_slot_index) {
                                     new_config[_delivery_slot_type].push(null);
                                 }
-                                new_config[_delivery_slot_type][_delivery_slot_index] = _selected_mine_spec['name'];
+                                new_config[_delivery_slot_type][_delivery_slot_index] = _selected_missile_spec['name'];
                             } else {
-                                new_config[_delivery_slot_type] = _selected_mine_spec['name'];
+                                new_config[_delivery_slot_type] = _selected_missile_spec['name'];
                             }
                             send_to_server.func(["CAST_SPELL", _obj.id, "CONFIG_SET", new_config]);
                             // client-side predict config
                             _obj.config = new_config;
                             _obj.request_sync();
                         }
-                        }; })(obj, selected_mine_spec, delivery_slot_type, delivery_slot_index, multiple_delivery_slots, build_cb);
+                    }; })(obj, selected_missile_spec, delivery_slot_type, delivery_slot_index, true, build_cb);
                     }
                     dialog.widgets['missile_frame'+wname].onclick = build_and_config_cb;
                     dialog.widgets['missile_cancel'+wname].show = false;
@@ -37391,8 +37399,8 @@ function update_crafting_dialog_status_missiles(dialog) {
                 if(pending) {
                     dialog.widgets['missile_frame'+wname].onclick = null;
                 }
-            } else if(delivery_slot_index < max_slots) {
-                // minefield does not exist
+            } else if(delivery_slot_index > num_slots - 1) {
+                // missile slot does not exist
                 dialog.widgets['missile_icon'+wname].show =
                     dialog.widgets['missile_skull'+wname].show =
                     dialog.widgets['missile_timer'+wname].show =
