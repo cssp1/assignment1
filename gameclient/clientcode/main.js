@@ -34668,7 +34668,7 @@ var ARMY_DIALOG_BUTTONS = {
                                                      return;
                                                  }
                                                  change_selection_unit(builder);
-                                                 invoke_upgrade_building_dialog();
+                                                 invoke_research_dialog('crafting', category);
                                                  return;
                                              }
                                          }
