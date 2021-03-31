@@ -36352,7 +36352,6 @@ function crafting_dialog_status_grid_weapons_cell_setup(dialog, row_col) {
 function crafting_dialog_init_status_missiles(dialog) {
     var dims = dialog.data['widgets']['missile_slot']['array'];
     dialog.user_data['missiles_page'] = 0;
-    dialog.on_mousewheel_function = scroll_dialog_status_missiles;
     for(var y = 0; y < dims[1]; y++) {
         for(var x = 0; x < dims[0]; x++) {
             var wname = x.toString()+','+y.toString();
@@ -36370,7 +36369,17 @@ function crafting_dialog_init_status_merge_items(dialog) {
     @param {number} page */
 function crafting_dialog_mousewheel(dialog, page) {
     var destination_page = (page > 0 ? dialog.user_data['page'] + 1 : dialog.user_data['page'] - 1);
-    crafting_dialog_scroll(dialog, destination_page)
+    crafting_dialog_scroll(dialog, destination_page);
+    if(dialog.user_data['category'] === 'missiles') {
+        // handle passing mousewheel for missile crafting
+        var delta = (page > 0 ? 1 : -1);
+        for(var i = 0; i < dialog.children.length; i++) {
+            var child = dialog.children[i];
+            if('user_data' in child && 'missiles_page' in child['user_data']) {
+                scroll_dialog_status_missiles(child, delta);
+            }
+        }
+    }
 }
 
 /** @param {SPUI.Dialog} dialog
@@ -37165,7 +37174,7 @@ function scroll_dialog_status_missiles(dialog, delta) {
     var max_page = dialog.user_data['max_page'];
     if(delta > 0) { delta = 1; }
     if(delta < 0) { delta = -1; }
-    if(page + delta < 1) { return; }
+    if(page + delta < 0) { return; }
     if(page + delta > max_page) { return; }
     page += delta;
     dialog.user_data['missiles_page'] = page;
@@ -37197,7 +37206,7 @@ function update_crafting_dialog_status_missiles(dialog) {
     var max_slots = get_leveled_quantity(delivery_building_spec['equip_slots'][delivery_slot_type], get_max_level(delivery_building_spec)); // max number of slots we could have if FULLY upgraded
     var max_page = Math.floor(num_slots / (dims[0] * dims[1]));
     dialog.user_data['max_page'] = max_page;
-    dialog.widgets['scroll_up'].show = dialog.widgets['scroll_down'].show = max_page > 1;
+    dialog.widgets['scroll_up'].show = dialog.widgets['scroll_down'].show = max_page > 0;
     dialog.widgets['scroll_up'].state = (page === 1 ? 'normal' : 'disabled');
     dialog.widgets['scroll_up'].onclick = function() { scroll_dialog_status_missiles(dialog, -1); };
     dialog.widgets['scroll_down'].state = (page === max_page ? 'disabled' : 'normal');
