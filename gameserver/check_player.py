@@ -805,6 +805,20 @@ if __name__ == '__main__':
                 bh_creat = bh_user.get('creation_time')
                 bh_creat_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_creat))
                 print fmt % ('BH Account age:', '%0.1f days (created %s)' % (float(time_now - bh_creat)/(24*60*60), bh_creat_str))
+                user_agent = user.get('browser_user_agent','UNKNOWN')
+                if 'bh_electron_' in user_agent:
+                    electron_agent = user_agent.replace('bh_electron_','')
+                    try:
+                        decoded_agent = SpinJSON.loads(electron_agent)
+                        client_vendor = decoded_agent.get('client_vendor', 'Unknown')
+                        formatted_vendor = 'Unknown'
+                        if client_vendor == 'microsoft':
+                            formatted_vendor = 'Windows Store'
+                        elif client_vendor == 'battlehouse':
+                            formatted_vendor = 'BH.com downloadable EXE'
+                        print fmt % ('Electron client type:', formatted_vendor)
+                    except:
+                        print fmt % ('Electron client type:', 'Unable to determine, showing: %s' % user_agent)
             print fmt % ('--- END Battlehouse Account Info---', '')
 
 
