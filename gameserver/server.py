@@ -28877,6 +28877,14 @@ class GAMEAPI(resource.Resource):
                     session.player.history['map_placement_gen'] = -1
                     session.player.update_map_placement(session, retmsg)
 
+            if session.player.home_region in gamedata['regions'] and \
+               (not Predicates.read_predicate(gamedata['regions'][session.player.home_region].get('requires',{'predicate':'ALWAYS_TRUE'})).is_satisfied2(session, session.player, None, override_time = None) or \
+               not Predicates.read_predicate(gamedata['regions'][session.player.home_region].get('show_if',{'predicate':'ALWAYS_TRUE'})).is_satisfied2(session, session.player, None, override_time = None)):
+                gamesite.exception_log.event(server_time, 'player %d no longer meets requirements for %s on login, relocating!' % (session.player.user_id, session.player.home_region))
+                session.player.home_region = session.player.my_home.base_region = session.player.my_home.base_map_loc = None
+                session.player.history['map_placement_gen'] = -1
+                session.player.update_map_placement(session, retmsg)
+
             retmsg.append(["REGION_CHANGE", session.player.home_region, session.player.my_home.base_map_loc, True, session.player.my_home.base_climate])
             if gamedata['regions'][session.player.home_region].get('enable_turf_control',False):
                 retmsg.append(["REGION_TURF_UPDATE", session.player.home_region, gamesite.nosql_client.alliance_turf_get_by_region(session.player.home_region, reason = 'login')])
