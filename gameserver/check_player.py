@@ -805,7 +805,7 @@ if __name__ == '__main__':
                 bh_creat = bh_user.get('creation_time')
                 bh_creat_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_creat))
                 print fmt % ('BH Account age:', '%0.1f days (created %s)' % (float(time_now - bh_creat)/(24*60*60), bh_creat_str))
-                user_agent = bh_user.get('browser_user_agent','UNKNOWN')
+                user_agent = user.get('browser_user_agent','UNKNOWN')
                 if 'bh_electron_' in user_agent:
                     electron_agent = user_agent.replace('bh_electron_','')
                     try:
