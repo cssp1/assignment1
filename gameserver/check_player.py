@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+SpinJSON.loads#!/usr/bin/env python
 
 # Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
@@ -818,7 +818,7 @@ if __name__ == '__main__':
                             formatted_vendor = 'BH.com downloadable EXE'
                         print fmt % ('Electron client type:', formatted_vendor)
                     except:
-                        print fmt % ('Electron client type:', 'Unable to determine')
+                        print fmt % ('Electron client type:', 'Unable to determine, showing: %s' % user_agent)
             print fmt % ('--- END Battlehouse Account Info---', '')
 
 
