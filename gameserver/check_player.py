@@ -1,4 +1,4 @@
-SpinJSON.loads#!/usr/bin/env python
+#!/usr/bin/env python
 
 # Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
@@ -809,7 +809,7 @@ if __name__ == '__main__':
                 if 'bh_electron_' in user_agent:
                     electron_agent = user_agent.replace('bh_electron_','')
                     try:
-                        decoded_agent = json.loads(electron_agent)
+                        decoded_agent = SpinJSON.loads(electron_agent)
                         client_vendor = decoded_agent.get('client_vendor', 'Unknown')
                         formatted_vendor = 'Unknown'
                         if client_vendor == 'microsoft':
