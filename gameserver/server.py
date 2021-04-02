@@ -15486,7 +15486,10 @@ class LivePlayer(Player):
                 if (force_region is not None) and gamedata['server']['log_stale_accounts']:
                     gamesite.exception_log.event(server_time, 'placing returning vet %d into region %s' % (self.user_id, force_region))
 
-        if self.history.get('map_placement_gen', 0) < gamedata['territory']['map_placement_gen'] and \
+        map_placement_too_old = self.history.get('map_placement_gen', 0) < gamedata['territory']['map_placement_gen']
+        requires_predicate_not_satisfied = self.home_region in gamedata['regions'] and not Predicates.read_predicate(gamedata['regions'][self.home_region].get('requires',{'predicate':'ALWAYS_TRUE'})).is_satisfied2(session, self, None, override_time = None)
+
+        if (map_placement_too_old or requires_predicate_not_satisfied) and \
            (self.eligible_for_quarries() or (force_region is not None)):
             success = self.change_region(force_region if (force_region is not None) else None, None, None, session, retmsg, reason='update_map_placement')
             if success:
@@ -28876,12 +28879,6 @@ class GAMEAPI(resource.Resource):
                     session.player.home_region = session.player.my_home.base_region = session.player.my_home.base_map_loc = None
                     session.player.history['map_placement_gen'] = -1
                     session.player.update_map_placement(session, retmsg)
-
-            if session.player.home_region in gamedata['regions'] and not Predicates.read_predicate(gamedata['regions'][session.player.home_region].get('requires',{'predicate':'ALWAYS_TRUE'})).is_satisfied2(session, session.player, None, override_time = None):
-                gamesite.exception_log.event(server_time, 'player %d no longer meets requirements for %s on login, relocating!' % (session.player.user_id, session.player.home_region))
-                session.player.home_region = session.player.my_home.base_region = session.player.my_home.base_map_loc = None
-                session.player.history['map_placement_gen'] = -1
-                session.player.update_map_placement(session, retmsg)
 
             retmsg.append(["REGION_CHANGE", session.player.home_region, session.player.my_home.base_map_loc, True, session.player.my_home.base_climate])
             if gamedata['regions'][session.player.home_region].get('enable_turf_control',False):
