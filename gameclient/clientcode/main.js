@@ -51470,7 +51470,7 @@ function handle_server_message(data) {
             var log_item = {'spec': specname, 'stack': count};
             var log_target_pos = null;
             var item_level = 1;
-            if(data[1] && 'item' in data[1] && data[1]['item'] && 'level' in data[1]['item'] && data[1]['item']['level']) {
+            if(data[1] && (typeof data[1] === 'object') && 'item' in data[1] && data[1]['item'] && 'level' in data[1]['item'] && data[1]['item']['level']) {
                 item_level = data[1]['item']['level'];
             }
 
