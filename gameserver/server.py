@@ -15486,7 +15486,10 @@ class LivePlayer(Player):
                 if (force_region is not None) and gamedata['server']['log_stale_accounts']:
                     gamesite.exception_log.event(server_time, 'placing returning vet %d into region %s' % (self.user_id, force_region))
 
-        if self.history.get('map_placement_gen', 0) < gamedata['territory']['map_placement_gen'] and \
+        map_placement_too_old = self.history.get('map_placement_gen', 0) < gamedata['territory']['map_placement_gen']
+        requires_predicate_not_satisfied = self.home_region in gamedata['regions'] and not Predicates.read_predicate(gamedata['regions'][self.home_region].get('requires',{'predicate':'ALWAYS_TRUE'})).is_satisfied2(session, self, None, override_time = None)
+
+        if (map_placement_too_old or requires_predicate_not_satisfied) and \
            (self.eligible_for_quarries() or (force_region is not None)):
             success = self.change_region(force_region if (force_region is not None) else None, None, None, session, retmsg, reason='update_map_placement')
             if success:
@@ -15723,7 +15726,8 @@ class LivePlayer(Player):
                 if gamedata.get('unit_donation_restrict_region', False):
                     gamesite.sql_client.invalidate_unit_donation_request(self.user_id)
                     self.donated_units = {}
-                    retmsg.append(["DONATED_UNITS_UPDATE", self.donated_units])
+                    if retmsg:
+                        retmsg.append(["DONATED_UNITS_UPDATE", self.donated_units])
 
             else:
                 # changed location within one region - no need to drop old stuff
