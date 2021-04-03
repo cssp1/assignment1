@@ -51457,7 +51457,6 @@ function handle_server_message(data) {
 
         if(index < player.inventory.length && player.inventory[index]['spec'] == specname) {
             var item = player.inventory[index];
-            var item_level = item['level'];
             if('pending' in item) {
                 delete item['pending'];
                 if('pending_action' in item) {
@@ -51471,7 +51470,7 @@ function handle_server_message(data) {
             var log_item = {'spec': specname, 'stack': count};
             var log_target_pos = null;
             var item_level = 1;
-            if('item' in data[1] && 'level' in data[1]['item']) {
+            if(data[1] && (typeof data[1] === 'object') && 'item' in data[1] && data[1]['item'] && 'level' in data[1]['item'] && data[1]['item']['level']) {
                 item_level = data[1]['item']['level'];
             }
 
