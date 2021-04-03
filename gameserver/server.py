@@ -5188,7 +5188,9 @@ class Session(object):
                         if climate['name'] in aura['required_climates']:
                             if obj.auras is None: obj.auras = []
                             Aura.apply_aura(obj.auras, aura['aura_name'], aura['aura_strength'], session_only = True)
-
+        if self.cur_objects is None:
+            self.cur_objects = ObjectCollection()
+            
         return self.cur_objects.add_object(obj)
 
     def rem_object(self, id):
@@ -14898,7 +14900,7 @@ class LivePlayer(Player):
     # migrate() is called on login, handles all migration of forwards-incompatible player state
     # migrate_proxy() is called when loading a Player other than the one who is currently logged in
 
-    def migrate(self, session, user_id, account_creation_time, is_returning_user):
+    def migrate(self, session, user_id, account_creation_time, is_returning_user, retmsg):
         # do all proxy steps first
         self.migrate_proxy()
 
@@ -15196,7 +15198,7 @@ class LivePlayer(Player):
             # migrate from old list format
             self.known_alt_accounts = dict([(str(alt_id), {'logins':999,'attacks':999}) for alt_id in self.known_alt_accounts])
 
-        self.update_map_placement(session, None)
+        self.update_map_placement(session, retmsg)
 
         # ensure CC level history value is set up
         if gamedata['townhall']+'_level' not in self.history:
@@ -28432,7 +28434,7 @@ class GAMEAPI(resource.Resource):
         player.prune_activity()
         player.prune_battle_history()
         player.spawn_deposits(user.user_id ^ int(server_time)) # time-varying seed
-        player.migrate(session, user.user_id, user.account_creation_time, is_returning_user)
+        player.migrate(session, user.user_id, user.account_creation_time, is_returning_user, retmsg)
         player.prune_player_auras(is_session_change = True, is_login = True)
 
         player.my_home.base_resource_loot = None # reset base_resource_loot state on login
