@@ -51470,7 +51470,10 @@ function handle_server_message(data) {
             var extra_spellargs = data[5];
             var log_item = {'spec': specname, 'stack': count};
             var log_target_pos = null;
-            var item_level = data[1]['item']['level'] || 1;
+            var item_level = 1;
+            if('item' in data[1] && 'level' in data[1]['item']) {
+                item_level = data[1]['item']['level'];
+            }
 
             if('use_effect' in spec) {
                 // check for null separately from checking if the effect exists so we can use a null effect
