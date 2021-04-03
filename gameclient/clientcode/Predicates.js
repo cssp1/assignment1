@@ -734,13 +734,12 @@ function EnhancementLevelPredicate(data) {
 }
 goog.inherits(EnhancementLevelPredicate, Predicate);
 EnhancementLevelPredicate.prototype.is_satisfied = function(player, qdata) {
-    var enh_satisfied = false;
-    session.for_each_real_object(function(obj) {
-        if(obj.team === 'player' && obj.is_building() && obj.enhancements && == this.enhancement in obj.enhancements) {
-            var enh_level = obj.enhancements[enh_tech['name']];
-            if(enh_level >= this.min_level && (this.max_level === -1 || enh_level <= this.max_level)) { enh_satisfied = true; }
+    if(session.for_each_real_object(function(obj) {
+        if(obj.team === 'player' && obj.is_building() && obj.enhancements && this.enhancement in obj.enhancements) {
+            var enh_level = obj.enhancements[this.enhancement];
+            if(enh_level >= this.min_level && (this.max_level === -1 || enh_level <= this.max_level)) { return true; }
         }
-    }
+    }, this)) { return true; }
     return false;
 };
 EnhancementLevelPredicate.prototype.do_ui_describe = function(player) {
