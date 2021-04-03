@@ -36421,7 +36421,7 @@ function crafting_dialog_select_recipe(dialog, rec) {
     if(recipe['crafting_category'] == 'mines' || recipe['crafting_category'] == 'ambushes') {
         crafting_dialog_select_recipe_grid_weapons(dialog, specname, recipe, recipe_level, recipe['crafting_category']);
     } else if(recipe['crafting_category'] == 'missiles') {
-        crafting_dialog_select_recipe_missiles(dialog, specname, recipe);
+        crafting_dialog_select_recipe_missiles(dialog, specname, recipe, recipe_level);
     } else if(recipe['crafting_category'] == 'leaders' || recipe['crafting_category'] == 'equips') {
         crafting_dialog_select_recipe_merge_items(dialog, specname, rec); // full dictionary, not recipe
     }
@@ -36500,13 +36500,14 @@ function crafting_dialog_select_recipe_grid_weapons(dialog, specname, recipe, re
 
 /** @param {SPUI.Dialog} dialog
     @param {string} specname
-    @param {!Object} recipe */
-function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) { // XXX does not handle recipe_level
+    @param {!Object} recipe
+    @param {number} recipe_level */
+function crafting_dialog_select_recipe_missiles(dialog, specname, recipe, recipe_level) {
     var product_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe);
     dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name_long(product_spec);
     dialog.widgets['description'].set_text_with_linebreaking(product_spec['ui_description']); // XXX overflow?
-    ItemDisplay.display_item(dialog.widgets['item'], {'spec':product_spec['name']}, {context_parent: dialog.parent});
-    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['item'].widgets['frame'], {'spec':product_spec['name']}, dialog.parent);
+    ItemDisplay.display_item(dialog.widgets['item'], {'spec':product_spec['name'], 'level': recipe_level}, {context_parent: dialog.parent});
+    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['item'].widgets['frame'], {'spec':product_spec['name'], 'level': recipe_level}, dialog.parent);
     dialog.widgets['item'].widgets['frame'].onclick = function(w) {
         if(w.parent.parent.parent) {
             var func = w.parent.parent.parent.user_data['on_use_recipe'];
@@ -36526,9 +36527,9 @@ function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) { // X
     }
 
     var stat_spec = product_spec;
-    var stat_level = product_spec['level'] || 1;
+    var stat_level = recipe_level || 1; //product_spec['level']
     var stat_spell = product_spell;
-    var stat_spell_level = 1;
+    var stat_spell_level = recipe_level || 1;
 
     for(var y = 0; y < dialog.data['widgets']['features']['array'][1]; y++) {
         for(var x = 0; x < dialog.data['widgets']['features']['array'][0]; x++) {
@@ -51456,6 +51457,7 @@ function handle_server_message(data) {
 
         if(index < player.inventory.length && player.inventory[index]['spec'] == specname) {
             var item = player.inventory[index];
+            var item_level = item['level'];
             if('pending' in item) {
                 delete item['pending'];
                 if('pending_action' in item) {
@@ -51468,6 +51470,7 @@ function handle_server_message(data) {
             var extra_spellargs = data[5];
             var log_item = {'spec': specname, 'stack': count};
             var log_target_pos = null;
+            var item_level = data[1]['item']['level'] || 1;
 
             if('use_effect' in spec) {
                 // check for null separately from checking if the effect exists so we can use a null effect
@@ -51485,6 +51488,7 @@ function handle_server_message(data) {
                     var use = uselist[m];
                     if('spellname' in use) {
                         var spell = gamedata['spells'][use['spellname']];
+                        var spell_level = item_level;
                         if(('code' in spell) && (spell['code'] == 'projectile_attack')) {
                             var target_loc = extra_spellargs[0], target_height = 0;
                             log_target_pos = target_loc;
@@ -51519,7 +51523,7 @@ function handle_server_message(data) {
                                                                                                    // since it won't be processed until next iteration
                                                                                                    world.combat_engine.cur_tick,
                                                                                                    0, null, -1,
-                                                                                                   spell['name'], 1, null,
+                                                                                                   spell['name'], spell_level, null,
                                                                                                    target_loc, target_height,
                                                                                                    interceptor ? interceptor.id : null));
                         }
