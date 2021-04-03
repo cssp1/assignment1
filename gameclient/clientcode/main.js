@@ -56403,6 +56403,9 @@ function draw_building_or_inert(world, obj, powerfac) {
             progress = 1;
             // ping server to see if it's been repaired
             if(/*obj.team === 'player' && */!obj.ping_sent) {
+                if(!obj.spec) {
+                    throw Error('draw_building_or_inert attempt to do repair_check ping on object without spec');
+                }
                 send_to_server.func(["PING_OBJECT", obj.id, "repair_check", obj.spec['ui_name']]);
                 obj.ping_sent = true;
             }
@@ -56412,6 +56415,9 @@ function draw_building_or_inert(world, obj, powerfac) {
             // if generator is using the power level that update with HP level, pings every time the current HP is at least 5% of max_hp higher than the last ping
             // this will max out the number of pings at 20x per generator per player, infrequent enough to prevent overwhelming traffic
             obj.last_ping_hp = obj.last_ui_hp;
+            if(!obj.spec) {
+                throw Error('draw_building_or_inert attempting to do power_repair_check ping on object without spec');
+            }
             send_to_server.func(["PING_OBJECT", obj.id, "power_repair_check", obj.spec['ui_name']]);
         }
         status_text.push(gamedata['strings']['cursors']['repairing']+': '+pretty_print_time(obj.repair_finish_time - server_time));
@@ -56440,6 +56446,18 @@ function draw_building_or_inert(world, obj, powerfac) {
             progress = obj.enhance_progress();
             if(progress >= 0 && (progress < 1 || obj.team == 'player')) {
                 // reuse researching text for enhancing
+                if(!obj.enhancing) {
+                    throw Error('draw_building_or_inert attempting to push enhancing name text for object without enhancing parameter');
+                }
+                if(!obj.enhancing['enhance']) {
+                    throw Error('draw_building_or_inert attempting to push enhancing name text for object without enhance parameter');
+                }
+                if(!obj.enhancing['enhance']['spec']) {
+                    throw Error('draw_building_or_inert attempting to push enhancing name text for object without spec parameter');
+                }
+                if(!gamedata['enhancements'][obj.enhancing['enhance']['spec']]) {
+                    throw Error('draw_building_or_inert: ' + obj.enhancing['enhance']['spec'] + ' missing from gamedata["enhance"]');
+                }
                 status_text.push(gamedata['strings']['cursors']['researching'].replace('%tech',gamedata['enhancements'][obj.enhancing['enhance']['spec']]['ui_name']).replace('%d', obj.enhancing['enhance']['level'].toString())+': ' + pretty_print_time(obj.enhance_time_left()));
             }
         } else if(obj.is_researching()) {
@@ -56447,6 +56465,9 @@ function draw_building_or_inert(world, obj, powerfac) {
             var current = ((obj.research_item in tech) ? tech[obj.research_item] : 0);
             progress = obj.research_progress();
             if(progress >= 0 && (progress < 1 || obj.team == 'player')) {
+                if(!obj.research_item) {
+                    throw Error('draw_building_or_inert attempting to push researching name text for object without research_item parameter');
+                }
                 status_text.push(gamedata['strings']['cursors']['researching'].replace('%tech',gamedata['tech'][obj.research_item]['ui_name']).replace('%d', (current+1).toString())+': '+ (session.enable_progress_timers ? pretty_print_time(obj.research_time_left()) : ' ...'));
             }
         } else if(obj.is_crafting()) {
@@ -56469,6 +56490,9 @@ function draw_building_or_inert(world, obj, powerfac) {
             var item = obj.manuf_queue[0];
             progress = obj.manuf_progress_one();
             if(progress < 1 || obj.team == 'player') {
+                if(!gamedata['units'][item['spec_name']]) {
+                    throw Error('draw_building_or_inert attempting to push manufacturing name text, but ' + item['spec_name'] + ' is missing from gamedata["units"]');
+                }
                 var s = gamedata['units'][item['spec_name']]['ui_name'];
                 if(obj.manuf_queue.length > 1) {
                     s += ' ... ';
@@ -56482,6 +56506,9 @@ function draw_building_or_inert(world, obj, powerfac) {
         progress = 1;
         // ping server to see if the action is finished
         if(obj.team === 'player' && !obj.ping_sent) {
+            if(!obj.spec) {
+                throw Error('draw_building_or_inert attempt to do action_check ping on object without spec');
+            }
             send_to_server.func(["PING_OBJECT", obj.id, "action_check", obj.spec['ui_name'], status_text.join('\n')]);
             obj.ping_sent = true;
         }
