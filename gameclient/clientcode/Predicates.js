@@ -724,6 +724,50 @@ TechLevelPredicate.prototype.do_ui_help = function(player) {
 };
 TechLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
+/** @constructor @struct
+  * @extends Predicate */
+function EnhancementLevelPredicate(data) {
+    goog.base(this, data);
+    this.enhancement = data['enhancement'];
+    this.min_level = data['min_level'];
+    this.max_level = ('max_level' in data ? data['max_level'] : -1);
+}
+goog.inherits(EnhancementLevelPredicate, Predicate);
+EnhancementLevelPredicate.prototype.is_satisfied = function(player, qdata) {
+    var enh_satisfied = false;
+    session.for_each_real_object(function(obj) {
+        if(obj.team === 'player' && obj.is_building() && obj.enhancements && == this.enhancement in obj.enhancements) {
+            var enh_level = obj.enhancements[enh_tech['name']];
+            if(enh_level >= this.min_level && (this.max_level === -1 || enh_level <= this.max_level)) { enh_satisfied = true; }
+        }
+    }
+    return false;
+};
+EnhancementLevelPredicate.prototype.do_ui_describe = function(player) {
+    var spec = gamedata['enhancements'][this.enhancement];
+    // do not return help for hidden techs
+    if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) {
+        return null;
+    }
+    var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
+    ret = ret.replace('%s', spec['ui_name']);
+    ret = ret.replace('%d', this.min_level.toString());
+    return new PredicateUIDescription(ret);
+};
+EnhancementLevelPredicate.prototype.do_ui_help = function(player) {
+    var spec = gamedata['enhancements'][this.enhancement];
+    // do not return help for hidden techs
+    if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) {
+        return null;
+    }
+    if(!this.is_satisfied(player, null)) {
+        return {'noun': 'enhancements', 'verb': 'research', 'target': this.enhancement,
+                'ui_arg_s': gamedata['enhancements'][this.enhancement]['ui_name'], 'ui_arg_d': this.min_level};
+    }
+    return null;
+};
+EnhancementLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
 // Certain operations will involve evaluating tons of predicates during a time when game state is guaranteed not to change.
 // (e.g., refreshing completion status of all quests, or updating the Store dialog)
 // For performance, optionally enable caches that work as long as game state does not change.
@@ -2417,6 +2461,7 @@ function read_predicate(data) {
     else if(kind === 'BUILDING_LEVEL') { return new BuildingLevelPredicate(data); }
     else if(kind === 'UNIT_QUANTITY') { return new UnitQuantityPredicate(data); }
     else if(kind === 'TECH_LEVEL') { return new TechLevelPredicate(data); }
+    else if(kind === 'ENHANCEMENT_LEVEL') { return new EnhancementLevelPredicate(data); }
     else if(kind === 'QUEST_COMPLETED') { return new QuestCompletedPredicate(data); }
     else if(kind === 'QUEST_ACTIVE') { return new QuestActivePredicate(data); }
     else if(kind === 'AURA_ACTIVE') { return new AuraActivePredicate(data); }
