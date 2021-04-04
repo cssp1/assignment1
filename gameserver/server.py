@@ -15709,7 +15709,7 @@ class LivePlayer(Player):
 
                 old_is_ladder = gamedata['regions'][old_region].get('ladder_pvp', gamedata.get('ladder_pvp', False))
                 new_is_ladder = self.my_home.base_region and gamedata['regions'][self.my_home.base_region].get('ladder_pvp', gamedata.get('ladder_pvp', False))
-                new_zero_points = self.my_home.base_region and gamedata['regions'][self.my_home.base_region].get('zero_points_on_entry', False) or Predicates.read_predicate(gamedata['regions'][self.my_home.base_region].get('zero_points_on_entry_if',{'predicate':'ALWAYS_FALSE'})).is_satisfied(self,None)
+                new_zero_points = self.my_home.base_region and (gamedata['regions'][self.my_home.base_region].get('zero_points_on_entry', False) or Predicates.read_predicate(gamedata['regions'][self.my_home.base_region].get('zero_points_on_entry_if',{'predicate':'ALWAYS_FALSE'})).is_satisfied(self,None))
 
                 if (old_is_ladder and (not new_is_ladder) and gamedata['matchmaking']['zero_points_on_ladder_exit']) or \
                    new_zero_points:
