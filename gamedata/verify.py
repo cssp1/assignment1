@@ -1972,7 +1972,7 @@ def check_cond_chain(chain, **kwargs):
 
 PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTORIAL_COMPLETE', 'ACCOUNT_CREATION_TIME',
                    'ALL_BUILDINGS_UNDAMAGED', 'OBJECT_UNDAMAGED', 'OBJECT_UNBUSY', 'BUILDING_DESTROYED', 'BUILDING_QUANTITY',
-                   'BUILDING_LEVEL', 'UNIT_QUANTITY', 'TECH_LEVEL', 'QUEST_COMPLETED', 'QUEST_ACTIVE', 'COOLDOWN_ACTIVE', 'COOLDOWN_INACTIVE',
+                   'BUILDING_LEVEL', 'UNIT_QUANTITY', 'TECH_LEVEL', 'ENHANCEMENT_LEVEL', 'QUEST_COMPLETED', 'QUEST_ACTIVE', 'COOLDOWN_ACTIVE', 'COOLDOWN_INACTIVE',
                    'ABTEST', 'ANY_ABTEST', 'RANDOM', 'LIBRARY', 'AI_BASE_ACTIVE', 'AI_BASE_SHOWN', 'PLAYER_HISTORY', 'GAMEDATA_VAR',
                    'RETAINED', 'TIME_IN_GAME', 'PLAYER_PREFERENCE',
                    'ATTACKS_LAUNCHED', 'ATTACKS_VICTORY', 'CONQUESTS', 'UNITS_MANUFACTURED', 'LOGGED_IN_TIMES',
@@ -2058,6 +2058,10 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             if not reason.startswith('units:'):
                 error |= 1
                 print '%s: %s predicate refers to disabled tech "%s"' % (reason, pred['predicate'], pred['tech'])
+    elif pred['predicate'] == 'ENHANCEMENT_LEVEL':
+        if pred.get('enhancement',None) not in gamedata['enhancements']:
+            error |= 1
+            print '%s: %s predicate refers to nonexistent enhancement "%s"' % (reason, pred['predicate'], pred.get('enhancement','MISSING'))
     elif pred['predicate'] in ('BUILDING_LEVEL','BUILDING_QUANTITY'):
         if pred['building_type'] not in gamedata['buildings']:
             error |= 1
