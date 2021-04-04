@@ -376,6 +376,21 @@ class TechLevelPredicate(Predicate):
         return (player.tech.get(self.tech,0) >= self.min_level) and \
                ((self.max_level < 0) or (player.tech.get(self.tech,0) <= self.max_level))
 
+class EnhancementLevelPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.enhancement = data['enhancement']
+        self.min_level = data['min_level']
+        self.max_level = data.get('max_level',-1)
+    def is_satisfied(self, player, qdata):
+        enh_satisfied = False
+        for obj in player.home_base_iter():
+            if obj.spec.kind == 'building':
+                enh_level = obj.enhancements.get(enh_name,0) if obj.enhancements else 0
+                if enh_level >= min_level and (self.max_level == -1 or enh_level <= max_level):
+                    enh_satisfied = True
+        return enh_satisfied
+
 class QuestActivePredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1113,6 +1128,7 @@ def read_predicate(data):
     elif kind == 'BUILDING_LEVEL': return BuildingLevelPredicate(data)
     elif kind == 'UNIT_QUANTITY': return UnitQuantityPredicate(data)
     elif kind == 'TECH_LEVEL': return TechLevelPredicate(data)
+    elif kind == 'ENHANCEMENT_LEVEL': return EnhancementLevelPredicate(data)
     elif kind == 'QUEST_COMPLETED': return QuestCompletedPredicate(data)
     elif kind == 'QUEST_ACTIVE': return QuestActivePredicate(data)
     elif kind == 'AURA_ACTIVE': return AuraActivePredicate(data)
