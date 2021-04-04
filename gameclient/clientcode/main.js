@@ -46268,6 +46268,7 @@ function update_upgrade_dialog(dialog) {
         if(unit.spec['enhancement_categories']) {
             for(var enh_name in gamedata['enhancements']) {
                 var enh_tech = gamedata['enhancements'][enh_name];
+                if(enh_tech['show_if'] && !read_predicate(enh_tech['show_if']).is_satisfied(player, null)) { continue; }
                 if(goog.array.contains(unit.spec['enhancement_categories'], enh_tech['enhancement_category'])) {
                     var stat = enh_tech['effects'][0]['stat'];
                     if(!goog.array.contains(feature_list, stat)) {
