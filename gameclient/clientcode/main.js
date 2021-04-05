@@ -38118,6 +38118,7 @@ function invoke_research_dialog(parent_category, newcategory, newpage) {
     var i = 0;
     var cat_list = goog.array.filter(gamedata['strings']['research_categories'][parent_category], function(entry) {
         if('show_if' in entry && !read_predicate(entry['show_if']).is_satisfied(player, null)) { return false; }
+        if('category_group' in entry && !goog.array.contains(entry['category_group'], newcategory)) { return false; } // do not display
         return !!get_lab_for(entry['name']);
     });
     var used = cat_list.length;
