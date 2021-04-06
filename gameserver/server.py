@@ -28844,9 +28844,15 @@ class GAMEAPI(resource.Resource):
             session.player.history['customer_support'].append(change_alias_log)
             if gamedata['strings'].get('notify_invalid_alias_reset_mail'):
                 session.player.mailbox_append(session.player.make_system_mail(gamedata['strings']['notify_invalid_alias_reset_mail'], replace_s = '%s' % old_ui_name))
-                gamesite.exception_log.event(server_time, 'Invalid alias, %s, detected for player ID %d. Reset alias to none and notified player via game message.' % (old_ui_name, session.player.user_id))
+                try:
+                    gamesite.exception_log.event(server_time, 'Invalid alias, %s, detected for player ID %d. Reset alias to none and notified player via game message.' % (old_ui_name, session.player.user_id))
+                except:
+                    gamesite.exception_log.event(server_time, 'Invalid alias detected for player ID %d. Reset alias to none and notified player via game message.' % session.player.user_id)
             else:
-                gamesite.exception_log.event(server_time, 'Invalid alias, %s, detected for player ID %d. Reset alias to none. Warning: player notification message not found in gamedata["strings"]["notify_invalid_alias_reset_mail"].' % (old_ui_name, session.player.user_id))
+                try:
+                    gamesite.exception_log.event(server_time, 'Invalid alias, %s, detected for player ID %d. Reset alias to none. Warning: player notification message not found in gamedata["strings"]["notify_invalid_alias_reset_mail"].' % (old_ui_name, session.player.user_id))
+                except:
+                    gamesite.exception_log.event(server_time, 'Invalid alias detected for player ID %d. Reset alias to none. Warning: player notification message not found in gamedata["strings"]["notify_invalid_alias_reset_mail"].' % session.player.user_id)
             metric_event_coded(session.player.user_id, '0992_invalid_alias_reset', {'alias': session.player.alias,
                                                                                     'receipts': session.player.history.get('money_spent', 0.00)})
 
