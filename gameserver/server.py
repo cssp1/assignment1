@@ -31,6 +31,7 @@ from twisted.protocols.policies import ProtocolWrapper
 import twisted.internet.utils
 from twisted.web import server, resource, http
 import twisted.web.error
+import BHAPI
 
 # handle different Twisted versions that moved NoResource around
 if hasattr(twisted.web.resource, 'NoResource'):
@@ -28849,6 +28850,10 @@ class GAMEAPI(resource.Resource):
             metric_event_coded(session.player.user_id, '0992_invalid_alias_reset', {'alias': session.player.alias,
                                                                                     'receipts': session.player.history.get('money_spent', 0.00)})
 
+        if session.player.frame_platform == 'bh' and session.player.history.get('money_spent', 0.00) > 0.00:
+            bh_id = session.user.social_id.replace('bh','')
+            update_bh_user_spend(bh_id, session.player.history['money_spent'], session.player.user_id)
+
         if session.player.is_on_map():
             assert session.player.home_region and (session.player.my_home.base_region == session.player.home_region)
 
@@ -34765,6 +34770,14 @@ def main():
     finally:
         # remove PID file
         os.unlink(pidfile)
+
+def update_bh_user_spend(bh_id, money_spent, user_id):
+    if bh_id and BHAPI.supported():
+        result = BHAPI.BHAPI('/update_money_spent/', args = {'user_id':bh_id,'money_spent':money_spent})
+        if not result.get('result', False) or result['result'] != 'ok':
+            gamesite.exception_log.event(server_time, 'Sent updated spend for player %d, got back invalid result %s.' % (user_id, str(result)))
+    else:
+        gamesite.exception_log.event(server_time, 'Tried to send updated spend for player %d, but got BHAPI configuration error.' % (user_id))
 
 if __name__ == '__main__':
     main()
