@@ -2250,7 +2250,7 @@ def check_logic(log, reason = '', context = None):
     return error
 
 CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
-                        'PLAYER_HISTORY', 'GIVE_LOOT', 'SESSION_LOOT', 'GIVE_TROPHIES', 'GIVE_TECH', 'APPLY_AURA', 'REMOVE_AURA', 'COOLDOWN_TRIGGER', 'COOLDOWN_TRIGGER', 'COOLDOWN_RESET',
+                        'PLAYER_HISTORY', 'GIVE_LOOT', 'SESSION_LOOT', 'GIVE_TROPHIES', 'GIVE_TECH', 'GIVE_ENHANCEMENT', 'APPLY_AURA', 'REMOVE_AURA', 'COOLDOWN_TRIGGER', 'COOLDOWN_TRIGGER', 'COOLDOWN_RESET',
                         'METRIC_EVENT', 'SPAWN_SECURITY_TEAM', 'CHAT_SEND', 'FIND_AND_REPLACE_ITEMS', 'FIND_AND_REPLACE_OBJECTS',
                         'VISIT_BASE', 'DISPLAY_MESSAGE', 'MESSAGE_BOX', 'TUTORIAL_ARROW', 'INVOKE_MAP_DIALOG', 'INVOKE_LEADERBOARD_DIALOG', 'INVOKE_SKILL_CHALLENGE_STANDINGS_DIALOG', 'START_AI_ATTACK',
                         'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG', 'INVOKE_MISSIONS_DIALOG', 'INVOKE_MAIL_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_UPGRADE_DIALOG', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_LOTTERY_DIALOG', 'INVOKE_MANUFACTURE_DIALOG',
@@ -2415,6 +2415,13 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
             level = cons.get('tech_level',1)
             if level < 1 or level > len(gamedata['tech'][cons['tech_name']][GameDataUtil.MAX_LEVEL_FIELD['tech']]):
                 error |= 1; print '%s: %s consequent gives "%s" L%d which is greater than its max level' % (reason, cons['consequent'], cons['tech_name'], cons['tech_level'])
+    elif cons['consequent'] == 'GIVE_ENHANCEMENT':
+        if cons['enhancement_name'] not in gamedata['enhancements']:
+            error |= 1; print '%s: %s consequent refers to nonexistent enhancement "%s"' % (reason, cons['consequent'], cons['enhancement_name'])
+        else:
+            level = cons.get('enhancement_level',1)
+            if level < 1 or level > len(gamedata['enhancements'][cons['enhancement_name']][GameDataUtil.MAX_LEVEL_FIELD['enhancements']]):
+                error |= 1; print '%s: %s consequent gives "%s" L%d which is greater than its max level' % (reason, cons['consequent'], cons['tech_name'], cons['enhancement_level'])
     elif cons['consequent'] == 'OPEN_URL':
         error |= check_url(cons['url'], reason = reason)
     elif cons['consequent'] == 'GIVE_TROPHIES':
