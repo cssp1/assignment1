@@ -941,6 +941,6 @@ def read_consequent(data):
         raise Exception('unknown consequent '+kind)
 
 def get_leveled_quantity(qty, level):
-    if type(qty) == list:
+    if isinstance(qty, list):
         return qty[level-1]
     return qty
