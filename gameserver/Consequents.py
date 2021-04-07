@@ -317,6 +317,23 @@ class GiveTechConsequent(Consequent):
     def execute(self, session, player, retmsg, context=None):
         session.give_tech(player, retmsg, self.tech_name, self.level, None, 'give_tech', give_xp = self.give_xp)
 
+class GiveEnhancementConsequent(Consequent):
+    def __init__(self, data):
+        Consequent.__init__(self, data)
+        self.enhancement_name = data['enhancement_name']
+        self.level = data.get('enhancement_level', 1)
+        self.give_to_all = bool(data.get('give_to_all', True)) # optionally only give to first building of this type
+        self.give_xp = bool(data.get('give_xp', True))
+    def execute(self, session, player, retmsg, context=None):
+        enhancement = gamedata['enhancements'][self.enhancement_name]
+        building_name = enhancement['enhancement_category']
+        building_min_level = get_leveled_quantity(enhancement.get('min_host_level',1), self.level)
+        for obj in player.home_base_iter():
+            if obj.spec.kind == "building" and obj.spec.name == building_name and obj.level >= building_min_level:
+                session.give_enhancement(player, retmsg, obj, self.enhancement_name, self.level, 'give_enhancement', give_xp = self.give_xp)
+                if not self.give_to_all:
+                    break
+
 class GiveLootConsequent(Consequent):
     def __init__(self, data):
         Consequent.__init__(self, data)
@@ -893,6 +910,7 @@ def read_consequent(data):
     elif kind == 'TAKE_UNITS': return TakeUnitsConsequent(data)
     elif kind == 'TAKE_ITEMS': return TakeItemsConsequent(data)
     elif kind == 'GIVE_TECH': return GiveTechConsequent(data)
+    elif kind == 'GIVE_ENHANCEMENT': return GiveEnhancementConsequent(data)
     elif kind == 'GIVE_LOOT': return GiveLootConsequent(data)
     elif kind == 'GIVE_TROPHIES': return GiveTrophiesConsequent(data)
     elif kind == 'APPLY_AURA': return ApplyAuraConsequent(data)
@@ -921,3 +939,8 @@ def read_consequent(data):
                   ): return ClientConsequent(data)
     else:
         raise Exception('unknown consequent '+kind)
+
+def get_leveled_quantity(qty, level):
+    if isinstance(qty, list):
+        return qty[level-1]
+    return qty
