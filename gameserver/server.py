@@ -28857,8 +28857,9 @@ class GAMEAPI(resource.Resource):
                                                                                     'receipts': session.player.history.get('money_spent', 0.00)})
 
         if session.player.frame_platform == 'bh' and session.player.history.get('money_spent', 0.00) > 0.00:
-            bh_id = session.user.social_id.replace('bh','')
-            update_bh_user_spend(bh_id, session.player.history['money_spent'], session.player.user_id)
+            bh_id = session.user.bh_id
+            bh_token = session.user.bh_auth_token
+            update_bh_user_spend(bh_id, session.player.history['money_spent'], session.player.user_id, bh_token)
 
         if session.player.is_on_map():
             assert session.player.home_region and (session.player.my_home.base_region == session.player.home_region)
@@ -34777,13 +34778,21 @@ def main():
         # remove PID file
         os.unlink(pidfile)
 
-def update_bh_user_spend(bh_id, money_spent, user_id):
-    if bh_id and BHAPI.supported():
-        result = BHAPI.BHAPI('/update_money_spent/', args = {'user_id':bh_id,'money_spent':money_spent})
-        if not result.get('result', False) or result['result'] != 'ok':
-            gamesite.exception_log.event(server_time, 'Sent updated spend for player %d, got back invalid result %s.' % (user_id, str(result)))
+def update_bh_user_spend(bh_id, money_spent, user_id, bh_token):
+    d = make_deferred('update_bh_user_spend')
+    gamesite.AsyncHTTP_Battlehouse.queue_request(server_time,
+                                                 SpinConfig.config['battlehouse_api_path']+('/user/%s/update_money_spent/' % bh_id),
+                                                 lambda result, _session=session, _d=d: update_bh_user_spend_complete(_session, _d, _user_id, result),
+                                                 headers = {'Authorization': 'Bearer ' + bh_token,
+                                                            'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
+
+def update_bh_user_spend_complete(self, session, d, user_id, result):
+    data = SpinJSON.loads(result)
+    if not data.get('result', False) or data['result'] != 'ok':
+        gamesite.exception_log.event(server_time, 'Sent updated spend for player %d, got back invalid result %s.' % (user_id, str(result)))
     else:
         gamesite.exception_log.event(server_time, 'Tried to send updated spend for player %d, but got BHAPI configuration error.' % (user_id))
+    d.callback(True)
 
 if __name__ == '__main__':
     main()
