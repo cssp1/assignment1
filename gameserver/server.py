@@ -31,7 +31,6 @@ from twisted.protocols.policies import ProtocolWrapper
 import twisted.internet.utils
 from twisted.web import server, resource, http
 import twisted.web.error
-import BHAPI
 
 # handle different Twisted versions that moved NoResource around
 if hasattr(twisted.web.resource, 'NoResource'):
@@ -34782,16 +34781,14 @@ def update_bh_user_spend(bh_id, money_spent, user_id, bh_token):
     d = make_deferred('update_bh_user_spend')
     gamesite.AsyncHTTP_Battlehouse.queue_request(server_time,
                                                  SpinConfig.config['battlehouse_api_path']+('/user/%s/update_money_spent/' % bh_id) + '?service=' + SpinConfig.game(),
-                                                 lambda result, _session=session, _d=d: update_bh_user_spend_complete(_session, _d, _user_id, result),
+                                                 lambda result, _session=session, _d=d, _user_id=user_id: update_bh_user_spend_complete(_session, _d, _user_id, result),
                                                  headers = {'Authorization': 'Bearer ' + bh_token,
                                                             'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
 
 def update_bh_user_spend_complete(self, session, d, user_id, result):
     data = SpinJSON.loads(result)
-    if not data.get('result', False) or data['result'] != 'ok':
+    if data.get('result') != 'ok':
         gamesite.exception_log.event(server_time, 'Sent updated spend for player %d, got back invalid result %s.' % (user_id, str(result)))
-    else:
-        gamesite.exception_log.event(server_time, 'Tried to send updated spend for player %d, but got BHAPI configuration error.' % (user_id))
     d.callback(True)
 
 if __name__ == '__main__':
