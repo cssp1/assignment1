@@ -2438,6 +2438,21 @@ ClientVersionPredicate.prototype.ui_time_range = function(player) { return [-1,-
     Never relevant mentioning this to the player. */
 ClientVersionPredicate.prototype.do_ui_describe = function(player) { return null; };
 
+/** @constructor @struct
+  * @extends Predicate */
+function HasAltsPredicate(data) {
+    goog.base(this, data);
+}
+goog.inherits(ClientVersionPredicate, Predicate);
+ClientVersionPredicate.prototype.is_satisfied = function(player, qdata) {
+    return player.has_alts;
+};
+/** @override */
+ClientVersionPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+/** @override
+    Never relevant mentioning this to the player. */
+ClientVersionPredicate.prototype.do_ui_describe = function(player) { return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']); };
+
 /** @param {!Object} data
     @return {!Predicate} */
 function read_predicate(data) {
@@ -2610,6 +2625,8 @@ function read_predicate(data) {
         return new ClientVendorPredicate(data);
     } else if (kind === 'CLIENT_VERSION') {
         return new ClientVersionPredicate(data);
+    } else if (kind === 'HAS_ALTS') {
+        return new HasAltsPredicate(data);
     } else {
         throw Error('unknown predicate '+JSON.stringify(data));
     }
