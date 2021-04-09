@@ -2443,15 +2443,15 @@ ClientVersionPredicate.prototype.do_ui_describe = function(player) { return null
 function HasAltsPredicate(data) {
     goog.base(this, data);
 }
-goog.inherits(ClientVersionPredicate, Predicate);
-ClientVersionPredicate.prototype.is_satisfied = function(player, qdata) {
+goog.inherits(HasAltsPredicate, Predicate);
+HasAltsPredicate.prototype.is_satisfied = function(player, qdata) {
     return player.has_alts;
 };
 /** @override */
-ClientVersionPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+HasAltsPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 /** @override
     Never relevant mentioning this to the player. */
-ClientVersionPredicate.prototype.do_ui_describe = function(player) { return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']); };
+HasAltsPredicate.prototype.do_ui_describe = function(player) { return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']); };
 
 /** @param {!Object} data
     @return {!Predicate} */
