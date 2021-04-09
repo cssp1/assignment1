@@ -30,6 +30,9 @@ time_unit_table = {
     'd': 'Day', 'h': 'Hour', 'm': 'Min', 's': 'Sec'
 }
 
+ALT_MIN_LOGINS = 5
+ALT_IGNORE_AGE = 7*86400
+
 def do_pretty_print_time_unit(qty, abbrev, spell_it):
     if spell_it:
         u = time_unit_table[abbrev]
@@ -709,11 +712,11 @@ if __name__ == '__main__':
             total_alts_banned = 0
             for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                                      key = lambda id_entry: -id_entry[1].get('logins',1)):
-                if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) == 0:
+                if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) < ALT_MIN_LOGINS:
                     continue
                 if entry.get('ignore',False): # marked non-alt
                     continue
-                if 'last_login' in entry and entry['last_login'] < (time_now - 90*86400):
+                if 'last_login' in entry and entry['last_login'] < (time_now - ALT_IGNORE_AGE):
                     continue
                 try:
                     if use_controlapi:
@@ -834,15 +837,12 @@ if __name__ == '__main__':
             print fmt % ('Known game alt accounts:', '')
             for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                                      key = lambda id_entry: -id_entry[1].get('logins',1)):
-                if private_ip_re.match(entry.get('last_ip', 'Unknown')):
+                if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins', 0) < ALT_MIN_LOGINS:
                     continue # invalid entry
-                if entry.get('logins',0) == 0:
-                    continue # ignore
                 if entry.get('ignore', False): # marked non-alt
                     print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt)' % (int(s_other_id)))
                     continue
-                if 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and entry.get('logins',1) < 100:
-                    # ignore logins more than 90d ago if there are fewer than 100 logins
+                if 'last_login' in entry and entry['last_login'] < (time_now - ALT_IGNORE_AGE):
                     continue
                 if entry.get('last_ip'):
                     ui_last_ip = entry['last_ip']
