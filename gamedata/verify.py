@@ -20,6 +20,15 @@ except ImportError:
     print 'pyxDamerauLevenshtein module not found - install this if you want typo-checking'
     pass
 
+# use the MatPlotLib to detect building overlapping
+has_matplotlib = False
+try:
+    import matplotlib.path as mpltPath
+    has_matplotlib = True
+except ImportError:
+    print 'matplotlip module not found - install this if you want to check for building overlap in AI bases'
+    pass
+
 time_now = int(time.time())
 gamedata = None
 verbose = False
@@ -3013,6 +3022,62 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
 
                     if base_type != 'quarry' and has_exotic_resource and ('base_resource_loot' not in base):
                         error |= 1; print 'ERROR: AI base %s has a %s that will drop exotic resource "%s" loot. It should be using "base_resource_loot" instead of the old loot system' % (strid, has_exotic_resource[0], has_exotic_resource[1])
+
+                elif KIND == 'buildings' and has_matplotlib:
+                    if item['spec'] in ('%RESOURCE_harvester'):
+                        if gamedata['game_id'] in ('dv', 'tr', 'fs', 'eg'):
+                            spec = gamedata['buildings']['supply_yard']
+                        elif gamedata['game_id'] in ('mf', 'mf2', 'bfm'):
+                            spec = gamedata['buildings']['iron_harvester']
+                        elif gamedata['game_id'] in ('sg'):
+                            spec = gamedata['buildings']['sawmill']
+                    else:
+                        spec = gamedata['buildings'][item['spec']]
+                    pos = item['xy']
+                    item_grid = []
+                    if spec['gridsize'] != [1,1]:
+                        item_grid.append([(pos[0] + (spec['gridsize'][0] / 2)), (pos[1] - (spec['gridsize'][1] / 2))])
+                        item_grid.append([(pos[0] + (spec['gridsize'][0] / 2)), (pos[1] + (spec['gridsize'][1] / 2))])
+                        item_grid.append([(pos[0] - (spec['gridsize'][0] / 2)), (pos[1] - (spec['gridsize'][1] / 2))])
+                        item_grid.append([(pos[0] - (spec['gridsize'][0] / 2)), (pos[1] + (spec['gridsize'][1] / 2))])
+                    else:
+                        item_grid.append(pos)
+                    polygon = item_grid
+                    path = mpltPath.Path(polygon)
+                    for object_type in ('scenery', 'buildings'):
+                        if object_type in base:
+                            for object in base[object_type]:
+                                if object['spec'] in ('%RESOURCE_harvester'):
+                                    if gamedata['game_id'] in ('dv', 'tr', 'fs', 'eg'):
+                                        obj_spec = gamedata['buildings']['supply_yard']
+                                    elif gamedata['game_id'] in ('mf', 'mf2', 'bfm'):
+                                        obj_spec = gamedata['buildings']['iron_harvester']
+                                    elif gamedata['game_id'] in ('sg'):
+                                        obj_spec = gamedata['buildings']['sawmill']
+                                elif 'scenery_quarry_%RESOURCE' in object['spec']:
+                                    if gamedata['game_id'] in ('mf', 'mf2', 'bfm'):
+                                        obj_spec = gamedata['inert'][object['spec'].replace('%RESOURCE', 'iron')]
+                                else:
+                                    obj_spec = gamedata['inert' if object_type == 'scenery' else 'buildings'][object['spec']]
+                                if 'auto_spawn' in obj_spec or ('unit_collision_gridsize' in obj_spec and obj_spec['unit_collision_gridsize'] == [0,0] and obj_spec['name'] not in ('minefield','ambush_point')): continue
+                                if object['xy'] == item['xy']: continue
+                                obj_pos = object['xy']
+                                obj_grid = []
+                                if obj_spec['gridsize'] != [1,1]:
+                                    x_min = obj_pos[0] - (obj_spec['gridsize'][0] / 2)
+                                    x_max = obj_pos[0] + (obj_spec['gridsize'][0] / 2)
+                                    y_min = obj_pos[1] - (obj_spec['gridsize'][1] / 2)
+                                    y_max = obj_pos[0] + (obj_spec['gridsize'][0] / 2)
+                                    for i in range (x_min, x_max):
+                                        for j in range (y_min, y_max):
+                                            obj_grid.append([i,j])
+                                else:
+                                    obj_grid.append(obj_pos)
+                                detected_colision = False
+                                for grid in obj_grid:
+                                    if path.contains_points([grid]) and not detected_colision:
+                                        print 'WARNING: AI base %s has a %s at xy %s that intersects with a %s at xy %s' % (strid, spec['name'], str(pos), obj_spec['name'], str(obj_pos))
+                                        detected_colision = True
 
                 elif KIND == 'units':
                     max_level = len(gamedata['units'][item['spec']]['max_hp'])
