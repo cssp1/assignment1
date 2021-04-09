@@ -27,6 +27,9 @@ time_now = int(time.time())
 # generic parameters for flot time graphs
 time_axis_params = {'mode':'time', 'timeformat': '%b %d %H:00', 'minTickSize': [1, "hour"]}
 
+ALT_MIN_LOGINS = 5
+ALT_IGNORE_AGE = 7*86400
+
 # this file assumes JSON decoding on raw CONTROLAPI calls
 def do_CONTROLAPI(*args, **kwargs): return SpinJSON.loads(ControlAPI.CONTROLAPI_raw(*args, **kwargs))
 def do_CONTROLAPI_checked(*args, **kwargs): return ControlAPI.CONTROLAPI(*args, **kwargs)
@@ -95,13 +98,13 @@ def get_alt_set(user_id, alt_set, aggressive):
     player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': user_id})['result'])
     for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                              key = lambda id_entry: -id_entry[1].get('logins',1)):
-        if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) == 0:
+        if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins', 0) < ALT_MIN_LOGINS:
             continue
         # don't include non-alts approved by customer support
         if entry.get('ignore',False):
             continue
-        # ignore alts that haven't logged in for 90+ days unless the aggressive check-mark is checked
-        if entry.get('logins',1) < 100 and 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and not aggressive:
+        # ignore alts that haven't logged in since the ALT_IGNORE_AGE days unless the aggressive check-mark is checked
+        if 'last_login' in entry and entry['last_login'] < (time_now - ALT_IGNORE_AGE) and not aggressive:
             continue
         other_id = int(s_other_id)
         if other_id not in alt_set:
@@ -112,13 +115,13 @@ def get_alt_set_recursive(user_id, alt_set, aggressive):
     player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': user_id})['result'])
     for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                              key = lambda id_entry: -id_entry[1].get('logins',1)):
-        if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) == 0:
+        if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins', 0) < ALT_MIN_LOGINS:
             continue
         # don't include non-alts approved by customer support
         if entry.get('ignore',False):
             continue
         # ignore alts that haven't logged in for 90+ days unless the aggressive check-mark is checked
-        if entry.get('logins',1) < 100 and 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and not aggressive:
+        if 'last_login' in entry and entry['last_login'] < (time_now - ALT_IGNORE_AGE) and not aggressive:
             continue
         other_id = int(s_other_id)
         if other_id not in alt_set:
