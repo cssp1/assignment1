@@ -34781,11 +34781,11 @@ def update_bh_user_spend(bh_id, money_spent, user_id, bh_token):
     d = make_deferred('update_bh_user_spend')
     gamesite.AsyncHTTP_Battlehouse.queue_request(server_time,
                                                  SpinConfig.config['battlehouse_api_path']+('/user/%s/update_money_spent/' % bh_id) + '?service=' + SpinConfig.game(),
-                                                 lambda result, _session=session, _d=d, _user_id=user_id: update_bh_user_spend_complete(_session, _d, _user_id, result),
+                                                 lambda result, _d=d, _user_id=user_id: update_bh_user_spend_complete(_d, _user_id, result),
                                                  headers = {'Authorization': 'Bearer ' + bh_token,
                                                             'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
 
-def update_bh_user_spend_complete(self, session, d, user_id, result):
+def update_bh_user_spend_complete(self, d, user_id, result):
     data = SpinJSON.loads(result)
     if data.get('result') != 'ok':
         gamesite.exception_log.event(server_time, 'Sent updated spend for player %d, got back invalid result %s.' % (user_id, str(result)))
