@@ -28871,6 +28871,11 @@ class GAMEAPI(resource.Resource):
             metric_event_coded(session.player.user_id, '0992_invalid_alias_reset', {'alias': session.player.alias,
                                                                                     'receipts': session.player.history.get('money_spent', 0.00)})
 
+        if session.player.frame_platform == 'bh' and session.player.history.get('money_spent', 0.00) > 0.00:
+            bh_id = session.user.bh_id
+            bh_token = session.user.bh_auth_token
+            update_bh_user_spend(bh_id, session.player.history['money_spent'], session.player.user_id, bh_token)
+
         if session.player.is_on_map():
             assert session.player.home_region and (session.player.my_home.base_region == session.player.home_region)
 
@@ -34787,6 +34792,20 @@ def main():
     finally:
         # remove PID file
         os.unlink(pidfile)
+
+def update_bh_user_spend(bh_id, money_spent, user_id, bh_token):
+    d = make_deferred('update_bh_user_spend')
+    gamesite.AsyncHTTP_Battlehouse.queue_request(server_time,
+                                                 SpinConfig.config['battlehouse_api_path']+('/user/%s/update_money_spent/' % bh_id) + '?service=' + SpinConfig.game(),
+                                                 lambda result, _session=session, _d=d, _user_id=user_id: update_bh_user_spend_complete(_session, _d, _user_id, result),
+                                                 headers = {'Authorization': 'Bearer ' + bh_token,
+                                                            'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
+
+def update_bh_user_spend_complete(self, session, d, user_id, result):
+    data = SpinJSON.loads(result)
+    if data.get('result') != 'ok':
+        gamesite.exception_log.event(server_time, 'Sent updated spend for player %d, got back invalid result %s.' % (user_id, str(result)))
+    d.callback(True)
 
 if __name__ == '__main__':
     main()
