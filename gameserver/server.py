@@ -9710,7 +9710,6 @@ class Player(AbstractPlayer):
         # list of {'obj_id':xxx,'original_hp':xxx,'res':xxx,'finish_time':xxx}
         self.unit_repair_queue = []
 
-        self.has_alts = False;
 
         self.resources = ResourceState(self)
 
@@ -9897,6 +9896,19 @@ class Player(AbstractPlayer):
         else:
             return 'human'
     def is_developer(self): return bool(self.developer) # use our copy of the usertable field
+
+    def has_alts(self):
+        alt_min_logins = gamedata['server'].get('alt_min_logins', 5) # default to 5 logins for an alt to be considered
+        alt_ignore_age = gamedata['server'].get('alt_ignore_age', 7*86400) # default to alts in the last 7 days
+        alt_ignore_how_many = gamedata['server'].get('alt_ignore_how_many', 0) # optionally allow server to ignore up to an arbitrary number of alts
+        for s_other_id, entry in sorted(session.player['known_alt_accounts'].iteritems(),
+                                        key = lambda id_entry: -id_entry[1].get('logins',1)):
+            if SpinHTTP.private_ip_re.match(entry.get('last_ip', 'Unknown')): continue
+            if entry.get('logins', 0) < alt_min_logins: continue
+            if entry.get('ignore',False): continue
+            if entry.get('last_login', server_time) < (server_time - alt_ignore_age): continue
+            total_alts += 1
+        return total_alts > alt_ignore_how_many
 
     def squad_base_id(self, squad_id): return 's%d_%d' % (self.user_id, squad_id)
     def squad_is_deployed(self, squad_id):
@@ -28820,19 +28832,7 @@ class GAMEAPI(resource.Resource):
         if show_battle_history:
             retmsg.append(["SHOW_BATTLE_HISTORY"])
 
-        session.player.has_alts = False;
-        alt_min_logins = gamedata['server'].get('alt_min_logins', 5) # default to 5 logins for an alt to be considered
-        alt_ignore_age = gamedata['server'].get('alt_ignore_age', 7*86400) # default to alts in the last 7 days
-        total_alts = 0
-        for s_other_id, entry in sorted(session.player['known_alt_accounts'].iteritems(),
-                                        key = lambda id_entry: -id_entry[1].get('logins',1)):
-            if SpinHTTP.private_ip_re.match(entry.get('last_ip', 'Unknown')): continue
-            if entry.get('logins', 0) < alt_min_logins: continue
-            if entry.get('ignore',False): continue
-            if entry.get('last_login', server_time) < (server_time - alt_ignore_age): continue
-            total_alts += 1
-        session.player.has_alts = total_alts > 0
-        retmsg.append(["HAS_ALTS_UPDATE", session.player.has_alts])
+        retmsg.append(["HAS_ALTS_UPDATE", session.player.has_alts()])
 
         if session.player.alias and not is_valid_alias(session.player.alias):
             metric_event_coded(session.player.user_id, '0990_invalid_alias_detected', {'alias': session.player.alias,

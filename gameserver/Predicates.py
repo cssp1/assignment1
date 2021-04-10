@@ -69,7 +69,7 @@ class HasAltsPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
     def is_satisfied(self, player, qdata):
-        return player.has_alts
+        return player.has_alts()
 
 class RandomPredicate(Predicate):
     def __init__(self, data):
