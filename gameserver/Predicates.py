@@ -65,6 +65,12 @@ class ClientVersionPredicate(Predicate):
         else:
             raise Exception('unknown method '+ self.method)
 
+class HasAltsPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+    def is_satisfied(self, player, qdata):
+        return player.has_alts()
+
 class RandomPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1254,6 +1260,8 @@ def read_predicate(data):
         return ClientVendorPredicate(data)
     elif kind == 'CLIENT_VERSION':
         return ClientVersionPredicate(data)
+    elif kind == 'HAS_ALTS':
+        return HasAltsPredicate(data)
     elif kind == 'OBJECT_OWNERSHIP':
         return ObjectOwnershipPredicate(data)
     raise Exception('unknown predicate %s' % repr(data))

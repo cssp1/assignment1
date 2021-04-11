@@ -6763,6 +6763,7 @@ player.tutorial_state = 'START';
 player.tutorial_hold = false; // stop tutorial temporarily, e.g. for replay on first visit
 
 player.unit_repair_queue = [];
+player.has_alts = false;
 player.tech = {};
 player.unit_equipment = {};
 player.player_auras = [];
@@ -34086,6 +34087,10 @@ function receive_unit_repair_update(data) {
     apply_unit_repair_update();
 }
 
+function receive_has_alts_update(data) {
+    player.has_alts = data;
+}
+
 // propagate finish times on to individual objects
 function apply_unit_repair_update() {
     session.for_each_real_object(function(obj) {
@@ -52525,6 +52530,8 @@ function handle_server_message(data) {
         }
     } else if(msg == "UNIT_REPAIR_UPDATE") {
         receive_unit_repair_update(data[1]);
+    } else if(msg == "HAS_ALTS_UPDATE") {
+        receive_has_alts_update(data[1]);
     } else if(msg == "SERVER_MAINTENANCE_WARNING") {
         var s = gamedata['strings']['server_going_down_short'];
         invoke_child_message_dialog(s['ui_title'], s['ui_description'], {'dialog': s['dialog']});
