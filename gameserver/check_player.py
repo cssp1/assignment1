@@ -14,7 +14,7 @@ import SpinJSON
 import SpinS3
 import ControlAPI
 import BHAPI
-from spinlibs.SpinHTTP import private_ip_re
+from spinlibs.SpinHTTP import is_private_ip
 import os
 
 def do_CONTROLAPI(args): return ControlAPI.CONTROLAPI(args, 'check_player.py')
@@ -287,6 +287,18 @@ def get_prior_violations(player, oldest_violation = 0):
         if entry['method'].upper() == 'TRIGGER_COOLDOWN' and 'args' in entry and entry['args'].get('name') == "vpn_login_violation":
             result['vpn_violations'] += 1
     return result
+
+def is_known_alt_valid(entry):
+    # check an entry from player['known_alt_accounts'] against the alt detection criteria
+    if is_private_ip(entry.get('last_ip', 'Unknown')):
+        return False # private IP address; this is probably a technical issue on our end, not an alt
+    if entry.get('logins',0) < ALT_MIN_LOGINS:
+        return False # number of logins is too low to matter
+    if entry.get('ignore',False):
+        return False # this was manually marked as "not an alt"
+    if 'last_login' in entry and entry['last_login'] < (time_now - ALT_IGNORE_AGE):
+        return False # last simultaneous login was too long ago to matter
+    return True # yes, this is considered an alt
 
 # main program
 if __name__ == '__main__':
@@ -712,18 +724,16 @@ if __name__ == '__main__':
             total_alts_banned = 0
             for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                                      key = lambda id_entry: -id_entry[1].get('logins',1)):
-                if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins',0) < ALT_MIN_LOGINS:
+                if not is_known_alt_valid(entry):
                     continue
-                if entry.get('ignore',False): # marked non-alt
-                    continue
-                if 'last_login' in entry and entry['last_login'] < (time_now - ALT_IGNORE_AGE):
-                    continue
+                other_id = int(s_other_id)
+
                 try:
                     if use_controlapi:
                         # requesting "stringify" is faster in the logged-out case (since the server doesn't parse/unparse) and probably same speed in logged-in case
-                        alt_player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': s_other_id}))
+                        alt_player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': other_id}))
                     else:
-                        alt_player = SpinJSON.loads(driver.sync_download_player(s_other_id))
+                        alt_player = SpinJSON.loads(driver.sync_download_player(other_id))
                 except Exception as e:
                     # don't worry about error handling for reading alts, just ignore this alt's violation history and continue
                     continue
@@ -837,13 +847,13 @@ if __name__ == '__main__':
             print fmt % ('Known game alt accounts:', '')
             for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                                      key = lambda id_entry: -id_entry[1].get('logins',1)):
-                if private_ip_re.match(entry.get('last_ip', 'Unknown')) or entry.get('logins', 0) < ALT_MIN_LOGINS:
-                    continue # invalid entry
                 if entry.get('ignore', False): # marked non-alt
-                    print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt)' % (int(s_other_id)))
+                    print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt)' % other_id)
+                    continue # manually ignored
+                if not is_known_alt_valid(entry):
                     continue
-                if 'last_login' in entry and entry['last_login'] < (time_now - ALT_IGNORE_AGE):
-                    continue
+                other_id = int(s_other_id)
+
                 if entry.get('last_ip'):
                     ui_last_ip = entry['last_ip']
                     ip_rep = get_ip_reputation(entry['last_ip']) if do_check_ip_reputation else None
@@ -855,23 +865,26 @@ if __name__ == '__main__':
                 try:
                     if use_controlapi:
                         # requesting "stringify" is faster in the logged-out case (since the server doesn't parse/unparse) and probably same speed in logged-in case
-                        alt_player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': s_other_id}))
+                        alt_player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': other_id}))
                     else:
-                        alt_player = SpinJSON.loads(driver.sync_download_player(s_other_id))
+                        alt_player = SpinJSON.loads(driver.sync_download_player(other_id))
                     violation_history = get_prior_violations(alt_player)
                 except Exception as e:
                     # don't worry about error handling for reading alts, just zero out alt's violation history and continue
+                    # but do a print a message, for debugging purposes
+                    print fmt % ('', 'ID: %7d, Error getting violation history: %r' % (other_id, e))
                     violation_history = {'chat_warnings':0, 'chat_violations':0, 'alt_violations':0, 'vpn_violations':0, 'banned':0}
+
                 if violation_history['banned']:
-                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (BANNED!)' % (int(s_other_id), entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (BANNED!)' % (other_id, entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip))
                 elif violation_history['chat_warnings'] == 0 and violation_history['chat_violations'] == 0 and violation_history['alt_violations'] == 0 and violation_history['vpn_violations'] == 0:
-                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (other_id, entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip))
                 else:
-                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Anti-Alt violations %d, VPN violations %d)' % (int(s_other_id), entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Anti-Alt violations %d, VPN violations %d)' % (other_id, entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip, violation_history['chat_warnings'], violation_history['chat_violations'], violation_history['alt_violations'], violation_history['vpn_violations']))
 
