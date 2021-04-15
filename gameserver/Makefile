@@ -10,7 +10,7 @@ FLAKE8?=flake8
 
 check_gameserver: ${GAMESERVER_PYSOURCES}
 	@echo "Running flake8 on gameserver Python sources..."
-	@trap "break 2; exit;" SIGINT;
+	@trap "break 2; exit;" INT
 	@${FLAKE8} $^
 
 pylint: ${GAMESERVER_PYSOURCES} ${GAMEDATA_PYSOURCES}
