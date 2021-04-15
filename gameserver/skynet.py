@@ -1412,7 +1412,7 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
 #                        return '%5s N=%4d' % (pretty_cents(group[key]), group[key+'_N'])
 
                     final_ltvs = ''
-                    skynet_ltvs = ' '.join([pretty_ltv(group, 'actual_skynet_ltv%d' % period) for period in [0,1,2,3]])
+                    skynet_ltvs = ' '.join([pretty_ltv(group, 'actual_skynet_ltv%d' % period) for period in [0,1,2,3]])  # noqa : F841
                     if group.get('max_end',-1) > 0 and (time_now - group['max_end']) > 90*24*60*60:
                         final_ltvs += ' R90 '+pretty_ltv(group, 'actual_receipts_d90')
                     if use_regexp_ltv and group.get('actual_skynet_ltv2_regexp_N',0) > 0:

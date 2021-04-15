@@ -3,16 +3,19 @@
 # found in the LICENSE file.
 
 # perform static analysis on our Python code
-PYSOURCES := *.py ../gamedata/*.py ../gamedata/*/*.py ChatMom/*.py
+GAMESERVER_PYSOURCES := *.py ChatMom/*.py
+GAMEDATA_PYSOURCES := ../gamedata/*.py
 PARALLEL := 4
+FLAKE8?=flake8
 
-check: ${PYSOURCES}
-# allow any Ctrl-C to exit the loop
-	@trap "break 2; exit;" SIGINT; for INPUT in $^; do pyflakes $$INPUT; done
+check_gameserver: ${GAMESERVER_PYSOURCES}
+	@echo "Running flake8 on gameserver Python sources..."
+	@trap "break 2; exit;" SIGINT;
+	@${FLAKE8} $^
 
-pylint: ${PYSOURCES}
+pylint: ${GAMESERVER_PYSOURCES} ${GAMEDATA_PYSOURCES}
 	pylint -j ${PARALLEL} $^
 
 # check Cyclomatic Complexity using the "radon" python module
-radon: ${PYSOURCES}
+radon: ${GAMESERVER_PYSOURCES} ${GAMEDATA_PYSOURCES}
 	@trap "break 2; exit;" SIGINT; for INPUT in $^; do radon cc $$INPUT -nd; done

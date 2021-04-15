@@ -6,6 +6,8 @@
 # This is intended to be used from a Jupyter notebook using the command
 # "from SpinJupyterEnvironment import *"
 
+# flake8: noqa
+
 # requires Python modules:
 # sshtunnel sqlalchemy ipython-sql
 import sys, os
