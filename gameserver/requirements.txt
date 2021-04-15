@@ -27,7 +27,7 @@ matplotlib>=2.0.2
 PyMySQL==0.10.1 # pure-Python implementation
 # MySQL-python==1.2.5 # note: will require a MySQL-devel package to build against
 
-Pillow==6.2.2
+Pillow==8.1.1
 psycopg2-binary==2.8.6
 py-vapid==1.8.1
 pyasn1>=0.4.8
