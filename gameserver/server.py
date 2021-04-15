@@ -9901,14 +9901,18 @@ class Player(AbstractPlayer):
         alt_min_logins = gamedata['server'].get('alt_min_logins', 5) # default to 5 logins for an alt to be considered
         alt_ignore_age = gamedata['server'].get('alt_ignore_age', 7*86400) # default to alts in the last 7 days
         alt_ignore_how_many = gamedata['server'].get('alt_ignore_how_many', 0) # optionally allow server to ignore up to an arbitrary number of alts
-        for s_other_id, entry in sorted(session.player['known_alt_accounts'].iteritems(),
-                                        key = lambda id_entry: -id_entry[1].get('logins',1)):
-            if SpinHTTP.private_ip_re.match(entry.get('last_ip', 'Unknown')): continue
+        total_alts = 0
+
+        for s_other_id, entry in self.known_alt_accounts.iteritems():
             if entry.get('logins', 0) < alt_min_logins: continue
             if entry.get('ignore',False): continue
             if entry.get('last_login', server_time) < (server_time - alt_ignore_age): continue
+            if SpinHTTP.is_private_ip(entry.get('last_ip', 'Unknown')): continue
             total_alts += 1
-        return total_alts > alt_ignore_how_many
+            if total_alts > alt_ignore_how_many:
+                return True
+
+        return False
 
     def squad_base_id(self, squad_id): return 's%d_%d' % (self.user_id, squad_id)
     def squad_is_deployed(self, squad_id):
