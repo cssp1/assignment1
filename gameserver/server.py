@@ -28057,7 +28057,7 @@ class GAMEAPI(resource.Resource):
         client_auth_token = arg[12]
         client_session_sig = arg[13]
         client_permissions = arg[14]
-        client_gamedata_checksums = arg[15]
+        client_gamedata_checksums = arg[15]  # noqa : F841
         client_login_country = arg[16]
         client_user_id = arg[17]
 

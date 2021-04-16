@@ -42,6 +42,13 @@ jobs:
             . venv/bin/activate
             python -c 'from spinlibs import SpinHTTP'
 
+      - run:
+          name: Python Syntax Checks
+          working_directory: ~/repo/game/gameserver
+          command: |
+            . venv/bin/activate
+            FLAKE8=venv/bin/flake8 make -f Makefile check_gameserver
+
   # test building the "eg" gamedata
   make_gamedata_eg:
     docker:

@@ -6,7 +6,7 @@
 
 # utility for sending out reminders via email or hipchat, used by dev_reminders.py and report_slow_mysql.py
 
-import smtplib, urllib, getpass, os, time
+import smtplib, getpass, os, time
 import requests
 from email.mime.text import MIMEText
 from email.header import Header

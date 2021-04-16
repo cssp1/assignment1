@@ -6,7 +6,7 @@
 
 # dump player_scores2 from MongoDB to SQL for warehousing
 
-import sys, time, getopt, os
+import sys, time, getopt
 import SpinConfig
 import SpinJSON
 import SpinNoSQL

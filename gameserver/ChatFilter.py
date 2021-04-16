@@ -12,7 +12,6 @@ import re
 import collections
 import unicodedata
 import codepoints
-import urllib
 
 class ChatFilter(object):
     def __init__(self, config):

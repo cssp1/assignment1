@@ -10,7 +10,7 @@
 import SpinConfig
 import SpinS3
 import AtomicFileWrite
-import sys, os, glob, hashlib
+import os, glob, hashlib
 
 class Driver (object):
     def __init__(self):
