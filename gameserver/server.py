@@ -29582,7 +29582,7 @@ class GAMEAPI(resource.Resource):
                     Store.execute_credit_order('0', self, session, network_id, network_id, currency, item['price'],
                                                order_info if currency == 'kgcredits' else item['data'])
                 except:
-                    gamesite.exception_log.event(server_time, 'DEV_SIMULATE_ORDER Exception (player %d): %s' % (arg[0], session.user.user_id, traceback.format_exc().strip())) # OK
+                    gamesite.exception_log.event(server_time, 'DEV_SIMULATE_ORDER Exception (player %d): %s' % (session.user.user_id, traceback.format_exc().strip())) # OK
                     retmsg.append(["ERROR", "ORDER_PROCESSING"])
 
         elif arg[0] == "FBPAYMENT_CREATE":
