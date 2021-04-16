@@ -392,8 +392,8 @@ class EnhancementLevelPredicate(Predicate):
         enh_satisfied = False
         for obj in player.home_base_iter():
             if obj.spec.kind == 'building':
-                enh_level = obj.enhancements.get(enh_name,0) if obj.enhancements else 0
-                if enh_level >= min_level and (self.max_level == -1 or enh_level <= max_level):
+                enh_level = obj.enhancements.get(self.enhancement,0) if obj.enhancements else 0
+                if enh_level >= self.min_level and (self.max_level == -1 or enh_level <= self.max_level):
                     enh_satisfied = True
         return enh_satisfied
 
