@@ -325,7 +325,7 @@ class GiveEnhancementConsequent(Consequent):
         self.give_to_all = bool(data.get('give_to_all', True)) # optionally only give to first building of this type
         self.give_xp = bool(data.get('give_xp', True))
     def execute(self, session, player, retmsg, context=None):
-        enhancement = gamesite.get_gamedata()['enhancements'][self.enhancement_name]
+        enhancement = player.get_gamedata_var('enhancements')[self.enhancement_name]
         building_name = enhancement['enhancement_category']
         building_min_level = get_leveled_quantity(enhancement.get('min_host_level',1), self.level)
         for obj in player.home_base_iter():
