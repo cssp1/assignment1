@@ -2151,7 +2151,7 @@ class HandleRenamePlayer(Handler):
         self.old_alias = None
         self.callsign_status = 'ok'
 
-    def check_callsign_status(self):
+    def check_callsign_status(self, session):
         import ChatFilter
         chat_filter = ChatFilter.ChatFilter(self.gamedata['client']['chat_filter'])
         if chat_filter.is_bad(self.new_alias): self.callsign_status = 'ChatFilter reports new Call Sign is bad. Enter a new one.'
