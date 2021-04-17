@@ -30,8 +30,11 @@ time_unit_table = {
     'd': 'Day', 'h': 'Hour', 'm': 'Min', 's': 'Sec'
 }
 
-ALT_MIN_LOGINS = 5
-ALT_IGNORE_AGE = 7*86400
+gamedata = {}
+gamedata['server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("server_compiled.json"))
+
+ALT_MIN_LOGINS = gamedata['server'].get('alt_min_logins', 5)
+ALT_IGNORE_AGE = gamedata['server'].get('alt_ignore_age', 7*86400)
 
 def do_pretty_print_time_unit(qty, abbrev, spell_it):
     if spell_it:

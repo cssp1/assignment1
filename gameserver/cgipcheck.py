@@ -27,8 +27,11 @@ time_now = int(time.time())
 # generic parameters for flot time graphs
 time_axis_params = {'mode':'time', 'timeformat': '%b %d %H:00', 'minTickSize': [1, "hour"]}
 
-ALT_MIN_LOGINS = 5
-ALT_IGNORE_AGE = 7*86400
+gamedata = {}
+gamedata['server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("server_compiled.json"))
+
+ALT_MIN_LOGINS = gamedata['server'].get('alt_min_logins', 5)
+ALT_IGNORE_AGE = gamedata['server'].get('alt_ignore_age', 7*86400)
 
 # this file assumes JSON decoding on raw CONTROLAPI calls
 def do_CONTROLAPI(*args, **kwargs): return SpinJSON.loads(ControlAPI.CONTROLAPI_raw(*args, **kwargs))
