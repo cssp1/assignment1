@@ -14712,7 +14712,12 @@ class LivePlayer(Player):
     def get_alt_data(self, other_id):
         if is_ai_user_id_range(other_id): return False
         key = str(other_id)
-        return self.known_alt_accounts.get(key, None)
+        if key not in self.known_alt_accounts: return False
+        alt = self.known_alt_accounts[key]
+        if SpinHTTP.private_ip_re.match(alt.get('last_ip', 'Unknown')) or alt.get('logins', 0) < gamedata['server'].get('alt_min_logins', 5): return False
+        if alt.get('ignore', False): return False
+        if 'last_login' in alt and alt['last_login'] < (server_time - gamedata['server'].get('alt_min_logins', 5)): return False
+        return alt
 
     def alt_record_attack(self, other_id):
         alt_data = self.get_alt_data(other_id)
