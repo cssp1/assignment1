@@ -14712,7 +14712,12 @@ class LivePlayer(Player):
     def get_alt_data(self, other_id):
         if is_ai_user_id_range(other_id): return False
         key = str(other_id)
-        return self.known_alt_accounts.get(key, None)
+        if key not in self.known_alt_accounts: return False
+        alt = self.known_alt_accounts[key]
+        if SpinHTTP.is_private_ip(alt.get('last_ip', 'Unknown')) or alt.get('logins', 0) < gamedata['server'].get('alt_min_logins', 5): return False
+        if alt.get('ignore', False): return False
+        if 'last_login' in alt and alt['last_login'] < (server_time - gamedata['server'].get('alt_min_logins', 5)): return False
+        return alt
 
     def alt_record_attack(self, other_id):
         alt_data = self.get_alt_data(other_id)
@@ -29234,7 +29239,9 @@ class GAMEAPI(resource.Resource):
         if session.player.isolate_pvp:
             cache_props['isolate_pvp'] = 1
 
-        known_alt_count = sum(1 for data in session.player.known_alt_accounts.itervalues() if not data.get('ignore',False))
+        known_alt_count = sum(1 for data in session.player.known_alt_accounts.itervalues() if not data.get('ignore',False) and not \
+                                (data.get('logins', 0) < gamedata['server'].get('alt_min_logins', 5)) and not \
+                                (data.get('last_login', server_time) < (server_time - gamedata['server'].get('alt_ignore_age', 7*86400))))
         if known_alt_count >= 1:
             cache_props['known_alt_count'] = known_alt_count
         else:

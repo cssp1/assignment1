@@ -474,10 +474,10 @@ class IdleCheckAntiRefreshPolicy(AntiRefreshPolicy):
 
 class AntiAltPolicy(Policy):
     # min number of simultaneous logins to trigger action
-    MIN_LOGINS = 5
+    MIN_LOGINS = gamedata['server'].get('alt_min_logins',5)
 
     # ignore alt-account logins that last happened over a week ago
-    IGNORE_AGE = 7*86400
+    IGNORE_AGE = gamedata['server'].get('alt_ignore_age', 7*86400)
 
     # cooldown that identifies a player as a repeat offender
     REPEAT_OFFENDER_COOLDOWN_NAME = 'alt_account_violation'
