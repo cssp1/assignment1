@@ -118,7 +118,7 @@ def get_alt_set_recursive(user_id, alt_set, aggressive):
     player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': user_id})['result'])
     for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                              key = lambda id_entry: -id_entry[1].get('logins',1)):
-        if SpinHTTP.is_private_ip(entry.get('last_ip', 'Unknown')) or entry.get('logins', 0) < ALT_MIN_LOGINS:
+        if is_private_ip(entry.get('last_ip', 'Unknown')) or entry.get('logins', 0) < ALT_MIN_LOGINS:
             continue
         # don't include non-alts approved by customer support
         if entry.get('ignore',False):

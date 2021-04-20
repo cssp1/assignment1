@@ -14714,7 +14714,7 @@ class LivePlayer(Player):
         key = str(other_id)
         if key not in self.known_alt_accounts: return False
         alt = self.known_alt_accounts[key]
-        if SpinHTTP.is_private_ip(entry.get('last_ip', 'Unknown')) or alt.get('logins', 0) < gamedata['server'].get('alt_min_logins', 5): return False
+        if SpinHTTP.is_private_ip(alt.get('last_ip', 'Unknown')) or alt.get('logins', 0) < gamedata['server'].get('alt_min_logins', 5): return False
         if alt.get('ignore', False): return False
         if 'last_login' in alt and alt['last_login'] < (server_time - gamedata['server'].get('alt_min_logins', 5)): return False
         return alt
