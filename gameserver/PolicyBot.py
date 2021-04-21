@@ -494,12 +494,6 @@ class AntiAltPolicy(Policy):
 
     def check_player(self, user_id, player):
 
-        # special case for BFM on BH - disregard BH accounts until April 15, 2021
-        if SpinConfig.game() == 'bfm' and time_now < 1618506000:
-            user = do_CONTROLAPI({'user_id':user_id, 'method':'get_raw_user'})
-            if (not user) or (user.get('frame_platform') == 'bh'):
-                return
-
         # possible race condition after player cache lookup (?)
         if player['home_region'] not in anti_alt_region_names: return
 
