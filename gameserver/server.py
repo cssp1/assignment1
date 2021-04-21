@@ -28843,6 +28843,18 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["HAS_ALTS_UPDATE", session.player.has_alts()])
 
+        if gamedata['server'].get('track_countries_seen', False:
+            if 'country_history' not in session.player.history:
+                session.player.history['country_history'] = {}
+            if session.user.country != 'unknown':
+                session.player.history['country_history'][session.user.country] = server_time
+            countries_seen = 0
+            for country, last_login in session.player.history['country_history'].iteritems():
+                if server_time - last_login < gamedata['server'].get('track_countries_epoch', 7*86400):
+                    countries_seen += 1
+            if countries_seen >= gamedata['server'].get('track_countries_limit', 2):
+                gamesite.exception_log.event(server_time, 'Multiple country hops detected for player ID %d. Review IP %s for VPN usage. Country history value is %s' % (session.player.user_id, session.user.last_login_ip, str(session.player.history['country_history'])))
+
         if session.player.alias and not is_valid_alias(session.player.alias):
             metric_event_coded(session.player.user_id, '0990_invalid_alias_detected', {'alias': session.player.alias,
                                                                                        'receipts': session.player.history.get('money_spent', 0.00)})
