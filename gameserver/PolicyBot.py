@@ -549,12 +549,6 @@ class AntiAltPolicy(Policy):
                 if master_account(our_pcache, alt_pcache) is not our_pcache:
                     continue
 
-                # special case for BFM on BH - disregard BH accounts
-                if SpinConfig.game() == 'bfm':
-                    other_user = do_CONTROLAPI({'user_id':alt_pcache['user_id'], 'method':'get_raw_user'})
-                    if (not other_user) or (other_user.get('frame_platform') == 'bh'):
-                        continue
-
                 interfering_alt_pcaches.append(alt_pcache)
 
         if not interfering_alt_pcaches:
