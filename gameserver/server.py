@@ -28843,7 +28843,7 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["HAS_ALTS_UPDATE", session.player.has_alts()])
 
-        if gamedata['server'].get('track_countries_seen', False:
+        if gamedata['server'].get('track_countries_seen', False):
             if 'country_history' not in session.player.history:
                 session.player.history['country_history'] = {}
             if session.user.country != 'unknown':
