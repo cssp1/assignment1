@@ -28223,7 +28223,7 @@ class GAMEAPI(resource.Resource):
         user.vpn_status = None
         if ip_rep_checker:
             ip_rep_result = ip_rep_checker.query(client_ip)
-            if ip_rep_result:
+            if ip_rep_result and not ip_rep_result.is_whitelisted():
                 user.vpn_status = repr(ip_rep_result) # this becomes a string that describes what is going on
         user.uninstalled = 0
         user.uninstalled_reason = None
