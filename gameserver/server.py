@@ -28852,7 +28852,10 @@ class GAMEAPI(resource.Resource):
             for country, last_login in session.player.history['country_history'].iteritems():
                 if server_time - last_login < gamedata['server'].get('track_countries_interval', 7*86400):
                     countries_seen += 1
-            if countries_seen >= gamedata['server'].get('track_countries_limit', 2):
+            ip_rep_result = None
+            if ip_rep_checker:
+                ip_rep_result = ip_rep_checker.query(session.user.last_login_ip)
+            if countries_seen >= gamedata['server'].get('track_countries_limit', 2) and not (ip_rep_result or ip_rep_result.is_whitelisted()):
                 gamesite.exception_log.event(server_time, 'Multiple country hops detected for player ID %d. Review IP %s for VPN usage. Country history value is %s' % (session.player.user_id, session.user.last_login_ip, str(session.player.history['country_history'])))
 
         if session.player.alias and not is_valid_alias(session.player.alias):
