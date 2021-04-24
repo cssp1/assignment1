@@ -2301,7 +2301,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 exception_log.event(proxy_time, 'proxyserver: SpinIPReputation.Checker query failed on IP %r:\n%s' % \
                                     (ip, traceback.format_exc()))
 
-            if rep_result and not rep_result.is_whitelisted():
+            if rep_result:
                 raw_log.event(proxy_time, 'SpinIPReputation hit for user_id %d IP %r: %r' % (user_id, ip, rep_result))
 
                 # don't let known toxic people play at all
@@ -2310,7 +2310,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
                 # optionally don't let VPN users create new accounts
                 if user_id == -1 and not SpinConfig.config['proxyserver'].get('allow_new_vpn_accounts', 1):
-                    exception_log.event(proxy_time, 'Blocked account creation for social ID %r because of SpinIPReputation on IP %r: %r' % (visitor.social_id, ip, repr(rep_result)))
+                    exception_log.event(proxy_time, 'Blocked account creation for social ID %r because of SpinIPReputation on IP %r: %r' % (visitor.social_id, ip, rep_result))
                     return self.index_visit_vpn_forbidden(request, visitor)
 
         # re-check user_id now, and create a new one since IP checks are complete
