@@ -28223,7 +28223,7 @@ class GAMEAPI(resource.Resource):
         user.vpn_status = None
         if ip_rep_checker:
             ip_rep_result = ip_rep_checker.query(client_ip)
-            if ip_rep_result and not ip_rep_result.is_whitelisted():
+            if ip_rep_result:
                 user.vpn_status = repr(ip_rep_result) # this becomes a string that describes what is going on
         user.uninstalled = 0
         user.uninstalled_reason = None
@@ -28854,9 +28854,10 @@ class GAMEAPI(resource.Resource):
                     countries_seen += 1
             ip_rep_result = None
             if ip_rep_checker:
-                ip_rep_result = ip_rep_checker.query(session.user.last_login_ip)
-            if countries_seen >= gamedata['server'].get('track_countries_limit', 2) and not (ip_rep_result or ip_rep_result.is_whitelisted()):
-                gamesite.exception_log.event(server_time, 'Multiple country hops detected for player ID %d. Review IP %s for VPN usage. Country history value is %s' % (session.player.user_id, session.user.last_login_ip, str(session.player.history['country_history'])))
+                ip_rep_result = ip_rep_checker.query(session.user.last_login_ip) # only log 'suspicious' IPs if they are not already known VPNs
+            if countries_seen >= gamedata['server'].get('track_countries_limit', 2) and not bool(ip_rep_result):
+                metric_event_coded(session.player.user_id, '7400_suspicious_ip_activity', {'ip': session.user.last_login_ip,
+                                                                                           'reason': 'country-hopping'})
 
         if session.player.alias and not is_valid_alias(session.player.alias):
             metric_event_coded(session.player.user_id, '0990_invalid_alias_detected', {'alias': session.player.alias,
