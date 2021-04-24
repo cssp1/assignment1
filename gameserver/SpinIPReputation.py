@@ -27,8 +27,6 @@ class CheckerResult(object):
 
     def is_toxic(self): return self.flags.get('toxic',0)
 
-    def is_whitelisted(self): return self.flags.get('whitelisted',0)
-
 class Checker(object):
     def __init__(self, path_to_db_file):
         self.ip_list4 = tuple()
