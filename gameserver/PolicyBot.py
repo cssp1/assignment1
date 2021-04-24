@@ -96,7 +96,6 @@ class AntiVPNPolicy(Policy):
         if not last_login_ip: return
         ip_rep_result = ip_rep_checker.query(last_login_ip)
         if not bool(ip_rep_result): return
-        if ip_rep_result.is_whitelisted(): return
 
         # skip if the player is flagged as ignored vpn by customer service
         if player['history'].get('vpn_excused', 0): return
