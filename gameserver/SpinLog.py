@@ -285,6 +285,7 @@ def MetricsLogFilter(child):
 
                                   '7530_cross_promo_banner_seen',
                                   '7531_cross_promo_banner_clicked',
+                                  '7400_suspicious_ip_activity',
                                   ],
                          deny = ['0970_client_exception'] # these get sent to the log_client_exceptions log instead
                          )

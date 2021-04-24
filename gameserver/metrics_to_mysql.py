@@ -185,6 +185,10 @@ if __name__ == '__main__':
                 keyvals.append(('spec', '%.4f' % ratio))
                 keyvals.append(('stack', int(client_interval)))
 
+            elif row['event_name'] == '7400_suspicious_ip_activity':
+                keyvals.append(('spec', row.get('ip','unknown')))
+                keyvals.append(('stack', row.get('reason','suspicious ip')))
+
             elif row['event_name'] in ('0113_account_deauthorized',
                                        '0140_tutorial_oneway_ticket',
                                        '0140_tutorial_start',
