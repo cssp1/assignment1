@@ -850,12 +850,15 @@ if __name__ == '__main__':
             print fmt % ('Known game alt accounts:', '')
             for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                                      key = lambda id_entry: -id_entry[1].get('logins',1)):
-                if entry.get('ignore', False): # marked non-alt
+                other_id = int(s_other_id)
+                if entry.get('ignore', False) and is_known_alt_valid(entry): # marked non-alt
                     print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt)' % other_id)
                     continue # manually ignored
+                elif entry.get('ignore', False) and not is_known_alt_valid(entry):
+                    print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt) - INACTIVE (will not be counted as alt if unignored)' % other_id)
+                    continue # manually ignored, but now lapsed
                 if not is_known_alt_valid(entry):
                     continue
-                other_id = int(s_other_id)
 
                 if entry.get('last_ip'):
                     ui_last_ip = entry['last_ip']

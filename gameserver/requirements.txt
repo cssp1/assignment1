@@ -30,7 +30,7 @@ PyMySQL==0.10.1 # pure-Python implementation
 
 Pillow==6.2.2
 psycopg2-binary==2.8.6
-py-vapid==1.8.1
+py-vapid==1.8.2
 pyasn1>=0.4.8
 pyasn1-modules>=0.2.8
 pymongo>=3.6.0
@@ -40,7 +40,7 @@ pywebpush==1.13.0
 requests==2.25.1
 service-identity>=18.1.0
 six==1.15.0
-SQLAlchemy==1.4.8
+SQLAlchemy==1.4.11
 txpostgres==1.7.0
 signxml==2.8.1
 
