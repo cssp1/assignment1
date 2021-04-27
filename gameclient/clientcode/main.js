@@ -7985,6 +7985,9 @@ function get_lab_for(category) {
             return name;
         }
     }
+    if('research_category' in gamedata['crafting']['categories'][category]) {
+        return get_lab_for(gamedata['crafting']['categories'][category]['research_category']);
+    }
     return null;
 }
 // find the type of building that can produce units of a specific category
@@ -38084,6 +38087,28 @@ var last_research_dialog_category = null;
     @param {number=} newpage */
 function invoke_research_dialog(parent_category, newcategory, newpage) {
     // note: assumes the research lab is already selected
+
+    // check if category is forwarded
+    var category_forward = '';
+    for(var i = 0; i < gamedata['strings']['research_categories']['army'].length; i++) {
+        var check_category = gamedata['strings']['research_categories']['army'][i];
+        if (check_category['name'] === newcategory) {
+            if ('category_forward' in check_category) {
+                category_forward = check_category['category_forward'];
+                break;
+            }
+        }
+    }
+    for(var i = 0; i < gamedata['strings']['research_categories']['crafting'].length; i++) {
+        var check_category = gamedata['strings']['research_categories']['crafting'][i];
+        if (check_category['name'] === newcategory) {
+            if ('category_forward' in check_category) {
+                category_forward = check_category['category_forward'];
+                break;
+            }
+        }
+    }
+    if(category_forward !== '') { newcategory = category_forward; }
 
     if(last_research_dialog_category === null) {
         last_research_dialog_category = gamedata['strings']['research_categories']['army'][0]['name'];
