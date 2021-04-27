@@ -36523,7 +36523,24 @@ function crafting_dialog_select_recipe_missiles(dialog, specname, recipe, recipe
     // set up stats display for this kind of recipe
     var statlist = gamedata['crafting']['categories'][recipe['crafting_category']]['display_stats'] || [];
 
-    var product_spell = gamedata['spells'][product_spec['use']['spellname']];
+    var product_spellname;
+    if (typeof(product_spec['use']) === 'object' && 'spellname' in product_spec['use']) {
+        product_spellname = product_spec['use']['spellname'];
+    } else if (product_spec['use'].length > 1) {
+        for(var i = 0; i < product_spec['use'].length; i++) {
+            var use_entry = product_spec['use'][i];
+            if (typeof(use_entry) === 'object' && 'spellname' in use_entry) {
+                product_spellname = use_entry['spellname'];
+                break;
+            }
+        }
+    } else {
+        throw Error('unhandled missile use value, unable to determine spellname' + product_spec['name']);
+    }
+
+    var product_spell = gamedata['spells'][product_spellname];
+
+
     if(gamedata['crafting']['categories'][recipe['crafting_category']]['display_damage_vs']) {
         init_damage_vs_icons(dialog, {'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
                              product_spell);
@@ -48895,6 +48912,9 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                 price = get_leveled_quantity(spec['research_gamebucks_cost'], new_level);
             } else if(formula === 'research' && 'research_credit_cost' in spec) {
                 price = get_leveled_quantity(spec['research_credit_cost'], new_level);
+            } else if(formula === 'research' && 'research_gamebucks_cost' in spec) {
+                p_currency = 'gamebucks';
+                price = get_leveled_quantity(spec['research_gamebucks_cost'], new_level);
             } else {
                 throw Error('unhandled formula/cost '+formula+' for '+spellarg);
             }
