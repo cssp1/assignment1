@@ -1,0 +1,38 @@
+version: 2
+updates:
+- package-ecosystem: pip
+  directory: "/gameserver"
+  schedule:
+    interval: weekly
+    day: friday
+    time: "17:00"
+  open-pull-requests-limit: 10
+  reviewers:
+  - danmaas
+  assignees:
+  - danmaas
+  ignore:
+  - dependency-name: bcrypt
+    versions:
+    - ">= 3.2.a, < 3.3"
+  - dependency-name: geoip2
+    versions:
+    - ">= 4.1.a, < 4.2"
+  - dependency-name: google-api-python-client
+    versions:
+    - "> 1.12.8"
+  - dependency-name: lz4
+    versions:
+    - "> 0.18.1"
+  - dependency-name: pillow
+    versions:
+    - "> 6.2.2"
+  - dependency-name: pillow
+    versions:
+    - ">= 7.a, < 8"
+  - dependency-name: pymysql
+    versions:
+    - ">= 1.a, < 2"
+  - dependency-name: pyflakes
+    versions:
+    - 2.3.0
