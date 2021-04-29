@@ -3,7 +3,7 @@ name: update-ip-reputation
 on:
   schedule:
     # Sundays at 17:00 UTC
-    - cron: 0 17 * * 0
+    - cron: 0 17 * * *
   workflow_dispatch:
 
 jobs:
