@@ -28877,7 +28877,7 @@ class GAMEAPI(resource.Resource):
             old_ui_name = str(session.player.alias)
             session.player.alias = None
             new_ui_name = session.user.get_real_name()
-            self.update_player_cache_ui_name(new_ui_name)
+            gamesite.pcache_client.player_cache_update(session.player.user_id, {'ui_name': new_ui_name, 'ui_name_searchable': new_ui_name.lower()})
             change_alias_log = {'time':server_time, 'spin_user':'login_process', 'method':'clear_alias', 'ui_reason':'Invalid alias, met requirements for reset_invalid_alias_on_login in game settings.'}
             if 'customer_support' not in session.player.history:
                 session.player.history['customer_support'] = []
