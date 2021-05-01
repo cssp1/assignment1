@@ -28874,7 +28874,7 @@ class GAMEAPI(resource.Resource):
                                                                                        'receipts': session.player.history.get('money_spent', 0.00)})
 
         if session.player.alias and Predicates.read_predicate(gamedata['server'].get('reset_invalid_alias_on_login',{'predicate':'ALWAYS_FALSE'})).is_satisfied2(session, session.player, None, override_time = None) and not is_valid_alias(session.player.alias):
-            old_ui_name = str(session.player.alias)
+            old_ui_name = session.player.alias
             session.player.alias = None
             new_ui_name = session.user.get_real_name()
             gamesite.pcache_client.player_cache_update(session.player.user_id, {'ui_name': new_ui_name, 'ui_name_searchable': new_ui_name.lower()})
