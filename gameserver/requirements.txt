@@ -39,7 +39,7 @@ pywebpush==1.13.0
 # pyxDamerauLevenshtein==1.4.1 # note: this is optional, and pulls in numpy (large)
 requests==2.25.1
 service-identity>=18.1.0
-six==1.15.0
+six==1.16.0
 SQLAlchemy==1.4.14
 txpostgres==1.7.0
 signxml==2.8.1
