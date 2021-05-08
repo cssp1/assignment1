@@ -2030,7 +2030,10 @@ if __name__ == '__main__':
     user_id = None
     yes_i_am_sure = False
     maint_enable_spawn = True
-    threshold_days = get_region_variable('weed_churned_players_after', 30*86400)/86400.0
+    threshold_time = gamedata['server'].get('alt_ignore_age', 28*86400)
+    alt_threshold_time = get_region_variable('weed_churned_players_after', False)
+    if alt_threshold_time: threshold_days = alt_threshold_time / 86400.0
+    else: threshold_days = threshold_time / 86400.0
     repair_days = get_region_variable('repair_churned_players_after', -1)/86400.0
     repair_pct = get_region_variable('repair_churned_players_leave_damaged_pct', -1)
     skip_quarry_owners = False
