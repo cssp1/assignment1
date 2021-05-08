@@ -9899,7 +9899,7 @@ class Player(AbstractPlayer):
 
     def has_alts(self):
         alt_min_logins = gamedata['server'].get('alt_min_logins', 5) # default to 5 logins for an alt to be considered
-        alt_ignore_age = gamedata['server'].get('alt_ignore_age', 7*86400) # default to alts in the last 7 days
+        alt_ignore_age = gamedata['server'].get('alt_ignore_age', 28*86400) # default to alts in the last 28 days
         alt_ignore_how_many = gamedata['server'].get('alt_ignore_how_many', 0) # optionally allow server to ignore up to an arbitrary number of alts
         total_alts = 0
 
@@ -29257,7 +29257,7 @@ class GAMEAPI(resource.Resource):
 
         known_alt_count = sum(1 for data in session.player.known_alt_accounts.itervalues() if not data.get('ignore',False) and not \
                                 (data.get('logins', 0) < gamedata['server'].get('alt_min_logins', 5)) and not \
-                                (data.get('last_login', server_time) < (server_time - gamedata['server'].get('alt_ignore_age', 7*86400))))
+                                (data.get('last_login', server_time) < (server_time - gamedata['server'].get('alt_ignore_age', 28*86400))))
         if known_alt_count >= 1:
             cache_props['known_alt_count'] = known_alt_count
         else:
