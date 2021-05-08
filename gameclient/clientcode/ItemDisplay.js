@@ -126,18 +126,20 @@ ItemDisplay.get_inventory_item_crafting_recipe = function(item) {
 
 /** given a 50x50 SPUI.StaticImage widget, set the widget's asset/state/alpha to show the item indicated by 'spec' (a spec from gamedata['items'])
    @param {SPUI.DialogWidget} widget
-   @param {Object} spec */
-ItemDisplay.set_inventory_item_asset = function(widget, spec) {
+   @param {Object} spec
+   @param {number=} [level=1] */
+ItemDisplay.set_inventory_item_asset = function(widget, spec, level) {
     var asset, alpha = 1;
+    if(!level) { level = 1; }
     if('icon' in spec) {
         if(spec['icon'] == 'gamebucks_inventory_icon') {
             asset = player.get_any_abtest_value('gamebucks_inventory_icon', gamedata['store']['gamebucks_inventory_icon']);
         } else {
-            asset = spec['icon'];
+            asset = get_leveled_quantity(spec['icon'], level);
         }
     } else if('unit_icon' in spec) {
         var unit_spec = gamedata['units'][spec['unit_icon']];
-        asset = get_leveled_quantity(unit_spec['art_asset'], 1);
+        asset = get_leveled_quantity(unit_spec['art_asset'], level);
         alpha = (unit_spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
     } else {
         throw Error('unhandled item icon '+spec['name'].toString());
