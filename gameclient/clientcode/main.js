@@ -8326,7 +8326,7 @@ UnitEquipSlotAddress.prototype.equals = function(other) {
     @return {Object} */
 player.decode_equipped_item = function(data) {
     if(typeof(data) === 'string') {
-        return {'spec':data};
+        return {'spec':data, 'level':1}; // force a level 1 if no level specified
     }
     return data;
 };
@@ -15812,11 +15812,12 @@ function update_combat_item_bar(dialog) {
                 // item index
                 var item_i = i + dialog.user_data['scroll_pos'];
                 var item = dialog.user_data['item_list'][item_i];
+                var item_level = ('level' in item ? item['level'] : 1);
                 var slot = dialog.user_data['slot_list'][item_i];
                 var stack_count = dialog.user_data['stack_count_list'][item_i];
                 var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
                 dialog.widgets['item'+i].show = true;
-                ItemDisplay.set_inventory_item_asset(dialog.widgets['item'+i], spec);
+                ItemDisplay.set_inventory_item_asset(dialog.widgets['item'+i], spec, item_level);
                 ItemDisplay._set_inventory_item_stack(dialog.widgets['stack'+i], spec, stack_count); // note: use combined stack count here
                 var can_activate = false;
 
@@ -47581,7 +47582,8 @@ function update_upgrade_dialog_equipment(dialog) {
                         var eitem = player.decode_equipped_item(equip[type_name][n]);
                         var especname = eitem['spec'];
                         var espec = ItemDisplay.get_inventory_item_spec(especname);
-                        ItemDisplay.set_inventory_item_asset(dialog.widgets['equip_item'+slot_i], espec);
+                        var elevel = eitem['level'];
+                        ItemDisplay.set_inventory_item_asset(dialog.widgets['equip_item'+slot_i], espec, elevel);
                         dialog.widgets['equip_item'+slot_i].show = true;
                         dialog.widgets['equip_frame'+slot_i].state = 'normal';
 
