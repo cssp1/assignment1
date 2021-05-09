@@ -9364,7 +9364,7 @@ function get_auto_spell_raw(spec) {
                 ret = auto_spell;
             }
         }
-    } else if ('equip' in spec && 'effects' in spec['equip']) {
+    } else if ('equip' in spec && 'effects' in spec['equip'] && !('use' in spec)) {
         var effects = spec['equip']['effects'];
         var mod_spellname = '';
         goog.array.forEach(effects, function(effect) {
@@ -9375,6 +9375,23 @@ function get_auto_spell_raw(spec) {
         var mod_auto_spell = gamedata['spells'][mod_spellname];
         if(mod_auto_spell['activation'] === 'auto') {
             ret = mod_auto_spell;
+        }
+    } else if ('use' in spec) {
+        var item_spellname = '';
+        if(typeof(spec['use']) === 'object' && 'spellname' in spec['use']) {
+            item_spellname = spec['use']['spellname'];
+        } else if ('use' in spec && spec['use'].length > 1) {
+            for(var i = 0; i < spec['use'].length; i++) {
+                var use_entry = spec['use'][i];
+                if (typeof(use_entry) === 'object' && 'spellname' in use_entry) {
+                    item_spellname = use_entry['spellname'];
+                    break;
+                }
+            }
+        }
+        var item_auto_spell = gamedata['spells'][item_spellname];
+        if(item_auto_spell['activation'] === 'targeted_area') {
+            ret = item_auto_spell;
         }
     }
     return ret;
@@ -9410,6 +9427,14 @@ Mobile.prototype.get_auto_spell_level = function() {
 
 function get_auto_spell_for_item(item_spec) {
     var spellname = ItemDisplay.get_inventory_item_weapon_spellname(item_spec);
+    if(spellname) {
+        return gamedata['spells'][spellname];
+    }
+    return null;
+}
+
+function get_targeted_spell_for_item(item_spec) {
+    var spellname = ItemDisplay.get_combat_consumable_weapon_spellname(item_spec);
     if(spellname) {
         return gamedata['spells'][spellname];
     }
@@ -46231,6 +46256,7 @@ function update_upgrade_dialog(dialog) {
     // FEATURES
 
     var feature_list = [];
+    var show_item_not_tech = false;
 
     if(tech) {
         // UNIT OR GENERIC TECH
@@ -46274,6 +46300,16 @@ function update_upgrade_dialog(dialog) {
             var auto_spell = get_auto_spell_for_item(item_spec);
             if(auto_spell) {
                 feature_list = feature_list.concat(get_weapon_spell_features2(item_spec, auto_spell, new_level));
+            } else {
+                var targeted_spell = get_targeted_spell_for_item(item_spec);
+                if(targeted_spell) {
+                    var targeted_feature_list = get_weapon_spell_features2(item_spec, targeted_spell, new_level);
+                    show_item_not_tech = true;
+                    for(var i = 0; i < targeted_feature_list.length; i++) {
+                        var targeted_feature = targeted_feature_list[i];
+                        if(targeted_feature !== 'weapon_range') { feature_list.push(targeted_feature); } // have to exclude weapon_range for missiles because it is always 9999999 to hit anywhere on the screen.
+                    }
+                }
             }
             if('equip' in item_spec && 'effects' in item_spec['equip']) {
                 goog.array.forEach(item_spec['equip']['effects'], function(effect) {
@@ -46719,12 +46755,16 @@ function update_upgrade_dialog(dialog) {
 
         var new_column = -1;
         var old_auto_spell, new_auto_spell;
+        var old_targeted_spell, new_targeted_spell, item_not_tech_spec = {};
         if(tech) {
             if('associated_unit' in tech || 'affects_unit' in tech) {
                 old_auto_spell = new_auto_spell = get_auto_spell_for_unit(player, spec);
             } else if('associated_item' in tech) {
                 old_auto_spell = get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.max(1,old_level))));
                 new_auto_spell = get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level,max_level))));
+                old_targeted_spell = get_targeted_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.max(1,old_level))));
+                new_targeted_spell = get_targeted_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level,max_level))));
+                item_not_tech_spec = ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level, max_level)));
             } else if('associated_building' in tech || 'enhance_time' in tech) {
                 old_auto_spell = new_auto_spell = null;
             } else {
@@ -46741,21 +46781,37 @@ function update_upgrade_dialog(dialog) {
         }
 
         feature_widget(dialog, grid_y, 0).show = true;
-        ModChain.display_label_widget(feature_widget(dialog, grid_y, 0), stat_name, old_auto_spell, enable_tooltip);
-
+        if(show_item_not_tech) {
+            ModChain.display_label_widget(feature_widget(dialog, grid_y, 0), stat_name, old_targeted_spell, enable_tooltip);
+        } else {
+            ModChain.display_label_widget(feature_widget(dialog, grid_y, 0), stat_name, old_auto_spell, enable_tooltip);
+        }
         if(old_level <= 0 && !show_level_0) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
-            ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, new_chain, spec, new_chain_level, new_auto_spell, new_spell_level, enable_tooltip);
+            if(show_item_not_tech) {
+                ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, new_chain, item_not_tech_spec, new_chain_level, new_targeted_spell, new_spell_level, enable_tooltip);
+            } else {
+                ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, new_chain, spec, new_chain_level, new_auto_spell, new_spell_level, enable_tooltip);
+            }
         } else if(stats_only || new_level > max_level) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
-            ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
+            if(show_item_not_tech) {
+                ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, item_not_tech_spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
+            } else {
+                ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
+            }
         } else {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = true;
-            ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
-            ModChain.display_widget(feature_widget(dialog, grid_y, 2), stat_name, new_chain, spec, new_chain_level, new_auto_spell, new_spell_level, enable_tooltip); // sets text color
+            if(show_item_not_tech) {
+                ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, item_not_tech_spec, old_chain_level, old_targeted_spell, old_spell_level, enable_tooltip);
+                ModChain.display_widget(feature_widget(dialog, grid_y, 2), stat_name, new_chain, item_not_tech_spec, new_chain_level, new_targeted_spell, new_spell_level, enable_tooltip); // sets text color
+            } else {
+                ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
+                ModChain.display_widget(feature_widget(dialog, grid_y, 2), stat_name, new_chain, spec, new_chain_level, new_auto_spell, new_spell_level, enable_tooltip); // sets text color
+            }
             if(feature_widget(dialog, grid_y, 2).str != feature_widget(dialog, grid_y, 1).str) {
                 feature_widget(dialog, grid_y, 2).text_color = delta_color;
             }
