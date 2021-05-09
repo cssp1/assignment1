@@ -797,6 +797,7 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
     if(stat == 'weapon_damage') {
         show_base = true;
         var spell = auto_spell;
+        if(!spell) { throw Error('Attempting display_value_detailed for spec ' + spec['name'] + ' but it has no valid auto_spell'); }
         var base_dps = get_leveled_quantity(spell['damage'], auto_spell_level);
 
         if(spell['kills_self']) {
