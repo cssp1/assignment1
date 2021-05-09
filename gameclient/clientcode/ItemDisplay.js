@@ -88,6 +88,33 @@ ItemDisplay.get_inventory_item_weapon_spell = function(spec) {
     throw Error('item spec does not carry a weapon or weapon spellname is invalid: '+spec['name']+' spellname '+(name ? name : 'null'));
 };
 
+/** For items that act as a weapon (e.g. missiles), return the spellname of the weapon they use.
+    @param {Object} spec
+    @return {string|null} the weapon spellname */
+ItemDisplay.get_combat_consumable_weapon_spellname = function(spec) {
+    if('use' in spec && typeof(spec['use']) === 'object' && 'spellname' in spec['use']) {
+        return spec['use']['spellname'];
+    } else if ('use' in spec && spec['use'].length > 1) {
+        for(var i = 0; i < spec['use'].length; i++) {
+            var use_entry = spec['use'][i];
+            if (typeof(use_entry) === 'object' && 'spellname' in use_entry) {
+                return use_entry['spellname'];
+            }
+        }
+    }
+    return null;
+};
+
+/** For items that act as a weapon (e.g. missiles), return the spell of the weapon.
+    Throw exception if spell doesn't exist.
+    @param {Object} spec
+    @return {Object} the weapon spell */
+ItemDisplay.get_combat_consumable_weapon_spell = function(spec) {
+    var name = ItemDisplay.get_combat_consumable_weapon_spellname(spec);
+    if(name && name in gamedata['spells']) { return gamedata['spells'][name]; }
+    throw Error('item spec does not carry a weapon or weapon spellname is invalid: '+spec['name']+' spellname '+(name ? name : 'null'));
+};
+
 /** For a crafting recipe that deterministically yields only one item, return the spec of that item.
     Otherwise, return the spec of unknown_crafting_product.
     @param {Object} recipe
