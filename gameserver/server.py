@@ -31933,17 +31933,23 @@ class GAMEAPI(resource.Resource):
                 if config is not None:
                     assert type(config) is dict
                     # sanity-check to prevent DDOS
+                    if len(config) > gamedata['server'].get('max_object_config_settings', 10):
+                        gamesite.exception_log.event(server_time, 'Received CONFIG_SET with config length > 10: %r' % config)
                     assert len(config) <= gamedata['server'].get('max_object_config_settings', 10)
                     for key, val in config.iteritems():
                         assert type(key) in (str, unicode)
                         assert type(val) in (int, str, unicode, list, dict)
                         if type(val) in (str, unicode): assert len(val) <= gamedata['server'].get('max_object_config_string', 64)
                         if type(val) is list:
+                            if len(val) > gamedata['server'].get('max_object_config_settings', 10):
+                                gamesite.exception_log.event(server_time, 'Received CONFIG_SET with val length > 10: %r' % val)
                             assert len(val) <= gamedata['server'].get('max_object_config_settings', 10)
                             for item in val:
                                 assert (type(item) in (str, unicode) or (item is None))
                                 if type(item) in (str, unicode): assert len(item) <= gamedata['server'].get('max_object_config_string', 64)
                         if type(val) is dict:
+                            if len(val) > gamedata['server'].get('max_object_config_settings', 10):
+                                gamesite.exception_log.event(server_time, 'Received CONFIG_SET with val length > 10: %r' % val)
                             assert len(val) <= gamedata['server'].get('max_object_config_settings', 10)
                             for subkey in val:
                                 item = val[subkey]
