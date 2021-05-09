@@ -46304,10 +46304,12 @@ function update_upgrade_dialog(dialog) {
                 var targeted_spell = get_targeted_spell_for_item(item_spec);
                 if(targeted_spell) {
                     var targeted_feature_list = get_weapon_spell_features2(item_spec, targeted_spell, new_level);
-                    show_item_not_tech = true;
-                    for(var i = 0; i < targeted_feature_list.length; i++) {
-                        var targeted_feature = targeted_feature_list[i];
-                        if(targeted_feature !== 'weapon_range') { feature_list.push(targeted_feature); } // have to exclude weapon_range for missiles because it is always 9999999 to hit anywhere on the screen.
+                    if(targeted_feature_list) {
+                        show_item_not_tech = true;
+                        for(var i = 0; i < targeted_feature_list.length; i++) {
+                            var targeted_feature = targeted_feature_list[i];
+                            if(targeted_feature !== 'weapon_range') { feature_list.push(targeted_feature); } // have to exclude weapon_range for missiles because it is always 9999999 to hit anywhere on the screen.
+                        }
                     }
                 }
             }
