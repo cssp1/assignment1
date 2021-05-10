@@ -424,6 +424,8 @@ def check_mandatory_fields(specname, spec, kind):
         slot_dict_list = spec['equip_slots'] if type(spec['equip_slots']) is list else [spec['equip_slots'],]
         for slot_dict in slot_dict_list:
             for slot_name, qty in slot_dict.iteritems():
+                if qty > gamedata['server'].get('max_object_config_settings', 10):
+                    error |= 1; print '%s: equip_slot type %s has %d slots, exceeds config limit of %d. Update gamedata["server"]["max_object_config_settings"] to increase the limit' % (specname, slot_name, qty, gamedata['server'].get('max_object_config_settings', 10))
                 if slot_name not in gamedata['strings']['equip_slots']:
                     error |= 1; print '%s: equip_slot type %s not found in strings.json' % (specname, slot_name)
                 if slot_name == 'security_node':
