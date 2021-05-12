@@ -14716,7 +14716,7 @@ class LivePlayer(Player):
         alt = self.known_alt_accounts[key]
         if SpinHTTP.is_private_ip(alt.get('last_ip', 'Unknown')) or alt.get('logins', 0) < gamedata['server'].get('alt_min_logins', 5): return False
         if alt.get('ignore', False): return False
-        if 'last_login' in alt and alt['last_login'] < (server_time - gamedata['server'].get('alt_min_logins', 5)): return False
+        if 'last_login' in alt and alt['last_login'] < (server_time - gamedata['server'].get('alt_ignore_age', 28*86400)): return False
         return alt
 
     def alt_record_attack(self, other_id):
