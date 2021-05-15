@@ -100,7 +100,7 @@ def leveled_quantity_iter(val, num_levels, reason):
         v = val_list[i]
         if val_type == 'num':
             if v < -2**31 or v > 2**31:
-                print 'value out of range: % L%d: %s' % (reason, i+1, repr(v))
+                print 'value out of range: %s L%d: %s' % (reason, i+1, repr(v))
         elif val_type == 'str':
             if len(v) > 64:
                 print 'value out of range: %s L%d: %s (len %d)' % (reason, i+1, v, len(v))
