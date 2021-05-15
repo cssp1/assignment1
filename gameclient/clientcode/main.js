@@ -37510,11 +37510,13 @@ function update_crafting_dialog_status_missiles(dialog) {
         }
     }
 
-    for(var y = 0; y < obj.equipment[delivery_slot_type].length; y++) {
-        var delivery_slot_index = y;
-        var cur_missile_item = null;
-        cur_missile_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > delivery_slot_index ? player.decode_equipped_item(obj.equipment[delivery_slot_type][delivery_slot_index]) : null);
-        if(cur_missile_item) { num_ready += 1; }
+    if(obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > 0) {
+        for(var y = 0; y < obj.equipment[delivery_slot_type].length; y++) {
+            var delivery_slot_index = y;
+            var cur_missile_item = null;
+            cur_missile_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > delivery_slot_index ? player.decode_equipped_item(obj.equipment[delivery_slot_type][delivery_slot_index]) : null);
+            if(cur_missile_item) { num_ready += 1; }
+        }
     }
 
     // hide arrows below the final visible slot row
