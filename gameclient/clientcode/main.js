@@ -34780,6 +34780,10 @@ function init_army_dialog_buttons(dialog, mode, my_dialog_name, category_name) {
     });
     if(mode === 'crafting' && category_name){
         dialog.widgets['production_button'].show = (category_name in gamedata['crafting']['categories'] && !('dialog' in gamedata['crafting']['categories'][category_name]));
+        if(dialog.widgets['production_button'].show) {
+            var category_crafter = find_object_by_type(get_workshop_for(category_name));
+            if(!category_crafter) { dialog.widgets['production_button'].show = false; console.log('Hid it'); }
+        }
     }
 }
 function hide_army_dialog_buttons(dialog, mode) {
