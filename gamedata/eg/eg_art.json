@@ -363,6 +363,21 @@
         "highlight": { "images": ["art/ui/menu_buttons19.png"], "dimensions": [27,46], "origins": [267,222], "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25, "load_priority": 20 },
         "disabled": { "images": ["art/ui/menu_buttons19.png"], "dimensions": [27,36], "origins": [267,314], "load_priority": 25 } // trim off sprite incursion at the bottom
     } },
+    "chat_scroll_up_highlight": { "states": { "normal": { "images": ["art/ui/menu_buttons19.png"], "dimensions": [27,46], "origins": [267,84], "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25, "load_priority": 20 } } },
+    "chat_scroll_down_highlight": { "states": { "normal": { "images": ["art/ui/menu_buttons19.png"], "dimensions": [27,46], "origins": [267,222], "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25, "load_priority": 20 } } },
+    "chat_scroll_up_disabled": { "states": { "normal": { "images": ["art/ui/menu_buttons19.png"], "dimensions": [27,46], "origins": [267,176], "load_priority": 25 } } },
+    "chat_scroll_down_disabled": { "states": { "normal": { "images": ["art/ui/menu_buttons19.png"], "dimensions": [27,36], "origins": [267,314], "load_priority": 25 } } },
+
+    "chat_scroll_right": { "states": {
+         "normal": { "subassets": [{"name": "chat_scroll_down", "transform": [0,0.8,0.8,0,-17,9]}]},
+         "highlight": { "subassets": [{"name": "chat_scroll_down_highlight", "transform": [0,0.8,0.8,0,-17,9]}]},
+         "disabled": { "subassets": [{"name": "chat_scroll_down_disabled", "transform": [0,0.8,0.8,0,-17,9]}]}
+    } },
+    "chat_scroll_left": { "states": {
+        "normal": { "subassets": [{"name": "chat_scroll_up", "transform": [0,0.8,0.8,0,-17,9]}]},
+        "highlight": { "subassets": [{"name": "chat_scroll_up_highlight", "transform": [0,0.8,0.8,0,-17,9]}]},
+        "disabled": { "subassets": [{"name": "chat_scroll_up_disabled", "transform": [0,0.8,0.8,0,-17,9]}]}
+    } },
 
     // same as chat_scroll but without large highlight area
     "small_scroll_up": { "states": {
