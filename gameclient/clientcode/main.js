@@ -38261,7 +38261,7 @@ function research_dialog_scroll_category(dialog, delta) {
         i++;
     }
     if(dialog.widgets['production_button'].show) {
-        var category_crafter = find_object_by_type(get_workshop_for(category_name));
+        var category_crafter = find_object_by_type(get_workshop_for(category));
         if(!category_crafter) { dialog.widgets['production_button'].show = false; }
     }
 }
