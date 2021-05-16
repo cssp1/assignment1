@@ -1901,6 +1901,10 @@
             "category_button": { "kind": "ActionButton", "xy": [-10,72], "dimensions": [100,33], "text_size": 13, "text_hjustify": "center",
                                  "highlight_text_color": [0.75,0.75,0.75,1], "mouseover_sound": 1,
                                  "array": [5,1], "array_offset": [80,0] },
+            "category_scroll_left": { "kind": "ActionButton", "xy": [180,70], "dimensions": [27,46], "bg_image": "chat_scroll_left",
+                                      "push_bg_image": 1},
+            "category_scroll_right": { "kind": "ActionButton", "xy": [555,70], "dimensions": [27,46], "bg_image": "chat_scroll_right",
+                                       "push_bg_image": 1},
 
             "scroll_text": { "kind": "TextField", "xy": [500,81], "dimensions": [181,17], "text_size": 13, "text_hjustify": "right", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.4,0.4,0.4,1] },
 

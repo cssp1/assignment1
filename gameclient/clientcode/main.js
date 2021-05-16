@@ -38195,21 +38195,61 @@ function invoke_research_dialog(parent_category, newcategory, newpage) {
         init_army_dialog_buttons(dialog.widgets['army_dialog_buttons_'+parent_category], parent_category, 'research_dialog');
     }
 
-    // set up category buttons
-    var i = 0;
+    // set up category list
     var cat_list = goog.array.filter(gamedata['strings']['research_categories'][parent_category], function(entry) {
         if('show_if' in entry && !read_predicate(entry['show_if']).is_satisfied(player, null)) { return false; }
         if('category_group' in entry && !goog.array.contains(entry['category_group'], newcategory)) { return false; } // do not display
         return !!get_lab_for(entry['name']);
     });
+    dialog.user_data['all_categories_list'] = cat_list;
+    dialog.user_data['category_page'] = 0;
+    dialog.widgets['category_scroll_left'].show =
+        dialog.widgets['category_scroll_right'].show =
+        (dialog.data['widgets']['category_button']['array'][0] - 1) < dialog.user_data['all_categories_list'].length;
+
+    dialog.widgets['scroll_left'].onclick = function(w) { dialog.user_data['scrolled'] = true; research_dialog_scroll(w.parent, w.parent.user_data['page']-1); };
+    dialog.widgets['scroll_right'].onclick = function(w) { dialog.user_data['scrolled'] = true; research_dialog_scroll(w.parent, w.parent.user_data['page']+1); };
+    dialog.widgets['category_scroll_left'].onclick = function(w) { research_dialog_scroll_category(w.parent, -1); };
+    dialog.widgets['category_scroll_right'].onclick = function(w) { research_dialog_scroll_category(w.parent, 1); };
+
+    dialog.ondraw = update_research_dialog;
+    research_dialog_scroll_category(dialog, 0);
+    research_dialog_change_category(dialog, newcategory, newpage || 0);
+}
+
+/** @param {SPUI.Dialog} dialog
+    @param {number=} delta page to scroll to */
+function research_dialog_scroll_category(dialog, delta) {
+    var category_page = dialog.user_data['category_page'];
+    if(delta < 0 && category_page === 0) { return; }
+    var all_cat_list = dialog.user_data['all_categories_list'];
+    var max_cat_list_length = dialog.data['widgets']['category_button']['array'][0] - 1;
+    var max_page = all_cat_list.length - max_cat_list_length;
+    if(max_page < 0) { max_page = 0; }
+    if(category_page == max_page && delta > 0) { return; }
+    category_page += delta;
+    dialog.user_data['category_page'] = category_page;
+    dialog.widgets['category_scroll_left'].state = (category_page > 0 ? 'normal' : 'disabled');
+    dialog.widgets['category_scroll_right'].state = (category_page < max_page ? 'normal' : 'disabled');
+    var cat_list = [];
+    var i = 0 + category_page;
+    // get visible categories based on page
+    while((cat_list.length < dialog.data['widgets']['category_button']['array'][0] - 1) && (cat_list.length < all_cat_list.length)) {
+        cat_list.push(all_cat_list[i]);
+        i++;
+    }
+    dialog.user_data['category_list'] = cat_list;
+    i = 0;
     var used = cat_list.length;
+    var category = dialog.user_data['category'];
     goog.array.forEach(cat_list, function(entry) {
         // manually compute X coordinate to center all the visible buttons
         var x = Math.floor(dialog.wh[0]/2 + (i - used/2) * dialog.data['widgets']['category_button']['array_offset'][0] + dialog.data['widgets']['category_button']['xy'][0]);
         dialog.widgets['category_button'+i.toString()].xy = [x, dialog.data['widgets']['category_button']['xy'][1]];
-
         dialog.widgets['category_button'+i.toString()].str = entry['ui_name'];
         dialog.widgets['category_button'+i.toString()].onclick = function(w) { research_dialog_change_category(w.parent, entry['name']); };
+        dialog.widgets['category_button'+i.toString()].text_color = (category === entry['name'] ? SPUI.default_text_color : SPUI.disabled_text_color);
+        dialog.widgets['category_button'+i.toString()].state = (category === entry['name'] ? 'active' : 'normal');
         i++;
         if(i >= dialog.data['widgets']['category_button']['array'][0]) { throw Error('not enough category_button array entries!'); }
     });
@@ -38217,20 +38257,12 @@ function invoke_research_dialog(parent_category, newcategory, newpage) {
         dialog.widgets['category_button'+i.toString()].show = false;
         i++;
     }
-    dialog.user_data['category_list'] = cat_list;
-
-    dialog.widgets['scroll_left'].onclick = function(w) { dialog.user_data['scrolled'] = true; research_dialog_scroll(w.parent, w.parent.user_data['page']-1); };
-    dialog.widgets['scroll_right'].onclick = function(w) { dialog.user_data['scrolled'] = true; research_dialog_scroll(w.parent, w.parent.user_data['page']+1); };
-
-    dialog.ondraw = update_research_dialog;
-    research_dialog_change_category(dialog, newcategory, newpage || 0);
 }
 
 /** @param {SPUI.Dialog} dialog
     @param {string} category
     @param {number=} num page to scroll to */
-function research_dialog_change_category(dialog, category, num)
-{
+function research_dialog_change_category(dialog, category, num) {
     dialog.user_data['category'] = category;
     last_research_dialog_category = dialog.user_data['category'];
     init_army_dialog_buttons(dialog.widgets['army_dialog_buttons_'+dialog.user_data['parent_category']], dialog.user_data['parent_category'], 'research_dialog', category);
