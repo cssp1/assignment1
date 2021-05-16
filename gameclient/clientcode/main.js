@@ -38260,10 +38260,6 @@ function research_dialog_scroll_category(dialog, delta) {
         dialog.widgets['category_button'+i.toString()].show = false;
         i++;
     }
-    if(dialog.widgets['production_button'].show) {
-        var category_crafter = find_object_by_type(get_workshop_for(category));
-        if(!category_crafter) { dialog.widgets['production_button'].show = false; }
-    }
 }
 
 /** @param {SPUI.Dialog} dialog
