@@ -34779,8 +34779,7 @@ function init_army_dialog_buttons(dialog, mode, my_dialog_name, category_name) {
         }
     });
     if(mode === 'crafting' && category_name){
-        var category_crafter = find_object_by_type(get_workshop_for(category_name));
-        dialog.widgets['production_button'].show = (category_crafter && category_name in gamedata['crafting']['categories'] && !('dialog' in gamedata['crafting']['categories'][category_name]));
+        dialog.widgets['production_button'].show = (category_name in gamedata['crafting']['categories'] && !('dialog' in gamedata['crafting']['categories'][category_name]));
     }
 }
 function hide_army_dialog_buttons(dialog, mode) {
@@ -38260,6 +38259,10 @@ function research_dialog_scroll_category(dialog, delta) {
     while(i < dialog.data['widgets']['category_button']['array'][0]) {
         dialog.widgets['category_button'+i.toString()].show = false;
         i++;
+    }
+    if(dialog.widgets['production_button'].show) {
+        var category_crafter = find_object_by_type(get_workshop_for(category));
+        if(!category_crafter) { dialog.widgets['production_button'].show = false; }
     }
 }
 
