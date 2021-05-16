@@ -7978,6 +7978,7 @@ player.record_client_history = function(name, incr) {
 };
 
 // find the type of building that can perform research on "category"
+/** @param {string} category */
 function get_lab_for(category) {
     for(var name in gamedata['buildings']) {
         var cats = gamedata['buildings'][name]['research_categories'] || null;
@@ -7991,6 +7992,7 @@ function get_lab_for(category) {
     return null;
 }
 // find the type of building that can produce units of a specific category
+/** @param {string} category */
 function get_factory_for(category) {
     for(var name in gamedata['buildings']) {
         if((gamedata['buildings'][name]['manufacture_category'] || null) == category) {
@@ -8000,6 +8002,7 @@ function get_factory_for(category) {
     return null;
 }
 // find the type of building that can craft items of a specific category
+/** @param {string} category */
 function get_workshop_for(category) {
     for(var name in gamedata['buildings']) {
         var cats = gamedata['buildings'][name]['crafting_categories'] || null;
@@ -34776,7 +34779,8 @@ function init_army_dialog_buttons(dialog, mode, my_dialog_name, category_name) {
         }
     });
     if(mode === 'crafting' && category_name){
-        dialog.widgets['production_button'].show = (category_name in gamedata['crafting']['categories'] && !('dialog' in gamedata['crafting']['categories'][category_name]));
+        var category_crafter = find_object_by_type(get_workshop_for(category_name));
+        dialog.widgets['production_button'].show = (category_crafter && category_name in gamedata['crafting']['categories'] && !('dialog' in gamedata['crafting']['categories'][category_name]));
     }
 }
 function hide_army_dialog_buttons(dialog, mode) {
