@@ -17,7 +17,10 @@ updates:
     - ">= 3.2.a, < 3.3"
   - dependency-name: geoip2
     versions:
-    - ">= 4.1.a, < 4.2"
+    - ">= 4"
+  - dependency-name: maxminddb
+    versions:
+    - ">= 2"
   - dependency-name: google-api-python-client
     versions:
     - "> 1.12.8"
@@ -36,3 +39,6 @@ updates:
   - dependency-name: pyflakes
     versions:
     - 2.3.0
+  - dependency-name: jinja2
+    versions:
+    - ">= 3"
