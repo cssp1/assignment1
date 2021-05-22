@@ -46,10 +46,12 @@ def master_account(a, b):
     return a
 
 def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
+def is_alt_limit_region(region): return region.get('alt_limit',0) > 0
 def is_anti_vpn_region(region): return 'anti_vpn' in region.get('tags',[])
 def is_anti_refresh_region(region): return 'anti_refresh' in region.get('tags',[])
 
 anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
+alt_limit_region_names = [name for name, data in gamedata['regions'].iteritems() if is_alt_limit_region(data)]
 anti_vpn_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_vpn_region(data)]
 ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
 anti_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_refresh_region(data)]
@@ -665,6 +667,161 @@ class AntiAltPolicy(Policy):
 
         return new_region['id']
 
+class AltLimitPolicy(Policy):
+    # min number of simultaneous logins to trigger action
+    MIN_LOGINS = gamedata['server'].get('alt_min_logins',5)
+
+    # ignore alt-account logins that last happened over a week ago
+    IGNORE_AGE = gamedata['server'].get('alt_ignore_age', 7*86400)
+
+    # cooldown that identifies a player as a repeat offender
+    REPEAT_OFFENDER_COOLDOWN_NAME = 'alt_account_limit_violation'
+
+    # query for candidate violators from player cache
+    @classmethod
+    def player_cache_query(cls, db_client, time_range, verbose = 0):
+        return db_client.player_cache_query_mtime_or_ctime_between([time_range], [],
+                                                                   townhall_name = gamedata['townhall'],
+                                                                   min_townhall_level = 3,
+                                                                   include_home_regions = alt_limit_region_names,
+                                                                   min_known_alt_count = 1)
+
+
+    def check_player(self, user_id, player):
+
+        # possible race condition after player cache lookup (?)
+        if player['home_region'] not in alt_limit_region_names: return
+
+        region_alt_limit = gamedata['regions'][player['home_region']]['alt_limit']
+
+        if self.test:
+            alt_accounts = {str(user_id+1): {'logins': 99, 'last_login': time_now-60}}
+        else:
+            # ignore bad old data
+            if player['history'].get('alt_account_data_epoch',-1) < gamedata['server'].get('alt_account_data_epoch',-1):
+                return
+
+            alt_accounts = player.get('known_alt_accounts', {})
+
+        if not alt_accounts or not isinstance(alt_accounts, dict): return
+
+        alt_ids = []
+
+        for salt_id, alt_data in alt_accounts.iteritems():
+            if alt_data.get('ignore',0): continue
+            if alt_data.get('logins',0) < self.MIN_LOGINS: continue
+            if alt_data.get('last_login',0) < time_now - self.IGNORE_AGE: continue
+
+            # last-chance check for any IGNORE_ALT instructions that were dumped out of alt_account_data
+            # but still logged in customer support history
+            ignored = False
+            for x in player['history'].get('customer_support',[]):
+                if x['method'] in ('ignore_alt', 'unignore_alt') and \
+                   int(x['args']['other_id']) == int(salt_id):
+                    if x['method'] == 'ignore_alt':
+                        ignored = True
+                    elif x['method'] == 'unignore_alt':
+                        ignored = False
+            if ignored: continue
+
+            alt_ids.append(int(salt_id))
+
+        if self.verbose >= 2:
+            print >> self.msg_fd, 'alt_ids %r alt_accounts %r' % (alt_ids, alt_accounts)
+
+        if not alt_ids: return
+
+        # query player cache on alts to determine if they are in the same region, and compare spend/account creation time
+        alt_pcaches = self.db_client.player_cache_lookup_batch(alt_ids, fields = ['home_region','money_spent','account_creation_time'])
+        our_pcache = {'user_id': user_id, 'money_spent': player['history'].get('money_spent',0), 'account_creation_time': player['creation_time']}
+
+        if self.verbose >= 2:
+            print >> self.msg_fd, 'player %d in %s has possible alts: %r' % (user_id, player['home_region'], alt_pcaches)
+
+        superior_alt_pcaches = []
+
+        for alt_pcache in alt_pcaches:
+            if self.test or alt_pcache.get('home_region', None) == player['home_region']:
+                if master_account(our_pcache, alt_pcache) is our_pcache:
+                    superior_alt_pcaches.append(alt_pcache)
+
+        if len(superior_alt_pcaches) <= region_alt_limit: # this player is either the master account or high up enough to be below the limit
+            return
+
+        print >> self.msg_fd, 'player %d exceeds alt limit: %d' % (user_id, region_alt_limit)
+
+        print >> self.msg_fd, 'punishing player %d...' % (user_id),
+
+        try:
+
+            # update the account's home region so next pass will get the right data
+            new_region_name = self.punish_player(user_id, player['home_region'])
+            player ['home_region'] = new_region_name
+            print >> self.msg_fd, 'moved to region %s' % (new_region_name)
+
+        except:
+            sys.stderr.write(('error punishing user %d: '%(user_id)) + traceback.format_exc())
+
+    def punish_player(self, user_id, cur_region_name):
+
+        cur_region = gamedata['regions'][cur_region_name]
+        cur_continent_id = cur_region.get('continent_id',None)
+
+        # check repeat offender status via cooldown
+        togo = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_togo', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})
+        is_repeat_offender = (togo > 0)
+
+        # pick destination region
+        new_region = None
+
+        # pick any prison region, as someone violating this policy is an alt farm by definition
+        candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
+                                   x.get('auto_join',1) and x.get('enable_map',1) and \
+                                   not x.get('developer_only',0) and \
+                                   'prison' in x['id'], gamedata['regions'].itervalues())
+        if self.verbose >= 2:
+            print >> self.msg_fd, 'continent %r candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
+
+        assert len(candidate_regions) >= 1
+        new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
+
+        if not self.test:
+            assert new_region['id'] != cur_region_name
+
+        if not self.dry_run:
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION}) == 'ok'
+
+            if is_repeat_offender:
+                # only repeat offenders get the banishment aura
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
+                                      'duration': self.REGION_BANISH_DURATION,
+                                      'data':SpinJSON.dumps({'tag':'anti_alt'})}) == 'ok'
+
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
+
+
+        # player messages are slightly different depending on whether the game is majority anti-alt (DV) or not (WSE,TR,etc).
+        if not is_repeat_offender:
+            message_body = 'We determined that you exceeded the alt limit in %s and therefore relocated your base to %s. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-alt policy will result in a permanent ban from map regions.' % (cur_region['ui_name'], new_region['ui_name'])
+        else: # repeat offender
+            message_body = 'We determined that you exceeded the alt limit in %s and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our alt limit policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (cur_region['ui_name'], new_region['ui_name'])
+
+        if not self.dry_run:
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'send_message',
+                                  'message_body': message_body,
+                                  'message_subject': 'Alt Account Policy',
+                                  }) == 'ok'
+
+        event_props = {'user_id': user_id, 'event_name': '7301_policy_bot_punished', 'code':7301,
+                       'old_region': cur_region_name, 'new_region': new_region['id'],
+                       'reason':'alt_account_violation', 'repeat_offender': is_repeat_offender}
+        if not self.dry_run:
+            self.policy_bot_log.event(time_now, event_props)
+        else:
+            print >> self.msg_fd, event_props
+
+        return new_region['id']
+
 def connect_to_db():
     return SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']), identity = 'PolicyBot')
 
@@ -679,6 +836,8 @@ POLICIES = []
 
 if anti_alt_region_names:
     POLICIES.append(AntiAltPolicy)
+if alt_limit_region_names:
+    POLICIES.append(AltLimitPolicy)
 if anti_vpn_region_names:
     POLICIES.append(AntiVPNPolicy)
 if anti_refresh_region_names:
