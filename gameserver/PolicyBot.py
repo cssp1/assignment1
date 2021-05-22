@@ -584,7 +584,7 @@ class AltPolicy(Policy):
         cur_continent_id = cur_region.get('continent_id',None)
 
         # find pro- and anti-alt regions in the same continent
-         = filter(lambda x: is_anti_alt_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
+        anti_alt_regions = filter(lambda x: is_anti_alt_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
         pro_alt_regions = filter(lambda x: not is_anti_alt_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
 
         assert len(anti_alt_regions) >= 1 and len(pro_alt_regions) >= 1
