@@ -46847,7 +46847,7 @@ function update_upgrade_dialog(dialog) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
             if(show_item_not_tech) {
-                ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, item_not_tech_spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
+                ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, item_not_tech_spec, old_chain_level, old_targeted_spell, old_spell_level, enable_tooltip);
             } else {
                 ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
             }
