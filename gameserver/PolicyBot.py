@@ -11,6 +11,7 @@ import SpinConfig, SpinJSON, SpinParallel
 import SpinNoSQL, SpinLog, SpinNoSQLLog, SpinIPReputation
 import SpinSingletonProcess
 import ControlAPI
+import copy
 
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
@@ -561,6 +562,9 @@ class AltPolicy(Policy):
         print >> self.msg_fd, 'player %d has %d violating alts: %r exceeding region limit of %d' % (user_id, len(interfering_alt_pcaches), interfering_alt_pcaches, region_alt_limit)
 
         master_pcache = interfering_alt_pcaches[0]
+        for alt_pchache in interfering_alt_pcaches[1:]:
+            if master_account(master_pcache, alt_pcache) is alt_pcache:
+                master_pcache = copy.deepcopy(alt_pcache) # step through all interfering pcaches and find the true master pcache
 
         print >> self.msg_fd, 'punishing player %d (alt of %d)...' % (user_id, master_pcache['user_id']),
 
