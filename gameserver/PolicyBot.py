@@ -27,25 +27,6 @@ def do_CONTROLAPI(args, extra_text = None):
     if extra_text: args['ui_reason'] += ' ' + extra_text
     return ControlAPI.CONTROLAPI(args, 'PolicyBot', max_tries = 3) # allow some retries
 
-# given two pcache entries for an alt pair, return the entry that is the more senior "master" account
-def master_account(a, b):
-    aspent = a.get('money_spent',0)
-    bspent = b.get('money_spent',0)
-    if aspent > bspent:
-        return -1
-    elif aspent < bspent:
-        return 1
-    acreat = a.get('account_creation_time',0)
-    bcreat = b.get('account_creation_time',0)
-    if acreat > bcreat:
-        return 1
-    elif acreat < bcreat:
-        return -1
-    # break ties
-    if a['user_id'] > b['user_id']:
-        return 1
-    return -1
-
 def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
 def is_alt_policy_region(region): return 'anti_alt' in region.get('tags',[]) or region.get('alt_limit',0) > 0
 def is_anti_vpn_region(region): return 'anti_vpn' in region.get('tags',[])
