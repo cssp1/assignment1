@@ -32,19 +32,19 @@ def master_account(a, b):
     aspent = a.get('money_spent',0)
     bspent = b.get('money_spent',0)
     if aspent > bspent:
-        return a
+        return -1
     elif aspent < bspent:
-        return b
+        return 1
     acreat = a.get('account_creation_time',0)
     bcreat = b.get('account_creation_time',0)
     if acreat > bcreat:
-        return b
+        return 1
     elif acreat < bcreat:
-        return a
+        return -1
     # break ties
     if a['user_id'] > b['user_id']:
-        return b
-    return a
+        return 1
+    return -1
 
 def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
 def is_alt_policy_region(region): return 'anti_alt' in region.get('tags',[]) or region.get('alt_limit',0) > 0
@@ -546,41 +546,36 @@ class AltPolicy(Policy):
         if self.verbose >= 2:
             print >> self.msg_fd, 'player %d in %s has possible alts: %r' % (user_id, player['home_region'], alt_pcaches)
 
-        interfering_alt_pcaches = []
-
+        pcaches_list = [our_pcache]
         for alt_pcache in alt_pcaches:
             if self.test or alt_pcache.get('home_region', None) == player['home_region']:
-                # check to see whether this is the "master" account - if not, it doesn't count towards the alt limit
-                if master_account(our_pcache, alt_pcache) is our_pcache:
-                    continue
+                pcaches_list.append(alt_pcache)
 
-                interfering_alt_pcaches.append(alt_pcache)
-
-        if len(interfering_alt_pcaches) <= region_alt_limit: # this player is either the master account or high up enough to be below the limit
+        if len(pcaches_list) - 1 <= region_alt_limit: # this player is either the master account or high up enough to be below the limit
             return
+
+        pcaches_list.sort(key = lambda p: (-p.get('money_spent', 0), p.get('account_creation_time', +1), p.get('user_id')))
+        master_pcache = interfering_alt_pcaches[0]
+        if master_pcache is not our_pcache: return
 
         print >> self.msg_fd, 'player %d has %d violating alts: %r exceeding region limit of %d' % (user_id, len(interfering_alt_pcaches), interfering_alt_pcaches, region_alt_limit)
 
-        master_pcache = interfering_alt_pcaches[0]
-        for alt_pchache in interfering_alt_pcaches[1:]:
-            if master_account(master_pcache, alt_pcache) is alt_pcache:
-                master_pcache = copy.deepcopy(alt_pcache) # step through all interfering pcaches and find the true master pcache
+        for alt_pcache in pcaches_list[region_alt_limit+1:]: # remove all alts in excess of limit
 
-        print >> self.msg_fd, 'punishing player %d (alt of %d)...' % (user_id, master_pcache['user_id']),
+            print >> self.msg_fd, 'punishing player %d (alt of %d)...' % (pcache['user_id'], master_pcache['user_id']),
+            try:
+                # list of region names where player has OTHER alts (including the master account)
+                other_alt_region_names = set([pc['home_region'] for pc in interfering_alt_pcaches if pc is not alt_pcache] + [player['home_region'],])
 
-        try:
-            # list of region names where player has OTHER alts (including the master account)
-            other_alt_region_names = set([pc['home_region'] for pc in interfering_alt_pcaches if pc is not alt_pcache] + [player['home_region'],])
+                # update the alt's home region so next pass will get the right data
+                new_region_name = self.punish_player(user_id, master_pcache['user_id'], player['home_region'], other_alt_region_names,
+                                                     [pc['user_id'] for pc in interfering_alt_pcaches]+[user_id,], region_alt_limit)
 
-            # update the alt's home region so next pass will get the right data
-            new_region_name = self.punish_player(user_id, master_pcache['user_id'], player['home_region'], other_alt_region_names,
-                                                 [pc['user_id'] for pc in interfering_alt_pcaches]+[user_id,], region_alt_limit)
+                our_pcache['home_region'] = new_region_name
+                print >> self.msg_fd, 'moved to region %s' % (new_region_name)
 
-            our_pcache['home_region'] = new_region_name
-            print >> self.msg_fd, 'moved to region %s' % (new_region_name)
-
-        except:
-            sys.stderr.write(('error punishing user %d: '%(user_id)) + traceback.format_exc())
+            except:
+                sys.stderr.write(('error punishing user %d: '%(alt_pcache['user_id'])) + traceback.format_exc())
 
     def punish_player(self, user_id, master_id, cur_region_name, other_alt_region_names, all_alt_ids, alt_limit = 0):
 
