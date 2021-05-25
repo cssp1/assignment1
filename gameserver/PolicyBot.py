@@ -478,7 +478,7 @@ class AltPolicy(Policy):
     def check_player(self, user_id, player):
 
         # possible race condition after player cache lookup (?)
-        if player['home_region'] not in alt_policy_region_names: return
+        if not player.get('home_region', False) or player['home_region'] not in alt_policy_region_names: return
 
         region_alt_limit = gamedata['regions'][player['home_region']].get('alt_limit',0) # if no alt_limit is set, this region is being checked because it has an anti_alt tag, so it default to 0
 
@@ -528,7 +528,7 @@ class AltPolicy(Policy):
 
         pcaches_list = [our_pcache]
         for alt_pcache in alt_pcaches:
-            if self.test or alt_pcache.get('home_region', None) == player['home_region']:
+            if alt_pcache.get('home_region', None) == player['home_region'] or (self.test and alt_pcache.get('home_region', False)):
                 pcaches_list.append(alt_pcache)
 
         if len(pcaches_list) - 1 <= region_alt_limit: # this player is either the master account or high up enough to be below the limit
