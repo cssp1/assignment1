@@ -26,30 +26,13 @@ def do_CONTROLAPI(args, extra_text = None):
     if extra_text: args['ui_reason'] += ' ' + extra_text
     return ControlAPI.CONTROLAPI(args, 'PolicyBot', max_tries = 3) # allow some retries
 
-# given two pcache entries for an alt pair, return the entry that is the more senior "master" account
-def master_account(a, b):
-    aspent = a.get('money_spent',0)
-    bspent = b.get('money_spent',0)
-    if aspent > bspent:
-        return a
-    elif aspent < bspent:
-        return b
-    acreat = a.get('account_creation_time',0)
-    bcreat = b.get('account_creation_time',0)
-    if acreat > bcreat:
-        return b
-    elif acreat < bcreat:
-        return a
-    # break ties
-    if a['user_id'] > b['user_id']:
-        return b
-    return a
-
 def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
+def is_alt_policy_region(region): return 'anti_alt' in region.get('tags',[]) or region.get('alt_limit',0) > 0
 def is_anti_vpn_region(region): return 'anti_vpn' in region.get('tags',[])
 def is_anti_refresh_region(region): return 'anti_refresh' in region.get('tags',[])
 
 anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
+alt_policy_region_names = [name for name, data in gamedata['regions'].iteritems() if is_alt_policy_region(data)]
 anti_vpn_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_vpn_region(data)]
 ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
 anti_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_refresh_region(data)]
@@ -472,7 +455,7 @@ class IdleCheckAntiRefreshPolicy(AntiRefreshPolicy):
         except:
             sys.stderr.write(('error punishing player %d: '%(user_id)) + traceback.format_exc())
 
-class AntiAltPolicy(Policy):
+class AltPolicy(Policy):
     # min number of simultaneous logins to trigger action
     MIN_LOGINS = gamedata['server'].get('alt_min_logins',5)
 
@@ -488,14 +471,16 @@ class AntiAltPolicy(Policy):
         return db_client.player_cache_query_mtime_or_ctime_between([time_range], [],
                                                                    townhall_name = gamedata['townhall'],
                                                                    min_townhall_level = 3,
-                                                                   include_home_regions = anti_alt_region_names,
+                                                                   include_home_regions = alt_policy_region_names,
                                                                    min_known_alt_count = 1)
 
 
     def check_player(self, user_id, player):
 
         # possible race condition after player cache lookup (?)
-        if player['home_region'] not in anti_alt_region_names: return
+        if player['home_region'] not in alt_policy_region_names: return
+
+        region_alt_limit = gamedata['regions'][player['home_region']].get('alt_limit',0) # if no alt_limit is set, this region is being checked because it has an anti_alt tag, so it default to 0
 
         if self.test:
             alt_accounts = {str(user_id+1): {'logins': 99, 'last_login': time_now-60}}
@@ -541,40 +526,38 @@ class AntiAltPolicy(Policy):
         if self.verbose >= 2:
             print >> self.msg_fd, 'player %d in %s has possible alts: %r' % (user_id, player['home_region'], alt_pcaches)
 
-        interfering_alt_pcaches = []
-
+        pcaches_list = [our_pcache]
         for alt_pcache in alt_pcaches:
             if self.test or alt_pcache.get('home_region', None) == player['home_region']:
-                # check to see whether this is the "master" account - if not, we'll be taking action when scanning the other account
-                if master_account(our_pcache, alt_pcache) is not our_pcache:
-                    continue
+                pcaches_list.append(alt_pcache)
 
-                interfering_alt_pcaches.append(alt_pcache)
-
-        if not interfering_alt_pcaches:
+        if len(pcaches_list) - 1 <= region_alt_limit: # this player is either the master account or high up enough to be below the limit
             return
 
-        print >> self.msg_fd, 'player %d has violating alts: %r' % (user_id, interfering_alt_pcaches)
+        pcaches_list.sort(key = lambda p: (-p.get('money_spent', 0), p.get('account_creation_time', +1), p.get('user_id')))
+        master_pcache = pcaches_list[0]
+        if master_pcache is not our_pcache: return
 
-        for alt_pcache in interfering_alt_pcaches:
-            print >> self.msg_fd, 'punishing player %d (alt of %d)...' % (alt_pcache['user_id'], user_id),
+        print >> self.msg_fd, 'player %d has %d violating alts: %r exceeding region limit of %d' % (user_id, len(pcaches_list), pcaches_list, region_alt_limit)
 
+        for alt_pcache in pcaches_list[region_alt_limit+1:]: # remove all alts in excess of limit
+
+            print >> self.msg_fd, 'punishing player %d (alt of %d)...' % (alt_pcache['user_id'], master_pcache['user_id']),
             try:
-
                 # list of region names where player has OTHER alts (including the master account)
-                other_alt_region_names = set([pc['home_region'] for pc in interfering_alt_pcaches if pc is not alt_pcache] + [player['home_region'],])
+                other_alt_region_names = set([pc['home_region'] for pc in pcaches_list if pc is not alt_pcache] + [player['home_region'],])
 
                 # update the alt's home region so next pass will get the right data
-                new_region_name = self.punish_player(alt_pcache['user_id'], user_id, player['home_region'], other_alt_region_names,
-                                                     [pc['user_id'] for pc in interfering_alt_pcaches]+[user_id,])
+                new_region_name = self.punish_player(user_id, master_pcache['user_id'], player['home_region'], other_alt_region_names,
+                                                     [pc['user_id'] for pc in pcaches_list]+[user_id,], region_alt_limit)
 
-                alt_pcache['home_region'] = new_region_name
+                our_pcache['home_region'] = new_region_name
                 print >> self.msg_fd, 'moved to region %s' % (new_region_name)
 
             except:
                 sys.stderr.write(('error punishing user %d: '%(alt_pcache['user_id'])) + traceback.format_exc())
 
-    def punish_player(self, user_id, master_id, cur_region_name, other_alt_region_names, all_alt_ids):
+    def punish_player(self, user_id, master_id, cur_region_name, other_alt_region_names, all_alt_ids, alt_limit = 0):
 
         cur_region = gamedata['regions'][cur_region_name]
         cur_continent_id = cur_region.get('continent_id',None)
@@ -638,11 +621,15 @@ class AntiAltPolicy(Policy):
         if not is_repeat_offender:
             if is_majority_anti_alt_game:
                 message_body = 'We identified an alternate account (ID %d) with you in %s and therefore relocated your base to %s. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-alt policy will result in a permanent ban from map regions.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
+            elif alt_limit > 0:
+                message_body = 'We identified more than %d alternate accounts with you in region %s and therefore relocated your base to %s. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-alt policy will result in a permanent ban from anti-alt maps.' % (alt_limit, cur_region['ui_name'], new_region['ui_name'])
             else:
                 message_body = 'We identified an alternate account (ID %d) with you in the anti-alt region %s and therefore relocated your base to %s. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-alt policy will result in a permanent ban from anti-alt maps.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
         else: # repeat offender
             if is_majority_anti_alt_game:
                 message_body = 'We identified an alternate account (ID %d) with you in %s and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our anti-alt policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
+            elif alt_limit > 0:
+                message_body = 'We identified more than %d alternate accounts with you in region %s and therefore relocated your base to %s. Moreover, your account has been locked from most map regions due to repeated violations of our alt policy. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our alt policy will result in a permanent ban from anti-alt maps.' % (alt_limit, cur_region['ui_name'], new_region['ui_name'])
             else:
                 message_body = 'We identified an alternate account (ID %d) with you in the anti-alt region %s and therefore relocated your base to %s. Moreover, your account has been locked from anti-alt map regions due to repeated violations of our anti-alt policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
 
@@ -677,8 +664,8 @@ class NullFD(object):
 
 POLICIES = []
 
-if anti_alt_region_names:
-    POLICIES.append(AntiAltPolicy)
+if alt_policy_region_names:
+    POLICIES.append(AltPolicy)
 if anti_vpn_region_names:
     POLICIES.append(AntiVPNPolicy)
 if anti_refresh_region_names:
