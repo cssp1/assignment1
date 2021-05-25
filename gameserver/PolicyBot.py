@@ -11,7 +11,6 @@ import SpinConfig, SpinJSON, SpinParallel
 import SpinNoSQL, SpinLog, SpinNoSQLLog, SpinIPReputation
 import SpinSingletonProcess
 import ControlAPI
-import copy
 
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
@@ -536,21 +535,21 @@ class AltPolicy(Policy):
             return
 
         pcaches_list.sort(key = lambda p: (-p.get('money_spent', 0), p.get('account_creation_time', +1), p.get('user_id')))
-        master_pcache = interfering_alt_pcaches[0]
+        master_pcache = pcaches_list[0]
         if master_pcache is not our_pcache: return
 
-        print >> self.msg_fd, 'player %d has %d violating alts: %r exceeding region limit of %d' % (user_id, len(interfering_alt_pcaches), interfering_alt_pcaches, region_alt_limit)
+        print >> self.msg_fd, 'player %d has %d violating alts: %r exceeding region limit of %d' % (user_id, len(pcaches_list), pcaches_list, region_alt_limit)
 
         for alt_pcache in pcaches_list[region_alt_limit+1:]: # remove all alts in excess of limit
 
-            print >> self.msg_fd, 'punishing player %d (alt of %d)...' % (pcache['user_id'], master_pcache['user_id']),
+            print >> self.msg_fd, 'punishing player %d (alt of %d)...' % (alt_pcache['user_id'], master_pcache['user_id']),
             try:
                 # list of region names where player has OTHER alts (including the master account)
-                other_alt_region_names = set([pc['home_region'] for pc in interfering_alt_pcaches if pc is not alt_pcache] + [player['home_region'],])
+                other_alt_region_names = set([pc['home_region'] for pc in pcaches_list if pc is not alt_pcache] + [player['home_region'],])
 
                 # update the alt's home region so next pass will get the right data
                 new_region_name = self.punish_player(user_id, master_pcache['user_id'], player['home_region'], other_alt_region_names,
-                                                     [pc['user_id'] for pc in interfering_alt_pcaches]+[user_id,], region_alt_limit)
+                                                     [pc['user_id'] for pc in pcaches_list]+[user_id,], region_alt_limit)
 
                 our_pcache['home_region'] = new_region_name
                 print >> self.msg_fd, 'moved to region %s' % (new_region_name)
