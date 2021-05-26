@@ -90,7 +90,7 @@ class AntiVPNPolicy(Policy):
             print >> self.msg_fd, 'moved to region %s' % (new_region_name)
 
         except:
-            sys.stderr.write(('error punishing user %d: '%(player['user_id'])) + traceback.format_exc())
+            sys.stderr.write(('error punishing %s user %d: '%(SpinConfig.game(), player['user_id'])) + traceback.format_exc())
 
     def punish_player(self, user_id, cur_region_name, last_login_ip, ip_rep_result):
 
@@ -372,7 +372,7 @@ class LoginPatternAntiRefreshPolicy(AntiRefreshPolicy):
                                       'name':self.HOLDOFF_COOLDOWN_NAME,
                                       'duration': self.HOLDOFF_COOLDOWN_DURATION}) == 'ok'
         except:
-            sys.stderr.write(('error punishing player %d: '%(user_id)) + traceback.format_exc())
+            sys.stderr.write(('error punishing %s player %d: '%(SpinConfig.game(), user_id)) + traceback.format_exc())
 
 class IdleCheckAntiRefreshPolicy(AntiRefreshPolicy):
     # ignore anything that happened more than a week ago
@@ -453,7 +453,7 @@ class IdleCheckAntiRefreshPolicy(AntiRefreshPolicy):
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'reset_idle_check_state'}) == 'ok'
 
         except:
-            sys.stderr.write(('error punishing player %d: '%(user_id)) + traceback.format_exc())
+            sys.stderr.write(('error punishing %s player %d: '%(SpinConfig.game(), user_id)) + traceback.format_exc())
 
 class AltPolicy(Policy):
     # min number of simultaneous logins to trigger action
@@ -555,7 +555,7 @@ class AltPolicy(Policy):
                 print >> self.msg_fd, 'moved to region %s' % (new_region_name)
 
             except:
-                sys.stderr.write(('error punishing user %d: '%(alt_pcache['user_id'])) + traceback.format_exc())
+                sys.stderr.write(('error punishing %s user %d: '%(SpinConfig.game(), alt_pcache['user_id'])) + traceback.format_exc())
 
     def punish_player(self, user_id, master_id, cur_region_name, other_alt_region_names, all_alt_ids, alt_limit = 0):
 
@@ -565,6 +565,7 @@ class AltPolicy(Policy):
         # find pro- and anti-alt regions in the same continent
         anti_alt_regions = filter(lambda x: is_anti_alt_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
         pro_alt_regions = filter(lambda x: not is_anti_alt_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
+        prison_regions = filter(lambda x: 'prison' in x.get('id',''), gamedata['regions'].itervalues())
 
         assert len(anti_alt_regions) >= 1 and len(pro_alt_regions) >= 1
         is_majority_anti_alt_game = (len(anti_alt_regions) > len(pro_alt_regions)) or \
@@ -602,8 +603,19 @@ class AltPolicy(Policy):
             assert len(candidate_regions) >= 1
             new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
 
+        if new_region['id'] == cur_region_name:
+            # pick a prison region on third pass
+            candidate_regions = filter(lambda x: x.get('open_join',1) and x.get('enable_map',1) and \
+                                       not x.get('developer_only',0),
+                                       prison_regions)
+            if self.verbose >= 2:
+                print >> self.msg_fd, 'continent %r third-pass candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
+
+            assert len(candidate_regions) >= 1
+            new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
+
         if not self.test:
-            assert new_region['id'] != cur_region_name
+            assert new_region['id'] != cur_region_name or 'prison' in new_region['id']
 
         if not self.dry_run:
             assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION}) == 'ok'
