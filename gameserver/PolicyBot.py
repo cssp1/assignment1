@@ -521,7 +521,7 @@ class AltPolicy(Policy):
 
         # query player cache on alts to determine if they are in the same region, and compare spend/account creation time
         alt_pcaches = self.db_client.player_cache_lookup_batch(alt_ids, fields = ['home_region','money_spent','account_creation_time'])
-        our_pcache = {'user_id': user_id, 'money_spent': player['history'].get('money_spent',0), 'account_creation_time': player['creation_time']}
+        our_pcache = {'user_id': user_id, 'money_spent': player['history'].get('money_spent',0), 'account_creation_time': player['creation_time'], 'home_region':player['home_region']}
 
         if self.verbose >= 2:
             print >> self.msg_fd, 'player %d in %s has possible alts: %r' % (user_id, player['home_region'], alt_pcaches)
