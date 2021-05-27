@@ -875,22 +875,24 @@ if __name__ == '__main__':
                     else:
                         alt_player = SpinJSON.loads(driver.sync_download_player(other_id))
                     violation_history = get_prior_violations(alt_player)
+                    alt_region = alt_player.get('home_region', 'None')
                 except Exception as e:
                     # don't worry about error handling for reading alts, just zero out alt's violation history and continue
                     # but do a print a message, for debugging purposes
                     print fmt % ('', 'ID: %7d, Error getting violation history: %r' % (other_id, e))
                     violation_history = {'chat_warnings':0, 'chat_violations':0, 'alt_violations':0, 'vpn_violations':0, 'banned':0}
+                    alt_region = 'Unknown'
 
                 if violation_history['banned']:
-                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (BANNED!)' % (other_id, entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, Region: %s, #Logins: %4d, Last simultaneous login: %s (IP %s), (BANNED!)' % (other_id, alt_region, entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip))
                 elif violation_history['chat_warnings'] == 0 and violation_history['chat_violations'] == 0 and violation_history['alt_violations'] == 0 and violation_history['vpn_violations'] == 0:
-                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (other_id, entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, Region: %s, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (other_id, alt_region, entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip))
                 else:
-                    print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Anti-Alt violations %d, VPN violations %d)' % (other_id, entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, Region: %s, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Anti-Alt violations %d, VPN violations %d)' % (other_id, alt_region, entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip, violation_history['chat_warnings'], violation_history['chat_violations'], violation_history['alt_violations'], violation_history['vpn_violations']))
 
