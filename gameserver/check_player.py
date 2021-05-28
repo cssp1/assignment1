@@ -852,10 +852,28 @@ if __name__ == '__main__':
                                      key = lambda id_entry: -id_entry[1].get('logins',1)):
                 other_id = int(s_other_id)
                 if entry.get('ignore', False) and is_known_alt_valid(entry): # marked non-alt
-                    print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt)' % other_id)
+                    try:
+                        if use_controlapi:
+                            # requesting "stringify" is faster in the logged-out case (since the server doesn't parse/unparse) and probably same speed in logged-in case
+                            alt_player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': other_id}))
+                        else:
+                            alt_player = SpinJSON.loads(driver.sync_download_player(other_id))
+                        alt_region = alt_player.get('home_region', 'None')
+                    except Exception as e:
+                        alt_region = 'Unknown'
+                    print fmt % ('', 'ID: %7d, Region: %s, IGNORED (marked as non-alt)' % (other_id, alt_region))
                     continue # manually ignored
                 elif entry.get('ignore', False) and not is_known_alt_valid(entry):
-                    print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt) - INACTIVE (will not be counted as alt if unignored)' % other_id)
+                    try:
+                        if use_controlapi:
+                            # requesting "stringify" is faster in the logged-out case (since the server doesn't parse/unparse) and probably same speed in logged-in case
+                            alt_player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': other_id}))
+                        else:
+                            alt_player = SpinJSON.loads(driver.sync_download_player(other_id))
+                        alt_region = alt_player.get('home_region', 'None')
+                    except Exception as e:
+                        alt_region = 'Unknown'
+                    print fmt % ('', 'ID: %7d, Region: %s, IGNORED (marked as non-alt) - INACTIVE (will not be counted as alt if unignored)' % (other_id, alt_region))
                     continue # manually ignored, but now lapsed
                 if not is_known_alt_valid(entry):
                     continue

@@ -540,7 +540,12 @@ class AltPolicy(Policy):
 
         print >> self.msg_fd, 'player %d has %d violating alts: %r exceeding region limit of %d' % (user_id, len(pcaches_list), pcaches_list, region_alt_limit)
 
-        for alt_pcache in pcaches_list[region_alt_limit + 1:]: # remove all alts in excess of limit
+        if region_alt_limit == 0:
+            region_alt_limit_offset = 1
+        else:
+            region_alt_limit_offset = region_alt_limit
+
+        for alt_pcache in pcaches_list[region_alt_limit_offset:]: # remove all alts in excess of limit
 
             print >> self.msg_fd, 'punishing player %d (alt of %d)...' % (alt_pcache['user_id'], master_pcache['user_id']),
             try:
