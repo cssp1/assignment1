@@ -7,6 +7,7 @@
 # gamedata checker
 
 import SpinJSON
+import SpinConfig
 import GameDataUtil
 import sys, traceback, os, copy, time, re
 import getopt
@@ -3029,7 +3030,7 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                     if base_type != 'quarry' and has_exotic_resource and ('base_resource_loot' not in base):
                         error |= 1; print 'ERROR: AI base %s has a %s that will drop exotic resource "%s" loot. It should be using "base_resource_loot" instead of the old loot system' % (strid, has_exotic_resource[0], has_exotic_resource[1])
 
-                elif KIND == 'buildings' and has_matplotlib:
+                elif KIND == 'buildings' and has_matplotlib and SpinConfig.config.get('verify_building_positions', 0):
                     if item['spec'] in ('%RESOURCE_harvester'):
                         if gamedata['game_id'] in ('dv', 'tr', 'fs', 'eg'):
                             spec = gamedata['buildings']['supply_yard']
