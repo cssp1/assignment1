@@ -443,7 +443,7 @@ def check_mandatory_fields(specname, spec, kind):
                                 found_node = True
                         if not found_node:
                             error |= 1; print '%s: has security_node equip_slot type but no "security_nodes_" entry in crafting_categories' % (specname)
-                if slot_name in mounted_weapons:
+                if slot_name in mounted_weapons and spec['name'] != 'toc' and spec['name'] != 'central_computer': # specifically exclude TOC/CC from this check
                     for weapon in mounted_weapons:
                         if weapon != slot_name:
                             for other_slot in slot_dict_list:
