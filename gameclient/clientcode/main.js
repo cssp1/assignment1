@@ -1200,6 +1200,39 @@ Aura.prototype.apply = function(world, obj) {
                 var o2 = obj_list[i].obj;
                 o2.create_aura(world, obj.id, obj.team, code.replace('booster', 'boosted'), this.strength, new GameTypes.TickCount(1), 0);
             }
+        } else if(code.indexOf('make_invuln') === 0) { // this handles both make_invuln and make_invuln_invisible
+            // apply the is_invuln or is_invuln_invisible aura to nearby units
+
+            if(obj.is_destroyed()) {
+                // but don't apply if the booster is dead
+                return;
+            }
+            var aura_strength = 0;
+            var aura_affects_specs = null;
+            var mobile_only = true
+            if(typeof(this.strength) === 'object') {
+                aura_affects_specs = this.strength['affects_specs'];
+                aura_strength = this.strength['strength_val'];
+                if('mobile_only' in this.strength) { mobile_only = this.strength['mobile_only']; }
+            } else {
+                aura_strength = this.strength;
+            }
+
+            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
+                                                               gamedata['map']['range_conversion'] * this.range,
+                                                               { only_team: obj.team, mobile_only: mobile_only });
+            for(var i = 0; i < obj_list.length; i++) {
+                var o = obj_list[i].obj;
+                if(aura_affects_specs) {
+                    if(goog.array.contains(aura_affects_specs, o.spec['name'])) {
+                        o.create_aura(world, obj.id, obj.team, code.replace('make', 'is'), this.strength, new GameTypes.TickCount(1), 0);
+                    }
+                } else {
+                    o.create_aura(world, obj.id, obj.team, code.replace('make', 'is'), this.strength, new GameTypes.TickCount(1), 0);
+                }
+            }
+        } else if(code === 'is_invuln') {
+            return; // need the code to avoid errors, but this is handled by GameObject.prototype.is_invul
         } else if(code.indexOf('detector') === 0) {
             // apply the detected aura to nearby units
 
@@ -2503,8 +2536,15 @@ GameObject.prototype.weapon_range = function() {
     return get_weapon_range(this.combat_stats, this.get_auto_spell_level(), spell);
 };
 GameObject.prototype.is_invul = function() {
-    return (this.spec['max_hp'] === 0) ||
-        (this.spec['quarry_invul'] && session.is_quarry());
+    if(this.spec['max_hp'] === 0) { return true; }
+    if(this.spec['quarry_invul'] && session.is_quarry()) { return true }
+    if(this.auras) {
+        for(var i = 0; i < this.auras.length; i++) {
+            var a = this.auras[i];
+            if(a.spec['name'] === 'is_invuln_invisible' || a.spec['name'] === 'is_invuln') { return true; }
+        }
+    }
+    return false;
 };
 
 // return true if we have a weapon that can shoot at target (regardless of whether target is in range or not)
