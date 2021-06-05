@@ -433,7 +433,7 @@ def check_mandatory_fields(specname, spec, kind):
                             error |= 1; print '%s: equip_slot type %s at L%d has %d slots, exceeds config limit of %d. Update gamedata["server"]["max_object_config_settings"] to increase the limit' % (specname, slot_name, i+1, allowed_qty, gamedata['server'].get('max_object_config_settings', 10))
                 if slot_name not in gamedata['strings']['equip_slots']:
                     error |= 1; print '%s: equip_slot type %s not found in strings.json' % (specname, slot_name)
-                if slot_name == 'security_node':
+                if slot_name == 'security_node' and spec['name'] != 'toc' and spec['name'] != 'central_computer':
                     if 'crafting_categories' not in spec and 'CRAFT_FOR_FREE' in spec['spells']:
                         error |= 1; print '%s: has security_node equip_slot type but no crafting_categories' % (specname)
                     found_node = False
