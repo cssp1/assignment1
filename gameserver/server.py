@@ -12946,6 +12946,9 @@ class Player(AbstractPlayer):
             for obj in self.state_changed_buildings:
                 if session.has_object(obj.obj_id):
                     retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
+            for obj in self.modded_buildings.itervalues():
+                if obj.auras:
+                    retmsg.append(["OBJECT_AURAS_UPDATE", obj.serialize_auras()])
 
     # raise the level/auras of all units affected by tech_name to the current tech level
     def update_unit_levels(self, observer, tech_name, session, retmsg):
