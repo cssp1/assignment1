@@ -433,17 +433,17 @@ def check_mandatory_fields(specname, spec, kind):
                             error |= 1; print '%s: equip_slot type %s at L%d has %d slots, exceeds config limit of %d. Update gamedata["server"]["max_object_config_settings"] to increase the limit' % (specname, slot_name, i+1, allowed_qty, gamedata['server'].get('max_object_config_settings', 10))
                 if slot_name not in gamedata['strings']['equip_slots']:
                     error |= 1; print '%s: equip_slot type %s not found in strings.json' % (specname, slot_name)
-                if slot_name == 'security_node' and spec['name'] != 'toc' and spec['name'] != 'central_computer':
+                if slot_name == 'security_node':
                     if 'crafting_categories' not in spec and 'CRAFT_FOR_FREE' in spec['spells']:
                         error |= 1; print '%s: has security_node equip_slot type but no crafting_categories' % (specname)
-                    found_node = False
-                    if 'crafting_categories' in spec and 'CRAFT_FOR_FREE' in spec['spells']:
-                        for category in spec['crafting_categories']:
-                            if 'security_nodes_' in category:
-                                found_node = True
-                        if not found_node:
-                            error |= 1; print '%s: has security_node equip_slot type but no "security_nodes_" entry in crafting_categories' % (specname)
-                if slot_name in mounted_weapons and spec['name'] != 'toc' and spec['name'] != 'central_computer': # specifically exclude TOC/CC from this check
+                found_node = False
+                if 'crafting_categories' in spec and 'CRAFT_FOR_FREE' in spec['spells']:
+                    for category in spec['crafting_categories']:
+                        if 'security_nodes_' in category:
+                            found_node = True
+                    if not found_node:
+                        error |= 1; print '%s: has security_node equip_slot type but no "security_nodes_" entry in crafting_categories' % (specname)
+                if slot_name in mounted_weapons:
                     for weapon in mounted_weapons:
                         if weapon != slot_name:
                             for other_slot in slot_dict_list:
