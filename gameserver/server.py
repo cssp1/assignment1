@@ -12623,6 +12623,7 @@ class Player(AbstractPlayer):
                                             additional_base.iter_objects() if additional_base else [])
 
             self.modded_buildings = {}
+            self.aura_changed_objects = {}
             self.state_changed_buildings = set()
 
             self.units = {}
@@ -12807,6 +12808,8 @@ class Player(AbstractPlayer):
                         if obj.auras is None: obj.auras = []
                         for data in permanent_auras:
                             Aura.apply_aura(obj.auras, data['aura_name'], data.get('aura_strength',1), range = data.get('aura_range',-1), from_stattab = True)
+                            if obj.obj_id not in player.stattab.aura_changed_objects:
+                                player.stattab.aura_changed_objects[obj.obj_id] = obj
 
             # even when squads are off, make sure total_space is enough for the whole of base defenders
             self.total_space = max(self.total_space, self.main_squad_space)
@@ -12946,6 +12949,9 @@ class Player(AbstractPlayer):
             for obj in self.state_changed_buildings:
                 if session.has_object(obj.obj_id):
                     retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
+            for obj in self.aura_changed_objects.itervalues():
+                if session.has_object(obj.obj_id):
+                    retmsg.append(["OBJECT_AURAS_UPDATE", obj.serialize_auras()])
 
     # raise the level/auras of all units affected by tech_name to the current tech level
     def update_unit_levels(self, observer, tech_name, session, retmsg):
