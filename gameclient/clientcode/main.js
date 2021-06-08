@@ -1231,8 +1231,8 @@ Aura.prototype.apply = function(world, obj) {
                     o.create_aura(world, obj.id, obj.team, code.replace('make', 'is'), this.strength, new GameTypes.TickCount(1), 0);
                 }
             }
-        } else if(code === 'is_invuln') {
-            return; // need the code to avoid errors, but this is handled by GameObject.prototype.is_invul
+        } else if(code === 'is_invuln' || code === 'is_invuln_invisible') {
+            obj.combat_stats.invulnerable = 1;
         } else if(code.indexOf('detector') === 0) {
             // apply the detected aura to nearby units
 
@@ -1830,6 +1830,7 @@ function CombatStats() {
     this.projectile_speed = 1;
     this.splash_range = 1;
     this.art_asset = null;
+    this.invulnerable = 0;
     this.invisible = 0;
     this.detected = 0;
     this.avoided_detection = 0;
@@ -1869,6 +1870,7 @@ CombatStats.prototype.clear = function() {
     this.maxvel = 1;
     this.erratic_flight = 0;
     this.art_asset = null;
+    this.invulnerable = 0;
     this.invisible = 0;
     this.detected = 0;
     this.avoided_detection = 0;
@@ -2536,15 +2538,7 @@ GameObject.prototype.weapon_range = function() {
     return get_weapon_range(this.combat_stats, this.get_auto_spell_level(), spell);
 };
 GameObject.prototype.is_invul = function() {
-    if(this.spec['max_hp'] === 0) { return true; }
-    if(this.spec['quarry_invul'] && session.is_quarry()) { return true }
-    if(this.auras) {
-        for(var i = 0; i < this.auras.length; i++) {
-            var a = this.auras[i];
-            if(a.spec['name'] === 'is_invuln_invisible' || a.spec['name'] === 'is_invuln') { return true; }
-        }
-    }
-    return false;
+    return((this.spec['max_hp'] === 0) || (this.spec['quarry_invul'] && session.is_quarry()) || (this.combat_stats.invulnerable === 1))
 };
 
 // return true if we have a weapon that can shoot at target (regardless of whether target is in range or not)
