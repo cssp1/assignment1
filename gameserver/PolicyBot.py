@@ -573,7 +573,7 @@ class AltPolicy(Policy):
         prison_regions = filter(lambda x: 'prison' in x.get('id',''), gamedata['regions'].itervalues())
 
         if len(anti_alt_regions) < 1 or len(pro_alt_regions) < 1:
-            sys.stderr.write(('error punishing %s user %d: anti_alt_regions length is %d (values %r), pro_alt_regions length is %d (values %r)'%(SpinConfig.game(), player['user_id']), len(anti_alt_regions), str(anti_alt_regions), len(pro_alt_regions), str(pro_alt_regions)))
+            sys.stderr.write(('error punishing %s user %d: anti_alt_regions length is %d (values %r), pro_alt_regions length is %d (values %r)'%(SpinConfig.game(), user_id), len(anti_alt_regions), str(anti_alt_regions), len(pro_alt_regions), str(pro_alt_regions)))
 
         assert len(anti_alt_regions) >= 1 and len(pro_alt_regions) >= 1
         is_majority_anti_alt_game = (len(anti_alt_regions) > len(pro_alt_regions)) or \
