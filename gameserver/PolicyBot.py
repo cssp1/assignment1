@@ -572,6 +572,9 @@ class AltPolicy(Policy):
         pro_alt_regions = filter(lambda x: not is_anti_alt_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
         prison_regions = filter(lambda x: 'prison' in x.get('id',''), gamedata['regions'].itervalues())
 
+        if len(anti_alt_regions) < 1 or len(pro_alt_regions) < 1:
+            sys.stderr.write('error punishing %s user %d: anti_alt_regions length is %d (values %r), pro_alt_regions length is %d (values %r)' % (SpinConfig.game(), user_id, len(anti_alt_regions), str(anti_alt_regions), len(pro_alt_regions), str(pro_alt_regions)))
+
         assert len(anti_alt_regions) >= 1 and len(pro_alt_regions) >= 1
         is_majority_anti_alt_game = (len(anti_alt_regions) > len(pro_alt_regions)) or \
                                     (SpinConfig.game() in ('bfm','mf','mf2')) # special-purpose hack for migration
