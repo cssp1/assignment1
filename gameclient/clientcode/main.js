@@ -1316,6 +1316,9 @@ Aura.prototype.apply = function(world, obj) {
                 var spellname = effect['spell'];
                 obj.cast_client_spell(world, spellname, gamedata['spells'][spellname], null, null);
             }
+        } else if(code === 'ai_missile_defending') {
+            // visual marker for AI buildings running extra missile defenses
+            return;
         } else {
             console.log('unhandled aura code '+code);
         }
