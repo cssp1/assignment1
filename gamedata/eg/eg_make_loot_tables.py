@@ -35,6 +35,19 @@ if __name__ == '__main__':
         # for the ~$200 USD, 20000-gamebuck SKU
         {"name": "item_bundle_20000", "loot": []},
 
+        # for "Medic and Mechanic Mayhem" event
+        {"name": "medic_bundle_500", "loot": []},
+
+        {"name": "medic_bundle_1000", "loot": []},
+
+        {"name": "medic_bundle_2500", "loot": []},
+
+        {"name": "medic_bundle_5000", "loot": []},
+
+        {"name": "medic_bundle_10000", "loot": []},
+
+        {"name": "medic_bundle_20000", "loot": []},
+
         # return one packaged L1+ unit that represents the "sexiest" unit the player has already unlocked
         {"name": "sexy_unlocked_unit",
          "loot": [{"cond": [

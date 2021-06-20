@@ -63,6 +63,11 @@ if __name__ == '__main__':
                                    {'alloy': 1050, 'kgcredits': 99, 'nominal_alloy': 1000, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                    {'alloy': 500, 'kgcredits': 49, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'}
                                    ] },
+               "P100MEDIC": { "level": 100, "kind": "MEDIC",
+                          "currency": "kgcredits",
+                          "skus": [{'alloy': 1050, 'kgcredits': 99, 'nominal_alloy': 1000, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                   {'alloy': 500, 'kgcredits': 49, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'}
+                                   ] },
                "P100FLASH50": { "level": 50, "kind": "FLASH50", # 50% Off sale for flash offers
                           "currency": "kgcredits",
                           "skus": [{'alloy': 24000, 'kgcredits':999, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},

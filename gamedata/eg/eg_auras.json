@@ -246,6 +246,15 @@
         "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
         // effects happen via AURA_(IN)ACTIVE predicates
     },
+    "medic_bundles": {
+        "name": "medic_bundles",
+        "icon": "inventory_gold_icon_gift",
+        "client": 0, "server": 0,
+        "help": 1, "cancelable": 0, "limited": 0, "track_recently_expired": 1,
+        "ui_name": "Special Offer", "show": 1, "show_in_battle_log": 0, "name_color": [0,1,0.25,1],
+        "ui_description": "Medic and Mechanic Mayhem! Get FREE repair kits with %gamebucks purchases. Act quickly, this offer ends soon!",
+        "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
+    },
     "store_bundles": {
         "name": "store_bundles",
         // note: data attributes "kind" and "duration" are mandatory for metrics logging. "tag" is optional.
