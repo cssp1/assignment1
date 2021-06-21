@@ -17,5 +17,11 @@
     "buy_gamebucks_FLASH_1000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
     "buy_gamebucks_FLASH_5000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
     "buy_gamebucks_FLASH_10000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
-    "buy_gamebucks_FLASH_20000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" }
+    "buy_gamebucks_FLASH_20000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_MEDIC_firstbuy_check": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_MEDIC_500_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_MEDIC_1000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_MEDIC_5000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_MEDIC_10000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" },
+    "buy_gamebucks_MEDIC_20000_on_purchase": {"consequent": "LIBRARY", "name": "on_login_pre_hello" }
 }

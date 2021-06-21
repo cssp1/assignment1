@@ -114,6 +114,12 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'NOK': 99.99, 'nominal_alloy': 1000, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'NOK': 49.99, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
                                         ] },
+               "MEDIC_SALE_NOK": { "kind": "MEDIC",
+                               "currency": "NOK",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'NOK': 99.99, 'nominal_alloy': 1000, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'NOK': 49.99, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
+                                        ] },
                "P175FLASH50_NOK": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "NOK",
                                     "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
@@ -179,9 +185,14 @@ if __name__ == '__main__':
                                         {'alloy': 13200, 'SEK': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE', 'loot_table': 'item_bundle_10000'},
                                         {'alloy': 6575, 'SEK': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE', 'loot_table': 'item_bundle_5000'},
                                         {'alloy': 2650, 'SEK': 249.99, 'nominal_alloy': 2500, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_2500'},
-
                                         {'alloy': 1050, 'SEK': 99.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'SEK': 49.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
+                                        ] },
+               "MEDIC_SALE_SEK": { "kind": "MEDIC",
+                               "currency": "SEK",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'SEK': 99.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'SEK': 49.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
                                         ] },
                "P135FLASH50_SEK": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "SEK",
@@ -260,6 +271,12 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'GBP': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'GBP': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
                                         ] },
+               "MEDIC_SALE_GBP": { "kind": "MEDIC",
+                               "currency": "GBP",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'GBP': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'GBP': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
+                                        ] },
                "P135FLASH50_GBP": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "GBP",
                                     "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
@@ -336,6 +353,12 @@ if __name__ == '__main__':
                                        {'alloy': 2650, 'EUR': 24.99, 'nominal_alloy': 2500, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_2500'},
                                        {'alloy': 1050, 'EUR': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                        {'alloy': 500, 'EUR': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
+                                       ] },
+              "MEDIC_SALE_EUR": { "kind": "MEDIC",
+                              "currency": "EUR",
+                              "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                              "skus": [{'alloy': 1050, 'EUR': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                       {'alloy': 500, 'EUR': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
                                        ] },
                "P135FLASH50_EUR": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "EUR",
@@ -415,6 +438,12 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'QAR': 49.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'QAR': 24.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
                                         ] },
+               "MEDIC_SALE_QAR": { "kind": "MEDIC",
+                               "currency": "QAR",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'QAR': 49.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'QAR': 24.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
+                                        ] },
                "P150FLASH50_QAR": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "QAR",
                                     "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
@@ -482,6 +511,12 @@ if __name__ == '__main__':
                                        {'alloy': 2650, 'BRL': 49.99, 'nominal_alloy': 2500, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_2500'},
                                        {'alloy': 1050, 'BRL': 19.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                        {'alloy': 500, 'BRL': 9.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
+                                       ] },
+              "MEDIC_SALE_BRL": { "kind": "MEDIC",
+                              "currency": "BRL",
+                              "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                              "skus": [{'alloy': 1050, 'BRL': 19.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                       {'alloy': 500, 'BRL': 9.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
                                        ] },
                "P100FLASH50_BRL": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "BRL",
@@ -551,6 +586,12 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'AED': 39.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'AED': 19.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
                                         ] },
+               "MEDIC_SALE_AED": { "kind": "MEDIC",
+                               "currency": "AED",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'AED': 39.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'AED': 19.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
+                                        ] },
                "P100FLASH50_AED": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "AED",
                                     "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
@@ -618,6 +659,12 @@ if __name__ == '__main__':
                                         {'alloy': 2650, 'DKK': 124.99, 'nominal_alloy': 2500, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_2500'},
                                         {'alloy': 1050, 'DKK': 49.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'DKK': 24.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
+                                        ] },
+               "MEDIC_SALE_DKK": { "kind": "MEDIC",
+                               "currency": "DKK",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'DKK': 49.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'DKK': 24.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
                                         ] },
                "P100FLASH50_DKK": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "DKK",
@@ -708,6 +755,12 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'AUD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'AUD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
                                         ] },
+               "MEDIC_SALE_AUD": { "kind": "MEDIC",
+                               "currency": "AUD",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'AUD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'AUD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
+                                        ] },
                "P100FLASH50_AUD": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "AUD",
                                     "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
@@ -786,6 +839,12 @@ if __name__ == '__main__':
                                         {'alloy': 2650, 'NZD': 24.99, 'nominal_alloy': 2500, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_2500'},
                                         {'alloy': 1050, 'NZD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'NZD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
+                                        ] },
+               "MEDIC_SALE_NZD": { "kind": "MEDIC",
+                               "currency": "NZD",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'NZD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'NZD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
                                         ] },
                "P080FLASH50_NZD": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "NZD",
@@ -866,6 +925,12 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'USD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'USD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
                                         ] },
+               "MEDIC_SALE_USD": { "kind": "MEDIC",
+                               "currency": "USD",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'USD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'USD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
+                                        ] },
 
                "P100FLASH50_USD": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "USD",
@@ -945,6 +1010,12 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'CAD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'CAD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
                                         ] },
+               "MEDIC_SALE_CAD": { "kind": "MEDIC",
+                               "currency": "CAD",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'CAD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'CAD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
+                                        ] },
                "P100FLASH50_CAD": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "CAD",
                                     "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
@@ -1013,6 +1084,12 @@ if __name__ == '__main__':
                                         {'alloy': 2650, 'ZAR': 249.99, 'nominal_alloy': 2500, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_2500'},
                                         {'alloy': 1050, 'ZAR': 99.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'ZAR': 49.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
+                                        ] },
+               "MEDIC_SALE_ZAR": { "kind": "MEDIC",
+                               "currency": "ZAR",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'ZAR': 99.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'ZAR': 49.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
                                         ] },
                "P100FLASH50_ZAR": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "ZAR",
@@ -1083,6 +1160,12 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'ISK': 999, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'ISK': 499, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
                                         ] },
+               "MEDIC_SALE_ISK": { "kind": "MEDIC",
+                               "currency": "ISK",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'ISK': 999, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'ISK': 499, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
+                                        ] },
                "P100FLASH50_ISK": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "ISK",
                                     "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
@@ -1151,6 +1234,12 @@ if __name__ == '__main__':
                                         {'alloy': 2650, 'IDR': 355575, 'nominal_alloy': 2500, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_2500'},
                                         {'alloy': 1050, 'IDR': 142230, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                         {'alloy': 500, 'IDR': 71115, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
+                                        ] },
+               "MEDIC_SALE_IDR": { "kind": "MEDIC",
+                               "currency": "IDR",
+                               "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                               "skus": [{'alloy': 1050, 'IDR': 142230, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                        {'alloy': 500, 'IDR': 71115, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
                                         ] },
                "P100FLASH50_IDR": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "IDR",
@@ -1240,6 +1329,12 @@ if __name__ == '__main__':
                                                 {'alloy': 2650, 'USD': 24.99, 'nominal_alloy': 2500, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_2500'},
                                                 {'alloy': 1050, 'USD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
                                                 {'alloy': 500, 'USD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'},
+                                                ] },
+               "MEDIC_SALE_USD": {"kind": "MEDIC", # same as P100D2SALE_USD
+                                       "currency": "USD",
+                                       "force_output": True, "unit_bonus_format": "short", "unit_bonus": None,
+                                       "skus": [{'alloy': 1050, 'USD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'medic_bundle_1000'},
+                                                {'alloy': 500, 'USD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'medic_bundle_500'},
                                                 ] },
                "FALLBACK_P100FLASH50_USD": { "kind": "FLASH50", # 50% Off sale for flash offers
                                     "currency": "USD",
@@ -1343,8 +1438,9 @@ if __name__ == '__main__':
             if 'loot_table' in data:
                 # check for typos in loot table specification
                 expected_loot_table = 'item_bundle_%d' % loot_level
-                if data['loot_table'] != expected_loot_table:
-                    raise Exception('unexpected loot_table: %s %s vs. %s' % (sku_name, data['loot_table'], expected_loot_table))
+                medic_loot_table = 'medic_bundle_%d' % loot_level
+                if data['loot_table'] not in (expected_loot_table, medic_loot_table):
+                    raise Exception('unexpected loot_table: %s %s vs. %s or %s' % (sku_name, data['loot_table'], expected_loot_table, medic_loot_table))
                 sku['loot_table'] = data['loot_table']
 
             if 'ui_banner' in data:
@@ -1371,7 +1467,7 @@ if __name__ == '__main__':
                 slate_match_predicate = {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_kind', 'value': slate_kind or 'UNUSED'}
 
                 # allow enabling individual FLASH SKUs by predicate, outside of normal FLASH whole-slate sale
-                if slate_kind in ('FLASH25','FLASH50') and loot_level in (500,1000,5000,10000,20000):
+                if slate_kind in ('FLASH25','FLASH50','MEDIC') and loot_level in (500,1000,5000,10000,20000):
 
                     sku_match_predname = 'buy_gamebucks_%s_%d_available' % (slate_kind, loot_level)
                     #print sku_name, sku_match_predname
@@ -1384,7 +1480,7 @@ if __name__ == '__main__':
                     # special on_purchase consequent that fires only when this SKU is selected by predicate
                     sku['on_purchase'] = {'consequent':'IF',
                                           'if': {'predicate': 'LIBRARY', 'name': sku_match_predname},
-                                          'then': {'consequent': 'LIBRARY', 'name': 'buy_gamebucks_FLASH_%d_on_purchase' % (loot_level,)}}
+                                          'then': {'consequent': 'LIBRARY', 'name': 'buy_gamebucks_%s_%d_on_purchase' % (re.sub(r'\d+', '', slate_kind), loot_level,)}}
 
                     # XXX temporary hack for testing - special version of ui_bonus that adds "Limit 1 per player"
                     if 'ui_bonus' in sku:

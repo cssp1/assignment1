@@ -88,14 +88,19 @@
     // selectors for individual discount SKUs
     "buy_gamebucks_FLASH25_500_available": {"predicate": "ALWAYS_FALSE"},
     "buy_gamebucks_FLASH50_500_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_MEDIC_500_available": {"predicate": "ALWAYS_FALSE"},
     "buy_gamebucks_FLASH25_1000_available": {"predicate": "ALWAYS_FALSE"},
     "buy_gamebucks_FLASH50_1000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_MEDIC_1000_available": {"predicate": "ALWAYS_FALSE"},
     "buy_gamebucks_FLASH25_5000_available": {"predicate": "ALWAYS_FALSE"},
     "buy_gamebucks_FLASH50_5000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_MEDIC_5000_available": {"predicate": "ALWAYS_FALSE"},
     "buy_gamebucks_FLASH25_10000_available": {"predicate": "ALWAYS_FALSE"},
     "buy_gamebucks_FLASH50_10000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_MEDIC_10000_available": {"predicate": "ALWAYS_FALSE"},
     "buy_gamebucks_FLASH25_20000_available": {"predicate": "ALWAYS_FALSE"},
     "buy_gamebucks_FLASH50_20000_available": {"predicate": "ALWAYS_FALSE"},
+    "buy_gamebucks_MEDIC_20000_available": {"predicate": "ALWAYS_FALSE"},
 
     // whether an ONP event is currently happening - controls visibility of ONP category on leaderboard.
     "token_event_happening": { "predicate": "OR", "subpredicates": [
