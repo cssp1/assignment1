@@ -248,7 +248,7 @@
     },
     "medic_bundles": {
         "name": "medic_bundles",
-        "icon": "inventory_gold_icon_gift",
+        "icon": "gamebucks_inventory_icon",
         "client": 0, "server": 0,
         "help": 1, "cancelable": 0, "limited": 0, "track_recently_expired": 1,
         "ui_name": "Special Offer", "show": 1, "show_in_battle_log": 0, "name_color": [0,1,0.25,1],
