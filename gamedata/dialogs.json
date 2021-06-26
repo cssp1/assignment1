@@ -5985,6 +5985,37 @@
                                              "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Affirmative" }
         }
     },
+    "upgrade_all_barriers_dialog": {
+        "bg_image": "",
+        "dimensions": [567,337],
+        "clip_children": 0,
+        "default_button": "upgrade_for_gamebucks_button",
+        "widgets": {
+            "bg":{"kind":"StaticImage","xy":[0,0],"dimensions":[567,337],"asset":"dialog_resizable","bg_image_resizable":1},
+            "sunken_left":{"kind":"StaticImage","xy":[10,12],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
+            "sidebar_splash":{"kind":"StaticImage","xy":[14,17],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
+
+            "sunken_right":{"kind":"StaticImage","xy":[169,12],"dimensions":[388,273],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
+
+            "title": { "kind": "TextField", "xy": [182,35], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
+                       "text_hjustify": "left", "ui_name": "Upgrades Ready", "ui_name_no_upgrades": "No Upgrades Remain" },
+            "close_button": { "kind": "ActionButton", "xy": [543,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+            "description": { "kind": "TextField", "xy": [182,69], "dimensions": [357, 25], "text_size": 13, "text_style": "normal",
+                             "text_hjustify": "left", "text_vjustify": "top",
+                             "ui_name_gamebucks": "A total of %d %BARRIER can be upgraded for %GAMEBUCKS %GAMEBUCKS_NAME. %extra",
+                             "ui_name_resources": "A total of %d %BARRIER can be upgraded for %IRON %IRON_NAME and %WATER %WATER_NAME.",
+                             "ui_name_resources_low": "No %BARRIER_PLURAL can be upgraded with the %IRON_NAME and %WATER_NAME you have in storage. You can purchase or produce additional resources to upgrade your %BARRIER_PLURAL, or you can use %GAMEBUCKS_NAME."
+                           },
+            "price_display": { "kind": "ActionButton", "xy": [170,293], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
+                               "bg_image": "price_display", "ui_name": "FREE", "ui_tooltip": "", "tooltip_delay": 0 },
+            "upgrade_for_gamebucks_button": { "kind": "ActionButton", "xy": [287,295], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
+                                       "bg_image": "action_button_134px", "ui_name": "Use %GAMEBUCKS_NAME", "ui_name_need_gamebucks": "Buy %GAMEBUCKS_NAME", "ui_tooltip": "", "tooltip_delay": 0 },
+            "upgrade_for_resources_button": { "kind": "ActionButton", "xy": [425,295], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
+                                              "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Use Resources", "ui_name_need_res": "Buy Resources" },
+            "no_upgrades_left_button": { "show": 0, "kind": "ActionButton", "xy": [425,295], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
+                                             "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Affirmative" }
+        }
+    },
     "gift_received_dialog": {
         "dimensions": [487,337],
         "default_button": "say_thanks_button",
