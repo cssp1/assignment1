@@ -13133,7 +13133,7 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
             old_res[res] = player.last_resource_state[res]
             cur_res[res] = player.resource_state[res][1];
         } else {
-            if(use_res_looter) { // display uncapped looted amount vs. starting looot amount available
+            if(use_res_looter) { // display uncapped looted amount vs. starting loot amount available
                 old_res[res] = session.last_looted_uncapped[res] || 0;
                 cur_res[res] = session.res_looter['looted_uncapped'][res] || 0;
                 capacity[res] = session.res_looter['starting'][res] || 0;
@@ -18848,6 +18848,143 @@ function invoke_recycle_dialog(obj) {
     return dialog;
 };
 
+function invoke_upgrade_all_barriers_dialog() {
+    var dialog_data = gamedata['dialogs']['upgrade_all_barriers_dialog'];
+    var dialog = new SPUI.Dialog(dialog_data);
+    dialog.user_data['dialog'] = 'upgrade_all_barriers_dialog';
+    dialog.modal = true;
+    dialog.ondraw = update_upgrade_all_barriers_dialog;
+    install_child_dialog(dialog);
+    dialog.auto_center();
+};
+
+/** @param {SPUI.Dialog} dialog */
+function update_upgrade_all_barriers_dialog(dialog) {
+    var barrier_count_gold = 0, barrier_count_res = 0, iron_cost = 0, water_cost = 0, gamebucks_cost = 0, iron_available = 0, water_available = 0, gold_available = 0;
+    iron_available += player.resource_state['iron'][1];
+    water_available += player.resource_state['water'][1];
+    gold_available += player.resource_state['gamebucks'];
+    var iron_needed = 0, water_needed = 0;
+    var barrier_list_gold = [];
+    var barrier_list_res = [];
+    session.for_each_real_object(function(obj) {
+        if(obj.team === 'player' && obj.is_building() && obj.is_barrier() && obj.level < obj.get_max_ui_level()) {
+            var next_level = obj.level + 1;
+            if(!('requires' in obj.spec && !read_predicate(get_leveled_quantity(obj.spec['requires'], next_level)).is_satisfied(player,null))) {
+                barrier_count_gold += 1;
+                gamebucks_cost += Store.get_user_currency_price(obj.id, gamedata['spells']['UPGRADE_FOR_MONEY'], null);
+                barrier_list_gold.push(obj);
+                if(iron_available >= get_leveled_quantity(obj.spec['build_cost_iron'], next_level) && water_available >= get_leveled_quantity(obj.spec['build_cost_water'], next_level)) {
+                    barrier_count_res += 1;
+                    iron_cost += get_leveled_quantity(obj.spec['build_cost_iron'], next_level);
+                    water_cost += get_leveled_quantity(obj.spec['build_cost_water'], next_level);
+                    iron_available -= get_leveled_quantity(obj.spec['build_cost_iron'], next_level);
+                    water_available -= get_leveled_quantity(obj.spec['build_cost_water'], next_level);
+                    barrier_list_res.push(obj);
+                }
+            }
+        }
+    });
+    if(barrier_count_res === 0 && barrier_count_gold > 0){
+        var lowest_iron = 999999999999999999;
+        var lowest_water = 999999999999999999;
+        session.for_each_real_object(function(obj) {
+            if(obj.team === 'player' && obj.is_building() && obj.is_barrier() && obj.level < obj.get_max_ui_level()) {
+                var next_level = obj.level + 1;
+                if(!('requires' in obj.spec && !read_predicate(get_leveled_quantity(obj.spec['requires'], next_level)).is_satisfied(player,null))) {
+                    if(lowest_iron > get_leveled_quantity(obj.spec['build_cost_iron'], next_level)) { lowest_iron = get_leveled_quantity(obj.spec['build_cost_iron'], next_level); }
+                    if(lowest_water > get_leveled_quantity(obj.spec['build_cost_water'], next_level)) { lowest_water = get_leveled_quantity(obj.spec['build_cost_water'], next_level); }
+                }
+            }
+        });
+    }
+    var txt = dialog.data['widgets']['description']['ui_name_gamebucks'];
+    txt = txt.replace('%GAMEBUCKS', pretty_print_number(gamebucks_cost)).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name());
+    if(barrier_count_gold > 1) {
+        txt = txt.replace('%BARRIER', gamedata['buildings']['barrier']['ui_name_plural']);
+    } else {
+        txt = txt.replace('%BARRIER', gamedata['buildings']['barrier']['ui_name']);
+    }
+    txt = txt.replace('%d', barrier_count_gold.toString());
+    var extra;
+    if(barrier_count_res > 0) {
+        extra = dialog.data['widgets']['description']['ui_name_resources'];
+        extra = extra.replace('%d', barrier_count_res.toString());
+        extra = extra.replace('%IRON', pretty_print_number(iron_cost));
+        extra = extra.replace('%WATER', pretty_print_number(water_cost));
+    } else {
+        extra = dialog.data['widgets']['description']['ui_name_resources_low'];
+        extra = extra.replaceAll('%BARRIER_PLURAL', gamedata['buildings']['barrier']['ui_name_plural']);
+        extra = extra.replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name());
+    }
+    extra = extra.replace('%IRON_NAME', gamedata['resources']['iron']['ui_name']);
+    extra = extra.replace('%WATER_NAME', gamedata['resources']['water']['ui_name']);
+    if(barrier_count_res > 1) {
+        extra = extra.replace('%BARRIER', gamedata['buildings']['barrier']['ui_name_plural']);
+    } else if(barrier_count_res > 0) {
+        extra = extra.replace('%BARRIER', gamedata['buildings']['barrier']['ui_name']);
+    }
+    txt = txt.replace('%extra', extra);
+    dialog.widgets['description'].set_text_with_linebreaking(txt);
+    if(gamebucks_cost > 0) {
+        dialog.widgets['price_display'].str = pretty_print_number(gamebucks_cost);
+    }
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
+    if(barrier_count_res > 0) {
+        dialog.widgets['upgrade_for_resources_button'].onclick = (function (_barrier_list, _dialog) { return function() {
+            do_upgrade_all_barriers_for_free(_barrier_list, _dialog);
+        }; })(barrier_list_res, dialog);
+    } else {
+        dialog.widgets['upgrade_for_resources_button'].str = dialog.data['widgets']['upgrade_for_resources_button']['ui_name_need_res'];
+        dialog.widgets['upgrade_for_resources_button'].onclick = (function () { return function() {
+            var helper_args = {};
+            var iron_needed = lowest_iron - iron_available;
+            if(iron_needed > 0) {
+                helper_args['iron'] = iron_needed;
+            }
+            var water_needed = lowest_water - water_available;
+            if(water_needed > 0) {
+                helper_args['water'] = water_needed;
+            }
+            var helper = get_requirements_help('resources', helper_args);
+            if(helper) { helper(); }
+        }; })();
+    }
+    if(gamebucks_cost <= gold_available){
+        dialog.widgets['upgrade_for_gamebucks_button'].str = dialog.data['widgets']['upgrade_for_gamebucks_button']['ui_name'].replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name());
+        dialog.widgets['upgrade_for_gamebucks_button'].onclick = (function (_barrier_list, _dialog) { return function() {
+            do_upgrade_all_barriers_for_gold(_barrier_list, _dialog);
+        }; })(barrier_list_gold, dialog);
+    } else {
+        dialog.widgets['upgrade_for_gamebucks_button'].str = dialog.data['widgets']['upgrade_for_gamebucks_button']['ui_name_need_gamebucks'].replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name());
+        dialog.widgets['upgrade_for_gamebucks_button'].onclick = (function () { return function() {
+            invoke_buy_gamebucks_dialog('new_store_category', -1, null);
+        }; })();
+    }
+};
+
+/** @param {Array.<Object>} barrier_list
+    @param {SPUI.Dialog} dialog */
+function do_upgrade_all_barriers_for_gold(barrier_list, dialog) {
+    for(var i = 0; i < barrier_list.length; i++) {
+        var obj = barrier_list[i];
+        Store.place_user_currency_order(obj.id, "UPGRADE_FOR_MONEY", null, null);
+    }
+    close_dialog(dialog);
+}
+
+/** @param {Array.<Object>} barrier_list
+    @param {SPUI.Dialog} dialog */
+function do_upgrade_all_barriers_for_free(barrier_list, dialog) {
+    for(var i = 0; i < barrier_list.length; i++) {
+        var obj = barrier_list[i];
+        send_to_server.func(["CAST_SPELL", obj.id, "UPGRADE_FOR_FREE"]);
+        var fx_data = ('upgrade_start_effect' in obj.spec ? obj.spec['upgrade_start_effect'] : gamedata['client']['vfx']['building_upgrade_start']);
+        if(fx_data) { session.get_real_world().fxworld.add_visual_effect_at_time([obj.x,obj.y], 0, [0,1,0], client_time, fx_data, true, { '%OBJECT_SPRITE': obj.get_leveled_quantity(obj.spec['art_asset'])}); }
+    }
+    close_dialog(dialog);
+}
+
 /** invoke the "Buy Resources" dialog
  * @param {Object} amounts - dictionary of {res:amount}
  * @param {?} continuation - optional callback to call after the purchase
@@ -23689,6 +23826,27 @@ function invoke_building_context_menu(mouse_xy) {
                 }
             }
         });
+    }
+
+    if(session.home_base && obj.is_building() && obj.is_barrier() && !!player.preferences['show_upgrade_all_barriers']) {
+        if(!(obj.is_repairing() || obj.is_under_construction() || obj.is_upgrading() || obj.is_enhancing() || obj.is_removing())) {
+            var can_upgrade_any_barrier = false;
+            session.for_each_real_object(function(obj) {
+                if(obj.team === 'player' && obj.is_building() && obj.is_barrier() && obj.level < obj.get_max_ui_level()) {
+                    var next_level = obj.level + 1;
+                    if(!('requires' in obj.spec && !read_predicate(get_leveled_quantity(obj.spec['requires'], next_level)).is_satisfied(player,null))) {
+                        can_upgrade_any_barrier = true;
+                    }
+                }
+            });
+            if(can_upgrade_any_barrier) {
+                buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['UPGRADE_ALL_BARRIERS']['ui_name'],
+                                                    ui_tooltip: gamedata['spells']['UPGRADE_ALL_BARRIERS']['ui_tooltip'].replace('%GAMEBUCKS_NAME', player.get_any_abtest_value('gamebucks_ui_name', gamedata['store']['gamebucks_ui_name'])),
+                                                    onclick: (function (_obj) { return function() {
+                                                        invoke_upgrade_all_barriers_dialog();
+                                                    }; })(obj), asset: 'menu_button_resizable'}));
+            }
+        }
     }
 
     if((obj.is_building() ||
