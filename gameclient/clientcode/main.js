@@ -23828,7 +23828,7 @@ function invoke_building_context_menu(mouse_xy) {
         });
     }
 
-    if(session.home_base && obj.is_building() && obj.is_barrier() && !!player.preferences['show_upgrade_all_barriers']) {
+    if(session.home_base && obj.is_building() && obj.is_barrier() && (!('show_upgrade_all_barriers' in player.preferences) || !!player.preferences['show_upgrade_all_barriers'])) {
         if(!(obj.is_repairing() || obj.is_under_construction() || obj.is_upgrading() || obj.is_enhancing() || obj.is_removing())) {
             var can_upgrade_any_barrier = false;
             session.for_each_real_object(function(obj) {
