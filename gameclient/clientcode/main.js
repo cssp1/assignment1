@@ -18914,7 +18914,8 @@ function update_upgrade_all_barriers_dialog(dialog) {
         extra = extra.replace('%WATER', pretty_print_number(water_cost));
     } else {
         extra = dialog.data['widgets']['description']['ui_name_resources_low'];
-        extra = extra.replaceAll('%BARRIER_PLURAL', gamedata['buildings']['barrier']['ui_name_plural']);
+        extra = extra.replace('%BARRIER_PLURAL1', gamedata['buildings']['barrier']['ui_name_plural']);
+        extra = extra.replace('%BARRIER_PLURAL2', gamedata['buildings']['barrier']['ui_name_plural']);
         extra = extra.replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name());
     }
     extra = extra.replace('%IRON_NAME', gamedata['resources']['iron']['ui_name']);
