@@ -6004,7 +6004,7 @@
                              "text_hjustify": "left", "text_vjustify": "top",
                              "ui_name_gamebucks": "A total of %d %BARRIER can be upgraded for %GAMEBUCKS %GAMEBUCKS_NAME. %extra",
                              "ui_name_resources": "A total of %d %BARRIER can be upgraded for %IRON %IRON_NAME and %WATER %WATER_NAME.",
-                             "ui_name_resources_low": "No %BARRIER_PLURAL can be upgraded with the %IRON_NAME and %WATER_NAME you have in storage. You can purchase or produce additional resources to upgrade your %BARRIER_PLURAL, or you can use %GAMEBUCKS_NAME."
+                             "ui_name_resources_low": "No %BARRIER_PLURAL1 can be upgraded with the %IRON_NAME and %WATER_NAME you have in storage. You can purchase or produce additional resources to upgrade your %BARRIER_PLURAL2, or you can use %GAMEBUCKS_NAME."
                            },
             "price_display": { "kind": "ActionButton", "xy": [170,293], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_name": "FREE", "ui_tooltip": "", "tooltip_delay": 0 },
