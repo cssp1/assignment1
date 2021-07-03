@@ -1299,6 +1299,7 @@ Aura.prototype.apply = function(world, obj) {
         } else if(code === 'weak_zombie') {
             obj.combat_stats.maxvel *= this.spec['zombie_speed'];
             obj.combat_stats.weapon_damage *= this.spec['zombie_damage'];
+            obj.combat_stats.weapon_range *= this.spec['zombie_range'];
         } else if(code === 'on_fire') {
             var apply_interval = effect['apply_interval'] || TICK_INTERVAL;
             // apply effect every N ticks
