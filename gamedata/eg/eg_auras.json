@@ -488,7 +488,8 @@
         "ui_description": "Unit was badly damaged in a previous battle. Damage and movement speed reduced by 75%.",
         "effects": [{"code": "weak_zombie"}],
         "zombie_speed": 0.25,
-        "zombie_damage": 0.25
+        "zombie_damage": 0.25,
+        "zombie_range": 0.25
     },
 
     "armor_boosted": {
