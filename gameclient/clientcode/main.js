@@ -18646,6 +18646,7 @@ function init_dialog_repair_buttons(dialog, base_damage, enable_confirm) {
         dialog.widgets['repair_not_necessary_button'].onclick = (any_unit_damage ? function(w) {
             close_parent_dialog(w);
             start_slow_repairs();
+            do_craft_mines_check();
         } : close_parent_dialog);
         dialog.default_button = dialog.widgets['repair_not_necessary_button'];
     }
@@ -23974,6 +23975,14 @@ function invoke_building_context_menu(mouse_xy) {
                                                             }; })(grid_item['associated_tech']), asset: 'menu_button_resizable'}));
                     }
                 }
+                var minelist = get_minefield_repair_list();
+                if (obj.is_minefield() && minelist.length > 0 && (!('show_rearm_all_mines' in player.preferences) || player.preferences['show_rearm_all_mines'])) {
+                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['REARM_MINEFIELDS']['ui_name'],
+                                                        onclick: (function () { return function() {
+                                                                do_craft_mines_check();
+                                                            }; })(), asset: 'menu_button_resizable'}));
+                }
+
             }
 
             if((obj.is_emplacement() || obj.is_security_node() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) && (session.home_base || quarry_upgradable)) { // special case for mounted weapons
