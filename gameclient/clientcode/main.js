@@ -18233,7 +18233,12 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
     dialog.auto_center();
     dialog.modal = true;
 
-    if('close_button' in dialog.widgets) { dialog.widgets['close_button'].onclick = function() { change_selection(null); }; }
+    if('close_button' in dialog.widgets) {
+        dialog.widgets['close_button'].onclick = function() {
+            change_selection(null);
+            do_craft_mines_check();
+        };
+    }
     if('screenshot_button' in dialog.widgets) {
         dialog.widgets['screenshot_button'].show = post_screenshot_enabled();
         dialog.widgets['screenshot_button'].onclick = function(w) {
@@ -18493,8 +18498,15 @@ function confirm_instant_repairs(price, ok_cb) {
     dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
     dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
     dialog.widgets['price_display'].onclick =
-        dialog.widgets['ok_button'].onclick = (function (_ok_cb) { return function(w) { close_parent_dialog(w); _ok_cb(); }; })(ok_cb);
-    dialog.widgets['close_button'].onclick = close_parent_dialog;
+        dialog.widgets['ok_button'].onclick = (function (_ok_cb) { return function(w) {
+            close_parent_dialog(w);
+            _ok_cb();
+            do_craft_mines_check();
+        }; })(ok_cb);
+    dialog.widgets['close_button'].onclick =  (function () { return function(w) {
+        close_parent_dialog(w);
+        do_craft_mines_check();
+    }; })();
     return dialog;
 }
 
@@ -18573,6 +18585,7 @@ function init_dialog_repair_buttons(dialog, base_damage, enable_confirm) {
                 dialog.widgets['repair_instant_button'].onclick = function(w) {
                     // manually send REPAIR followed by SPEEDUP_FOR_FREE on each damaged building
                     close_parent_dialog(w);
+                    do_craft_mines_check();
                     send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
 
                     session.for_each_real_object(function(obj) {
@@ -18598,6 +18611,7 @@ function init_dialog_repair_buttons(dialog, base_damage, enable_confirm) {
                 var on_complete = (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog);
                 if(do_instant_repairs(on_complete)) {
                     on_start();
+                    do_craft_mines_check();
                 }
             }; })(dialog);
 
@@ -18612,6 +18626,7 @@ function init_dialog_repair_buttons(dialog, base_damage, enable_confirm) {
         dialog.widgets['repair_slow_button'].onclick = function(w) {
             close_parent_dialog(w);
             start_slow_repairs();
+            do_craft_mines_check();
         };
 
         if(!session.enable_progress_timers) {
@@ -18847,6 +18862,274 @@ function invoke_recycle_dialog(obj) {
         }
     }
     return dialog;
+};
+
+function do_craft_mines_check() {
+    if('show_rearm_all_mines' in player.preferences && !player.preferences['show_rearm_all_mines']) { return; }
+    var minelist = get_minefield_repair_list();
+    if (minelist.length > 0) {
+        invoke_craft_all_mines_dialog(minelist);
+    }
+}
+
+function get_minefield_repair_list() {
+    var minelist = [];
+    var builder = find_object_by_type(get_workshop_for('mines'));
+    var craft_queue = (builder ? builder.get_crafting_queue() : []);
+    var catspec = gamedata['crafting']['categories']['mines'];
+    var delivery_slot_type = catspec['delivery_slot_type'];
+    session.for_each_real_object(function(obj) {
+        if(obj.is_building() && obj.is_minefield() && obj.team === 'player') {
+            var cur_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > 0 && obj.equipment[delivery_slot_type][0] ? player.decode_equipped_item(obj.equipment[delivery_slot_type][0]) : null);
+            var cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type] && (player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] : null);
+            var in_progress = false;
+            for(var i = 0; i < craft_queue.length; i++) {
+                var entry = craft_queue[i];
+                if(entry['craft']['delivery'] && entry['craft']['delivery']['obj_id'] == obj.id && (!('slot_type' in entry['craft']['delivery']) || entry['craft']['delivery']['slot_type'] == delivery_slot_type) && ((entry['craft']['delivery']['slot_index'] || 0) == 0)) {
+                    in_progress = true;
+                    break;
+                }
+            }
+            if(cur_config && !cur_item && !in_progress) {
+                minelist.push(obj);
+            }
+        }
+    });
+    return minelist;
+}
+
+/** @param {Array.<Object>} minelist */
+function invoke_craft_all_mines_dialog(minelist) {
+    var dialog_data = gamedata['dialogs']['craft_all_mines_dialog'];
+    var dialog = new SPUI.Dialog(dialog_data);
+    dialog.user_data['dialog'] = 'craft_all_mines_dialog';
+    dialog.user_data['minelist'] = minelist;
+    dialog.modal = true;
+    dialog.ondraw = update_craft_all_mines_dialog;
+    install_child_dialog(dialog);
+    dialog.auto_center();
+};
+
+/** @param {SPUI.Dialog} dialog */
+function update_craft_all_mines_dialog(dialog) {
+    var builder = find_object_by_type(get_workshop_for('mines'));
+    var craft_queue = (builder ? builder.get_crafting_queue() : []);
+    var catspec = gamedata['crafting']['categories']['mines'];
+    var delivery_slot_type = catspec['delivery_slot_type'];
+    var iron_available = 0, water_available = 0, res3_available = 0;
+    iron_available += player.resource_state['iron'][1];
+    water_available += player.resource_state['water'][1];
+    if('res3' in player.resource_state) {
+        res3_available += player.resource_state['res3'][1];
+    }
+    var minelist = dialog.user_data['minelist'];
+    var iron_needed = 0, water_needed = 0, res3_needed = 0;
+    var mine_list_res = {};
+    var mine_list_types = [];
+    for(var i = 0; i < minelist.length; i++) {
+        var obj = minelist[i];
+        var cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type] && (player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] : null);
+        var cur_item_spec = gamedata['items'][cur_config];
+        var config_recipe = null;
+        for(var n in gamedata['crafting']['recipes']) {
+            var rec = gamedata['crafting']['recipes'][n];
+            if(rec['crafting_category'] == 'mines' && ItemDisplay.get_crafting_recipe_product_spec(rec)['name'] == cur_config) {
+                config_recipe = n; break;
+            }
+        }
+        var config_recipe_spec = (config_recipe ? gamedata['crafting']['recipes'][config_recipe] : null);
+        if(config_recipe_spec) {
+            var config_recipe_max_level = (config_recipe_spec['max_level'] || 1);
+            var config_recipe_level = 1;
+            var config_recipe_associated_tech = (config_recipe_spec['associated_tech'] || false);
+            if((config_recipe_max_level || 1) > 1 && config_recipe_associated_tech && player.tech[config_recipe_associated_tech]) {
+                config_recipe_level = player.tech[config_recipe_associated_tech];
+            }
+        }
+        var cur_config_cost = get_leveled_quantity(config_recipe_spec['cost'], config_recipe_level);
+        if(!(cur_config in mine_list_res)) {
+            var this_mine_type = { 'name': cur_config, 'ui_name': cur_item_spec['ui_name'], 'ui_name_plural': cur_item_spec['ui_name_plural'], 'count': 0 };
+            this_mine_type['iron'] = 0;
+            this_mine_type['water'] = 0;
+            this_mine_type['res3'] = 0;
+            mine_list_res[cur_config] = this_mine_type;
+            mine_list_types.push(cur_config);
+        }
+        mine_list_res[cur_config]['count'] += 1;
+        if('iron' in cur_config_cost) {
+            mine_list_res[cur_config]['iron'] += cur_config_cost['iron'];
+            iron_needed += cur_config_cost['iron'];
+        }
+        if('water' in cur_config_cost) {
+            mine_list_res[cur_config]['water'] += cur_config_cost['water'];
+            water_needed += cur_config_cost['water'];
+        }
+        if('res3' in cur_config_cost) {
+            mine_list_res[cur_config]['res3'] += cur_config_cost['res3'];
+            res3_needed += cur_config_cost['res3'];
+        }
+    }
+    var mine_types_count = 0;
+    var description_text = dialog.data['widgets']['description']['ui_name'];
+    var resource_count = 0;
+    if(iron_needed > 0) { resource_count += 1; }
+    if(water_needed > 0) { resource_count += 1; }
+    if(res3_needed > 0) { resource_count += 1; }
+    var resource_text;
+    if(resource_count === 3) {
+        resource_text = dialog.data['widgets']['description']['ui_cost_3resources_template'];
+        if(res3_needed > 1) {
+            resource_text = resource_text.replace('%RES3_NAME', gamedata['resources']['res3']['ui_name_plural']);
+            resource_text = resource_text.replace('%RES3', res3_needed.toString());
+        } else {
+            resource_text = resource_text.replace('%RES3_NAME', gamedata['resources']['res3']['ui_name']);
+            resource_text = resource_text.replace('%RES3', res3_needed.toString());
+        }
+    } else {
+        resource_text = dialog.data['widgets']['description']['ui_cost_2resources_template'];
+    }
+    if(iron_needed > 1) {
+        resource_text = resource_text.replace('%IRON_NAME', gamedata['resources']['iron']['ui_name_plural']);
+        resource_text = resource_text.replace('%IRON', iron_needed.toString());
+    } else if(iron_needed === 1) {
+        resource_text = resource_text.replace('%IRON_NAME', gamedata['resources']['iron']['ui_name']);
+        resource_text = resource_text.replace('%IRON', iron_needed.toString());
+    } else {
+        resource_text = resource_text.replace('%IRON_NAME', gamedata['resources']['iron']['ui_name']);
+        resource_text = resource_text.replace('%IRON', 'No');
+    }
+    if(water_needed > 1) {
+        resource_text = resource_text.replace('%WATER_NAME', gamedata['resources']['water']['ui_name_plural']);
+        resource_text = resource_text.replace('%WATER', water_needed.toString());
+    } else if (water_needed === 1) {
+        resource_text = resource_text.replace('%WATER_NAME', gamedata['resources']['water']['ui_name']);
+        resource_text = resource_text.replace('%WATER', water_needed.toString());
+    } else {
+        resource_text = resource_text.replace('%WATER_NAME', gamedata['resources']['water']['ui_name']);
+        resource_text = resource_text.replace('%WATER', 'No');
+    }
+    description_text = description_text.replace('%COST', resource_text);
+    for(var n in mine_list_res) {
+        mine_types_count += 1;
+    }
+    var mine_text = '';
+    if(mine_types_count === 1) {
+        var this_mine_text = dialog.data['widgets']['description']['ui_mine_template'];
+        var this_mine_type = mine_list_types[0];
+        var this_mine = mine_list_res[this_mine_type];
+        if(this_mine['count'] > 1) {
+            this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name_plural']);
+        } else {
+            this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name']);
+        }
+        this_mine_text = mine_text.replace('%d', this_mine['count'].toString());
+        mine_text += this_mine_text;
+    } else if(mine_types_count === 2) {
+        var this_mine_text = dialog.data['widgets']['description']['ui_mine_template'];
+        var this_mine_type = mine_list_types[0];
+        var this_mine = mine_list_res[this_mine_type];
+        if(this_mine['count'] > 1) {
+            this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name_plural']);
+        } else {
+            this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name']);
+        }
+        this_mine_text = this_mine_text.replace('%d', this_mine['count'].toString());
+        mine_text += this_mine_text;
+        this_mine_text = ' and ' + dialog.data['widgets']['description']['ui_mine_template'];
+        this_mine_type = mine_list_types[1];
+        this_mine = mine_list_res[this_mine_type];
+        if(this_mine['count'] > 1) {
+            this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name_plural']);
+        } else {
+            this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name']);
+        }
+        this_mine_text = this_mine_text.replace('%d', this_mine['count'].toString());
+        mine_text += this_mine_text;
+    } else {
+        var this_mine_text = dialog.data['widgets']['description']['ui_mine_template'];
+        var this_mine_type = mine_list_types[0];
+        var this_mine = mine_list_res[this_mine_type];
+        if(this_mine['count'] > 1) {
+            this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name_plural']);
+        } else {
+            this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name']);
+        }
+        this_mine_text = this_mine_text.replace('%d', this_mine['count'].toString());
+        mine_text += this_mine_text;
+        for(var i = 1; i < mine_list_types.length - 1; i++) {
+            this_mine_text = ', ' + dialog.data['widgets']['description']['ui_mine_template'];
+            this_mine_type = mine_list_types[i];
+            this_mine = mine_list_res[this_mine_type];
+            if(this_mine['count'] > 1) {
+                this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name_plural']);
+            } else {
+                this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name']);
+            }
+            this_mine_text = this_mine_text.replace('%d', this_mine['count'].toString());
+            mine_text += this_mine_text;
+        }
+        this_mine_text = ', and ' + dialog.data['widgets']['description']['ui_mine_template'];
+        this_mine_type = mine_list_types[mine_list_types.length - 1];
+        this_mine = mine_list_res[this_mine_type];
+        if(this_mine['count'] > 1) {
+            this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name_plural']);
+        } else {
+            this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name']);
+        }
+        this_mine_text = this_mine_text.replace('%d', this_mine['count'].toString());
+        mine_text += this_mine_text;
+    }
+    description_text = description_text.replace('%MINES', mine_text);
+    dialog.widgets['description'].set_text_with_linebreaking(description_text);
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
+    var can_craft = true;
+    var helper_args = {};
+    if(iron_available < iron_needed) {
+        can_craft = false;
+        helper_args['iron'] = iron_needed - iron_available;
+    }
+    if(water_available < water_needed) {
+        can_craft = false;
+        helper_args['water'] = water_needed - water_available;
+    }
+    if(res3_available < res3_needed) {
+        can_craft = false;
+        helper_args['res3'] = res3_needed - res3_available;
+    }
+    if(!can_craft) {
+        dialog.widgets['craft_for_resources_button'].str = dialog.data['widgets']['craft_for_resources_button']['ui_name_need_res'];
+        dialog.widgets['craft_for_resources_button'].onclick = (function (_helper_args) { return function() {
+            var helper = get_requirements_help('resources', _helper_args);
+            if(helper) { helper(); }
+        }; })(helper_args);
+    } else {
+        dialog.widgets['craft_for_resources_button'].onclick = (function (_builder, _minelist, _delivery_slot_type, _w) { return function() {
+            var delivery_slot_index = 0;
+            for(var i = 0; i < _minelist.length; i++) {
+                var obj = _minelist[i];
+                var this_config = (obj.config && (_delivery_slot_type in obj.config) && obj.config[_delivery_slot_type] && (player.decode_equipped_item(obj.config[_delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[_delivery_slot_type])['spec'] : null);
+                var recipe = null;
+                for(var n in gamedata['crafting']['recipes']) {
+                    var rec = gamedata['crafting']['recipes'][n];
+                    if(rec['crafting_category'] == 'mines' && ItemDisplay.get_crafting_recipe_product_spec(rec)['name'] == this_config) {
+                        recipe = n; break;
+                    }
+                }
+                var recipe_spec = gamedata['crafting']['recipes'][recipe];
+                var recipe_max_level = (recipe_spec['max_level'] || 1);
+                var recipe_level = 1;
+                var recipe_associated_tech = (recipe_spec['associated_tech'] || false);
+                if((recipe_max_level || 1) > 1 && recipe_associated_tech && player.tech[recipe_associated_tech]) {
+                    recipe_level = player.tech[recipe_associated_tech];
+                }
+                var extra_params = {'delivery': {'obj_id':obj.id, 'slot_type':_delivery_slot_type, 'slot_index': delivery_slot_index}, 'level': recipe_level };
+                start_crafting(_builder, recipe_spec, extra_params);
+            }
+            // play sound effect
+            GameArt.play_canned_sound('action_button_134px');
+            close_parent_dialog(_w);
+        }; })(builder, minelist, delivery_slot_type, dialog.widgets['close_button']);
+    }
 };
 
 function invoke_upgrade_all_barriers_dialog() {
