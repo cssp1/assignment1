@@ -308,6 +308,10 @@
         "ui_name": "Collect",
         "activation": "instant"
     },
+    "REARM_MINEFIELDS": {
+        "ui_name": "Rearm All",
+        "activation": "popup"
+    },
     "RESEARCH_FOR_FREE": {
         "ui_name": "Research",
         "ui_dialog_name": "Unlock & Upgrade",
