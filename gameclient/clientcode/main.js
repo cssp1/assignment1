@@ -18877,7 +18877,7 @@ function get_minefield_repair_list() {
     var minelist = [];
     var builder = find_object_by_type(get_workshop_for('mines'));
     var craft_queue = (builder ? builder.get_crafting_queue() : []);
-    if(!('mines' in gamedata['crafting']['categories']) { return minelist; } // end early if mines aren't a category
+    if(!('mines' in gamedata['crafting']['categories'])) { return minelist; } // end early if mines aren't a category
     var catspec = gamedata['crafting']['categories']['mines'];
     var delivery_slot_type = catspec['delivery_slot_type'];
     session.for_each_real_object(function(obj) {
