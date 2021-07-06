@@ -910,11 +910,11 @@ if __name__ == '__main__':
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip))
                 elif violation_history['chat_warnings'] == 0 and violation_history['chat_violations'] == 0 and violation_history['alt_violations'] == 0 and violation_history['vpn_violations'] == 0:
-                    print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (other_id, alt_region, violation_history['spend'], entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (other_id, alt_region, pretty_spend(violation_history['spend']), entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip))
                 else:
-                    print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Anti-Alt violations %d, VPN violations %d)' % (other_id, alt_region, violation_history['spend'], entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Anti-Alt violations %d, VPN violations %d)' % (other_id, alt_region, pretty_spend(violation_history['spend']), entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip, violation_history['chat_warnings'], violation_history['chat_violations'], violation_history['alt_violations'], violation_history['vpn_violations']))
 
