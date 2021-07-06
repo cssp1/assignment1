@@ -2308,6 +2308,10 @@ class GameProxy(proxy.ReverseProxyResource):
                 if rep_result.is_toxic():
                     return self.index_visit_banned(request, visitor)
 
+                # don't let known alt factory IPs create new accounts
+                if user_id == -1 and rep_result.is_alt_factory():
+                    return self.index_visit_banned(request, visitor) # display banned landing page. Possibly make new custom landing?
+
                 # optionally don't let VPN users create new accounts
                 if user_id == -1 and not SpinConfig.config['proxyserver'].get('allow_new_vpn_accounts', 1):
                     exception_log.event(proxy_time, 'Blocked account creation for social ID %r because of SpinIPReputation on IP %r: %r' % (visitor.social_id, ip, rep_result))
