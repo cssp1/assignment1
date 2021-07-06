@@ -273,7 +273,8 @@ def get_ip_reputation(ip):
     return ''
 
 def get_prior_violations(player, oldest_violation = 0):
-    result = {'chat_warnings':0, 'chat_violations':0, 'alt_violations':0, 'vpn_violations':0, 'banned':0}
+    result = {'chat_warnings':0, 'chat_violations':0, 'alt_violations':0, 'vpn_violations':0, 'banned':0, 'spend':0}
+    result['spend'] = player['history'].get('money_spent',0)
     if player.get('banned_until',-1) > time_now:
         result['banned'] = 1
         return result # if player is banned, don't bother tabulating other violations to save processing time
@@ -724,6 +725,7 @@ if __name__ == '__main__':
             total_alt_prior_chat_violations = 0
             total_alt_prior_alt_violations = 0
             total_alt_prior_vpn_violations = 0
+            total_alt_spend = 0
             total_alts_banned = 0
             for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                                      key = lambda id_entry: -id_entry[1].get('logins',1)):
@@ -745,6 +747,7 @@ if __name__ == '__main__':
                 total_alt_prior_chat_violations += violation_history['chat_violations']
                 total_alt_prior_alt_violations += violation_history['alt_violations']
                 total_alt_prior_vpn_violations += violation_history['vpn_violations']
+                total_alt_spend += violation_history['spend']
                 total_alts_banned += violation_history['banned']
 
             if total_alt_prior_chat_violations > 0 or total_alt_prior_alt_violations > 0 or total_alt_prior_vpn_violations > 0:
@@ -753,6 +756,7 @@ if __name__ == '__main__':
                 print fmt % ('Chat Abuse:', total_alt_prior_chat_violations)
                 print fmt % ('Anti-Alt Violations:', total_alt_prior_alt_violations)
                 print fmt % ('VPN Login Violations:', total_alt_prior_vpn_violations)
+                print fmt % ('Spend on Alts:', pretty_spend(total_alt_spend))
                 if total_alts_banned > 0:
                     print fmt % ('Number of Banned Alts:', total_alts_banned)
 
@@ -898,7 +902,7 @@ if __name__ == '__main__':
                     # don't worry about error handling for reading alts, just zero out alt's violation history and continue
                     # but do a print a message, for debugging purposes
                     print fmt % ('', 'ID: %7d, Error getting violation history: %r' % (other_id, e))
-                    violation_history = {'chat_warnings':0, 'chat_violations':0, 'alt_violations':0, 'vpn_violations':0, 'banned':0}
+                    violation_history = {'chat_warnings':0, 'chat_violations':0, 'alt_violations':0, 'vpn_violations':0, 'banned':0, 'spend': 0}
                     alt_region = 'Unknown'
 
                 if violation_history['banned']:
@@ -906,11 +910,11 @@ if __name__ == '__main__':
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip))
                 elif violation_history['chat_warnings'] == 0 and violation_history['chat_violations'] == 0 and violation_history['alt_violations'] == 0 and violation_history['vpn_violations'] == 0:
-                    print fmt % ('', 'ID: %7d, Region: %s, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (other_id, alt_region, entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, #Logins: %4d, Last simultaneous login: %s (IP %s)' % (other_id, alt_region, violation_history['spend'], entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip))
                 else:
-                    print fmt % ('', 'ID: %7d, Region: %s, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Anti-Alt violations %d, VPN violations %d)' % (other_id, alt_region, entry.get('logins',1),
+                    print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, #Logins: %4d, Last simultaneous login: %s (IP %s), (Chat Warnings %d, Chat violations %d, Anti-Alt violations %d, VPN violations %d)' % (other_id, alt_region, violation_history['spend'], entry.get('logins',1),
                                                                                                     pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
                                                                                                     ui_last_ip, violation_history['chat_warnings'], violation_history['chat_violations'], violation_history['alt_violations'], violation_history['vpn_violations']))
 
