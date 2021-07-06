@@ -31,6 +31,8 @@ class CheckerResult(object):
 
     def is_proxy(self): return self.flags.get('proxy',0)
 
+    def is_datacenter(self): return self.flags.get('datacenter',0)
+
 class Checker(object):
     def __init__(self, path_to_db_file):
         self.ip_list4 = tuple()

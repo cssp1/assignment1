@@ -242,14 +242,14 @@ def is_valid_alliance_tag(tag):
 def is_valid_alias(name):
     assert type(name) is unicode # make sure we're given Unicode input
     if len(name) < 4 or len(name) > 15: return False
+    if 'spinpunch' in name.lower(): return False
+    if 'battlehouse' in name.lower(): return False
+    if 'bh-' in name.lower(): return False
     if chat_filter.is_bad(name): return False
     if chat_filter.is_graphical(name): return False
     if chat_filter.switches_charsets_or_blacklisted_chars(name): return False
     if chat_filter.is_ugly(name): return False
     if chat_filter.has_repeating_characters(name): return False
-    if 'spinpunch' in name.lower(): return False
-    if 'battlehouse' in name.lower(): return False
-    if 'bh-' in name.lower(): return False
     return True
 
 # recognize obsolete time-series history fields for deletion
@@ -28861,7 +28861,12 @@ class GAMEAPI(resource.Resource):
             ip_rep_result = None
             if ip_rep_checker:
                 ip_rep_result = ip_rep_checker.query(session.user.last_login_ip) # only log 'suspicious' IPs if they are not already known VPNs
-            if countries_seen >= gamedata['server'].get('track_countries_limit', 2) and not bool(ip_rep_result):
+            log_ip = False
+            if ip_rep_result:
+                if not ip_rep_result.is_proxy() and not ip_rep_result.is_datacenter():
+                    log_ip = True
+
+            if log_ip and countries_seen >= gamedata['server'].get('track_countries_limit', 2):
                 metric_event_coded(session.player.user_id, '7400_suspicious_ip_activity', {'ip': session.user.last_login_ip,
                                                                                            'reason': 'country-hopping'})
 
