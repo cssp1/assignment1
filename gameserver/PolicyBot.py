@@ -78,7 +78,7 @@ class AntiVPNPolicy(Policy):
         last_login_ip = player['history'].get('last_login_ip', 0)
         if not last_login_ip: return
         ip_rep_result = ip_rep_checker.query(last_login_ip)
-        if not bool(ip_rep_result): return
+        if not bool(ip_rep_result) or (not ip_rep_result.is_proxy() and not ip_rep_result.is_datacenter()): return
 
         # skip if the player is flagged as ignored vpn by customer service
         if player['history'].get('vpn_excused', 0): return
