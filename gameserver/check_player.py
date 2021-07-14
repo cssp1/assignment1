@@ -265,7 +265,7 @@ def get_ip_reputation(ip):
 
         result = ip_rep_checker.query(ip)
 
-        if result.is_proxy() or result.is_datacenter():
+        if result and (result.is_proxy() or result.is_datacenter()):
             return repr(result)
     else:
         raise Exception('Missing ip_reputation_database')
