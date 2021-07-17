@@ -911,7 +911,7 @@ def check_aura(auraname, spec, maxlevel):
 
     return error
 
-EFFECT_TYPES = set(['combine', 'explosion', 'sound', 'shockwave', 'particles', 'camera_shake', 'combat_text', 'phantom_unit', 'random', 'particle_magnet', 'drag_field','library'])
+EFFECT_TYPES = set(['combine', 'explosion', 'sound', 'shockwave', 'particles', 'camera_shake', 'combat_text', 'phantom_unit', 'bombing_run', 'random', 'particle_magnet', 'drag_field','library'])
 def check_visual_effect(name, effect):
     error = 0
     if effect is None: # "null" is valid here
@@ -943,7 +943,7 @@ def check_visual_effect(name, effect):
     elif effect['type'] == 'explosion':
         if effect['sprite'] != '%OBJECT_SPRITE':
             error |= require_art_asset(effect['sprite'], name+':sprite')
-    elif effect['type'] == 'phantom_unit':
+    elif effect['type'] in ('phantom_unit', 'bombing_run'):
         if effect['spec'] not in gamedata['units']:
             error |= 1; print '%s refers to bad spec %s' % (name, effect['spec'])
 
