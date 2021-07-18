@@ -32,7 +32,7 @@ if __name__=='__main__':
     cmd_args=['-u', conf['username'], "-p"+conf['password'], '-h', conf['host'], '--port', '%d' % conf['port'], '--protocol=tcp']
 
     if mode == 'dump': # perform dump
-        cmd_args += ['--routines',conf['dbname']]
+        cmd_args += ['--no-tablespaces','--routines',conf['dbname']]
         try:
             subprocess.check_call('mysqldump '+' '.join(cmd_args)+' | gzip -c - > '+dump_to, shell = True)
         except:
