@@ -1983,12 +1983,24 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
 
     this.duration = (!('duration' in data) || /** @type {number} */ (data['duration']) >= 0) ? (/** @type {number} */ (data['duration']) || 3.0) : -1;
     this.end_at_dest = (('end_at_dest' in data) ? /** @type {boolean} */ (data['end_at_dest']) : true);
+    var x_offset = 0;
+    var y_offset = 0;
+    var dest_x_offset = 0;
+    var dest_y_offset = 0;
+    if('bombing_run' in instance_data) {
+        x_offset = SPFX._random_offset();
+        y_offset = SPFX._random_offset();
+        dest_x_offset = x_offset * -1;
+        dest_y_offset = y_offset * -1;
+        this.duration = 4.0; // set longer to allow full flight animation.
+    }
 
     /** @type {!Mobile} */
     this.obj = new Mobile();
     this.obj.id = GameObject.DEAD_ID;
     this.obj.spec = gamedata['units']['spec' in instance_data ? /** @type {string} */ (instance_data['spec']) : /** @type {string} */ (data['spec'])];
-    this.obj.x = pos[0]; this.obj.y = pos[1];
+    this.obj.x = pos[0] + x_offset;
+    this.obj.y = pos[1] + y_offset;
     this.obj.hp = this.obj.max_hp = 0;
     this.obj.team = ('team' in data ? /** @type {string} */ (data['team']) : 'none');
     this.obj.level = (instance_data ? /** @type {number|undefined} */ (instance_data['level']) : null) || 1;
@@ -2011,6 +2023,8 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     } else if('path' in instance_data) {
         path = /** @type {!Array.<!Array.<number>>} */ (instance_data['path']);
         dest = path[path.length - 1];
+    } else if('bombing_run' in instance_data) {
+        dest = [pos[0] + dest_x_offset, pos[1] + dest_y_offset];
     } else {
         throw Error('PhantomUnit requires one of dest, heading, or path in instance data');
     }
@@ -2030,8 +2044,8 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
         /** @type {number|undefined} */ (this.data['start_halted']) || 0;
 
     this.obj.control_state = (this.start_halted ? control_states.CONTROL_STOP : control_states.CONTROL_MOVING);
-    this.obj.pos = [pos[0],pos[1]];
-    this.obj.next_pos = [pos[0],pos[1]];
+    this.obj.pos = [pos[0] + x_offset,pos[1] + y_offset];
+    this.obj.next_pos = [pos[0] + x_offset,pos[1] + y_offset];
     this.obj.combat_stats.altitude = altitude;
 };
 goog.inherits(SPFX.PhantomUnit, SPFX.Effect);
@@ -2249,6 +2263,15 @@ SPFX.FXWorld.prototype._add_visual_effect = function(pos, altitude, orient, when
             ret = this.add_phantom(new SPFX.PhantomUnit(pos, altitude, orient, when, data, instance_data));
             do_add = false;
         }
+    } else if(effect_type === 'bombing_run') {
+        if('altitude' in data) {
+            altitude = data['altitude'];
+        } else {
+            altitude = 5; // Missile launches come from altitude 100. Bombing runs use a sprite to simulate a gunship flying in and delivering a payload. Override to 5 for realistic height.
+        }
+        instance_data = { 'bombing_run':true };
+        ret = this.add_phantom(new SPFX.PhantomUnit(pos, altitude, orient, when, data, instance_data));
+        do_add = false;
     } else {
         console.log('unhandled visual effect type "'+effect_type+'"!');
     }
@@ -2265,3 +2288,17 @@ SPFX.FXWorld.prototype._add_visual_effect = function(pos, altitude, orient, when
 
     return ret;
 };
+
+/** @return {number} */
+SPFX._random_offset = function() {
+    var multiplier = 1;
+    var min = Math.ceil(1);
+	var max = Math.floor(2);
+    var do_negative = Math.floor(Math.random() * (max - min + 1)) + min;
+	if(do_negative > 1) {
+        multiplier = -1;
+    };
+    min = Math.ceil(50);
+	max = Math.floor(100);
+	return multiplier * (Math.floor(Math.random() * (max - min + 1)) + min);
+}
