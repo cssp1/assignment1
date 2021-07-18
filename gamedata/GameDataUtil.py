@@ -82,7 +82,7 @@ def get_cc_requirement_predicate(gamedata, pred):
         return get_cc_requirement_predicate(gamedata, gamedata['predicate_library'][pred['name']])
     elif pred['predicate'] == 'BASE_RICHNESS':
         return pred['min_richness']//10 # keep in sync with balance.py
-    elif pred['predicate'] in ('ALWAYS_TRUE', 'ANY_ABTEST', 'OR', 'BUILDING_QUANTITY', 'HOME_REGION',
+    elif pred['predicate'] in ('ALWAYS_TRUE', 'ANY_ABTEST', 'OR', 'BUILDING_QUANTITY', 'HOME_REGION', 'UNIT_QUANTITY', 'NOT',
                                'LADDER_PLAYER', 'PLAYER_HISTORY', 'ABSOLUTE_TIME', 'QUEST_COMPLETED', 'AURA_INACTIVE','TRUST_LEVEL', 'BASE_TYPE'):
         pass
     else:
@@ -182,4 +182,3 @@ def ui_difficulty_comment_for_townhall_loot_malus(gamedata, ai_townhall_level, b
     return [[{"predicate": "PLAYER_HISTORY", "key": gamedata['townhall']+"_level", "method": ">=", "value": attacker_townhall_level},
              comment_for_attacker_level(attacker_townhall_level)] for attacker_townhall_level in xrange(max_townhall_level, ai_townhall_level, -1)] + \
              [[{"predicate": "ALWAYS_TRUE"}, comment_for_attacker_level(1)]]
-
