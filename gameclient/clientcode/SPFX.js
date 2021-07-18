@@ -2264,11 +2264,7 @@ SPFX.FXWorld.prototype._add_visual_effect = function(pos, altitude, orient, when
             do_add = false;
         }
     } else if(effect_type === 'bombing_run') {
-        if('altitude' in data) {
-            altitude = data['altitude'];
-        } else {
-            altitude = 5; // Missile launches come from altitude 100. Bombing runs use a sprite to simulate a gunship flying in and delivering a payload. Override to 5 for realistic height.
-        }
+        altitude = 5; // Missile launches come from altitude 100. Bombing runs use a sprite to simulate a gunship flying in and delivering a payload. Override to 5 for realistic height.
         instance_data = { 'bombing_run':true };
         ret = this.add_phantom(new SPFX.PhantomUnit(pos, altitude, orient, when, data, instance_data));
         do_add = false;
