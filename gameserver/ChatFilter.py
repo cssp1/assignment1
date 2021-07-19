@@ -267,10 +267,13 @@ class ChatFilter(object):
     # Check for switching charsets in a potential alias, a tactic players have used to make strange spellings of names
     # Also allows blacklisting of large groups of Unicode
     def switches_charsets_or_blacklisted_chars(self, input):
-        first_charset = self.check_charset(codepoints.from_unicode(input)[0])
+        cp_list = list(codepoints.from_unicode(input))
+        if len(cp_list) < 1: return True
+
+        first_charset = self.check_charset(cp_list[0])
         if not first_charset: return True
 
-        for codepoint in codepoints.from_unicode(input):
+        for codepoint in cp_list:
             if self.check_charset(codepoint) != first_charset: return True
         return False
 
