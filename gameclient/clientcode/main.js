@@ -19024,7 +19024,7 @@ function update_craft_all_mines_dialog(dialog) {
         } else {
             this_mine_text = this_mine_text.replace('%MINE_NAME', this_mine['ui_name']);
         }
-        this_mine_text = mine_text.replace('%d', this_mine['count'].toString());
+        this_mine_text = this_mine_text.replace('%d', this_mine['count'].toString());
         mine_text += this_mine_text;
     } else if(mine_types_count === 2) {
         var this_mine_text = dialog.data['widgets']['description']['ui_mine_template'];
