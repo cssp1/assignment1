@@ -576,9 +576,9 @@ class AltPolicy(Policy):
         if len(anti_alt_regions) < 1 or len(pro_alt_regions) < 1:
             anti_alt_region_names = []
             pro_alt_region_names = []
-            for x in anti_alt_regions.itervalues():
+            for x in anti_alt_regions:
                 anti_alt_region_names.append(x['id'])
-            for x in pro_alt_regions.itervalues():
+            for x in pro_alt_regions:
                 pro_alt_region_names.append(x['id'])
             sys.stderr.write('error punishing %s user %d in region %s: anti_alt_regions length is %d (values %r), pro_alt_regions length is %d (values %r)' % (SpinConfig.game(), user_id, cur_region_name, len(anti_alt_regions), str(anti_alt_region_names), len(pro_alt_regions), str(pro_alt_region_names)))
 
