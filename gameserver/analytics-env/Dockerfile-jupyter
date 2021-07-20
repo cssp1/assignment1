@@ -1,0 +1,33 @@
+# Dockerfile for running Jupyter notebooks and publishing metrics dashboard
+# build from game/ directory
+
+FROM jupyter/scipy-notebook:29edefbcb06a
+
+WORKDIR $HOME
+
+USER root
+
+RUN apt-get update && \
+    apt-get install -y curl libmysqlclient-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# install Envkey-source binary
+RUN curl -s https://raw.githubusercontent.com/envkey/envkey-source/master/install.sh | /bin/sh
+
+RUN pip install envkey mysqlclient
+# 'boto3>=1.7.84' 'botocore>=1.12.13'
+
+# COPY aws aws
+COPY gameserver gameserver
+# COPY gamedata gamedata
+# COPY gameclient gameclient
+# COPY spinpunch-private spinpunch-private
+
+COPY gameserver/config.json.example gameserver/config.json
+COPY gameserver/analytics-env/Dockerfile-jupyter-entrypoint.sh /entrypoint.sh
+
+USER 1000
+ENV JUPYTER_PORT="8888"
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD /entrypoint.sh sh -c 'start-notebook.sh --NotebookApp.notebook_dir=gameserver/analytics-env/notebooks --port=${JUPYTER_PORT}'

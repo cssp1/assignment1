@@ -4,3 +4,4 @@ spinpunch-private
 git-sync.txt
 .DS_Store
 *.swp
+.env
