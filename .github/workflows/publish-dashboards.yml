@@ -29,7 +29,7 @@ jobs:
       - name: Execute dashboard notebook(s) (inside Docker)
         run: >
           /entrypoint.sh jupyter nbconvert --execute --no-input --no-prompt --ExecutePreprocessor.timeout=900
-      	  ${GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard.ipynb
+      	  ${env:GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard.ipynb
           --to html
       - name: Publish HTML dashboards to S3 (inside Docker)
         run: >
@@ -38,8 +38,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY="${BATCH_TASKS_AWS_SECRET_KEY}"
           AWS_REGION="us-east-1"
           aws s3 cp
-            "${GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard.html"
+            "${env:GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard.html"
             "s3://dashboards.spinpunch.com/dashboard.html"
             --content-type "text/html"
-          EOF
+          '
 
