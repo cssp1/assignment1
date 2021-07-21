@@ -1,0 +1,45 @@
+name: publish-dashboards
+
+on:
+  schedule:
+    # Sundays at 17:00 UTC
+    - cron: 0 17 * * 0
+  push:
+    branches:
+      - github-automation-dashboards
+  workflow_dispatch:
+
+jobs:
+  publish_dashboards:
+    name: Publish analyics dashboards using Jupyter
+    runs-on: ubuntu-latest
+    container:
+      image: docker://ghcr.io/spinpunch/game-jupyter:latest
+      credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+      env:
+        ENVKEY: ${{ secrets.ENVKEY_MANAGEMENT }}
+    defaults:
+      run:
+        working-directory: /usr/src/app/gameserver
+    steps:
+      - name: Check out game repository (outside Docker)
+        uses: actions/checkout@v2
+      - name: Execute dashboard notebook(s) (inside Docker)
+        run: |
+          /entrypoint.sh jupyter nbconvert --execute --no-input --no-prompt --ExecutePreprocessor.timeout=900 \
+      	  "${GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard.ipynb" \
+          --to html
+      - name: Publish HTML dashboards to S3 (inside Docker)
+        run: |
+          /entrypoint.sh sh -c <<EOF
+          AWS_ACCESS_KEY_ID="${BATCH_TASKS_AWS_KEY_ID}"
+          AWS_SECRET_ACCESS_KEY="${BATCH_TASKS_AWS_SECRET_KEY}"
+          AWS_REGION="us-east-1"
+          aws s3 cp \
+            "${GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard.html" \
+            "s3://dashboards.spinpunch.com/dashboard.html" \
+            --content-type "text/html"
+          EOF
+

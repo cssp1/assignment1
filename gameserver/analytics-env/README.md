@@ -31,7 +31,8 @@ The components of this are split between:
 - `.github/workflows/publish-dashboards.yml`: Github action to run and publish notebooks
 
 The publishing flow is as follows:
-- (once-only) push to `github-automation` branch to trigger the `build-jupyter-image` workflow to build the Docker image `ghcr.io/spinpunch/game-jupyter:latest`
-- (daily) GitHub cron schedule triggers `publish-dashboards` workflow to execute the notebooks and publish the HTML files to the S3 bucket `dashboards.spinpunch.com`
-  - This uses the `ANALYTICS_SSH_KEY` to tunnel into the RDS server via `gamemaster.spinpunch.com`
-- access to `https://dashboards.spinpunch.com/...` is guarded by CloudFlare Access which requires a Google OAuth sign-in from any `*@battlehouse.com` email address.
+- (once-only, or whenever the Jupyer Dockerfile changes) Push to the `github-automation` branch to trigger the `build-jupyter-image` workflow to build the Docker image `ghcr.io/spinpunch/game-jupyter:latest`
+- (daily) A GitHub cron schedule triggers the `publish-dashboards` workflow to execute the notebooks and publish the HTML files to the S3 bucket `dashboards.spinpunch.com`
+  - This uses the `ANALYTICS_SSH_KEY` Envkey to tunnel into the RDS server via `gamemaster.spinpunch.com`
+  - And also `BATCH_TASKS_AWS` credentials from Envkey
+- Access to `https://dashboards.spinpunch.com/...` is guarded by CloudFlare Access which requires a Google OAuth sign-in from any `*@battlehouse.com` email address.
