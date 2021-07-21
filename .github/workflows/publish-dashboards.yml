@@ -26,6 +26,7 @@ jobs:
     steps:
       - name: Check out game repository (outside Docker)
         uses: actions/checkout@v2
+        with: ubuntu-latest
       - name: Execute dashboard notebook(s) (inside Docker)
         env:
           GITHUB_WORKSPACE: ${{ env.GITHUB_WORKSPACE }}

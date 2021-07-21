@@ -8,7 +8,7 @@ WORKDIR $HOME
 USER root
 
 RUN apt-get update && \
-    apt-get install -y curl libmysqlclient-dev && \
+    apt-get install -y curl libmysqlclient-dev ssh && \
     rm -rf /var/lib/apt/lists/*
 
 # install Envkey-source binary
@@ -25,6 +25,7 @@ COPY gameserver gameserver
 
 COPY gameserver/config.json.example gameserver/config.json
 COPY gameserver/analytics-env/Dockerfile-jupyter-entrypoint.sh /entrypoint.sh
+COPY gameserver/analytics-env/Dockerfile-jupyter-entrypoint-with-aws-tunnel.sh /entrypoint-with-aws-tunnel.sh
 
 USER 1000
 ENV JUPYTER_PORT="8888"
