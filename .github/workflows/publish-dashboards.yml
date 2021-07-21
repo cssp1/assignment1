@@ -27,19 +27,23 @@ jobs:
       - name: Check out game repository (outside Docker)
         uses: actions/checkout@v2
       - name: Execute dashboard notebook(s) (inside Docker)
+        env:
+          GITHUB_WORKSPACE: ${{ env.GITHUB_WORKSPACE }}
         run: >
           /entrypoint.sh jupyter nbconvert --execute --no-input --no-prompt --ExecutePreprocessor.timeout=900
-          ${{env:GITHUB_WORKSPACE}}/gameserver/analytics-env/notebooks/dashboard.ipynb
+          $GITHUB_WORKSPACE/gameserver/analytics-env/notebooks/dashboard.ipynb
           --to html
       - name: Publish HTML dashboards to S3 (inside Docker)
+        env:
+          GITHUB_WORKSPACE: ${{ env.GITHUB_WORKSPACE }}
         run: >
           /entrypoint.sh sh -c '
           AWS_ACCESS_KEY_ID="${BATCH_TASKS_AWS_KEY_ID}"
           AWS_SECRET_ACCESS_KEY="${BATCH_TASKS_AWS_SECRET_KEY}"
           AWS_REGION="us-east-1"
           aws s3 cp
-            "${{env:GITHUB_WORKSPACE}}/gameserver/analytics-env/notebooks/dashboard.html"
-            "s3://dashboards.spinpunch.com/dashboard.html"
+            \"$GITHUB_WORKSPACE/gameserver/analytics-env/notebooks/dashboard.html\"
+            \"s3://dashboards.spinpunch.com/dashboard.html\"
             --content-type "text/html"
           '
 
