@@ -11,7 +11,7 @@ on:
 
 jobs:
   publish_dashboards:
-    name: Publish analyics dashboards using Jupyter
+    name: Publish analytics dashboards using Jupyter
     runs-on: ubuntu-latest
     container:
       image: docker://ghcr.io/spinpunch/game-jupyter:latest
@@ -20,9 +20,6 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
       env:
         ENVKEY: ${{ secrets.ENVKEY_MANAGEMENT }}
-    defaults:
-      run:
-        working-directory: /usr/src/app/gameserver
     steps:
       - name: Check out game repository
         uses: actions/checkout@v2
@@ -31,7 +28,7 @@ jobs:
           /entrypoint-with-ssh-tunnel.sh sh -c '
           jupyter nbconvert --execute --no-input --no-prompt --ExecutePreprocessor.timeout=900
           "${GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard.ipynb"
-          --to html
+          --to html --output-dir "${HOME}"
           '
       - name: Publish HTML dashboards to S3
         run: >
@@ -40,7 +37,7 @@ jobs:
           export AWS_SECRET_ACCESS_KEY="${BATCH_TASKS_AWS_SECRET_KEY}"
           export AWS_REGION="us-east-1"
           aws s3 cp
-            "${GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard.html"
+            "${HOME}/dashboard.html"
             "s3://dashboards.spinpunch.com/dashboard.html"
             --content-type "text/html"
           '
