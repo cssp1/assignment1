@@ -8,7 +8,7 @@ WORKDIR $HOME
 USER root
 
 RUN apt-get update && \
-    apt-get install -y curl libmysqlclient-dev ssh && \
+    apt-get install -y curl libmysqlclient-dev ssh git && \
     rm -rf /var/lib/apt/lists/*
 
 # install Envkey-source binary
