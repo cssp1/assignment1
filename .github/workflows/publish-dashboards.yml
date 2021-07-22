@@ -2,8 +2,8 @@ name: publish-dashboards
 
 on:
   schedule:
-    # Sundays at 17:00 UTC
-    - cron: 0 17 * * 0
+    # Fridays at 8:00 UTC
+    - cron: 0 8 * * 5
   push:
     branches:
       - github-automation-dashboards
