@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Execute dashboard notebook(s)
         run: >
-          /entrypoint-with-ssh-tunnel.sh sh -c '
+          /entrypoint-with-aws-tunnel.sh sh -c '
           jupyter nbconvert --execute --no-input --no-prompt --ExecutePreprocessor.timeout=900
           "${GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard.ipynb"
           --to html --output-dir "${HOME}"
