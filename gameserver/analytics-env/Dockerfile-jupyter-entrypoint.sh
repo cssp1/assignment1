@@ -2,6 +2,8 @@
 
 set -e
 
+su jovyan
+
 if [ -z $ENVKEY ]; then
     echo "ENVKEY is not set"
     exit 1

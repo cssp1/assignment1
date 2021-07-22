@@ -27,7 +27,11 @@ COPY gameserver/config.json.example gameserver/config.json
 COPY gameserver/analytics-env/Dockerfile-jupyter-entrypoint.sh /entrypoint.sh
 COPY gameserver/analytics-env/Dockerfile-jupyter-entrypoint-with-aws-tunnel.sh /entrypoint-with-aws-tunnel.sh
 
-USER 1000
+# GitHub actions require the container itself to run as USER root
+# Jupyter wants us to be running as USER 1000 (jovyan)
+# Resolve this by su'ing to jovyan inside of the entrypoint
+# USER 1000
+
 ENV JUPYTER_PORT="8888"
 
 ENTRYPOINT ["/entrypoint.sh"]
