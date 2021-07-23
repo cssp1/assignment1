@@ -12,6 +12,9 @@ RUN apk update && \
 # install Envkey
 RUN curl -s https://raw.githubusercontent.com/envkey/envkey-source/master/install.sh | /bin/sh
 
+# note: the 'game' and 'game-spinpunch-private' master code
+# will be "baked" into this Docker image under /usr/src/app
+# at the time the image is built.
 WORKDIR /usr/src/app
 
 COPY aws aws

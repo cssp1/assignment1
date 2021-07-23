@@ -17,14 +17,22 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
       env:
         ENVKEY: ${{ secrets.ENVKEY_MANAGEMENT }}
-    defaults:
-      run:
-        working-directory: /usr/src/app/gameserver
     steps:
+      - name: Check out game-spinpunch-private repository to get latest scripts and IP ban lists
+        uses: actions/checkout@v2
+        with:
+          repository: spinpunch/game-spinpunch-private
+          # note: always use master branch
+          ref: master
+          token: ${{ secrets.GHCR_PAT }}
+          # note: the checkout will appear under ${GITHUB_WORKSPACE}/spinpunch-private-master
+          # which is separate from the (possibly stale) copy baked into the game-batch-tasks
+          # Docker image at /usr/src/app/spinpunch-private
+          path: spinpunch-private-master
       - name: Run SpinPunch IP Reputation Update
-        working-directory: /usr/src/app
+        working-directory: ${{ env.GITHUB_WORKSPACE }}
         # install proxy-lists module manually here to avoid bloating
         # the batch-tasks Docker image. --unsafe-perm flag is required
         # to work around puppeteer issue:
         # https://github.com/puppeteer/puppeteer/issues/5656
-        run: /entrypoint.sh sh -c 'npm install -g proxy-lists --unsafe-perm && python spinpunch-private/update-ip-reputation.py'
+        run: /entrypoint.sh sh -c 'npm install -g proxy-lists --unsafe-perm && python spinpunch-private-master/update-ip-reputation.py'
