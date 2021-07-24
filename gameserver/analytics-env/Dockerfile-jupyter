@@ -8,13 +8,13 @@ WORKDIR $HOME
 USER root
 
 RUN apt-get update && \
-    apt-get install -y curl libmysqlclient-dev && \
+    apt-get install -y curl libmysqlclient-dev ssh git && \
     rm -rf /var/lib/apt/lists/*
 
 # install Envkey-source binary
 RUN curl -s https://raw.githubusercontent.com/envkey/envkey-source/master/install.sh | /bin/sh
 
-RUN pip install envkey mysqlclient
+RUN pip install envkey mysqlclient awscli
 # 'boto3>=1.7.84' 'botocore>=1.12.13'
 
 # COPY aws aws
@@ -25,8 +25,13 @@ COPY gameserver gameserver
 
 COPY gameserver/config.json.example gameserver/config.json
 COPY gameserver/analytics-env/Dockerfile-jupyter-entrypoint.sh /entrypoint.sh
+COPY gameserver/analytics-env/Dockerfile-jupyter-entrypoint-with-aws-tunnel.sh /entrypoint-with-aws-tunnel.sh
 
-USER 1000
+# GitHub actions require the container itself to run as USER root
+# Jupyter wants us to be running as USER 1000 (jovyan)
+# Resolve this by su'ing to jovyan inside of the entrypoint
+# USER 1000
+
 ENV JUPYTER_PORT="8888"
 
 ENTRYPOINT ["/entrypoint.sh"]

@@ -23,12 +23,11 @@ variable "sitename" { default = "game-batch-tasks" }
 # variable "envkey" {}
 
 data "external" "management_secrets" {
-  program = ["envkey-fetch", "${data.terraform_remote_state.corp.outputs.management_envkey}", "--cache"]
+  program = ["envkey-fetch", data.terraform_remote_state.corp.outputs.management_envkey, "--cache"]
 }
 
 provider "aws" {
   region = var.region
-  version = "~> 2"
 }
 
 # note: role for Fargate containers
@@ -82,7 +81,8 @@ locals {
       ],
       "Effect": "Allow",
       "Resource": [
-        "arn:aws:s3:::spinpunch-puppet*"
+        "arn:aws:s3:::spinpunch-puppet*",
+        "${aws_s3_bucket.dashboards.arn}*"
       ]
     },
     {
