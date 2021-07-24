@@ -581,6 +581,16 @@ class RemoveAuraConsequent(Consequent):
                     player['player_auras'].remove(aura)
                 return
 
+class RemoveProtectionConsequent(Consequent):
+    def __init__(self, data):
+        Consequent.__init__(self, data)
+
+    def execute(self, session, player, retmsg, context=None):
+        session.player.set_protection_end_time(session, int(time.time()) - 1, '3887_protection_removed_consequent')
+    def execute_offline(self, gamesite, user, player, context=None):
+        player['resources']['protection_end_time'] = int(time.time()) - 1
+        return
+
 class CooldownTriggerConsequent(Consequent):
     def __init__(self, data):
         Consequent.__init__(self, data)
@@ -915,6 +925,7 @@ def read_consequent(data):
     elif kind == 'GIVE_TROPHIES': return GiveTrophiesConsequent(data)
     elif kind == 'APPLY_AURA': return ApplyAuraConsequent(data)
     elif kind == 'REMOVE_AURA': return RemoveAuraConsequent(data)
+    elif kind == 'REMOVE_PROTECTION': return RemoveProtectionConsequent(data)
     elif kind == 'COOLDOWN_TRIGGER': return CooldownTriggerConsequent(data)
     elif kind == 'COOLDOWN_RESET': return CooldownResetConsequent(data)
     elif kind == 'FIND_AND_REPLACE_ITEMS': return FindAndReplaceItemsConsequent(data)
