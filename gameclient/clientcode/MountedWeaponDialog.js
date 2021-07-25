@@ -40,6 +40,10 @@ MountedWeaponDialog.invoke = function(mounting_obj) {
         building_context = 'ui_name_building_context_security_node';
         crafting_category = 'security_nodes_' + mounting_obj.spec.name; // security node hack - have to use a per-building category change to get nodes to work in multiple building types
         slot_type = 'security_node';
+    } else if (mounting_obj.is_airstrike_building()) {
+        building_context = 'ui_name_building_context_airstrike';
+        crafting_category = 'combat_air_patrols';
+        slot_type = 'combat_air_patrol';
     }
     dialog.user_data['dialog'] = 'mounted_weapon_dialog';
     dialog.user_data['emplacement'] = mounting_obj;
@@ -47,10 +51,23 @@ MountedWeaponDialog.invoke = function(mounting_obj) {
     dialog.user_data['crafting_category'] = crafting_category;
     dialog.user_data['slot_type'] = slot_type;
     dialog.user_data['selected_recipe'] = null;
+    if('label_current' in gamedata['crafting']['categories'][crafting_category]) {
+        dialog.widgets['label_current'].str = gamedata['crafting']['categories'][crafting_category]['label_current'];
+    }
+    if('label_new' in gamedata['crafting']['categories'][crafting_category]) {
+        dialog.widgets['label_new'].str = gamedata['crafting']['categories'][crafting_category]['label_new'];
+    }
+    if('label_new_detail' in gamedata['crafting']['categories'][crafting_category]) {
+        dialog.widgets['label_new_detail'].str = gamedata['crafting']['categories'][crafting_category]['label_new_detail'];
+    }
+    if('flavor_text' in gamedata['crafting']['categories'][crafting_category]) {
+        dialog.widgets['flavor_text'].set_text_with_linebreaking(gamedata['crafting']['categories'][crafting_category]['flavor_text'].replace('%s', gamedata['buildings'][get_lab_for(research_category)]['ui_name']));
+    } else {
+        dialog.widgets['flavor_text'].set_text_with_linebreaking(dialog.data['widgets']['flavor_text']['ui_name'].replace('%s', gamedata['buildings'][get_lab_for(research_category)]['ui_name']));
+    }
 
     dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name'].replace('%s', gamedata['spells']['CRAFT_FOR_FREE'][building_context]);
     dialog.widgets['dev_title'].show = player.is_cheater;
-    dialog.widgets['flavor_text'].set_text_with_linebreaking(dialog.data['widgets']['flavor_text']['ui_name'].replace('%s', gamedata['buildings'][get_lab_for(research_category)]['ui_name']));
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
     // construct recipe list
@@ -130,6 +147,8 @@ MountedWeaponDialog.ondraw = function(dialog) {
                 mounted = obj.townhall_weapon_item() || obj.townhall_weapon_inprogress_item();
             } else if (dialog.user_data['crafting_category'] === 'security_nodes' && obj.is_security_node()) {
                 mounted = obj.security_node_item() || obj.security_node_inprogress_item();
+            } else if (dialog.user_data['crafting_category'] === 'security_nodes' && obj.is_airstrike_building()) {
+                mounted = obj.airstrike_building_item() || obj.airstrike_building_inprogress_item();
             }
             if(mounted) {
                 var mounted_spec = ItemDisplay.get_inventory_item_spec(mounted['spec']);
@@ -324,6 +343,8 @@ MountedWeaponDialog.ondraw = function(dialog) {
         current_item = mounting_obj.townhall_weapon_item();
     } else if (mounting_obj.is_security_node()) {
         current_item = mounting_obj.security_node_item();
+    } else if (mounting_obj.is_airstrike_building()) {
+        current_item = mounting_obj.airstrike_building_item();
     }
 
     dialog.widgets['no_current'].show = !current_item;
