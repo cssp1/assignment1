@@ -5811,6 +5811,32 @@ Building.prototype.is_security_node_crafting = function() {
     }
     return ret;
 };
+Building.prototype.is_airstrike_building = function() { return this.spec['equip_slots'] && ('combat_air_patrol' in this.spec['equip_slots']); };
+Building.prototype.is_airstrike_building_only = function() {
+    if(!(this.spec['equip_slots'] && ('combat_air_patrol' in this.spec['equip_slots']))) { return false; }
+    var ret = true;
+    goog.object.forEach(this.spec['crafting_categories'], function(cat) {
+        if(cat && typeof(cat) === 'string' && cat !== 'combat_air_patrol') {
+            ret = false;
+        };
+    });
+    return ret;
+};
+Building.prototype.is_airstrike_building_crafting = function() {
+    if(!this.is_airstrike_building()) { return false; }
+    var craft_queue = this.get_crafting_queue();
+    var ret = false;
+    if(craft_queue && craft_queue.length > 0) {
+        goog.object.forEach(craft_queue, function(craft) {
+            var recipe = craft['craft']['recipe'];
+            var category = gamedata['crafting']['recipes'][recipe]['crafting_category'];
+            if(category === 'combat_air_patrol') {
+                ret = true;
+            };
+        });
+    }
+    return ret;
+};
 Building.prototype.is_barrier = function() { return this.spec['name'] === 'barrier'; };
 Building.prototype.is_trapped_barrier = function() { return this.spec['equip_slots'] && ('barrier_trap' in this.spec['equip_slots']); };
 Building.prototype.is_armed_building = function() { return this.spec['equip_slots'] && ('building_weapon' in this.spec['equip_slots']); };
@@ -5867,6 +5893,16 @@ Building.prototype.building_weapon_item = function() {
 };
 /** @return {Object|null} the building weapon item currently being crafted (assumes is_crafting() is true) */
 Building.prototype.building_weapon_inprogress_item = Building.prototype.first_crafting_inprogress_item;
+
+/** @return {Object|null} the instance of the building weapon item equipped here, if any, otherwise null */
+Building.prototype.airstrike_building_item = function() {
+    if(this.equipment && this.equipment['combat_air_patrol'] && this.equipment['combat_air_patrol'].length > 0) {
+        return this.equipment['combat_air_patrol'][0] ? player.decode_equipped_item(this.equipment['combat_air_patrol'][0]) : null;
+    }
+    return null;
+};
+/** @return {Object|null} the building weapon item currently being crafted (assumes is_crafting() is true) */
+Building.prototype.airstrike_building_inprogress_item = Building.prototype.first_crafting_inprogress_item;
 
 /** @return {Object|null} the instance of the townhall weapon item equipped here, if any, otherwise null */
 Building.prototype.townhall_weapon_item = function() {
@@ -10213,7 +10249,10 @@ function get_killer_info(killer) {
                 ret['building_weapon'] = killer.building_weapon_item()['spec'];
             } else if(killer.is_armed_townhall() && killer.townhall_weapon_item()) {
                 ret['townhall_weapon'] = killer.townhall_weapon_item()['spec'];
+            } else if(killer.is_airstrike_building() && killer.airstrike_building_item()) {
+                ret['combat_air_patrol'] = killer.airstrike_building_item()['spec'];
             }
+
         }
         return ret;
     }
@@ -16168,7 +16207,7 @@ BuildUICursor.prototype.draw = function(offset) {
         color = new SPUI.Color(0.3, 0.85, 0.24);
     }
     var spell = spell_range_aoe[0], range = (spell_range_aoe[3] > 0 ? spell_range_aoe[3] : spell_range_aoe[1]), aoe = spell_range_aoe[2], min_range = spell_range_aoe[4];
-    if(range > 0 || (this.obj && this.obj.is_building() && (this.obj.is_minefield() || this.obj.is_ambush() || this.obj.is_security_node()))) {
+    if(range > 0 || (this.obj && this.obj.is_building() && (this.obj.is_minefield() || this.obj.is_ambush() || this.obj.is_security_node() || this.obj.is_airstrike_building()))) {
         // manually draw prospective range at new location
         if(range > 0) {
             draw_weapon_range(xy, range, true, aoe, min_range, color);
@@ -22147,6 +22186,10 @@ function do_invoke_speedup_dialog(kind) {
             var product = selection.unit.building_weapon_inprogress_item();
             var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
             description_finish = gamedata['strings']['speedup']['finish_building_weapon'].replace('%s', ui_name);
+        } else if(selection.unit.is_airstrike_building()) {
+            var product = selection.unit.airstrike_building_inprogress_item();
+            var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
+            description_finish = gamedata['strings']['speedup']['finish_airstrike'].replace('%s', ui_name);
         } else if(selection.unit.is_armed_townhall()) {
             var product = selection.unit.townhall_weapon_inprogress_item();
             var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
@@ -23889,7 +23932,7 @@ function invoke_building_context_menu(mouse_xy) {
                     throw Error('Missing crafting_categories for crafter: ' + obj.spec['ui_name']);
                 }
 
-                if(!obj.is_emplacement() && !obj.is_security_node_only() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall()) { // mounted weapons have special case, see below
+                if(!obj.is_emplacement() && !obj.is_security_node_only() && !obj.is_airstrike_building_only() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall()) { // mounted weapons have special case, see below
                     buttons.push(new ContextMenuButton({ui_name: cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
                                                         asset: 'action_button_resizable',
                                                         onclick: (function (_cat) { return function() {
@@ -23906,7 +23949,7 @@ function invoke_building_context_menu(mouse_xy) {
                 if(obj.is_crafting()) {
                     // for turret emplacements, add the speedup/cancel buttons above the divider
                     var which_buttons;
-                    if(obj.is_emplacement() || obj.is_security_node_crafting() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) {
+                    if(obj.is_emplacement() || obj.is_security_node_crafting() || obj.is_airstrike_building_crafting() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) {
                         if(!special_buttons['mounted']) {special_buttons['mounted'] = [];}
                         which_buttons = special_buttons['mounted'];
                     } else {
@@ -23986,7 +24029,7 @@ function invoke_building_context_menu(mouse_xy) {
 
             }
 
-            if((obj.is_emplacement() || obj.is_security_node() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) && (session.home_base || quarry_upgradable)) { // special case for mounted weapons
+            if((obj.is_emplacement() || obj.is_security_node() || obj.is_airstrike_building() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) && (session.home_base || quarry_upgradable)) { // special case for mounted weapons
                 dialog_name = 'mounted_weapon_context_menu';
                 var cur_item = null;
                 if (obj.is_emplacement()) {
@@ -23999,6 +24042,8 @@ function invoke_building_context_menu(mouse_xy) {
                     cur_item = obj.townhall_weapon_item();
                 } else if (obj.is_security_node()) {
                     cur_item = obj.security_node_item();
+                } else if (obj.is_airstrike_building()) {
+                    cur_item = obj.airstrike_building_item();
                 }
                 var item_spec = (cur_item ? ItemDisplay.get_inventory_item_spec(cur_item['spec']) : null);
                 var under_leveled = false;
@@ -24020,7 +24065,7 @@ function invoke_building_context_menu(mouse_xy) {
                     }
                 }
 
-                if(obj.time_until_finish() <= 0 || (obj.is_security_node() && !obj.is_security_node_crafting())) {
+                if(obj.time_until_finish() <= 0 || (obj.is_security_node() && !obj.is_security_node_crafting()) || (obj.is_airstrike_building() && !obj.is_airstrike_building_crafting())) {
                     var spell = gamedata['spells']['CRAFT_FOR_FREE'];
                     var this_ui_context = 'ui_name_building_context_emplacement';
                     if(!special_buttons['mounted']) {special_buttons['mounted'] = [];}
@@ -24032,6 +24077,8 @@ function invoke_building_context_menu(mouse_xy) {
                         this_ui_context = 'ui_name_building_context_townhall_weapon';
                     } else if (obj.is_security_node()) {
                         this_ui_context = 'ui_name_building_context_security_node';
+                    } else if (obj.is_airstrike_building()) {
+                        this_ui_context = 'ui_name_building_context_airstrike';
                     }
                     special_buttons['mounted'].push(new ContextMenuButton({ui_name: spell[this_ui_context],
                                                                            onclick: (function (_obj) { return function(w) { MountedWeaponDialog.invoke(_obj); }; })(obj),
@@ -24220,7 +24267,13 @@ function invoke_building_context_menu(mouse_xy) {
             } else {
                 cur_item = obj.security_node_item();
             }
-        }  else if (obj.is_trapped_barrier()) {
+        } else if (obj.is_airstrike_building()) {
+            if(obj.is_airstrike_building_crafting()) {
+                cur_item = obj.airstrike_building_inprogress_item();
+            } else {
+                cur_item = obj.airstrike_building_item();
+            }
+        } else if (obj.is_trapped_barrier()) {
             cur_item = obj.barrier_trap_item() || obj.barrier_trap_inprogress_item();
         } else if (obj.is_armed_building()) {
             cur_item = obj.building_weapon_item() || obj.building_weapon_inprogress_item();
@@ -46904,7 +46957,7 @@ function update_upgrade_dialog(dialog) {
 
         if(unit.is_researcher()) { feature_list.push('research_level'); }
         if(unit.is_researcher()) { feature_list.push('research_speed'); }
-        if(unit.is_crafter() && !unit.is_emplacement() && !unit.is_security_node() && !unit.is_trapped_barrier() && !unit.is_armed_building() && !unit.is_armed_townhall() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
+        if(unit.is_crafter() && !unit.is_emplacement() && !unit.is_security_node() && !unit.is_airstrike_building() && !unit.is_trapped_barrier() && !unit.is_armed_building() && !unit.is_armed_townhall() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
         if(unit.is_crafter() && ('crafting_queue_space' in unit.spec)) { feature_list.push('crafting_queue_space'); }
 
         if('provides_quarry_control' in unit.spec && session.region.map_enabled()) { feature_list.push('provides_quarry_control'); }
@@ -47037,7 +47090,7 @@ function update_upgrade_dialog(dialog) {
                                    (stat.indexOf('weapon_')!=0 ||
                                     stat.indexOf('weapon_damage_vs:')==0 ||
                                     (stat === 'weapon_range_pvp' && goog.array.contains(feature_list, 'weapon_range'))) &&
-                                   (stat != 'weapon' || !(unit && unit.is_emplacement()) || !(unit && unit.is_security_node()) || !(unit && unit.is_trapped_barrier()) || !(unit && unit.is_armed_building()) || !(unit && unit.is_armed_townhall())) && /* don't show "weapon" stat on mounted weapon buildings */
+                                   (stat != 'weapon' || !(unit && unit.is_emplacement()) || !(unit && unit.is_security_node()) || !(unit && unit.is_airstrike_building()) || !(unit && unit.is_trapped_barrier()) || !(unit && unit.is_armed_building()) || !(unit && unit.is_armed_townhall())) && /* don't show "weapon" stat on mounted weapon buildings */
                                    (modchain['mods'].length>1 && modchain['val'] != modchain['mods'][0]['val'])) {
                                     feature_list.push(stat);
                                 }
@@ -56566,7 +56619,7 @@ Building.prototype.get_idle_state_legacy = function() {
             /* draw_idle_icon = 'craft_done'; */
         }
 
-        if((this.is_emplacement() && this.turret_head_item()) || (this.is_security_node() && this.security_node_item()) || (this.is_trapped_barrier() && this.barrier_trap_item()) || (this.is_armed_building() && this.building_weapon_item()) || (this.is_armed_townhall() && this.townhall_weapon_item())){ // assumes mounted weapon recipients are crafters
+        if((this.is_emplacement() && this.turret_head_item()) || (this.is_security_node() && this.security_node_item()) || (this.is_airstrike_building() && this.airstrike_building_item()) || (this.is_trapped_barrier() && this.barrier_trap_item()) || (this.is_armed_building() && this.building_weapon_item()) || (this.is_armed_townhall() && this.townhall_weapon_item())){ // assumes mounted weapon recipients are crafters
             var item = null;
             var mounted_weapon_idle_icon = null;
             if(this.is_emplacement()) {
@@ -56575,7 +56628,10 @@ Building.prototype.get_idle_state_legacy = function() {
             } else if(this.is_security_node()) {
                 item = this.security_node_item();
                 mounted_weapon_idle_icon = 'under_leveled_security_node';
-            }  else if(this.is_trapped_barrier()) {
+            } else if(this.is_airstrike_building()) {
+                item = this.airstrike_building_item();
+                mounted_weapon_idle_icon = 'under_leveled_combat_air_patrol';
+            } else if(this.is_trapped_barrier()) {
                 item = this.barrier_trap_item();
                 mounted_weapon_idle_icon = 'under_leveled_barrier_trap';
             } else if(this.is_armed_building()) {
@@ -56777,7 +56833,7 @@ Building.prototype.get_idle_state_advanced = function() {
             }
         }
     } else if(this.is_crafter()) {
-        if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item()) && !(this.is_security_node() && this.security_node_item())  && !(this.is_trapped_barrier() && this.barrier_trap_item()) && !(this.is_armed_building() && this.building_weapon_item()) && !(this.is_armed_townhall() && this.townhall_weapon_item())) {
+        if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item()) && !(this.is_security_node() && this.security_node_item())  && !(this.is_airstrike_building() && this.airstrike_building_item()) && !(this.is_trapped_barrier() && this.barrier_trap_item()) && !(this.is_armed_building() && this.building_weapon_item()) && !(this.is_armed_townhall() && this.townhall_weapon_item())) {
             var building_cat = this.spec['crafting_categories'];
             goog.array.forEach(this.spec['crafting_categories'], function(cat) {
                 if(cat && Array.isArray(cat)){
@@ -56844,7 +56900,7 @@ Building.prototype.get_idle_state_advanced = function() {
             /* draw_idle_icon = 'craft_done'; */
         }
 
-        if((this.is_emplacement() && this.turret_head_item()) || (this.is_security_node() && this.security_node_item()) || (this.is_trapped_barrier() && this.barrier_trap_item()) || (this.is_armed_building() && this.building_weapon_item()) || (this.is_armed_townhall() && this.townhall_weapon_item())){ // assumes mounted weapon recipients are crafters
+        if((this.is_emplacement() && this.turret_head_item()) || (this.is_security_node() && this.security_node_item()) || (this.is_airstrike_building() && this.airstrike_building_item()) || (this.is_trapped_barrier() && this.barrier_trap_item()) || (this.is_armed_building() && this.building_weapon_item()) || (this.is_armed_townhall() && this.townhall_weapon_item())){ // assumes mounted weapon recipients are crafters
             var item = null;
             var mounted_weapon_idle_icon = null;
             if(this.is_emplacement()) {
@@ -56853,6 +56909,9 @@ Building.prototype.get_idle_state_advanced = function() {
             } else if(this.is_security_node()) {
                 item = this.security_node_item();
                 mounted_weapon_idle_icon = 'under_leveled_security_node';
+            } else if(this.is_airstrike_building()) {
+                item = this.airstrike_building_item();
+                mounted_weapon_idle_icon = 'under_leveled_airstrike';
             } else if(this.is_trapped_barrier()) {
                 item = this.barrier_trap_item();
                 mounted_weapon_idle_icon = 'under_leveled_barrier_trap';
