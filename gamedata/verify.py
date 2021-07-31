@@ -3597,6 +3597,22 @@ def check_achievements(achievements):
             if (PRED in data) and check_predicate(data[PRED], reason = 'achievement:'+key+':'+PRED):
                 error |= 1
                 print 'achievement %s has bad %s predicate' % (key, PRED)
+        if gamedata['game_id'] in ('tr','dv') and key.startswith('equipment_') and key.endswith('L1'):
+            found_L2 = False
+            for PRED in data['goal']['subpredicates']:
+                if PRED['predicate'] == 'OR':
+                    continue
+                elif PRED['predicate'] == 'HAS_ITEM':
+                    item_name = PRED['item_name'].replace('L1','L2')
+                    if item_name in gamedata['items']:
+                        found_L2 = True
+                        error |= 1
+                        print 'achievement %s only has L1 equipment %s but should probably be an OR predicate and include %s' % (key, PRED['item_name'], item_name)
+            if found_L2:
+                if key.replace('L1', 'L2') not in achievements:
+                    error |= 1
+                    print 'achievement %s: L1 version exists, but L2 equipment is available. %s should be created' % (key, key.replace('L1','L2'))
+
 
         # ensure uniqueness of ui_names
         if data['ui_name'] in seen_ui_names:
