@@ -52193,6 +52193,7 @@ function handle_server_message(data) {
                     if('spellname' in use) {
                         var spell = gamedata['spells'][use['spellname']];
                         var spell_level = item_level;
+
                         if(('code' in spell) && (spell['code'] == 'projectile_attack')) {
                             var target_loc = extra_spellargs[0], target_height = 0;
                             log_target_pos = target_loc;
@@ -52205,6 +52206,9 @@ function handle_server_message(data) {
                                 if(obj.is_building() && !obj.is_destroyed() && !obj.disarmed && !obj.combat_stats.stunned && (obj.team !== 'player') &&
                                    obj.equipment && obj.is_shooter()) {
                                     var chance = 1 - obj.combat_stats.anti_missile;
+                                    if('allow_intercept' in spell && !(spell['allow_intercept'])) {
+                                        chance = 0;
+                                    }
                                     if(chance > 0) {
                                         // check range
                                         var range = obj.weapon_range()[1];
