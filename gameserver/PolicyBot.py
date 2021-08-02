@@ -481,6 +481,9 @@ class AltPolicy(Policy):
         # possible race condition after player cache lookup (?)
         if not player.get('home_region', False) or player['home_region'] not in alt_policy_region_names: return
 
+        # skip any prison map if prison is somehow included in alt policy regions
+        if 'prison' in player['home_region']: return
+
         region_alt_limit = gamedata['regions'][player['home_region']].get('alt_limit',0) # if no alt_limit is set, this region is being checked because it has an anti_alt tag, so it default to 0
 
         if self.test:
