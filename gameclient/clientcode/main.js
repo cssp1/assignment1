@@ -45373,7 +45373,10 @@ function build_dialog_scroll(dialog, page) {
     var build_closure = function(kind, bname) {
         return function() {
             var spec = gamedata[kind][bname];
-            var build_time = get_leveled_quantity(spec['build_time'], 1);
+            var build_time = 1;
+            if ('build_time' in spec) { // have to do this check when placing new environment decorations or it will crash
+                build_time = get_leveled_quantity(spec['build_time'], 1);
+            }
             // if foreman is busy, prompt player to add foreman or speed up current operation
             if(player.foreman_is_busy() && (build_time > 0 || !gamedata['foreman_ignore_zero_time_building'])) {
                 if(gamedata['enable_multiple_foremen'] && player.tutorial_state == "COMPLETE") {
@@ -56915,7 +56918,7 @@ Building.prototype.get_idle_state_advanced = function() {
                 mounted_weapon_idle_icon = 'under_leveled_security_node';
             } else if(this.is_airstrike_building()) {
                 item = this.airstrike_building_item();
-                mounted_weapon_idle_icon = 'under_leveled_airstrike';
+                mounted_weapon_idle_icon = 'under_leveled_combat_air_patrol';
             } else if(this.is_trapped_barrier()) {
                 item = this.barrier_trap_item();
                 mounted_weapon_idle_icon = 'under_leveled_barrier_trap';
