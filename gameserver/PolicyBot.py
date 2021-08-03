@@ -568,6 +568,8 @@ class AltPolicy(Policy):
 
     def punish_player(self, user_id, master_id, cur_region_name, other_alt_region_names, all_alt_ids, alt_limit = 0):
 
+        if 'prison' in cur_region_name: return cur_region_name # there should never be a situation where a player in a prison is being punished. Just leave them in prison.
+
         cur_region = gamedata['regions'][cur_region_name]
         cur_continent_id = cur_region.get('continent_id',None)
 
