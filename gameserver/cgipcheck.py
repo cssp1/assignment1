@@ -724,7 +724,7 @@ def do_remove_mentor(args):
     if not bh_id:
         return 'This is not a Battlehouse account.'
     result = BHAPI.BHAPI('/invite_delete/', args = {'user_id':bh_id})
-    if result.get('result') == 'ok':
+    if result == 'ok':
         history_args = copy.deepcopy(args)
         history_args['method'] = 'add_note'
         history_args['ui_reason'] = 'Removed mentor: %s' % args['ui_reason']
