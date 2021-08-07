@@ -3133,11 +3133,19 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                                     if effect['code'] == 'modstat' and effect['stat'] in ('on_destroy','on_damage','on_approach'):
                                         conslist = effect['strength']
                                         for cons in conslist:
-                                            if cons['consequent'] == 'SPAWN_SECURITY_TEAM':
-                                                for secteam_name in cons['units']:
-                                                    if not climate_allows_unit(climate_data, gamedata['units'][secteam_name]):
-                                                        error |= 1
-                                                        print 'ERROR: AI base %s has %s with item %r that spawns security team unit %s not allowed by climate %s' % (strid, item['spec'], slot, secteam_name, climate)
+                                            if isinstance(cons,dict):
+                                                if cons['consequent'] == 'SPAWN_SECURITY_TEAM':
+                                                    for secteam_name in cons['units']:
+                                                        if not climate_allows_unit(climate_data, gamedata['units'][secteam_name]):
+                                                            error |= 1
+                                                            print 'ERROR: AI base %s has %s with item %r that spawns security team unit %s not allowed by climate %s' % (strid, item['spec'], slot, secteam_name, climate)
+                                            elif isinstance(cons, list):
+                                                for subcons in cons:
+                                                    if subcons['consequent'] == 'SPAWN_SECURITY_TEAM':
+                                                        for secteam_name in subcons['units']:
+                                                            if not climate_allows_unit(climate_data, gamedata['units'][secteam_name]):
+                                                                error |= 1
+                                                                print 'ERROR: AI base %s has %s with item %r that spawns security team unit %s not allowed by climate %s' % (strid, item['spec'], slot, secteam_name, climate)
     if 'buildings' in base:
         error |= check_ai_base_contents_power(base['buildings'], strid)
 
