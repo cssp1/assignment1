@@ -133,7 +133,7 @@ class AntiVPNPolicy(Policy):
                 # only repeat offenders get the banishment aura
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
                                       'duration': self.REGION_BANISH_DURATION,
-                                      'data':SpinJSON.dumps({'tag':'anti_vpn'})}) == 'ok'
+                                      'data':SpinJSON.dumps({'tag':'anti_vpn', 'region': cur_region_name})}) == 'ok'
 
             assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
 
@@ -644,7 +644,7 @@ class AltPolicy(Policy):
                 # only repeat offenders get the banishment aura
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
                                       'duration': self.REGION_BANISH_DURATION,
-                                      'data':SpinJSON.dumps({'tag':'anti_alt'})}) == 'ok'
+                                      'data':SpinJSON.dumps({'tag':'anti_alt', 'region': cur_region_name})}) == 'ok'
 
             assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
 
