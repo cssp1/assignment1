@@ -1520,16 +1520,17 @@ def check_item(itemname, spec):
         consequent_error_messages = []
         player_history_found = False
         blueprint_congrats_found = False
-        for consequent in spec['use']['subconsequents']:
-            # check that the item will set the expected player history key and invoke the appropriate "blueprint congrats" screen upon usage
-            if consequent['consequent'] == 'PLAYER_HISTORY':
-                player_history_found = True
-                if consequent['key'] != expect_history and enable_name_check:
-                    consequent_error_messages.append('PLAYER_HISTORY key for %s blueprint item can only be %s' % (itemname, expect_history))
-            elif consequent['consequent'] == 'INVOKE_BLUEPRINT_CONGRATS':
-                blueprint_congrats_found = True
-                if consequent['item'] != spec['name'] and enable_name_check:
-                    consequent_error_messages.append('INVOKE_BLUEPRINT_CONGRATS item for %s blueprint item can only be %s' % (itemname, itemname))
+        if spec['use'].get('consequent') == 'AND':
+            for consequent in spec['use']['subconsequents']:
+                # check that the item will set the expected player history key and invoke the appropriate "blueprint congrats" screen upon usage
+                if consequent['consequent'] == 'PLAYER_HISTORY':
+                    player_history_found = True
+                    if consequent['key'] != expect_history and enable_name_check:
+                        consequent_error_messages.append('PLAYER_HISTORY key for %s blueprint item can only be %s' % (itemname, expect_history))
+                elif consequent['consequent'] == 'INVOKE_BLUEPRINT_CONGRATS':
+                    blueprint_congrats_found = True
+                    if consequent['item'] != spec['name'] and enable_name_check:
+                        consequent_error_messages.append('INVOKE_BLUEPRINT_CONGRATS item for %s blueprint item can only be %s' % (itemname, itemname))
         if consequent_error_messages:
             error |= 1; print ', '.join(consequent_error_messages)
         if gamedata['game_id'] in ('bfm',):
