@@ -342,8 +342,14 @@ def generate_showcase_consequent(data, fd):
             already_obtained_unit_predicate = {"predicate": "OR", "subpredicates": [{"predicate": "LIBRARY", "name": final_loot_unit+"_unlocked"},
                                                                                     {"predicate": "HAS_ITEM", "item_name": final_loot_unit+"_blueprint"}]}
 
+            final_loot_unit_ai_name = ''
+            if '_L1' in final_loot_unit:
+                final_loot_unit_ai_name = gamedata['units'][final_loot_unit.replace('_L1','')]['ui_name']
+            else:
+                final_loot_unit_ai_name = gamedata['units'][final_loot_unit]['ui_name']
+
             progression_text = [[already_obtained_unit_predicate, progression_text.replace('%FINAL_REWARD', 'a bonus item pack')], \
-                                [{"predicate": "ALWAYS_TRUE"}, progression_text.replace('%FINAL_REWARD', 'blueprints for the %s' % gamedata['units'][final_loot_unit]['ui_name'])]]
+                                [{"predicate": "ALWAYS_TRUE"}, progression_text.replace('%FINAL_REWARD', 'blueprints for the %s' % final_loot_unit_ai_name)]]
         else:
             # most immortal events reward a unit as the final reward, so just use a generic message as a final fallback option
             progression_text = data['showcase'].get('progression_text', DEFAULT_PROGRESSION_TEXT_OTHER).replace('%AI', data['villain_ui_name'])
@@ -382,9 +388,14 @@ def generate_showcase_consequent(data, fd):
                 showcase['ui_subtitle'] = 'SINGLE PLAYER'
 
         if final_loot_unit:
-            showcase['final_reward_unit'] = final_loot_unit
-            showcase["ui_final_reward_title_bbcode"] = "[color=#ffff08]%s[/color]" % gamedata['units'][final_loot_unit]['ui_name']
-            showcase["ui_final_reward_subtitle_bbcode"] = gamedata['units'][final_loot_unit]['ui_tip']
+            if '_L1' in final_loot_unit:
+                showcase['final_reward_unit'] = final_loot_unit.replace('_L1','')
+                showcase["ui_final_reward_title_bbcode"] = "[color=#ffff08]%s[/color]" % gamedata['units'][final_loot_unit.replace('_L1','')]['ui_name']
+                showcase["ui_final_reward_subtitle_bbcode"] = gamedata['units'][final_loot_unit.replace('_L1','')]['ui_tip']
+            else:
+                showcase['final_reward_unit'] = final_loot_unit
+                showcase["ui_final_reward_title_bbcode"] = "[color=#ffff08]%s[/color]" % gamedata['units'][final_loot_unit]['ui_name']
+                showcase["ui_final_reward_subtitle_bbcode"] = gamedata['units'][final_loot_unit]['ui_tip']
 
             if final_loot_unit_substitute_items: # show these items only if you already have obtained the unit
                 already_obtained_unit_predicate = {"predicate": "OR", "subpredicates": [{"predicate": "LIBRARY", "name": final_loot_unit+"_unlocked"},
@@ -549,7 +560,10 @@ def generate_showcase_consequent(data, fd):
         elif final_loot_item_set:
             login_showcase['ui_login_body_bbcode'] += '[color=#ffffff]%s[/color]' % gamedata['item_sets'][final_loot_item_set]['ui_name'].upper()
         elif final_loot_unit:
-            login_showcase['ui_login_body_bbcode'] += 'the [color=#ffffff]%s[/color] unit' % gamedata['units'][final_loot_unit]['ui_name'].upper()
+            if '_L1' in final_loot_unit:
+                login_showcase['ui_login_body_bbcode'] += 'the [color=#ffffff]%s[/color] unit' % gamedata['units'][final_loot_unit.replace('_L1','')]['ui_name'].upper()
+            else:
+                login_showcase['ui_login_body_bbcode'] += 'the [color=#ffffff]%s[/color] unit' % gamedata['units'][final_loot_unit]['ui_name'].upper()
         else:
             # one of the above cases must be true because we checked that earlier
             pass
