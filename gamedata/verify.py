@@ -1539,6 +1539,9 @@ def check_item(itemname, spec):
         if '_permit' in spec['name']:
             # allows techless blueprints to ignore congrats
             blueprint_congrats_found = True
+            player_history_found = True
+            if spec['use'].get('key') != expect_history and enable_name_check:
+                consequent_error_messages.append('PLAYER_HISTORY key for %s blueprint item can only be %s' % (itemname, expect_history))
         if spec.get('crafting_blueprint', False):
             # TR/DV craftable troop blueprints have no tech
             blueprint_congrats_found = True
