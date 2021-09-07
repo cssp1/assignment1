@@ -1513,7 +1513,7 @@ def check_item(itemname, spec):
         elif spec['name'] in ('elite_stinger_gunner_blueprint', 'stinger_gunner_blueprint'):
             # special-case some legacy items that have inconsistent names
             enable_name_check = False
-        if spec['use'].get('consequent') != 'AND':
+        if spec['use'].get('consequent') != 'AND' and spec['use'].get('consequent') != 'PLAYER_HISTORY':
             error |= 1; print '%s: blueprint items should have a "use" key for player history updates' % (itemname,)
         error |= check_consequent(spec['use'])
         expect_history = spec['name'] + "_unlocked"
@@ -1534,6 +1534,9 @@ def check_item(itemname, spec):
             error |= 1; print ', '.join(consequent_error_messages)
         if gamedata['game_id'] in ('bfm',):
             # BFM still uses buildings, not techs, for turrets, but has blueprints
+            blueprint_congrats_found = True
+        if '_permit' in spec['name']:
+            # allows techless blueprints to ignore congrats
             blueprint_congrats_found = True
         if spec.get('crafting_blueprint', False):
             # TR/DV craftable troop blueprints have no tech
