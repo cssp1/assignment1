@@ -4620,7 +4620,7 @@ def main(args):
                 if thing.endswith('stinger_gunner'):
                     expect_player_history_keys.add(thing[:-len('stinger_gunner')] + 'stinger_blueprint_unlocked')
             else:
-                expect_player_history_keys = set([thing+'_blueprint_unlocked'])
+                expect_player_history_keys = set([thing+'_blueprint_unlocked',thing+'_permit_unlocked',])
                 if my_level >= 0: # allow any item of equal or lesser level
                     for level in xrange(my_level, my_level+1):
                         expect_player_history_keys.add(thing+'_blueprint_unlocked'+('_L%d' % level))
