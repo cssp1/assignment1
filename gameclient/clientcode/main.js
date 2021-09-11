@@ -52214,6 +52214,9 @@ function handle_server_message(data) {
                                     if(chance > 0) {
                                         // check range
                                         var range = obj.weapon_range()[1];
+                                        if(range < 1 && 'minimum_anti_missile_range' in gamedata && gamedata['minimum_anti_missile_range'] > 0) {
+                                            range = gamedata['minimum_anti_missile_range'];
+                                        }
                                         var dist = vec_distance(obj.raw_pos(), target_loc);
                                         if(range > 0 && dist < range) {
                                             // chance of interception
