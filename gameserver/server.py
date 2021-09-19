@@ -29499,7 +29499,7 @@ class GAMEAPI(resource.Resource):
                     session.player.cooldown_trigger('spy_cooldown', spy_cooldown)
                     retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
-            if player.cooldown_togo('spy_cooldown') > 0 and dest_id != session.player.user_id and dest_base_id != home_base_id(session.player.user_id) and not is_ai_user_id_range(dest_id):
+            if session.player.cooldown_togo('spy_cooldown') > 0 and dest_id != session.player.user_id and dest_base_id != home_base_id(session.player.user_id) and not is_ai_user_id_range(dest_id):
                 # if optional spy cooldown is active and player is not returning home, do not allow session change
                 retmsg.append(["ERROR", "ON_COOLDOWN"])
                 return
