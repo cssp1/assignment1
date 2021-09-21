@@ -1045,7 +1045,11 @@ class NoSQLClient (object):
     def facebook_id_table(self):
         coll = self._table('facebook_id_map')
         if not self.seen_facebook_ids:
-            coll.create_index('user_id')  #, unique=True)
+            try:
+                coll.create_index('user_id')  #, unique=True)
+            except pymongo.errors.OperationFailure:
+                # temporary - this can complain if the existing index has unique=True
+                pass
             self.seen_facebook_ids = True
             self.min_user_id = SpinConfig.config.get('min_user_id', 1111)
         return coll
