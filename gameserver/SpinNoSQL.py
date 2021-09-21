@@ -1045,7 +1045,7 @@ class NoSQLClient (object):
     def facebook_id_table(self):
         coll = self._table('facebook_id_map')
         if not self.seen_facebook_ids:
-            coll.create_index('user_id', unique=True)
+            coll.create_index('user_id')  #, unique=True)
             self.seen_facebook_ids = True
             self.min_user_id = SpinConfig.config.get('min_user_id', 1111)
         return coll
