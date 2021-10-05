@@ -15542,7 +15542,7 @@ class LivePlayer(Player):
     # main region-change function
     # pass None to get a random region
     # returns whether it succeeded or not
-    def _change_region(self, request_region, request_loc, request_precision, session, retmsg, reason = ''):
+    def _change_region(self, request_region, request_loc, request_precision, session, retmsg, reason = '', attempts = 0):
         if (not gamesite.nosql_client):
             return False
 
@@ -15665,9 +15665,12 @@ class LivePlayer(Player):
                     if cap > 0:
                         # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
                         fullness = new_region_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
+                        centralize_min_radius = gamedata['territory'].get('centralize_min_radius',10)
+                        if attempts > 0:
+                            centralize_min_radius += attempts * 5
                         if fullness < 1:
                             # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
-                            radius = [max(gamedata['territory'].get('centralize_min_radius',10), int(math.sqrt(fullness) * x)) for x in radius]
+                            radius = [max(centralize_min_radius, int(math.sqrt(fullness) * x)) for x in radius]
 
                 # rectangle within which we can place the player
                 placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
@@ -15707,7 +15710,11 @@ class LivePlayer(Player):
 
             if (not self.my_home.base_region) or ((self.my_home.base_region == old_region) and (self.my_home.base_map_loc == old_loc)):
                 if not new_loc: # don't print this warning when player deliberately tries to enter a crowded neighborhood
-                    gamesite.exception_log.event(server_time, 'map: failed to place player %d in region %s after %d trials' % (self.user_id, new_region, i))
+                    if attempts < gamedata['territory'].get('change_region_attempts',10):
+                        attempts += 1
+                        return self._change_region(request_region, request_loc, request_precision, session, retmsg, reason = reason, attempts = attempts)
+                    else:
+                        gamesite.exception_log.event(server_time, 'map: failed to place player %d in region %s after %d trials and %d attempts' % (self.user_id, new_region, i, attempts))
                 return False
 
             session.player_base_lock = (self.my_home.base_region, self.my_home.base_id)
