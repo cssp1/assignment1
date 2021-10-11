@@ -15542,7 +15542,7 @@ class LivePlayer(Player):
     # main region-change function
     # pass None to get a random region
     # returns whether it succeeded or not
-    def _change_region(self, request_region, request_loc, request_precision, session, retmsg, reason = '', attempts = 0):
+    def _change_region(self, request_region, request_loc, request_precision, session, retmsg, reason = ''):
         if (not gamesite.nosql_client):
             return False
 
@@ -15669,16 +15669,16 @@ class LivePlayer(Player):
                             fullness = new_region_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
                             if fullness < 1:
                                 # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
-                                radius = [max(gamedata['territory'].get('centralize_min_radius',10) + (i * gamedata['territory'].get('centralize_radius_expand_per_attempt', 0)), int(math.sqrt(fullness) * x)) for x in radius]
+                                # allow an optional increase per attempt
+                                radius = [max(gamedata['territory'].get('centralize_min_radius',10) + int((i * gamedata['territory'].get('centralize_radius_expand_per_attempt', 0))), int(math.sqrt(fullness) * x)) for x in radius]
 
                     # rectangle within which we can place the player
                     placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
                                        [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
-                    sub_trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2),
-                                                min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2)), gamedata['territory'].get('max_player_placement_attempts', 100))
-                    for tr in sub_trials:
-                        trials_set.add(tr)
-                    trials = list(trials_set)
+                    trials_set.add(min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2))
+                    trials_set.add(min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2))
+
+                trials = list(trials_set)
 
             # note: this will exclude the currently-occupied location, preventing "non-moves"
             trials = filter(lambda x: not Region(gamedata, new_region).obstructs_bases(x), trials)
