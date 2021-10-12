@@ -15675,8 +15675,7 @@ class LivePlayer(Player):
                     # rectangle within which we can place the player
                     placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
                                        [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
-                    trials_set.add(min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2))
-                    trials_set.add(min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2))
+                    trials_set.add((min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2), min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2)))
 
                 trials = list(trials_set)
 
