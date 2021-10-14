@@ -15646,7 +15646,7 @@ class LivePlayer(Player):
                 # search within a radius around new_loc
                 trials_set = set()
                 rad = precision['max_rad']
-                for i in xrange(100):
+                for i in xrange(gamedata['territory'].get('max_player_placement_attempts', 100)):
                     tr = (new_loc[0] + int((2*randgen.random()-1)*rad),
                           new_loc[1] + int((2*randgen.random()-1)*rad))
                     if tr[0] < BORDER or tr[0] >= map_dims[0]-BORDER or tr[1] < BORDER or tr[1] >= map_dims[1]-BORDER:
@@ -15655,25 +15655,29 @@ class LivePlayer(Player):
                 trials = list(trials_set)
             else:
                 # search the entire map
+                trials_set = set()
+                for i in xrange(gamedata['territory'].get('max_player_placement_attempts', 100)):
 
-                # radius: how far from the center of the map we can place the player
-                radius = [map_dims[0]//2 - BORDER, map_dims[1]//2 - BORDER]
+                    # radius: how far from the center of the map we can place the player
+                    radius = [map_dims[0]//2 - BORDER, map_dims[1]//2 - BORDER]
 
-                # when entering a low-population region, prefer placing player close to the center of the map
-                if new_region_pop is not None:
-                    cap = gamedata['regions'][new_region].get('pop_hard_cap',-1)
-                    if cap > 0:
-                        # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
-                        fullness = new_region_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
-                        if fullness < 1:
-                            # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
-                            radius = [max(gamedata['territory'].get('centralize_min_radius',10), int(math.sqrt(fullness) * x)) for x in radius]
+                    # when entering a low-population region, prefer placing player close to the center of the map
+                    if new_region_pop is not None:
+                        cap = gamedata['regions'][new_region].get('pop_hard_cap',-1)
+                        if cap > 0:
+                            # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
+                            fullness = new_region_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
+                            if fullness < 1:
+                                # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
+                                # allow an optional increase per attempt
+                                radius = [max(gamedata['territory'].get('centralize_min_radius',10) + int((i * gamedata['territory'].get('centralize_radius_expand_per_attempt', 0))), int(math.sqrt(fullness) * x)) for x in radius]
 
-                # rectangle within which we can place the player
-                placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
-                                   [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
-                trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2),
-                                        min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2)), xrange(100))
+                    # rectangle within which we can place the player
+                    placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
+                                       [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
+                    trials_set.add((min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2), min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2)))
+
+                trials = list(trials_set)
 
             # note: this will exclude the currently-occupied location, preventing "non-moves"
             trials = filter(lambda x: not Region(gamedata, new_region).obstructs_bases(x), trials)
