@@ -327,7 +327,7 @@ class HandleBan(Handler):
         self.do_public_announce(ui_player_name, session.player.home_region)
         self.do_remove_from_map(self.user_id, session.player.home_region)
         HandleModifyScores(self.time_now, self.user_id, self.gamedata, self.gamesite,
-                           {'stat': 'trophies_pvp', 'value': str(self.gamedata['trophy_floor']['pvp'])}) \
+                           {'stat': 'trophies_pvp', 'update_method': '=' 'value': str(self.gamedata['trophy_floor']['pvp'])}) \
                            .exec_offline(session.user, session.player)
         return ReturnValue(result = 'ok', kill_session = True)
     def do_exec_offline(self, user, player):
