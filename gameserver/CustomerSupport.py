@@ -328,7 +328,7 @@ class HandleBan(Handler):
         self.do_remove_from_map(self.user_id, session.player.home_region)
         HandleModifyScores(self.time_now, self.user_id, self.gamedata, self.gamesite,
                            {'stat': 'trophies_pvp', 'value': str(self.gamedata['trophy_floor']['pvp'])}) \
-                           .exec_offline(user, player)
+                           .exec_offline(session.user, session.player)
         return ReturnValue(result = 'ok', kill_session = True)
     def do_exec_offline(self, user, player):
         player['banned_until'] = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
