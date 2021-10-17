@@ -38977,7 +38977,9 @@ function research_dialog_scroll(dialog, page) {
                     if(player_quant < min_quant) {
                         able_to_research = false;
                     }
-                    tooltip_text.push(dialog.data['widgets']['grid']['ui_tooltip_requires_res'].replace('%d',pretty_print_number(min_quant)).replace('%res',resdata['ui_name']));
+                    if(min_quant > 0) {
+                        tooltip_text.push(dialog.data['widgets']['grid']['ui_tooltip_requires_res'].replace('%d',pretty_print_number(min_quant)).replace('%res',resdata['ui_name']));
+                    }
                 }
 
                 // get list of any unsatisfied requirements
@@ -38993,6 +38995,20 @@ function research_dialog_scroll(dialog, page) {
                         unlocked = false;
                     }
                 }
+
+                // if max level not unlocked, list max unlocked
+                var max_level_able_to_unlock = 0;
+                if(current < limit) {
+                    for(var l = current + 1; l <= limit; l++) {
+                        if(read_predicate(get_leveled_quantity(spec['requires'], l)).is_satisfied(player, null)) {
+                            max_level_able_to_unlock = l;
+                        }
+                    }
+                }
+                if(unlocked && max_level_able_to_unlock > 0 && max_level_able_to_unlock < limit) {
+                    tooltip_text.push(dialog.data['widgets']['grid']['ui_tooltip_max_level_able_to_unlock'].replace('%d', max_level_able_to_unlock));
+                }
+
             }
 
             // bring up the tech upgrade dialog
@@ -39011,7 +39027,7 @@ function research_dialog_scroll(dialog, page) {
                 };
             })(name);
 
-            widget.tooltip.str = null;
+            widget.tooltip.str = tooltip_text.join('\n');
             widget.tooltip.text_color = SPUI.default_text_color;
 
             grid_x += 1;
