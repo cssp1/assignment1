@@ -11076,6 +11076,9 @@ class Player(AbstractPlayer):
         squad = self.verify_squad(squad_id)
         if not squad: return False, [rollback_feature], ["INVALID_SQUAD"] # squad is already deployed
 
+        if not session.player.get_army_space_usage_by_squad()[squad_id] >= gamedata['regions'][self.home_region].get('minimum_squad_size', -1):
+            return False, [], ["CANNOD_DEPLOY_MINIMUM_SIZE_NOT_MET", squad_id]
+
         if self.squad_is_under_repair(squad_id): return False, [rollback_feature], ["CANNOT_DEPLOY_SQUAD_UNDER_REPAIR", squad_id] # cannot deploy squad while under repair
 
         # raids deploy at base, otherwise squads deploy next to base
