@@ -11079,7 +11079,7 @@ class Player(AbstractPlayer):
         # ensure player doesn't need unrestricted region access for tutorial purposes
         if 'guided_quests_complete' not in gamedata['predicate_library'] or Predicates.read_predicate(gamedata['predicate_library']['guided_quests_complete']).is_satisfied(session.player,None):
             # region has minimum squad size and squad is too small
-            if not session.player.get_army_space_usage_by_squad()[squad_id] >= session.player.get_territory_setting('minimum_squad_size' default_value = -1):
+            if session.player.get_army_space_usage_by_squad()[squad_id] < session.player.get_territory_setting('minimum_squad_size', default_value = -1):
                 return False, [], ["CANNOT_DEPLOY_MINIMUM_SIZE_NOT_MET", squad_id, session.player.get_territory_setting('minimum_squad_size'), session.player.get_army_space_usage_by_squad()[squad_id]]
 
         if self.squad_is_under_repair(squad_id): return False, [rollback_feature], ["CANNOT_DEPLOY_SQUAD_UNDER_REPAIR", squad_id] # cannot deploy squad while under repair
@@ -11235,7 +11235,7 @@ class Player(AbstractPlayer):
         # ensure player doesn't need unrestricted region access for tutorial purposes
         if 'guided_quests_complete' not in gamedata['predicate_library'] or Predicates.read_predicate(gamedata['predicate_library']['guided_quests_complete']).is_satisfied(session.player,None):
             # check if region has minimum squad size and squad is too small
-            if not session.player.get_army_space_usage_by_squad()[squad_id] >= session.player.get_territory_setting('minimum_squad_size' default_value = -1):
+            if session.player.get_army_space_usage_by_squad()[squad_id] < session.player.get_territory_setting('minimum_squad_size', default_value = -1):
                 return False, [], ["CANNOT_DEPLOY_MINIMUM_SIZE_NOT_MET", squad_id, session.player.get_territory_setting('minimum_squad_size'), session.player.get_army_space_usage_by_squad()[squad_id]]
 
         rollback_feature = self.squad_get_rollback_props(squad_id)
