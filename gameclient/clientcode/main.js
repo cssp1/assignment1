@@ -53551,7 +53551,7 @@ function handle_server_message(data) {
                 player.squad_clear_client_data(argument); // unblock UI and erase orders
                 invoke_squad_error(display_title, display_string.replace('%BATNAME', squad['ui_name']));
             }
-        }  else if(name == "CANNOT_DEPLOY_MINIMUM_SIZE_NOT_MET") == 0) {
+        }  else if(name == "CANNOT_DEPLOY_MINIMUM_SIZE_NOT_MET") {
             // stop whatever AI action the squad was trying to do
             if(argument && (argument.toString() in player.squads)) {
                 var squad = player.squads[argument.toString()];

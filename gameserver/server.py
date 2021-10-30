@@ -11077,7 +11077,7 @@ class Player(AbstractPlayer):
         if not squad: return False, [rollback_feature], ["INVALID_SQUAD"] # squad is already deployed
 
         # ensure player doesn't need unrestricted region access for tutorial purposes
-        if not 'guided_quests_complete' in gamedata['predicate_library'] or Predicates.read_predicate(gamedata['predicate_library']['guided_quests_complete']).is_satisfied(session.player,None):
+        if 'guided_quests_complete' not in gamedata['predicate_library'] or Predicates.read_predicate(gamedata['predicate_library']['guided_quests_complete']).is_satisfied(session.player,None):
             # region has minimum squad size and squad is too small
             if not session.player.get_army_space_usage_by_squad()[squad_id] >= session.player.get_territory_setting('minimum_squad_size' default_value = -1):
                 return False, [], ["CANNOT_DEPLOY_MINIMUM_SIZE_NOT_MET", squad_id, session.player.get_territory_setting('minimum_squad_size'), session.player.get_army_space_usage_by_squad()[squad_id]]
@@ -11233,7 +11233,7 @@ class Player(AbstractPlayer):
                 return False, [], ["CANNOT_MOVE_SQUAD_ON_COOLDOWN", squad_id] # squad doesn't even exist
 
         # ensure player doesn't need unrestricted region access for tutorial purposes
-        if not 'guided_quests_complete' in gamedata['predicate_library'] or Predicates.read_predicate(gamedata['predicate_library']['guided_quests_complete']).is_satisfied(session.player,None):
+        if 'guided_quests_complete' not in gamedata['predicate_library'] or Predicates.read_predicate(gamedata['predicate_library']['guided_quests_complete']).is_satisfied(session.player,None):
             # check if region has minimum squad size and squad is too small
             if not session.player.get_army_space_usage_by_squad()[squad_id] >= session.player.get_territory_setting('minimum_squad_size' default_value = -1):
                 return False, [], ["CANNOT_DEPLOY_MINIMUM_SIZE_NOT_MET", squad_id, session.player.get_territory_setting('minimum_squad_size'), session.player.get_army_space_usage_by_squad()[squad_id]]
