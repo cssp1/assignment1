@@ -53551,6 +53551,25 @@ function handle_server_message(data) {
                 player.squad_clear_client_data(argument); // unblock UI and erase orders
                 invoke_squad_error(display_title, display_string.replace('%BATNAME', squad['ui_name']));
             }
+        }  else if(name == "CANNOT_DEPLOY_MINIMUM_SIZE_NOT_MET") == 0) {
+            // stop whatever AI action the squad was trying to do
+            if(argument && (argument.toString() in player.squads)) {
+                var squad = player.squads[argument.toString()];
+                player.squad_clear_client_data(argument); // unblock UI and erase orders
+                var min_size = data[2];
+                if(min_size) {
+                    display_string = display_string.replace('%MINSIZE', min_size);
+                } else {
+                    display_string = display_string.replace('of %MINSIZE ', '');
+                }
+                var your_size = data[3];
+                if(your_size) {
+                    display_string = display_string.replace('%YOURSIZE', your_size);
+                } else {
+                    display_string = display_string.replace('%YOURSIZE', 'too small');
+                }
+                invoke_squad_error(display_title, display_string);
+            }
         } else if(name.indexOf("CANNOT_CHANGE_REGION") == 0) {
             if(change_region_pending == 'paid') {
                 display_string += gamedata['errors'][name]['ui_name_paid'].replace('%GAMEBUCKS', Store.gamebucks_ui_name());
