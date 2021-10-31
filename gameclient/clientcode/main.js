@@ -53556,13 +53556,13 @@ function handle_server_message(data) {
             if(argument && (argument.toString() in player.squads)) {
                 var squad = player.squads[argument.toString()];
                 player.squad_clear_client_data(argument); // unblock UI and erase orders
-                var min_size = data[2];
+                var min_size = data[0];
                 if(min_size) {
                     display_string = display_string.replace('%MINSIZE', min_size);
                 } else {
                     display_string = display_string.replace('of %MINSIZE ', '');
                 }
-                var your_size = data[3];
+                var your_size = data[1];
                 if(your_size) {
                     display_string = display_string.replace('%YOURSIZE', your_size);
                 } else {
