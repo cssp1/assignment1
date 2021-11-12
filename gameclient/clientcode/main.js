@@ -46615,12 +46615,12 @@ function update_upgrade_dialog(dialog) {
                 }
             }
             widget.str = widget.data['ui_name'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
-            if(stats_when_busy) {
+            if(stats_when_busy && builder.research_item === techname && old_level < max_level) {
                 widget.str = widget.data['ui_name'].replace('%s', tech['ui_name']).replace('%d', old_level.toString());
             }
             if(widget.str.length > widget.data['ui_name_max_length']) {
                 widget.str = widget.data['ui_name_short'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
-                if(stats_when_busy) {
+                if(stats_when_busy && builder.research_item === techname && old_level < max_level) {
                     widget.str = widget.data['ui_name_short'].replace('%s', tech['ui_name']).replace('%d', old_level.toString());
                 }
             }
@@ -46634,7 +46634,7 @@ function update_upgrade_dialog(dialog) {
             }
             widget.xy = widget.data['ui_name_stats_xy'];
         } else {
-            if(stats_when_busy) {
+            if(stats_when_busy && builder.research_item === techname && old_level < max_level) {
                 dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_upgrading'];
                 widget.str = widget.data['ui_name'].replace('%s', unit.spec['ui_name']).replace('%d', old_level.toString());
                 if(widget.str.length > widget.data['ui_name_max_length']) {
