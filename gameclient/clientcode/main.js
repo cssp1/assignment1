@@ -37808,10 +37808,13 @@ function update_crafting_dialog_status_missiles(dialog) {
     var craft_queue = (builder ? builder.get_crafting_queue() : []);
     var num_slots = get_leveled_quantity(delivery_building_spec['equip_slots'][delivery_slot_type], obj.level); // number of slots we currently have
     var max_slots = get_leveled_quantity(delivery_building_spec['equip_slots'][delivery_slot_type], get_max_level(delivery_building_spec)); // max number of slots we could have if FULLY upgraded
-    var max_page = Math.floor(num_slots / (dims[0] * dims[1]));
+
+    var total_rows = (num_slots > dims[0] * dims[1] ? Math.ceil(num_slots / dims[0]) : dims[1]);
+    var max_page = Math.max(total_rows - dims[1], 0);
+
     dialog.user_data['max_page'] = max_page;
     dialog.widgets['scroll_up'].show = dialog.widgets['scroll_down'].show = max_page > 0;
-    dialog.widgets['scroll_up'].state = (page === 1 ? 'normal' : 'disabled');
+    dialog.widgets['scroll_up'].state = (page > 0 ? 'normal' : 'disabled');
     dialog.widgets['scroll_up'].onclick = function() { scroll_dialog_status_missiles(dialog, -1); };
     dialog.widgets['scroll_down'].state = (page === max_page ? 'disabled' : 'normal');
     dialog.widgets['scroll_down'].onclick = function() { scroll_dialog_status_missiles(dialog, 1); };
