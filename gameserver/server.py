@@ -11543,7 +11543,7 @@ class Player(AbstractPlayer):
             if cdtime > 0:
                 cdname = 'squad_order:%d' % squad_id
                 time_ref = server_time_high if gamedata['server'].get('map_path_highres_time') else server_time
-                self.cooldown_trigger(cdname,  new_path[-1]['eta'] + cdtime - time_ref)
+                self.cooldown_trigger(cdname, max(cdtime, new_path[-1]['eta'] + cdtime - time_ref))
                 session.deferred_player_cooldowns_update = True
 
         session.activity_classifier.set_flag('map_move')
