@@ -11545,9 +11545,6 @@ class Player(AbstractPlayer):
                 time_ref = server_time_high if gamedata['server'].get('map_path_highres_time') else server_time
                 self.cooldown_trigger(cdname, max(cdtime, new_path[-1]['eta'] + cdtime - time_ref))
                 cooldown_debug_time = new_path[-1]['eta'] + cdtime - time_ref
-                if cooldown_debug_time <= 0:
-                    gamesite.exception_log.event(server_time, 'player %d squad %d cooldown time triggered with new time of %r' % (self.user_id, squad_id, cooldown_debug_time))
-
                 session.deferred_player_cooldowns_update = True
 
         session.activity_classifier.set_flag('map_move')
