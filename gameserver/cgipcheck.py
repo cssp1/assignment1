@@ -710,6 +710,8 @@ def do_lookup(args):
         cmd_args += ['--battlehouse-id', args['battlehouse_id']]
     else:
         raise Exception('must pass user_id, facebook_id, or battlehouse_id')
+    if 'get-all-alts' in args:
+        cmd_args += ['--get-all-alts']
     p = subprocess.Popen(['./check_player.py'] + cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     if err:

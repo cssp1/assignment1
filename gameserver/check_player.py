@@ -300,9 +300,14 @@ def is_known_alt_valid(entry):
         return False # number of logins is too low to matter
     if entry.get('ignore',False):
         return False # this was manually marked as "not an alt"
-    if 'last_login' in entry and entry['last_login'] < (time_now - ALT_IGNORE_AGE):
+    if 'last_login' in entry and entry['last_login'] < (time_now - ALT_IGNORE_AGE) and not get_all_alts:
         return False # last simultaneous login was too long ago to matter
     return True # yes, this is considered an alt
+
+def is_expired_alt(entry):
+    if 'last_login' in entry and entry['last_login'] < (time_now - ALT_IGNORE_AGE):
+        return True # this is an expired alt
+    return False # this is a valid alt
 
 # main program
 if __name__ == '__main__':
@@ -317,7 +322,7 @@ if __name__ == '__main__':
                                                       'give-alloy=', 'give-protection-time=', 'give-item=', 'melt-hours=', 'item-stack=', 'item-log-reason=',
                                                       'give-item-subject=', 'give-item-body=',
                                                       'send-message', 'message-subject=', 'message-body=', 'message-sender=', 'message-expire-time=', 'message-expire-in=',
-                                                      'check-ip-reputation',
+                                                      'check-ip-reputation', 'get-all-alts',
                                                        ])
 
 
@@ -351,6 +356,7 @@ if __name__ == '__main__':
     do_isolate = False
     do_unisolate = False
     do_check_ip_reputation = False
+    get_all_alts = False
     give_item = None
     send_message = False
     message_sender = 'Customer Support'
@@ -447,6 +453,8 @@ if __name__ == '__main__':
             send_message = True
         elif key == '--check-ip-reputation':
             do_check_ip_reputation = True
+        elif key == '--get-all-alts':
+            get_all_alts = True
 
     if len(args) > 0:
         user_id = int(args[0])
@@ -879,6 +887,18 @@ if __name__ == '__main__':
                         alt_region = 'Unknown'
                     print fmt % ('', 'ID: %7d, Region: %s, IGNORED (marked as non-alt) - INACTIVE (will not be counted as alt if unignored)' % (other_id, alt_region))
                     continue # manually ignored, but now lapsed
+                if get_all_alts and is_known_alt_valid(entry) and is_expired_alt(entry):
+                    try:
+                        if use_controlapi:
+                            # requesting "stringify" is faster in the logged-out case (since the server doesn't parse/unparse) and probably same speed in logged-in case
+                            alt_player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': other_id}))
+                        else:
+                            alt_player = SpinJSON.loads(driver.sync_download_player(other_id))
+                        alt_region = alt_player.get('home_region', 'None')
+                    except Exception as e:
+                        alt_region = 'Unknown'
+                    print fmt % ('', 'ID: %7d, Region: %s, EXPIRED (last simultaneous login more than %r seconds ago)' % (other_id, alt_region, ALT_IGNORE_AGE))
+                    continue # manually ignored
                 if not is_known_alt_valid(entry):
                     continue
 
