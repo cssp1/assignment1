@@ -898,7 +898,7 @@ if __name__ == '__main__':
                         violation_history = get_prior_violations(alt_player)
                     except Exception as e:
                         alt_region = 'Unknown'
-                    print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, EXPIRED (last simultaneous login more than %r seconds ago)' % (other_id, alt_region, pretty_spend(violation_history['spend']) pretty_print_time(ALT_IGNORE_AGE)))
+                    print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, EXPIRED (last simultaneous login more than %r seconds ago)' % (other_id, alt_region, pretty_spend(violation_history['spend']), pretty_print_time(ALT_IGNORE_AGE)))
                     continue # manually ignored
                 if not is_known_alt_valid(entry):
                     continue
