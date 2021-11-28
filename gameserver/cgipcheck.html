@@ -287,6 +287,7 @@ var has_regions_with_tag = function(t) {
     return false;
 };
 var has_anti_alt_regions = function() { return has_regions_with_tag('anti_alt'); };
+var has_anti_vpn_regions = function() { return has_regions_with_tag('anti_vpn'); };
 var has_anti_refresh_regions = function() { return has_regions_with_tag('anti_refresh'); };
 
 var has_non_anti_alt_regions = function() {
@@ -306,6 +307,7 @@ var method_change_region = function() {
     var new_region = $("#change_region_destination")[0].value;
     var ui_reason = check_ui_reason($("#change_region_reason")[0].value);
     var alt_banish_duration = (has_anti_alt_regions() && $("#change_region_do_alt_banish")[0].checked) ? ($("#region_alt_banish_duration").spinner("value") * 3600) : 0;
+    var vpn_banish_duration = (has_anti_vpn_regions() && $("#change_region_do_vpn_banish")[0].checked) ? ($("#region_vpn_banish_duration").spinner("value") * 3600) : 0;
     var refresh_banish_duration = (has_anti_refresh_regions() && $("#change_region_do_refresh_banish")[0].checked) ? ($("#region_refresh_banish_duration").spinner("value") * 3600) : 0;
     var include_alts = $("#region_include_alts")[0].checked ? '1' : '0';
     var include_alts_recursive = $("#region_include_alts_recursive")[0].checked ? '1' : '0';
@@ -1821,6 +1823,11 @@ $(function() {
     } else {
         $('#change_region_alt_banishment_controls').remove();
     }
+    if(has_anti_vpn_regions()) {
+        $('#region_vpn_banish_duration').spinner({max:999999, min:1, step:1});
+    } else {
+        $('#change_region_vpn_banishment_controls').remove();
+    }
     if(has_anti_refresh_regions()) {
         $('#region_refresh_banish_duration').spinner({max:999999, min:1, step:1});
     } else {
@@ -2034,6 +2041,14 @@ $(function() {
                     <button onclick="method_remove_aura('region_banished', {'tag': 'anti_alt'})" class="spin_button" style="width:260px;">Undo Anti-Alt Banishment</button>
                 </p>
             </span>
+            <span id="change_region_vpn_banishment_controls">
+                <p>
+                    <input id="change_region_do_vpn_banish" type="checkbox" checked="1" style="height:initial;"></input>Also banish from anti-VPN regions for:
+                    <input type="text" id="region_vpn_banish_duration" name="region_vpn_banish_duration" value="720" style="width:100px"> Hours
+                    <button onclick="method_remove_aura('region_banished', {'tag': 'anti_vpn'})" class="spin_button" style="width:260px;">Undo Anti-VPN Banishment</button>
+                </p>
+            </span>
+
             <span id="change_region_refresh_banishment_controls">
                 <p>
                     <input id="change_region_do_refresh_banish" type="checkbox" style="height:initial;"></input>Also banish from anti-refresh regions for:
