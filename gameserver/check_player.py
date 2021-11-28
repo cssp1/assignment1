@@ -897,8 +897,17 @@ if __name__ == '__main__':
                         alt_region = alt_player.get('home_region', 'None')
                         violation_history = get_prior_violations(alt_player)
                     except Exception as e:
+                        violation_history = {'chat_warnings':0, 'chat_violations':0, 'alt_violations':0, 'vpn_violations':0, 'banned':0, 'spend': 0}
                         alt_region = 'Unknown'
-                    print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, EXPIRED (last simultaneous login more than %r seconds ago)' % (other_id, alt_region, pretty_spend(violation_history['spend']), pretty_print_time(ALT_IGNORE_AGE)))
+                    if violation_history['banned']:
+                        print fmt % ('', 'ID: %7d, Region: %s, #Logins: %4d, EXPIRED (last simultaneous login more than %r ago), (BANNED!)' % (other_id, alt_region, entry.get('logins',1),
+                                                                                                        pretty_print_time(ALT_IGNORE_AGE)))
+                    elif violation_history['chat_warnings'] == 0 and violation_history['chat_violations'] == 0 and violation_history['alt_violations'] == 0 and violation_history['vpn_violations'] == 0:
+                        print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, #Logins: %4d, EXPIRED (last simultaneous login more than %r ago)' % (other_id, alt_region, pretty_spend(violation_history['spend']), entry.get('logins',1),
+                                                                                                        pretty_print_time(ALT_IGNORE_AGE)))
+                    else:
+                        print fmt % ('', 'ID: %7d, Region: %s, Spend: %s, #Logins: %4d, EXPIRED (last simultaneous login more than %r ago), (Chat Warnings %d, Chat violations %d, Anti-Alt violations %d, VPN violations %d)' % (other_id, alt_region, pretty_spend(violation_history['spend']), entry.get('logins',1),
+                                                                                                        pretty_print_time(ALT_IGNORE_AGE), violation_history['chat_warnings'], violation_history['chat_violations'], violation_history['alt_violations'], violation_history['vpn_violations']))
                     continue # manually ignored
                 if not is_known_alt_valid(entry):
                     continue
