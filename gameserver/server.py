@@ -13141,8 +13141,10 @@ class Player(AbstractPlayer):
 
         # prevents time frame from exceeding server time + 1 month due to apparent attack on WSE by malicious QUERY_SCORE_LEADERS2 or QUERY_PLAYER_SCORES2 message
         if axes['time'][0] > server_time + 2592000:
+            gamesite.exception_log.event(server_time, 'Player %d sent score query with future time axes %r. This may be malicious' % (self.user_id, axes['time']))
             axes['time'][0] = server_time + 2592000
         if axes['time'][1] > server_time + 2592000:
+            gamesite.exception_log.event(server_time, 'Player %d sent score query with future time axes %r. This may be malicious' % (self.user_id, axes['time']))
             axes['time'][1] = server_time + 2592000
 
         time_scope, time_loc = axes['time']
