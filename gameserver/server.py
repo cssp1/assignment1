@@ -13139,6 +13139,12 @@ class Player(AbstractPlayer):
         if not ('time' in axes and 'space' in axes and len(axes['time']) == 2 and len(axes['space']) == 2):
             return None # mal-formed axes
 
+        # prevents time frame from exceeding server time + 1 month due to apparent attack on WSE by malicious QUERY_SCORE_LEADERS2 or QUERY_PLAYER_SCORES2 message
+        if axes['time'][0] > server_time + 2592000:
+            axes['time'][0] = server_time + 2592000
+        if axes['time'][1] > server_time + 2592000:
+            axes['time'][1] = server_time + 2592000
+
         time_scope, time_loc = axes['time']
         if time_scope == Scores2.FREQ_WEEK:
             if (not allow_cold_history) and abs(time_loc - SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time())) >= 2:
