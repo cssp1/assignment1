@@ -13143,7 +13143,7 @@ class Player(AbstractPlayer):
         time_scope, time_loc = axes['time']
         if time_scope == Scores2.FREQ_WEEK:
             current_pvp_week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time())
-            if (not allow_cold_history) and abs(time_loc - SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time())) >= 2:
+            if (not allow_cold_history) and abs(time_loc - current_pvp_week) >= 2:
                 return None # too far from current time
             if time_loc > current_pvp_week + 2:
                 # prevents more than 2 weeks in the future to prevent malicious QUERY_SCORE_LEADERS2 or QUERY_PLAYER_SCORES2 messages
@@ -13151,7 +13151,7 @@ class Player(AbstractPlayer):
                 return None
         elif time_scope == Scores2.FREQ_SEASON:
             current_pvp_season = SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time())
-            if (not allow_cold_history) and abs(time_loc - SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time())) >= 2:
+            if (not allow_cold_history) and abs(time_loc - current_pvp_season) >= 2:
                 return None # too far from current time
             if time_loc > current_pvp_season + 1:
                 # prevents more than 1 season in the future to prevent malicious QUERY_SCORE_LEADERS2 or QUERY_PLAYER_SCORES2 messages
