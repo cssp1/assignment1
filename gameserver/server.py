@@ -13139,24 +13139,35 @@ class Player(AbstractPlayer):
         if not ('time' in axes and 'space' in axes and len(axes['time']) == 2 and len(axes['space']) == 2):
             return None # mal-formed axes
 
-        # prevents time frame from exceeding server time + 1 month due to apparent attack on WSE by malicious QUERY_SCORE_LEADERS2 or QUERY_PLAYER_SCORES2 message
-        if axes['time'][0] > server_time + 2592000:
-            gamesite.exception_log.event(server_time, 'Player %d sent score query with future time axes %r. This may be malicious' % (self.user_id, axes['time']))
-            axes['time'][0] = server_time + 2592000
-        if axes['time'][1] > server_time + 2592000:
-            gamesite.exception_log.event(server_time, 'Player %d sent score query with future time axes %r. This may be malicious' % (self.user_id, axes['time']))
-            axes['time'][1] = server_time + 2592000
 
         time_scope, time_loc = axes['time']
         if time_scope == Scores2.FREQ_WEEK:
+            current_pvp_week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time())
             if (not allow_cold_history) and abs(time_loc - SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time())) >= 2:
                 return None # too far from current time
+            if time_loc > current_pvp_week + 2:
+                # prevents more than 2 weeks in the future to prevent malicious QUERY_SCORE_LEADERS2 or QUERY_PLAYER_SCORES2 messages
+                gamesite.exception_log.event(server_time, 'Player %d sent score query with future time axes %r. This may be malicious.' % (self.user_id, axes['time']))
+                return None
         elif time_scope == Scores2.FREQ_SEASON:
+            current_pvp_season = SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time())
             if (not allow_cold_history) and abs(time_loc - SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time())) >= 2:
                 return None # too far from current time
+            if time_loc > current_pvp_season + 1:
+                # prevents more than 1 season in the future to prevent malicious QUERY_SCORE_LEADERS2 or QUERY_PLAYER_SCORES2 messages
+                gamesite.exception_log.event(server_time, 'Player %d sent score query with future time axes %r. This may be malicious.' % (self.user_id, axes['time']))
+                return None
+        elif time_scope == Scores2.FREQ_DAY:
+            current_pvp_day = self.get_absolute_time()
+            if time_loc > current_pvp_day + 2*86400:
+                # prevents more than 2 days into the future to prevent malicious QUERY_SCORE_LEADERS2 or QUERY_PLAYER_SCORES2 messages
+                gamesite.exception_log.event(server_time, 'Player %d sent score query with future time axes %r. This may be malicious.' % (self.user_id, axes['time']))
+                return None
         elif time_scope == Scores2.FREQ_ALL:
             if time_loc != 0:
                 return None # only the 0 coordinate is valid with FREQ_ALL
+        else:
+            return None # invalid time_scope type
 
         space_scope, space_loc = axes['space']
         if space_scope == Scores2.SPACE_REGION:
@@ -13168,6 +13179,8 @@ class Player(AbstractPlayer):
         elif space_scope == Scores2.SPACE_ALL:
             if space_loc != Scores2.SPACE_ALL_LOC:
                 return None # invalid coordinate for SPACE_ALL
+        else:
+            return None # invalide space_scope
 
         # parse extra axes
         if 'challenge' in axes:
