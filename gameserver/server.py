@@ -4437,6 +4437,8 @@ class Session(object):
         self.last_rival_query = -1 # time of last rival query, for checking cooldown
         self.last_quarry_query = -1 # time of last quarry query, for checking cooldown
 
+        self.object_spec_strikes = 0 # number of times a combat object's spec name has been altered by the client
+
         self.activity_classifier = ActivityClassifier.ActivityClassifier(gamedata)
         self.last_activity_sample_time = -1
 
@@ -26938,8 +26940,20 @@ class GAMEAPI(resource.Resource):
             obj = session.get_object(id)
 
             if obj.spec.name != client_specname:
-                gamesite.exception_log.event(server_time, 'object_combat_updates: player %d object %s client_specname %s does not match server spec %s. This is probably a hacking attempt.' % \
-                                             (session.player.user_id, str(id), str(client_specname), obj.spec.name))
+                spend = session.player.history.get('money_spent',0)
+                msg = 'object_combat_updates: user %7d ($%8.2f) object %s client_specname %s does not match server spec %s.' % (session.player.user_id, spend, str(id), client_specname, obj.spec.name)
+                session.object_spec_strikes += 1
+                msg += ' (strike %d)' % session.object_spec_strikes
+                strike_limit = gamedata['server'].get('object_spec_autoban_strike_limit', -1)
+                if strike_limit >= 0 and session.gamecheck_strikes >= strike_limit and spend <= gamedata['server'].get('object_spec_autoban_spend_limit', 0):
+                    # Too many strikes. Ban the player
+                    msg += ' - BANNED!'
+                    reactor.callLater(2, gamesite.do_CONTROLAPI, session.user.user_id,
+                                      {'method':'ban','reliable':1,'user_id':session.user.user_id,'spin_user':'GameCheck',
+                                       'ui_reason': ('Auto-banned for gamedata hacking after %d strike(s)' % session.gamecheck_strikes),
+                                       'public_announce':1
+                                      })
+                gamesite.exception_log.event(server_time, msg)
 
             # do not accept hp updates when not in battle
             if not session.has_attacked:
