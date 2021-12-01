@@ -26937,6 +26937,10 @@ class GAMEAPI(resource.Resource):
 
             obj = session.get_object(id)
 
+            if obj.spec.name != client_specname:
+                gamesite.exception_log.event(server_time, 'object_combat_updates: player %d object %s client_specname %s does not match server spec %s. This is probably a hacking attempt.' % \
+                                             (session.player.user_id, str(id), str(client_specname), obj.spec.name))
+
             # do not accept hp updates when not in battle
             if not session.has_attacked:
                 newhp = -1
