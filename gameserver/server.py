@@ -26950,7 +26950,7 @@ class GAMEAPI(resource.Resource):
                     msg += ' - BANNED!'
                     reactor.callLater(2, gamesite.do_CONTROLAPI, session.user.user_id,
                                       {'method':'ban','reliable':1,'user_id':session.user.user_id,'spin_user':'GameCheck',
-                                       'ui_reason': ('Auto-banned for gamedata hacking after %d strike(s)' % session.object_spec_strikes),
+                                       'ui_reason': ('Auto-banned for object spec hacking after %d strike(s)' % session.object_spec_strikes),
                                        'public_announce':1
                                       })
                 gamesite.exception_log.event(server_time, msg)
