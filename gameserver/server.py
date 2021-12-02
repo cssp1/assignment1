@@ -26945,12 +26945,12 @@ class GAMEAPI(resource.Resource):
                 session.object_spec_strikes += 1
                 msg += ' (strike %d)' % session.object_spec_strikes
                 strike_limit = gamedata['server'].get('object_spec_autoban_strike_limit', -1)
-                if strike_limit >= 0 and session.gamecheck_strikes >= strike_limit and spend <= gamedata['server'].get('object_spec_autoban_spend_limit', 0):
+                if strike_limit >= 0 and session.object_spec_strikes >= strike_limit and spend <= gamedata['server'].get('object_spec_autoban_spend_limit', 0):
                     # Too many strikes. Ban the player
                     msg += ' - BANNED!'
                     reactor.callLater(2, gamesite.do_CONTROLAPI, session.user.user_id,
                                       {'method':'ban','reliable':1,'user_id':session.user.user_id,'spin_user':'GameCheck',
-                                       'ui_reason': ('Auto-banned for gamedata hacking after %d strike(s)' % session.gamecheck_strikes),
+                                       'ui_reason': ('Auto-banned for gamedata hacking after %d strike(s)' % session.object_spec_strikes),
                                        'public_announce':1
                                       })
                 gamesite.exception_log.event(server_time, msg)
