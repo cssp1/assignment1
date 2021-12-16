@@ -326,9 +326,9 @@ class HandleBan(Handler):
         self.gamesite.exception_log.event(self.time_now, 'banned player %d' % self.user_id)
         self.do_public_announce(ui_player_name, session.player.home_region)
         self.do_remove_from_map(self.user_id, session.player.home_region)
-        HandleModifyScores(self.time_now, self.user_id, self.gamedata, self.gamesite,
-                           {'stat': 'trophies_pvp', 'update_method': '=', 'value': str(self.gamedata['trophy_floor']['pvp'])}) \
-                           .exec_online(session, retmsg)
+        #HandleModifyScores(self.time_now, self.user_id, self.gamedata, self.gamesite,
+        #                   {'stat': 'trophies_pvp', 'update_method': '=', 'value': str(self.gamedata['trophy_floor']['pvp'])}) \
+        #                   .exec_online(session, retmsg)
         return ReturnValue(result = 'ok', kill_session = True)
     def do_exec_offline(self, user, player):
         player['banned_until'] = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
