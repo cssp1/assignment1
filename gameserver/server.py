@@ -4438,6 +4438,7 @@ class Session(object):
         self.last_quarry_query = -1 # time of last quarry query, for checking cooldown
 
         self.object_spec_strikes = 0 # number of times a combat object's spec name has been altered by the client
+        self.object_spec_strike_ban_pending = 0 # flag to note whether an object_spec_strike ban is pending (prevents "banned" chat message spam)
 
         self.activity_classifier = ActivityClassifier.ActivityClassifier(gamedata)
         self.last_activity_sample_time = -1
@@ -26945,7 +26946,8 @@ class GAMEAPI(resource.Resource):
                 session.object_spec_strikes += 1
                 msg += ' (strike %d)' % session.object_spec_strikes
                 strike_limit = gamedata['server'].get('object_spec_autoban_strike_limit', -1)
-                if strike_limit >= 0 and session.object_spec_strikes >= strike_limit and spend <= gamedata['server'].get('object_spec_autoban_spend_limit', 0):
+                if session.object_spec_strike_ban_pending < 1 and strike_limit >= 0 and session.object_spec_strikes >= strike_limit and spend <= gamedata['server'].get('object_spec_autoban_spend_limit', 0):
+                    session.object_spec_strike_ban_pending = 1
                     # Too many strikes. Ban the player
                     msg += ' - BANNED!'
                     reactor.callLater(2, gamesite.do_CONTROLAPI, session.user.user_id,
