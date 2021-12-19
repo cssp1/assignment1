@@ -9917,6 +9917,42 @@ class Player(AbstractPlayer):
 
         return False
 
+    def log_suspicious_alts(self):
+        # Check if any of this player's known alts are banned,
+        # or are marked "inactive" yet present in a region,
+        # and if so, then report it to the exception log.
+
+        alt_min_logins = gamedata['server'].get('alt_min_logins', 5)
+        alt_ignore_age = gamedata['server'].get('alt_ignore_age', 28*86400)
+
+        # collect a list of all known alt user IDs
+        alt_id_list = [int(s_other_id) for s_other_id in self.known_alt_accounts.iterkeys()]
+        if len(alt_id_list) < 1:
+            return # nothing to do
+
+        # query player cache for the ban status and home region of all known alts
+        pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch(alt_id_list, fields = ['home_region', 'banned_until'], reason = 'log_suspicious_alts')
+
+        for alt_id, alt_pcache in zip(alt_id_list, pcache_result_list):
+            # look up the corresponding entry within known_alt_accounts
+            entry = self.known_alt_accounts[str(alt_id)]
+
+            # if any known alt is banned, report it
+            if alt_pcache and alt_pcache.get('banned_until', -1) > server_time:
+                gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt of banned account %d' % (self.user_id, alt_id))
+
+            # if any known alt meets the login threshold, and is not ignored
+            # but doesn't count as an alt because it has not logged in for a while,
+            # and that alt is still on the map somewhere, then report it.
+
+            if entry.get('logins', 0) < alt_min_logins: continue
+            if entry.get('ignore',False): continue
+            if entry.get('last_login', server_time) < (server_time - alt_ignore_age):
+                # this alt hasn't logged in recently enough to count as a true alt,
+                # but let's report if it is still on the map somewhere
+                if alt_pcache and alt_pcache.get('home_region', None):
+                    gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt account %d is marked inactive but is still in region %r.' % (self.user_id, alt_id, alt_pcache.get('home_region')))
+
     def squad_base_id(self, squad_id): return 's%d_%d' % (self.user_id, squad_id)
     def squad_is_deployed(self, squad_id):
         squad = self.squads.get(str(squad_id), None)
@@ -28904,6 +28940,10 @@ class GAMEAPI(resource.Resource):
         if show_battle_history:
             retmsg.append(["SHOW_BATTLE_HISTORY"])
 
+        # report the status of this player's alts
+        session.player.log_suspicious_alts()
+
+        # tell the browser what we think of the player's alt status
         retmsg.append(["HAS_ALTS_UPDATE", session.player.has_alts()])
 
         if gamedata['server'].get('track_countries_seen', False):

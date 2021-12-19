@@ -329,6 +329,8 @@ class HandleBan(Handler):
         #HandleModifyScores(self.time_now, self.user_id, self.gamedata, self.gamesite,
         #                   {'stat': 'trophies_pvp', 'update_method': '=', 'value': str(self.gamedata['trophy_floor']['pvp'])}) \
         #                   .exec_online(session, retmsg)
+        # update the 'banned_until' field in player cache
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'banned_until': session.player.banned_until})
         return ReturnValue(result = 'ok', kill_session = True)
     def do_exec_offline(self, user, player):
         player['banned_until'] = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
@@ -339,15 +341,21 @@ class HandleBan(Handler):
         HandleModifyScores(self.time_now, self.user_id, self.gamedata, self.gamesite,
                            {'stat': 'trophies_pvp', 'update_method': '=', 'value': str(self.gamedata['trophy_floor']['pvp'])}) \
                            .exec_offline(user, player)
+        # update the 'banned_until' field in player cache
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'banned_until': player['banned_until']})
         return ReturnValue(result = 'ok')
 
 class HandleUnban(Handler):
     need_user = False
     def do_exec_online(self, session, retmsg):
         session.player.banned_until = -1
+        # update the 'banned_until' field in player cache
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'banned_until': session.player.banned_until})
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         player['banned_until'] = -1
+        # update the 'banned_until' field in player cache
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'banned_until': player['banned_until']})
         return ReturnValue(result = 'ok')
 
 class HandleVPNExcuse(Handler):
