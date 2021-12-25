@@ -53791,7 +53791,8 @@ function flush_dirty_objects(options) {
                             (obj.state_dirty & obj_state_flags.HP ? obj.hp : -1),
                             orders,
                             (obj.is_building() ? obj.killer_info : null),
-                            ((obj.is_mobile() && (obj.state_dirty & obj_state_flags.PATROL)) ? obj.patrol : null)
+                            ((obj.is_mobile() && (obj.state_dirty & obj_state_flags.PATROL)) ? obj.patrol : null),
+                            obj.team
                            ];
             args.push(this_arg);
 
