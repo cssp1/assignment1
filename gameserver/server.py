@@ -27303,9 +27303,10 @@ class GAMEAPI(resource.Resource):
 
         obj = session.get_object(id)
 
-        killer_obj = session.get_object(killer_info['id'])
-        if obj.owner.user_id == killer_obj.owner.user_id:
-            gamesite.exception_log.event(server_time, 'destroy_object: player %d session had %s id %s killed by %s id %s both owned by %s. Possible hacking attempt.' % (session.player.user_id, obj.spec.name, obj.obj_id, killer_obj.spec.name, killer_obj.obj_id, str(obj.owner.user_id)))
+        if killer_info and killer_info.get('id', False):
+            killer_obj = session.get_object(killer_info['id'])
+            if obj.owner.user_id == killer_obj.owner.user_id:
+                gamesite.exception_log.event(server_time, 'destroy_object: player %d session had %s id %s killed by %s id %s both owned by %s. Possible hacking attempt.' % (session.player.user_id, obj.spec.name, obj.obj_id, killer_obj.spec.name, killer_obj.obj_id, str(obj.owner.user_id)))
 
         # only mobile units get destroyed permanently
         assert obj.is_mobile()
