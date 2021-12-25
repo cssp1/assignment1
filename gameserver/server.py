@@ -5273,10 +5273,6 @@ class Session(object):
                 killer_info = None
 
         if killer_info:
-            if killer_info['team'] == obj['team']:
-                gamesite.exception_log.event(server_time, 'log_attack_unit by %d: %s id %s killed by %s id %s owned by same team. Likely hacking attempt.' % (self.player.user_id, obj.spec.name, obj.obj_id, killer_info['spec'], killer_info['obj_id']))
-
-        if killer_info:
             if killer_info['team'] == 'player':
                 attacker_user_id = self.player.user_id
             elif self.home_base:
@@ -27306,6 +27302,10 @@ class GAMEAPI(resource.Resource):
             return
 
         obj = session.get_object(id)
+
+        killer_obj = session.get_object(killer_info['id'])
+        if obj.owner == killer_obj.owner:
+            gamesite.exception_log.event(server_time, 'log_attack_unit by %d: %s id %s killed by %s id %s owned by same team. Likely hacking attempt.' % (session.player.user_id, obj.spec.name, obj.obj_id, killer_obj.spec.name, killer_obj.obj_id))
 
         # only mobile units get destroyed permanently
         assert obj.is_mobile()
