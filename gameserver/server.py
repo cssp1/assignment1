@@ -9949,12 +9949,46 @@ class Player(AbstractPlayer):
             # and that alt is still on the map somewhere, then report it.
 
             if entry.get('logins', 0) < alt_min_logins: continue
-            if entry.get('ignore',False): continue
+            if entry.get('ignore', False): continue
             if entry.get('last_login', server_time) < (server_time - alt_ignore_age):
                 # this alt hasn't logged in recently enough to count as a true alt,
                 # but let's report if it is still on the map somewhere
                 if alt_pcache and alt_pcache.get('home_region', None):
-                    gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt account %d is marked inactive but is still in region %r.' % (self.user_id, alt_id, alt_pcache.get('home_region')))
+                    alt_region = alt_pcache['home_region']
+                    if self.home_region == alt_region:
+                        gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt account %d is marked inactive but is still in same anti-alt region %r.' % (self.user_id, alt_id, alt_region))
+                    alt_region_data = gamedata['regions'][alt_region]
+                    if 'anti_alt' in alt_region_data.get('tags', []):
+                        total_alts_in_alt_region = 0
+                        for sub_alt_id, sub_alt_pcache in zip(alt_id_list, pcache_result_list):
+                            if total_alts_in_alt_region > 0: break
+                            if sub_alt_id == alt_id: continue
+                            sub_entry = self.known_alt_accounts[str(sub_alt_id)]
+                            if sub_entry.get('logins', 0) < alt_min_logins: continue
+                            if sub_entry.get('ignore', False): continue
+                            if not sub_alt_pcache: continue
+                            if not sub_alt_pcache.get('home_region', False): continue
+                            sub_alt_region = sub_alt_pcache['home_region']
+                            if sub_alt_region == alt_region:
+                                total_alts_in_alt_region += 1
+                        if total_alts_in_alt_region > 0:
+                            gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt account %d in anti-alt region %r is marked inactive but player has more than one alt in this region.' % (self.user_id, alt_id, alt_region))
+                    if alt_region_data.get('alt_limit', -1) > -1:
+                        alt_limit = alt_region_data['alt_limit']
+                        total_alts_in_alt_region = 0
+                        for sub_alt_id, sub_alt_pcache in zip(alt_id_list, pcache_result_list):
+                            if total_alts_in_alt_region > alt_limit: break
+                            if sub_alt_id == alt_id: continue
+                            sub_entry = self.known_alt_accounts[str(sub_alt_id)]
+                            if sub_entry.get('logins', 0) < alt_min_logins: continue
+                            if sub_entry.get('ignore', False): continue
+                            if not sub_alt_pcache: continue
+                            if not sub_alt_pcache.get('home_region', False): continue
+                            sub_alt_region = sub_alt_pcache['home_region']
+                            if sub_alt_region == alt_region:
+                                total_alts_in_alt_region += 1
+                        if total_alts_in_alt_region > alt_limit:
+                            gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt account %d in alt-limited region %r is marked inactive but player has more than %d alts in this region.' % (self.user_id, alt_id, alt_region, alt_limit))
 
     def squad_base_id(self, squad_id): return 's%d_%d' % (self.user_id, squad_id)
     def squad_is_deployed(self, squad_id):
