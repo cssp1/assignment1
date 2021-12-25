@@ -9955,9 +9955,9 @@ class Player(AbstractPlayer):
                 # but let's report if it is still on the map somewhere
                 if alt_pcache and alt_pcache.get('home_region', None):
                     alt_region = alt_pcache['home_region']
+                    alt_region_data = gamedata['regions'][alt_region]
                     if self.home_region == alt_region and 'anti_alt' in alt_region_data.get('tags', []):
                         gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt account %d is marked inactive but is still in same anti-alt region %r.' % (self.user_id, alt_id, alt_region))
-                    alt_region_data = gamedata['regions'][alt_region]
                     if 'anti_alt' in alt_region_data.get('tags', []):
                         total_alts_in_alt_region = 0
                         for sub_alt_id, sub_alt_pcache in zip(alt_id_list, pcache_result_list):
