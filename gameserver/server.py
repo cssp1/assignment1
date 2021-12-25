@@ -26954,7 +26954,7 @@ class GAMEAPI(resource.Resource):
                 strike_limit = gamedata['server'].get('object_team_autoban_strike_limit', -1)
                 if session.object_team_strike_ban_pending < 1 and strike_limit >= 0 and session.object_team_strikes >= strike_limit and spend <= gamedata['server'].get('object_team_autoban_spend_limit', 0):
                     session.object_team_strike_ban_pending = 1
-                     Too many strikes. Ban the player
+                    # Too many strikes. Ban the player
                     msg += ' - BANNED!'
                     reactor.callLater(2, gamesite.do_CONTROLAPI, session.user.user_id,
                                       {'method':'ban','reliable':1,'user_id':session.user.user_id,'spin_user':'GameCheck',
@@ -27332,7 +27332,7 @@ class GAMEAPI(resource.Resource):
                 # if an object was killed by its own team and it was not a suicide unit, this may be a client hack to hijack units
                 if obj.owner.user_id == killer_obj.owner.user_id and obj.obj_id != killer_obj.obj_id:
                     spend = session.player.history.get('money_spent',0)
-                    msg = 'destroy_object: user %7d ($%8.2f) object %s id %s killed by %s id %s both owned by %s.' % (session.player.user_id, obj.spec.name, obj.obj_id, killer_obj.spec.name, killer_obj.obj_id, str(obj.owner.user_id))
+                    msg = 'destroy_object: user %7d ($%8.2f) object %s id %s killed by %s id %s both owned by %s.' % (session.player.user_id, spend, obj.spec.name, obj.obj_id, killer_obj.spec.name, killer_obj.obj_id, str(obj.owner.user_id))
                     session.object_team_strikes += 1
                     msg += ' (strike %d)' % session.object_team_strikes
                     strike_limit = gamedata['server'].get('object_team_autoban_strike_limit', -1)
