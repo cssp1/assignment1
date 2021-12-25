@@ -26979,6 +26979,7 @@ class GAMEAPI(resource.Resource):
                     self.destroy_object(session, retmsg, *objects_destroyed_arg)
                     destroyed_count += 1
                 if combat_updates_arg:
+                    combat_updates_arg.append('auto_resolve')
                     self.object_combat_updates(session, retmsg, [combat_updates_arg,])
 
             # check for security team spawning
@@ -27016,7 +27017,8 @@ class GAMEAPI(resource.Resource):
             expected_team = 'player'
             if obj.owner.user_id != session.player.user_id:
                 expected_team = 'enemy'
-            if team != expected_team:
+            # do not check object team if this is an AutoResolve combat update
+            if team not in ('auto_resolve', expected_team):
                 spend = session.player.history.get('money_spent',0)
                 msg = 'object_combat_updates: user %7d ($%8.2f) object %s team %s does not match server team %s.' % (session.player.user_id, spend, str(id), team, expected_team)
                 session.object_team_strikes += 1
