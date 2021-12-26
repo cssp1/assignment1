@@ -9927,6 +9927,11 @@ class Player(AbstractPlayer):
 
         alt_min_logins = gamedata['server'].get('alt_min_logins', 5)
         alt_ignore_age = gamedata['server'].get('alt_ignore_age', 28*86400)
+        log_banned_alt_spend_cutoff = gamedata['server'].get('log_banned_alt_spend_cutoff', 100) # ignore banned alts of superfans by default, but configurable
+        log_region_alt_spend_cutoff = gamedata['server'].get('log_region_alt_spend_cutoff', 1000000) # don't ignore expired alts of anyone who has spent less than $1 million, but configurable
+        money_spent = self.history.get('money_spent', 0)
+
+        if money_spent > log_banned_alt_spend_cutoff and money_spent > log_region_alt_spend_cutoff: return # spend exceeds both ignore thresholds, nothing to do
 
         # collect a list of all known alt user IDs
         alt_id_list = [int(s_other_id) for s_other_id in self.known_alt_accounts.iterkeys()]
@@ -9944,7 +9949,7 @@ class Player(AbstractPlayer):
             entry = self.known_alt_accounts[str(alt_id)]
 
             # if any known alt is banned, report it, but only if player is zero-spend
-            if alt_pcache and alt_pcache.get('banned_until', -1) > server_time and self.history.get('money_spent', 0) == 0:
+            if alt_pcache and alt_pcache.get('banned_until', -1) > server_time and money_spent < log_banned_alt_spend_cutoff:
                 gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt of banned account %d' % (self.user_id, alt_id))
 
             # if any known alt meets the login threshold, and is not ignored
@@ -9953,6 +9958,7 @@ class Player(AbstractPlayer):
 
             if entry.get('logins', 0) < alt_min_logins: continue
             if entry.get('ignore', False): continue
+            if money_spent > log_region_alt_spend_cutoff: continue
             if entry.get('last_login', server_time) < (server_time - alt_ignore_age):
                 # this alt hasn't logged in recently enough to count as a true alt,
                 # but let's report if it is still on the map somewhere
