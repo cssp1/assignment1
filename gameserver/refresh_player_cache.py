@@ -116,6 +116,12 @@ def update_user(user_id, db_client):
         props['protection_end_time'] = player['resources']['protection_end_time']
         props['player_level'] = player['resources'].get('player_level',1)
 
+        # update banned_until from the player data
+        if player.get('banned_until', -1) > 0:
+            props['banned_until'] = player['banned_until']
+        else:
+            props['banned_until'] = None # clear it
+
         # COMPUTE PVP RATING
         props['lootable_buildings'] = get_lootable_buildings(player)
 
