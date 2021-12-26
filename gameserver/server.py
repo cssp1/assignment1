@@ -9940,8 +9940,8 @@ class Player(AbstractPlayer):
             # look up the corresponding entry within known_alt_accounts
             entry = self.known_alt_accounts[str(alt_id)]
 
-            # if any known alt is banned, report it
-            if alt_pcache and alt_pcache.get('banned_until', -1) > server_time:
+            # if any known alt is banned, report it, but only if player is zero-spend
+            if alt_pcache and alt_pcache.get('banned_until', -1) > server_time and self.history.get('money_spent', 0) == 0:
                 gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt of banned account %d' % (self.user_id, alt_id))
 
             # if any known alt meets the login threshold, and is not ignored
