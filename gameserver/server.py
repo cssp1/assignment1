@@ -9936,6 +9936,9 @@ class Player(AbstractPlayer):
         # query player cache for the ban status and home region of all known alts
         pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch(alt_id_list, fields = ['home_region', 'banned_until'], reason = 'log_suspicious_alts')
 
+        # log regions reported so we don't spam the exception log
+        reported_regions = []
+
         for alt_id, alt_pcache in zip(alt_id_list, pcache_result_list):
             # look up the corresponding entry within known_alt_accounts
             entry = self.known_alt_accounts[str(alt_id)]
@@ -9955,9 +9958,12 @@ class Player(AbstractPlayer):
                 # but let's report if it is still on the map somewhere
                 if alt_pcache and alt_pcache.get('home_region', None):
                     alt_region = alt_pcache['home_region']
+                    if alt_region in reported_regions: continue
                     alt_region_data = gamedata['regions'][alt_region]
                     if self.home_region == alt_region and 'anti_alt' in alt_region_data.get('tags', []):
                         gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt account %d is marked inactive but is still in same anti-alt region %r.' % (self.user_id, alt_id, alt_region))
+                        reported_regions.append(alt_region) # log regions reported so we don't spam the exception log
+                        continue # only one warning needed per alt
                     if 'anti_alt' in alt_region_data.get('tags', []):
                         total_alts_in_alt_region = 0
                         for sub_alt_id, sub_alt_pcache in zip(alt_id_list, pcache_result_list):
@@ -9973,6 +9979,8 @@ class Player(AbstractPlayer):
                                 total_alts_in_alt_region += 1
                         if total_alts_in_alt_region > 0:
                             gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt account %d in anti-alt region %r is marked inactive but player has more than one alt in this region.' % (self.user_id, alt_id, alt_region))
+                            reported_regions.append(alt_region) # log regions reported so we don't spam the exception log
+                            continue # only one warning needed per alt
                     if alt_region_data.get('alt_limit', -1) > -1:
                         alt_limit = alt_region_data['alt_limit']
                         total_alts_in_alt_region = 0
@@ -9989,6 +9997,7 @@ class Player(AbstractPlayer):
                                 total_alts_in_alt_region += 1
                         if total_alts_in_alt_region > alt_limit:
                             gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt account %d in alt-limited region %r is marked inactive but player has more than %d alts in this region.' % (self.user_id, alt_id, alt_region, alt_limit))
+                            reported_regions.append(alt_region)
 
     def squad_base_id(self, squad_id): return 's%d_%d' % (self.user_id, squad_id)
     def squad_is_deployed(self, squad_id):
