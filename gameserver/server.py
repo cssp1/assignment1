@@ -9925,7 +9925,7 @@ class Player(AbstractPlayer):
         # or are marked "inactive" yet present in a monitored region,
         # and if so, then report it to the exception log.
 
-        alt_min_logins = gamedata['server'].get('alt_min_logins', 5)
+        alt_min_logins = gamedata['server'].get('suspicious_alt_min_logins', 100) # use a higher value than the default alt detection. We want to ignore cyber-cafes and casual account sharing
         alt_ignore_age = gamedata['server'].get('alt_ignore_age', 28*86400)
         log_banned_alt_spend_cutoff = gamedata['server'].get('log_banned_alt_spend_cutoff', 100) # ignore banned alts of superfans by default, but configurable
         log_region_alt_spend_cutoff = gamedata['server'].get('log_region_alt_spend_cutoff', 1000000) # don't ignore expired alts of anyone who has spent less than $1 million, but configurable
