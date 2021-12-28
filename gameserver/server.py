@@ -34193,8 +34193,10 @@ class GameSite(server.Site):
                     break
 
         # garbage-collect the Session table
-        timeout = gamedata['server']['session_timeout']
-        absolute_timeout = gamedata['server']['absolute_session_timeout']
+        timeout = gamedata['server'].get('session_timeout', 1200)
+        anti_bot_timeout = gamedata['server'].get('anti_bot_session_timeout', 28800)
+        anti_bot_random_factor = gamedata['server'].get('anti_bot_random_factor', 14400)
+        absolute_timeout = gamedata['server'].get('absolute_session_timeout', 43200)
 
         lock_keepalive_sessions = []
         lock_keepalive_ids = []
@@ -34205,6 +34207,8 @@ class GameSite(server.Site):
         for session in list(iter_sessions()): # make a copy since we might mutate the table
 
             kick_reason = None
+
+            anti_bot_time_check = anti_bot_timeout - random.randint(0, anti_bot_random_factor)
 
             # check for expired idle sessions
 
@@ -34218,9 +34222,13 @@ class GameSite(server.Site):
                 if gamedata['server']['log_abnormal_logins'] >= 2:
                     gamesite.exception_log.event(server_time, 'user %d - no activity within %d sec of login, kicking.' % (session.user.user_id, gamedata['server']['initial_session_timeout']))
 
-            elif (server_time - session.login_time) > absolute_timeout and (not session.has_attacked):
+            elif (server_time - session.login_time) > anti_bot_time_check and (not session.has_attacked):
                 kick_reason = 'long_session'
-                gamesite.exception_log.event(server_time, 'user %d - terminating extremely long session (%dmin)' % (session.user.user_id, (server_time-session.login_time)/60))
+                gamesite.exception_log.event(server_time, 'user %d - terminating long session with bot check random factor (%d min)' % (session.user.user_id, (server_time-session.login_time)/60))
+
+            elif (server_time - session.login_time) > absolute_timeout:
+                kick_reason = 'max_session'
+                gamesite.exception_log.event(server_time, 'user %d - terminating maximum-length session (%d min)' % (session.user.user_id, (server_time-session.login_time)/60))
 
             # perform idle check
             playtime = session.cur_playtime()
