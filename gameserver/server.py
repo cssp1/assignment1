@@ -9922,7 +9922,7 @@ class Player(AbstractPlayer):
 
     def log_suspicious_alts(self):
         # Check if any of this player's known alts are banned,
-        # or are marked "inactive" yet present in a region,
+        # or are marked "inactive" yet present in a monitored region,
         # and if so, then report it to the exception log.
 
         alt_min_logins = gamedata['server'].get('alt_min_logins', 5)
@@ -9930,6 +9930,7 @@ class Player(AbstractPlayer):
         log_banned_alt_spend_cutoff = gamedata['server'].get('log_banned_alt_spend_cutoff', 100) # ignore banned alts of superfans by default, but configurable
         log_region_alt_spend_cutoff = gamedata['server'].get('log_region_alt_spend_cutoff', 1000000) # don't ignore expired alts of anyone who has spent less than $1 million, but configurable
         money_spent = self.history.get('money_spent', 0)
+        suspicious_alt_regions = gamedata['server'].get('suspicious_alts_regions',[]) # only report suspicious alts in regions configured per-game
 
         if money_spent > log_banned_alt_spend_cutoff and money_spent > log_region_alt_spend_cutoff: return # spend exceeds both ignore thresholds, nothing to do
 
@@ -9964,6 +9965,7 @@ class Player(AbstractPlayer):
                 # but let's report if it is still on the map somewhere
                 if alt_pcache and alt_pcache.get('home_region', None):
                     alt_region = alt_pcache['home_region']
+                    if alt_region not in suspicious_alt_regions: continue
                     if alt_region in reported_regions: continue
                     alt_region_data = gamedata['regions'][alt_region]
                     if self.home_region == alt_region and 'anti_alt' in alt_region_data.get('tags', []):
