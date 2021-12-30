@@ -9949,16 +9949,17 @@ class Player(AbstractPlayer):
             # look up the corresponding entry within known_alt_accounts
             entry = self.known_alt_accounts[str(alt_id)]
 
-            # if any known alt is banned, report it, but only if player is zero-spend
-            if alt_pcache and alt_pcache.get('banned_until', -1) > server_time and money_spent < log_banned_alt_spend_cutoff:
-                gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt of banned account %d' % (self.user_id, alt_id))
-
             # if any known alt meets the login threshold, and is not ignored
             # but doesn't count as an alt because it has not logged in for a while,
             # and that alt is still on the map somewhere, then report it.
 
             if entry.get('logins', 0) < alt_min_logins: continue
             if entry.get('ignore', False): continue
+
+            # if any known alt is banned, report it, but only if player is zero-spend
+            if alt_pcache and alt_pcache.get('banned_until', -1) > server_time and money_spent < log_banned_alt_spend_cutoff:
+                gamesite.exception_log.event(server_time, 'warning: player %d logging in, alt of banned account %d' % (self.user_id, alt_id))
+
             if money_spent > log_region_alt_spend_cutoff: continue
             if entry.get('last_login', server_time) < (server_time - alt_ignore_age):
                 # this alt hasn't logged in recently enough to count as a true alt,
