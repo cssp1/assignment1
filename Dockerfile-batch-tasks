@@ -21,7 +21,7 @@ COPY aws aws
 COPY gameserver gameserver
 # COPY gamedata gamedata
 # COPY gameclient gameclient
-COPY spinpunch-private spinpunch-private
+# COPY spinpunch-private spinpunch-private
 
 # enable installation of pre-made "manylinux" Python binary builds on Alpine
 # see https://github.com/pypa/pip/issues/3969#issuecomment-247381915
