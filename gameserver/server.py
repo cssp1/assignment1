@@ -27419,6 +27419,7 @@ class GAMEAPI(resource.Resource):
         if killer_info:
             if killer_info.get('id', False) and session.get_object_if_exists(killer_info['id']):
                 killer_obj = session.get_object(killer_info['id'])
+                killer_spec_name = killer_info.get('spec', 'unknown')
                 # if an object was killed by its own team and it was not a suicide unit, this may be a client hack to hijack units
                 if obj.owner.user_id == killer_obj.owner.user_id and obj.obj_id != killer_obj.obj_id:
                     spend = session.player.history.get('money_spent',0)
@@ -27435,6 +27436,22 @@ class GAMEAPI(resource.Resource):
                                            'ui_reason': ('Auto-banned for object team hacking after %d strike(s)' % session.object_team_strikes),
                                            'public_announce':1
                                           })
+                    gamesite.exception_log.event(server_time, msg)
+                if killer_obj.spec.name != killer_spec_name:
+                    spend = session.player.history.get('money_spent',0)
+                    msg = 'destroy_object: user %7d ($%8.2f) object %s id %s killed by id %s, killer_spec_name %s does not match server spec %s.' % (session.player.user_id, spend, obj.spec.name, obj.obj_id, killer_obj.obj_id, killer_spec_name, killer_obj.spec.name)
+                    session.object_spec_strikes += 1
+                    msg += ' (strike %d)' % session.object_spec_strikes
+                    strike_limit = gamedata['server'].get('object_spec_autoban_strike_limit', -1)
+                    if session.object_spec_strike_ban_pending < 1 and strike_limit >= 0 and session.object_spec_strikes >= strike_limit and spend <= gamedata['server'].get('object_spec_autoban_spend_limit', 0):
+                        session.object_spec_strike_ban_pending = 1
+                        # Too many strikes. Ban the player
+                        msg += ' - BANNED!'
+                        reactor.callLater(2, gamesite.do_CONTROLAPI, session.user.user_id,
+                                        {'method':'ban','reliable':1,'user_id':session.user.user_id,'spin_user':'GameCheck',
+                                         'ui_reason': ('Auto-banned for object spec hacking after %d strike(s)' % session.object_spec_strikes),
+                                         'public_announce':1
+                                        })
                     gamesite.exception_log.event(server_time, msg)
 
         # only mobile units get destroyed permanently
