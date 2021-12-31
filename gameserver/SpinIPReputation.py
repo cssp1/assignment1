@@ -34,22 +34,54 @@ class CheckerResult(object):
     def is_datacenter(self): return self.flags.get('datacenter',0)
 
 class Checker(object):
-    def __init__(self, path_to_db_file):
-        self.ip_list4 = tuple()
-        self.ip_list6 = tuple()
-
-        if (not path_to_db_file):
-            # silently disable the checker
-            return
-
+    @classmethod
+    def get_db_file_hash(cls, path_to_db_file):
+        """ Return a stable hash of the reputation DB file.
+        None if it doesn't exist, otherwise (size, mtime) tuple. """
         if not os.path.exists(path_to_db_file):
             log.warning('IP reputation database not found: %s', path_to_db_file)
-            return
+            return None
+        stats = os.stat(path_to_db_file)
+        return (stats.st_size, stats.st_mtime)
 
+    def __init__(self, path_to_db_file):
+        self.path_to_db_file = path_to_db_file
+        self.cached_db_file_hash = None
+        self.ip_list4 = tuple()
+        self.ip_list6 = tuple()
+        self.reload()
+
+    def reload(self):
+        """ Reload the reputation DB file from disk into memory.
+        But do nothing if the DB file hash hasn't changed since the previous load.
+        Return True if new data was loaded. """
+
+        if (not self.path_to_db_file):
+            # silently disable the checker
+            return False
+
+        new_db_file_hash = self.get_db_file_hash(self.path_to_db_file)
+
+        # if hash is up to date, do nothing
+        if new_db_file_hash == self.cached_db_file_hash:
+            log.debug('In-memory DB is current. Not reloading.')
+            return False
+
+        elif new_db_file_hash:
+            log.debug('Reloading in-memory DB...')
+            self.do_reload()
+            self.cached_db_file_hash = new_db_file_hash
+            log.debug('Done reloading in-memory DB.')
+            return True
+
+        else: # new_db_file_hash is None, meaning the file is missing
+            return False
+
+    def do_reload(self):
         ip_dict4 = {} # map from range_lo -> ip-reputation entry dict
         ip_dict6 = {} # map from range_lo -> ip-reputation entry dict
 
-        for line in open(path_to_db_file, 'r'):
+        for line in open(self.path_to_db_file, 'r'):
             line = line.strip()
             if not line or line.startswith('//'):
                 continue
@@ -144,7 +176,7 @@ if __name__ == '__main__':
         elif key == '--force': force = True
         elif key == '-q': verbose = False
 
-    logging.basicConfig(level = logging.INFO if verbose else logging.WARNING)
+    logging.basicConfig(level = os.environ.get('LOGLEVEL') or (logging.INFO if verbose else logging.WARNING))
 
     if mode == 'check':
         c = Checker(db_filename)
@@ -162,6 +194,7 @@ if __name__ == '__main__':
                      '2600:1700:fe30:7ca0:542e:f64f:b412:da4a', # None
                      ):
             print addr, '->', c.query(addr)
+        c.reload()
 
     elif mode == 'get':
         # download the S3 copy of the DB to a local file
@@ -178,7 +211,6 @@ if __name__ == '__main__':
                 log.info('%s is up to date with s3://%s/%s already.', db_filename, s3_bucket_name, s3_key_name)
                 sys.exit(0)
 
-        client.download_file(s3_bucket_name, s3_key_name, db_filename)
         log.info('Downloading s3://%s/%s to %s ...', s3_bucket_name, s3_key_name, db_filename)
         client.download_file(s3_bucket_name, s3_key_name, db_filename)
         log.info('Done! Downloaded %s', db_filename)

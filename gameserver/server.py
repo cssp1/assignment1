@@ -495,7 +495,8 @@ def reload_gamedata():
         localized_gamedata_cache = {}
 
         chat_filter = ChatFilter.ChatFilter(gamedata['client']['chat_filter'])
-        # reinitialize the IP Reputation database
+
+        # reinitialize the IP Reputation database from scratch
         global ip_rep_checker
         if SpinConfig.config.get('ip_reputation_database') and os.path.exists(SpinConfig.config['ip_reputation_database']):
             ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
@@ -34206,6 +34207,14 @@ class GameSite(server.Site):
         if (server_time - self.last_ai_base_gc_time) >= gamedata['server'].get('ai_base_gc_interval', 1800):
             self.last_ai_base_gc_time = server_time
             ai_instance_table.collect_garbage()
+
+        # check for IP reputation DB update
+        if ip_rep_checker:
+            try:
+                if ip_rep_checker.reload():
+                    gamesite.exception_log.event(server_time, 'Updated SpinIPReputation database (gameserver %s)' % spin_server_name)
+            except Exception as e:
+                gamesite.exception_log.event(server_time, 'Error reloading SpinIPReputation database: %r' % e)
 
         # if we're about to go down for maintenance, kick all logged-in players
         maint_kicks = 0

@@ -3565,7 +3565,7 @@ def reconfig():
         if db_client:
             db_client.update_dbconfig(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
 
-        # reinitialize the IP Reputation database
+        # reinitialize the IP Reputation database from scratch
         global ip_rep_checker
         ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config.get('ip_reputation_database'))
 
@@ -3722,6 +3722,10 @@ def do_main():
                 facebook_log.event(proxy_time, 'API Usage: %s' % fb_api_usage.dump())
 
             controlapi_queue_poll()
+
+            # check for IP reputation DB update
+            if ip_rep_checker.reload():
+                exception_log.event(proxy_time, 'Updated SpinIPReputation database (proxyserver)')
 
         except:
             exception_log.event(proxy_time, 'proxyserver bgfunc Exception: ' + traceback.format_exc())
