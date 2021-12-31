@@ -8477,14 +8477,21 @@ class ResourceStateSnapshot:
 
     def serialize(self, enemy = False):
         if enemy:
+            gamebucks = 0
+            facebook_credits = 0
             prot_end_time = conceal_protection_time(self.protection_end_time)
         else:
+            gamebucks = self.gamebucks
+            facebook_credits = self.facebook_credits
             prot_end_time = self.protection_end_time
-        ret = { "gamebucks": self.gamebucks,
-                "facebook_credits": self.facebook_credits,
+        ret = { "gamebucks": gamebucks,
+                "facebook_credits": facebook_credits,
                 "player_level": self.player_level, "xp": self.xp,
                 "protection_end_time": prot_end_time }
-        for res in gamedata['resources']: ret[res] = getattr(self, res)
+        for res in gamedata['resources']:
+            ret[res] = getattr(self, res)
+            if res == 'gamebucks' and enemy:
+                ret[res] = 0
         return ret
     def max_res(self, res): return self.res_max[res]
     def cur_res(self, res): return self.res_cur[res]
