@@ -27042,7 +27042,7 @@ class GAMEAPI(resource.Resource):
             if obj.owner.user_id != session.player.user_id:
                 expected_team = 'enemy'
             # do not check object team if this is an AutoResolve combat update
-            if team not in ('auto_resolve', expected_team) and session.player.tutorial_state == "COMPLETE":
+            if team not in ('auto_resolve', expected_team) and 'team_flip' not in obj.behaviors:
                 spend = session.player.history.get('money_spent',0)
                 msg = 'object_combat_updates: user %7d ($%8.2f) object %s team %s does not match server team %s.' % (session.player.user_id, spend, str(id), team, expected_team)
                 session.object_team_strikes += 1
@@ -27428,7 +27428,7 @@ class GAMEAPI(resource.Resource):
                 killer_spec_name = killer_info.get('spec', 'unknown')
                 # if an object was killed by its own team and it was not a suicide unit, this may be a client hack to hijack units
                 # include a tutorial check because Firestrike has units swap sides in one of the tutorial missions
-                if obj.owner.user_id == killer_obj.owner.user_id and obj.obj_id != killer_obj.obj_id and session.player.tutorial_state == "COMPLETE":
+                if obj.owner.user_id == killer_obj.owner.user_id and obj.obj_id != killer_obj.obj_id and 'team_flip' not in obj.behaviors and 'team_flip' not in killer_obj.behaviors:
                     spend = session.player.history.get('money_spent',0)
                     msg = 'destroy_object: user %7d ($%8.2f) object %s id %s killed by %s id %s both owned by %s.' % (session.player.user_id, spend, obj.spec.name, obj.obj_id, killer_obj.spec.name, killer_obj.obj_id, str(obj.owner.user_id))
                     session.object_team_strikes += 1
