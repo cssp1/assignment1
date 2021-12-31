@@ -16,12 +16,12 @@ jobs:
       - name: Check out game repository
         uses: actions/checkout@v2
 
-      - name: Check out game-spinpunch-private repository
-        uses: actions/checkout@v2
-        with:
-          repository: spinpunch/game-spinpunch-private
-          token: ${{ secrets.GHCR_PAT }}
-          path: spinpunch-private
+#      - name: Check out game-spinpunch-private repository
+#        uses: actions/checkout@v2
+#        with:
+#          repository: spinpunch/game-spinpunch-private
+#          token: ${{ secrets.GHCR_PAT }}
+#          path: spinpunch-private
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
