@@ -8489,9 +8489,8 @@ class ResourceStateSnapshot:
                 "player_level": self.player_level, "xp": self.xp,
                 "protection_end_time": prot_end_time }
         for res in gamedata['resources']:
+            if res == 'gamebucks': continue # no need to push gamebucks twice
             ret[res] = getattr(self, res)
-            if res == 'gamebucks' and enemy:
-                ret[res] = 0
         return ret
     def max_res(self, res): return self.res_max[res]
     def cur_res(self, res): return self.res_cur[res]
