@@ -1728,8 +1728,8 @@ $(function() {
     if(spin_token_data['roles'].indexOf('ADMIN') == -1) {
        $('#mode_server_tab').remove();
        $('#mode_server').remove();
-       $('#mode_logs_tab').remove();
-       $('#mode_logs').remove();
+       //$('#mode_logs_tab').remove(); Logs now viewable by all as of 2022-01-01
+       //$('#mode_logs').remove();
     } else {
        $('#server_status').bind('show', function() { console.log("HERE"); });
     }
