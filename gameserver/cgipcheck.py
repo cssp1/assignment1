@@ -619,7 +619,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
 
         elif path[0] == 'logs':
             # log retrieval methods
-            check_role(spin_token_data, 'ADMIN')
+            # check_role(spin_token_data, 'ADMIN') logs used to require admin, no longer requires it
 
             log_name = args['log_name']
             assert log_name in ('log_exceptions', 'log_client_exceptions', 'log_metrics', 'log_credits')
