@@ -1674,8 +1674,8 @@ def check_item(itemname, spec):
                                        expect_level = spec.get('level', None),
                                        expect_item_sets = set((spec['item_set'],)) if 'item_set' in spec else None,
                                        expect_strength_array_length = max_level)
-                if effect['stat'] == 'permanent_auras' and not any(x['kind'] == 'building' for x in spec['equip'].get('compatible',[spec['equip']])):
-                    error |= 1; print '%s: permanent_auras mods are not supported on mobile units (buildings only)' % itemname
+                if effect['stat'] == 'permanent_auras' and not any(x['kind'] == 'building' for x in spec['equip'].get('compatible',[spec['equip']])) and spec['equip']['slot_type'] != 'reskin':
+                    error |= 1; print '%s: permanent_auras mods are only supported on mobile units for reskins, otherwise buildings only' % itemname
                 if effect['stat'] in ('on_destroy','on_damage','on_approach') and ('strength' in effect):
                     for entry in effect['strength']:
                         if isinstance(entry,dict):
@@ -1818,7 +1818,7 @@ def check_item(itemname, spec):
     return error
 
 MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', 'weapon_range', 'weapon_range_pvp', 'effective_weapon_range', 'ice_effects', 'rate_of_fire',
-                                          'damage_taken', 'armor', 'unit_repair_speed', 'unit_repair_cost',
+                                          'damage_taken', 'armor', 'unit_repair_speed', 'unit_repair_cost', 'art_asset',
                                           'manufacture_speed', 'manufacture_cost', 'repair_speed', 'swamp_effects',
                                           'research_speed', 'crafting_speed', 'manufacture_speed', 'weapon', 'weapon_level', 'weapon_asset', 'permanent_auras', 'continuous_cast',
                                           'anti_air', 'anti_missile', 'resurrection', 'splash_range','effective_range','accuracy',
