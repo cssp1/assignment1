@@ -37,17 +37,17 @@ if __name__ == '__main__':
         EXTRA_UNITS = [] # units that are not included in units.json but whose icons are needed
         if game_id in ('tr','dv'):
             EXTRA_UNITS += [('ch47', {'art_asset': 'ch47'})]
-            for extra_name in ('ah1x','ah64','armyguy_javelinx','armyguy_m240x','armyguy_mortarx','armyguy_sapperx','armyguy_stingerx','armyguy_xm110x',
-                               'armyguyx','bmp1x','brdm3x','btr90x','dv_adlerkfz13x','dv_armyguyx','dv_armyguy_javelinx','dv_armyguy_m240x',
+            for extra_name in ('ah1x','ah64x','armyguy_javelinx','armyguy_m240x','armyguy_mortarx','armyguy_sapperx','armyguy_stingerx','armyguy_xm110x',
+                               'armyguyx','bmp1x','brdm3x','dv_adlerkfz13x','dv_armyguyx','dv_armyguy_javelinx','dv_armyguy_m240x',
                                'dv_armyguy_mortarx','dv_m12x','dv_m26_pershingx','dv_m4a2_shermanx','dv_m4_halftrackx','dv_panzerwerferx','dv_panzer_ivx',
-                               'dv_sdkfz234_pumax','f35x','gaz_tigrx','hz9x','ka50x','m109a6x','m1abramsx','mi24x','mq1cx','mq8bx','mstax','nimrx','oh58x',
+                               'dv_sdkfz234_pumax','f35x','gaz_tigrx','m109a6x','m1abramsx','mi24x','mq1cx','mq8bx','mstax','oh58x',
                                'strykerx','suicide_truckx','t90x','tos1ax','uh60x'):
-                for extra_color in ('black','blue','brown','green','orange','purple','red','yellow'):
+                for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
                     extra_val = '%s_t%s' % (extra_name, extra_color)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
         if game_id in ('bfm','mf2'):
-            for extra_name in ('bfm_centurionx','bfm_elevated_cannon_six_wheels_flamingx','bfm_hellhoundx','bfm_kitbashed_curiosityx','bfm_liberatorx','bfm_maulerx','bfm_mech_on_wheelsx','bfm_missile_carx','bfm_pencil_nosex','bfm_rainmakerx','bfm_tri_fighterx','bfm_two_thrusters_two_cannonsx','bfm_warbirdx','bfm_wombatx','bfm_wreckerx'):
-                for extra_color in ('black','blue','brown','green','orange','purple','red','yellow'):
+            for extra_name in ('bfm_centurionx','bfm_elevated_cannon_six_wheels_flamingx','bfm_hellhoundx','bfm_kitbashed_curiosityx','bfm_liberatorx','bfm_maulerx','bfm_mech_on_wheelsx','bfm_missile_carx','bfm_pencil_nosex','bfm_rainmakerx','bfm_two_thrusters_two_cannonsx','bfm_warbirdx','bfm_wombatx','bfm_wreckerx'):
+                for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
                     extra_val = '%s_t%s' % (extra_name, extra_color)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
         for unit_name, unit_data in units.items() + EXTRA_UNITS:
