@@ -35,7 +35,7 @@ if __name__ == '__main__':
         # (sg uses hand-painted images in art.json)
 
         EXTRA_UNITS = [] # units that are not included in units.json but whose icons are needed
-        if game_id in ('tr','dv'):
+        if game_id in ('tr','dv','eg'):
             EXTRA_UNITS += [('ch47', {'art_asset': 'ch47'})]
             for extra_name in ('ah1x','ah64x','armyguy_javelinx','armyguy_m240x','armyguy_mortarx','armyguy_sapperx','armyguy_stingerx','armyguy_xm110x',
                                'armyguyx','bmp1x','brdm3x','dv_adlerkfz13x','dv_armyguyx','dv_armyguy_javelinx','dv_armyguy_m240x',
@@ -45,7 +45,7 @@ if __name__ == '__main__':
                 for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
                     extra_val = '%s_t%s' % (extra_name, extra_color)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
-        if game_id in ('bfm','mf2'):
+        if game_id in ('bfm','mf2','eg'):
             for extra_name in ('bfm_centurionx','bfm_elevated_cannon_six_wheels_flamingx','bfm_hellhoundx','bfm_kitbashed_curiosityx','bfm_liberatorx','bfm_maulerx','bfm_mech_on_wheelsx','bfm_missile_carx','bfm_pencil_nosex','bfm_rainmakerx','bfm_two_thrusters_two_cannonsx','bfm_warbirdx','bfm_wombatx','bfm_wreckerx'):
                 for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
                     extra_val = '%s_t%s' % (extra_name, extra_color)
