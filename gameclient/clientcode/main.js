@@ -2432,6 +2432,7 @@ GameObject.prototype.get_permanent_auras_range = function() {
     return [check_val, range, false, -1, -1]; // returns in the same format as get_weapon_range()
 };
 
+/** @param {!Object} spec */
 function get_max_level(spec) {
     if('kind' in spec && spec['kind'] === 'mobile') {
         return spec['max_hp'].length;
@@ -2452,12 +2453,25 @@ function get_max_level(spec) {
 
 // return maximum level that should be displayed to players
 // (may be lower than true max level)
+/** @param {!Object} spec */
 function get_max_ui_level(spec) {
     var max_level = get_max_level(spec);
     if(!player.is_cheater && ('max_ui_level' in spec)) {
         max_level = Math.min(max_level, eval_cond_or_literal(spec['max_ui_level'], player, null));
     }
     return max_level;
+}
+
+// determine which art asset should currently be displayed for players
+/** @param {!Object} spec */
+function get_current_art_asset(spec) {
+    if('kind' in spec && spec['kind'] === 'mobile') {
+        var name = spec['name'];
+        if(name in player.stattab.units && 'art_asset' in player.stattab.units[name]) {
+            return player.stattab.units[name]['art_asset']['val'];
+        }
+    }
+    return spec['art_asset'];
 }
 
 GameObject.prototype.get_max_level = function() { return get_max_level(this.spec); };
@@ -9434,6 +9448,7 @@ function get_unit_stat(stattab, specname, stat, default_value) {
 // this version of get_auto_spell disregards modstats - this is only
 // to be used when getting stats for a new building you have not built
 // yet, or a unit you have not unlocked.
+/** @param {!Object} spec */
 function get_auto_spell_raw(spec) {
     var ret = null;
     if(('spells' in spec) && (spec['spells'].length > 0)) {
@@ -15427,7 +15442,7 @@ function update_unit_deployment_bar_batch_or_drip(dialog) {
             if('icon' in spec) {
                 d.widgets['item'].asset = get_leveled_quantity(spec['icon'],1);
             } else {
-                d.widgets['item'].asset = get_leveled_quantity(spec['art_asset'],1);
+                d.widgets['item'].asset = get_leveled_quantity(get_current_art_asset(spec),1);
             }
             d.widgets['item'].state = GameArt.assets[d.widgets['item'].asset].has_state('icon') ? 'icon' : 'normal';
             d.widgets['stack'].str = home_qty.toString();
@@ -15453,7 +15468,7 @@ function update_unit_deployment_bar_batch_or_drip(dialog) {
             d.widgets['plus_one'].state = d.widgets['plus_all'].state = (can_deploy ? 'normal' : 'disabled');
 
             d.widgets['bg'].tooltip.str = tip;
-            d.widgets['unit'].bg_image = get_leveled_quantity(spec['art_asset'],1);
+            d.widgets['unit'].bg_image = get_leveled_quantity(get_current_art_asset(spec),1);
             d.widgets['unit'].state = 'icon';
             d.widgets['unit'].alpha = (spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
             d.widgets['counter'].str = deploy_qty.toString()+'/'+home_qty.toString();
@@ -22940,7 +22955,7 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
                     if('icon' in spec) {
                         d.widgets['item'].asset = get_leveled_quantity(spec['icon'],1);
                     } else {
-                        d.widgets['item'].asset = get_leveled_quantity(spec['art_asset'],1);
+                        d.widgets['item'].asset = get_leveled_quantity(get_current_art_asset(spec),1);
                     }
                     d.widgets['item'].state = GameArt.assets[d.widgets['item'].asset].has_state('icon') ? 'icon' : 'normal';
                     d.widgets['stack'].str = pretty_print_number(qty);
@@ -33609,7 +33624,7 @@ function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override
         var cur_level = (obj && ('level' in obj) ? obj['level'] :
                          player.tech[spec['level_determined_by_tech']] || 1);
         var level_str = gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', cur_level.toString()).replace('%max', max_level.toString());
-        dialog.widgets['icon'].asset = get_leveled_quantity(spec['art_asset'], 1);
+        dialog.widgets['icon'].asset = get_leveled_quantity(get_current_art_asset(spec), 1);
         dialog.widgets['icon'].state = 'icon';
         dialog.widgets['stack'].str = (qty > 1 ? pretty_print_number(qty) : null);
         dialog.widgets['frame'].onclick = (onclick ? onclick : null);
@@ -33947,7 +33962,7 @@ player.get_mobile_squad_capabilities = function() {
             entry.can_raid_scout = true;
         }
 
-        entry.icon_asset = get_leveled_quantity(spec['art_asset'], obj_level);
+        entry.icon_asset = get_leveled_quantity(get_current_art_asset(spec), obj_level);
 
         if('raid_offense' in spec || 'raid_defense' in spec) {
             goog.array.forEach(spec['defense_types'], function(key) {
@@ -34769,7 +34784,7 @@ function update_repair_control(dialog) {
             var cur_max_hp = army_unit_hp(obj); cur_hp = cur_max_hp[0]; max_hp = cur_max_hp[1];
         }
 
-        dialog.widgets['in_production_icon'].bg_image = get_leveled_quantity(obj_spec['art_asset'], obj_level);
+        dialog.widgets['in_production_icon'].bg_image = get_leveled_quantity(get_current_art_asset(obj_spec), obj_level);
         dialog.widgets['in_production_icon'].alpha = (obj_spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
 
         // estimate current HP value
@@ -34832,7 +34847,7 @@ function update_repair_control(dialog) {
                 counters[box] = 1;
                 kind = obj_spec['name'];
                 dialog.widgets['queue'+box.toString()].show = !player.squads_enabled();
-                dialog.widgets['queue'+box.toString()].bg_image = get_leveled_quantity(obj_spec['art_asset'], obj_level);
+                dialog.widgets['queue'+box.toString()].bg_image = get_leveled_quantity(get_current_art_asset(obj_spec), obj_level);
                 dialog.widgets['queue'+box.toString()].alpha = (obj_spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
                 dialog.widgets['queue_counter_bg'+box.toString()].show =
                     dialog.widgets['queue_counter'+box.toString()].show = !player.squads_enabled();
@@ -34925,7 +34940,7 @@ function update_repair_control(dialog) {
                 allow_repair = obj.is_damaged() && !is_under_repair;
             }
 
-            dialog.widgets['grid'+coord].asset = get_leveled_quantity(spec['art_asset'], level);
+            dialog.widgets['grid'+coord].asset = get_leveled_quantity(get_current_art_asset(spec), level);
             dialog.widgets['grid'+coord].tooltip.str = dialog.data['widgets']['grid']['ui_tooltip'].replace('%s', spec['ui_name']).replace('%cur', pretty_print_number(level)).replace('%max', pretty_print_number(get_max_ui_level(spec)));
             dialog.widgets['grid'+coord].alpha = (spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
             dialog.widgets['grid_health'+coord].show = (hp != max_hp) && (hp>0);
@@ -35587,7 +35602,7 @@ function manufacture_dialog_select_unit(dialog, name) {
         hero_state = (level < 1 && GameArt.assets[hero_asset].has_state('normal_disabled') ? 'normal_disabled' : 'normal');
         hero_offset = dialog.data['widgets']['unit_hero_icon']['bg_image_offset_splash'];
     } else {
-        hero_asset = get_leveled_quantity(spec['art_asset'], Math.max(level, 1));
+        hero_asset = get_leveled_quantity(get_current_art_asset(spec), Math.max(level, 1));
         if(level < 1) {
             // player can't build this unit - show level 1 stats and gray out portrait
             level = 1;
@@ -35738,7 +35753,7 @@ function update_manufacture_dialog(dialog) {
             voffset = 0;
         } else {
             asset_is_3d = true;
-            widget.bg_image = get_leveled_quantity(spec['art_asset'], 1);
+            widget.bg_image = get_leveled_quantity(get_current_art_asset(spec), 1);
             widget.alpha = spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1;
             if(spec['flying']) {
                 voffset = -1*spec['altitude'];
@@ -35794,7 +35809,7 @@ function update_manufacture_dialog(dialog) {
                         if(fx_data) {
                             session.get_real_world().fxworld.add_visual_effect_at_time([builder.x,builder.y], 0, [0,1,0], client_time, fx_data,
                                                            true,
-                                                           { '%OBJECT_SPRITE': get_leveled_quantity(spec['art_asset'], level)});
+                                                           { '%OBJECT_SPRITE': get_leveled_quantity(get_current_art_asset(spec), level)});
                         }
                         player.quest_tracked_dirty = true;
 
@@ -38939,7 +38954,7 @@ function research_dialog_scroll(dialog, page) {
                     widget.bg_image = get_leveled_quantity(unit_spec['splash_image'], Math.min(current+1, limit));
                     widget.transform = dialog.data['widgets']['grid']['transform_splash_image'];
                 } else {
-                    widget.bg_image = get_leveled_quantity(unit_spec['art_asset'], Math.min(current+1, limit));
+                    widget.bg_image = get_leveled_quantity(get_current_art_asset(unit_spec), Math.min(current+1, limit));
                     widget.transform = null;
                 }
                 widget.alpha = unit_spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1;
@@ -39720,7 +39735,7 @@ function missions_dialog_select_mission(dialog, row) {
                 var str = qty.toString() + 'x ' + spec['ui_name'];
                 reward_other.push(str);
                 dialog.widgets['reward_unit_icon'].show = true;
-                dialog.widgets['reward_unit_icon'].asset = get_leveled_quantity(spec['art_asset'], 1);
+                dialog.widgets['reward_unit_icon'].asset = get_leveled_quantity(get_current_art_asset(spec), 1);
                 var voffset;
                 if(spec['flying']) {
                     voffset = -4*spec['altitude'];
@@ -41076,7 +41091,7 @@ function apply_dialog_hacks(dialog, _tip, consequent_context) {
         var spec = gamedata['units'][_tip['unit_icon']] || gamedata['buildings'][_tip['unit_icon']] || null;
         if(spec) {
             dialog.widgets['unit_icon'].show = true;
-            dialog.widgets['unit_icon'].asset = get_leveled_quantity(spec['art_asset'], 1);
+            dialog.widgets['unit_icon'].asset = get_leveled_quantity(get_current_art_asset(spec), 1);
         }
         if('unit_icon_xy' in _tip) { dialog.widgets['unit_icon'].xy = _tip['unit_icon_xy']; }
     }
@@ -41273,7 +41288,7 @@ function invoke_ingame_tip(name, options) {
         var spec = gamedata['units'][tip['unit_icon']] || gamedata['buildings'][tip['unit_icon']] || null;
         if(spec) {
             dialog.widgets['unit_icon'].show = true;
-            dialog.widgets['unit_icon'].asset = get_leveled_quantity(spec['art_asset'], 1);
+            dialog.widgets['unit_icon'].asset = get_leveled_quantity(get_current_art_asset(spec), 1);
         }
     }
     return dialog;
@@ -42015,7 +42030,7 @@ function invoke_building_upgrade_congrats(spec_name, level) {
     // new: sound is handled by the VFX or dialog widgets for new flashy case
     var sound_name = null;
 
-    var dialog = invoke_generic_upgrade_congrats(null, false, sound_name, spec['ui_name'], level, text, get_leveled_quantity(spec['art_asset'], level),
+    var dialog = invoke_generic_upgrade_congrats(null, false, sound_name, spec['ui_name'], level, text, get_leveled_quantity(get_current_art_asset(spec), level),
                                                  get_leveled_quantity(spec['cloaked'] || 0, level),
                                                  viral_name, viral_props);
     if(level == 1) {
@@ -42039,7 +42054,7 @@ function invoke_enhancement_congrats(obj_id, enh_name, level) {
     if('splash_image' in spec) {
         asset = get_leveled_quantity(spec['splash_image'], level);
     } else {
-        asset = get_leveled_quantity(host.spec['art_asset'], level);
+        asset = get_leveled_quantity(get_current_art_asset(host.spec), level);
         cloaked = get_leveled_quantity(host.spec['cloaked'] || 0, host.level)
     }
     var dialog = invoke_generic_upgrade_congrats(null, false, null, spec['ui_name'], level, text,
@@ -42087,8 +42102,8 @@ function invoke_tech_upgrade_congrats(spec_name) {
     // new: sound is handled by the VFX or dialog widgets for new flashy case
     var sound_name = null;
 
-    var dialog = invoke_generic_upgrade_congrats(get_leveled_quantity(unit_spec['art_asset'], level), alt_bg, sound_name,
-                                                 ui_tech_name, level, text, get_leveled_quantity(tech_spec['splash_image'] || unit_spec['splash_image'] || unit_spec['art_asset'], level),
+    var dialog = invoke_generic_upgrade_congrats(get_leveled_quantity(get_current_art_asset(unit_spec), level), alt_bg, sound_name,
+                                                 ui_tech_name, level, text, get_leveled_quantity(tech_spec['splash_image'] || unit_spec['splash_image'] || get_current_art_asset(unit_spec), level),
                                                  get_leveled_quantity(unit_spec['cloaked'] || 0, level),
                                                  null, null);
 
@@ -42157,7 +42172,7 @@ function invoke_blueprint_congrats(item_spec_name, tech_spec_name) {
     }
 
     if(unit_spec) {
-        dialog.widgets['small_icon'].asset = get_leveled_quantity(unit_spec['art_asset'],1);
+        dialog.widgets['small_icon'].asset = get_leveled_quantity(get_current_art_asset(unit_spec),1);
         dialog.widgets['small_icon'].alpha = icon_alpha;
         dialog.widgets['big_icon'].alpha = icon_alpha;
     }
@@ -45459,7 +45474,7 @@ function build_dialog_scroll(dialog, page) {
                 dialog.widgets['grid_status'+widget_name].show = false;
                 dialog.widgets['grid_jewel'+widget_name].show = false;
                 dialog.widgets['grid'+widget_name].show = true;
-                dialog.widgets['grid'+widget_name].bg_image = spec['art_asset'];
+                dialog.widgets['grid'+widget_name].bg_image = get_current_art_asset(spec);
                 dialog.widgets['grid'+widget_name].state = 'normal';
                 // shrink large sprites
                 dialog.widgets['grid'+widget_name].transform = (spec['gridsize'][0] > 8 ?  [0.2,0,0,0.2,dialog.data['widgets']['grid']['dimensions'][0]/2,dialog.data['widgets']['grid']['dimensions'][1]/2] : null);
@@ -45468,7 +45483,7 @@ function build_dialog_scroll(dialog, page) {
             } else {
                 var spec = gamedata['buildings'][name];
                 var widget = dialog.widgets['grid'+widget_name];
-                widget.bg_image = get_leveled_quantity(spec['art_asset'], 1);
+                widget.bg_image = get_leveled_quantity(get_current_art_asset(spec), 1);
                 widget.state = 'icon';
                 widget.transform = null;
                 widget.show = true;
@@ -46659,7 +46674,7 @@ function update_upgrade_dialog(dialog) {
         var asset, state = 'hero', pos_state = 'xy';;
         if('associated_unit' in tech && !('splash_image' in gamedata['units'][tech['associated_unit']])) { // UNIT without splash image
             var unit_spec = gamedata['units'][tech['associated_unit']];
-            asset = get_leveled_quantity(unit_spec['art_asset'], (new_level > max_level ? max_level : new_level));
+            asset = get_leveled_quantity(get_current_art_asset(unit_spec), (new_level > max_level ? max_level : new_level));
 
             var voffset;
             if(unit_spec['flying']) {
@@ -46700,7 +46715,7 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['icon'].asset = asset;
         dialog.widgets['icon'].state = state;
     } else {
-        dialog.widgets['icon'].asset = get_leveled_quantity(unit.spec['art_asset'], (new_level > max_level ? max_level : new_level));
+        dialog.widgets['icon'].asset = get_leveled_quantity(get_current_art_asset(unit.spec), (new_level > max_level ? max_level : new_level));
         // special-case because some buildings are really tall
         dialog.widgets['icon'].bg_image_offset = vec_add(dialog.data['widgets']['icon']['bg_image_offset'], unit.spec['hero_icon_pos'] || [0,0]);
     }
@@ -47934,7 +47949,7 @@ function update_upgrade_dialog(dialog) {
                 if(fx_data) {
                     session.get_real_world().fxworld.add_visual_effect_at_time([__unit.x,__unit.y], 0, [0,1,0], client_time, fx_data,
                                                    true, // !spec['worth_less_xp'], // no sound for barrier upgrades?
-                                                   { '%OBJECT_SPRITE': __unit.get_leveled_quantity(__unit.spec['art_asset'])});
+                                                   { '%OBJECT_SPRITE': __unit.get_leveled_quantity(get_current_art_asset(__unit.spec))});
                 }
 
                 invoke_ui_locker(__unit.request_sync(), (function (___dialog) { return function() { close_dialog(___dialog); }; })(__dialog));
@@ -51993,7 +52008,7 @@ function handle_server_message(data) {
                 if(fx_data) {
                     var tech = gamedata['enhancements'][enh_name];
                     var unit = tech['associated_unit'] || tech['affects_unit'] || null;
-                    var asset = lab.get_leveled_quantity(lab.spec['art_asset']);
+                    var asset = lab.get_leveled_quantity(get_current_art_asset(lab.spec));
                     var instance_data = { '%OBJECT_SPRITE': asset };
                     world.fxworld.add_visual_effect_at_time([lab.x,lab.y], 0, [0,1,0], client_time, fx_data,
                                                             true,
@@ -52028,7 +52043,7 @@ function handle_server_message(data) {
                 var fx_data = gamedata['client']['vfx']['tech_research_finish'];
                 var tech = gamedata['tech'][newly_researched];
                 var unit = tech['associated_unit'] || tech['affects_unit'] || null;
-                var asset = (unit ? get_leveled_quantity(gamedata['units'][unit]['art_asset'], Math.max(1,player.tech[unit['level_determined_by_tech']])) : lab.get_leveled_quantity(lab.spec['art_asset']));
+                var asset = (unit ? get_leveled_quantity(gamedata['units'][unit]['art_asset'], Math.max(1,player.tech[unit['level_determined_by_tech']])) : lab.get_leveled_quantity(get_current_art_asset(lab.spec)));
                 var instance_data = { '%OBJECT_SPRITE': asset };
                 world.fxworld.add_visual_effect_at_time([lab.x,lab.y], 0, [0,1,0], client_time, fx_data,
                                                         true,
@@ -57051,8 +57066,8 @@ function draw_building_or_inert(world, obj, powerfac) {
     var status_text = [];
     var sprite_data = null;
 
-    if(obj.get_leveled_quantity(obj.spec['art_asset']) in GameArt.assets) {
-        var sprite_name = obj.get_leveled_quantity(obj.spec['art_asset']);
+    if(obj.get_leveled_quantity(get_current_art_asset(obj.spec)) in GameArt.assets) {
+        var sprite_name = obj.get_leveled_quantity(get_current_art_asset(obj.spec));
         icon = GameArt.assets[sprite_name];
         sprite_data = gamedata['art'][sprite_name];
     } else {
