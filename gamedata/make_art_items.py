@@ -42,11 +42,17 @@ if __name__ == '__main__':
                 for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
                     extra_val = '%s_t%s' % (extra_name, extra_color)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
+                    key = 'icon_inventory_reskin_%s' % extra_val
+                    outkeys.append(key)
+                    out[key] = { "states": { "normal": { "subassets": ["inventory_bg_black", "inventory_%s" % extra_val] } } }
         if game_id in ('tr','eg'):
             for extra_name in ('armyguy_javelinx','armyguy_m240x','armyguy_mortarx','armyguy_sapperx','armyguy_stingerx','armyguy_xm110x','armyguyx'):
                 for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
                     extra_val = '%s_t%s' % (extra_name, extra_color)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
+                    key = 'icon_inventory_reskin_%s' % extra_val
+                    outkeys.append(key)
+                    out[key] = { "states": { "normal": { "subassets": ["inventory_bg_black", "inventory_%s" % extra_val] } } }
         if game_id in ('dv','eg'):
             for extra_name in ('dv_adlerkfz13x','dv_armyguyx','dv_armyguy_javelinx','dv_armyguy_m240x',
                                'dv_armyguy_mortarx','dv_m12x','dv_m26_pershingx','dv_m4a2_shermanx','dv_m4_halftrackx','dv_panzerwerferx','dv_panzer_ivx',
@@ -54,11 +60,17 @@ if __name__ == '__main__':
                 for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
                     extra_val = '%s_t%s' % (extra_name, extra_color)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
+                    key = 'icon_inventory_reskin_%s' % extra_val
+                    outkeys.append(key)
+                    out[key] = { "states": { "normal": { "subassets": ["inventory_bg_black", "inventory_%s" % extra_val] } } }
         if game_id in ('bfm','mf2','eg'):
             for extra_name in ('bfm_centurionx','bfm_elevated_cannon_six_wheels_flamingx','bfm_hellhoundx','bfm_kitbashed_curiosityx','bfm_liberatorx','bfm_maulerx','bfm_mech_on_wheelsx','bfm_missile_carx','bfm_pencil_nosex','bfm_rainmakerx','bfm_two_thrusters_two_cannonsx','bfm_warbirdx','bfm_wombatx','bfm_wreckerx'):
                 for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
                     extra_val = '%s_t%s' % (extra_name, extra_color)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
+                    key = 'icon_inventory_reskin_%s' % extra_val
+                    outkeys.append(key)
+                    out[key] = { "states": { "normal": { "subassets": ["inventory_bg_black", "inventory_%s" % extra_val] } } }
         for unit_name, unit_data in units.items() + EXTRA_UNITS:
             key = 'inventory_%s' % unit_name
             outkeys.append(key)
