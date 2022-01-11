@@ -9381,13 +9381,14 @@ Mobile.prototype.apply_snapshot = function(snap) {
     if('is_invisible' in snap) { this.replay_invisible = !!snap['is_invisible']; }
 };
 
-Mobile.update_art_asset = function(team, stattab, world) {
+Mobile.update_art_asset = function(team, stattab_units, world) {
+    if(!stattab_units) { return; }
     session.for_each_real_object(function(obj) {
         if(obj.is_mobile() && obj.team == team) {
             obj.remove_aura('sprite_swapped');
             var name = obj.spec.name;
-            if(name in stattab.units && 'art_asset' in player.stattab.units[name]) {
-                var new_asset = player.stattab.units[name]['art_asset']['val'];
+            if(name in stattab_units && 'art_asset' in stattab_units[name]) {
+                var new_asset = stattab_units[name]['art_asset']['val'];
                 obj.create_aura(world, null, null, 'sprite_swapped', {'sprite':new_asset}, GameTypes.TickCount.infinity, -1);
             }
         }
@@ -51885,6 +51886,18 @@ function handle_server_message(data) {
         world.objects.add_object(obj);
 
         if(obj.is_mobile()) {
+
+            // check if a sprite aura needs to be applied
+            var name = obj.spec['name'];
+            if(obj.team == 'player' && name in player.stattab.units && 'art_asset' in player.stattab.units[name]) {
+                var new_asset = player.stattab.units[name]['art_asset']['val'];
+                obj.create_aura(world, null, null, 'sprite_swapped', {'sprite':new_asset}, GameTypes.TickCount.infinity, -1);
+            }
+            if(obj.team == 'enemy' && name in enemy.stattab.units && 'art_asset' in enemy.stattab.units[name]) {
+                var new_asset = enemy.stattab.units[name]['art_asset']['val'];
+                obj.create_aura(world, null, null, 'sprite_swapped', {'sprite':new_asset}, GameTypes.TickCount.infinity, -1);
+            }
+
             // check for arming delay when in hostile territory
             if((obj.team == 'player' && session.viewing_base.base_landlord_id !== session.user_id) ||
                (obj.team == 'enemy' && session.viewing_base.base_landlord_id === session.user_id)) {
@@ -51985,7 +51998,7 @@ function handle_server_message(data) {
         player.stattab = data[1];
         if(world) { // ignore updates prior to first connection (pre-hello consequents etc)
             Building.update_modstats('player', player.stattab['buildings']);
-            Mobile.update_art_asset('player', player.stattab, world);
+            Mobile.update_art_asset('player', player.stattab.units, world);
         }
 
         // check for any change to combat_time_scale
@@ -52002,7 +52015,7 @@ function handle_server_message(data) {
         enemy.stattab = data[1];
         if(world) {
             Building.update_modstats('enemy', enemy.stattab['buildings']);
-            Mobile.update_art_asset('enemy', enemy.stattab, world);
+            Mobile.update_art_asset('enemy', enemy.stattab.units, world);
         }
     } else if(msg == "PLAYER_UNIT_EQUIP_UPDATE") {
         player.unit_equipment = data[1];
