@@ -2302,20 +2302,26 @@ class GameProxy(proxy.ReverseProxyResource):
                                     (ip, traceback.format_exc()))
 
             if rep_result:
-                exception_log.event(proxy_time, 'SpinIPReputation hit for user_id %r IP %r: %r' % (user_id, ip, rep_result))
+                if SpinConfig.config['proxyserver'].get('log_rep_results', 0):
+                    exception_log.event(proxy_time, 'SpinIPReputation hit for user_id %r IP %r: %r' % (user_id, ip, rep_result))
 
                 # don't let known toxic people play at all
                 if rep_result.is_toxic():
+                    if SpinConfig.config['proxyserver'].get('log_toxic_results', 0):
+                        exception_log.event(proxy_time, 'SpinIPReputation blocked toxic IP from user_id %r IP %r: %r' % (user_id, ip, rep_result))
                     return self.index_visit_banned(request, visitor)
 
                 # don't let known alt factory IPs create new accounts
                 if user_id is None and rep_result.is_alt_factory():
+                    if SpinConfig.config['proxyserver'].get('log_alt_factory_rep', 1):
+                        exception_log.event(proxy_time, 'SpinIPReputation blocked account creation for social ID %r because of SpinIPReputation IP %r: %r' % (visitor.social_id, ip, rep_result))
                     return self.index_visit_banned(request, visitor) # display banned landing page. Possibly make new custom landing?
 
                 # optionally don't let VPN users create new accounts
                 # default to no as of 2021-12-31 due to abuse
                 if user_id is None and not SpinConfig.config['proxyserver'].get('allow_new_vpn_accounts', 0):
-                    exception_log.event(proxy_time, 'Blocked account creation for social ID %r because of SpinIPReputation on IP %r: %r' % (visitor.social_id, ip, rep_result))
+                    if SpinConfig.config['proxyserver'].get('log_vpn_rep', 1):
+                        exception_log.event(proxy_time, 'Blocked account creation for social ID %r because of SpinIPReputation on IP %r: %r' % (visitor.social_id, ip, rep_result))
                     return self.index_visit_vpn_forbidden(request, visitor)
 
         # re-check user_id now, and create a new one since IP checks are complete
