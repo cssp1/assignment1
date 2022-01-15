@@ -51,8 +51,13 @@ fi
 if [[ $QUIET == 0 ]]; then echo "Unpacking art assets..."; fi
 
 if [[ $(uname) == "Darwin" ]]; then
+    # for MacOS
+    TAR_OPTIONS=""
+elif $(tar --version | grep -q busybox); then
+    # for busybox (Alpine Linux)
     TAR_OPTIONS=""
 else
+    # assume GNU Linux
     TAR_OPTIONS="--warning=no-unknown-keyword"
 fi
 
