@@ -49,4 +49,12 @@ if [[ $FORCE_CLEAN == 1 ]]; then
 fi
 
 if [[ $QUIET == 0 ]]; then echo "Unpacking art assets..."; fi
-(cd ../gameclient && tar zxf art.tar.gz)
+
+if [[ $(uname) == "Darwin" ]]; then
+    TAR_OPTIONS=""
+else
+    TAR_OPTIONS="--warning=no-unknown-keyword"
+fi
+
+(cd ../gameclient && tar ${TAR_OPTIONS} -z -x -f art.tar.gz)
+
