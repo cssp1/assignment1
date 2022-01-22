@@ -26693,15 +26693,13 @@ function update_mail_dialog_context(dialog) {
 function confirm_item_delete(item_list, action_cb, multi, refund_str) {
     var need_confirm = goog.array.some(item_list, function(item) {
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
-        return (!!spec['ui_precious'] || spec['category'] === 'blueprint');
+        return !!spec['ui_precious'];
     });
     if(need_confirm) {
         var precious_first = goog.array.clone(item_list);
         precious_first.sort(function(a, b) {
             var a_is_precious = !!(ItemDisplay.get_inventory_item_spec(a['spec'])['ui_precious']);
-            if(!a_is_precious && a) { a_is_precious = (ItemDisplay.get_inventory_item_spec(a['spec'])['category'] === 'blueprint'); }
             var b_is_precious = !!(ItemDisplay.get_inventory_item_spec(b['spec'])['ui_precious']);
-            if(!b_is_precious && b) { b_is_precious = (ItemDisplay.get_inventory_item_spec(b['spec'])['category'] === 'blueprint'); }
             if(a_is_precious && !b_is_precious) {
                 return -1;
             } else if(!a_is_precious && b_is_precious) {

@@ -1428,6 +1428,8 @@ def check_item(itemname, spec):
             error |= 1; print '%s has category %s, which does not have a listing in strings.json item_types.' % (itemname, spec['category'])
         if spec['category'] in ('equip', 'leader'):
             error |= 1; print '%s has category %s, which should be removed since ItemDisplay can figure out a more accurate category' % (itemname, spec['category'])
+        if spec['category'] == 'blueprint' and not spec.get('ui_precious', 0):
+            error |= 1; print '%s is a blueprint item but is not flagged ui_precious' % (itemname)
 
     max_level = spec.get('max_level', 1)
 
