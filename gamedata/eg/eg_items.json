@@ -94,6 +94,7 @@
     "category": "blueprint",
     "icon": "inventory_stinger_blueprint",
     "rarity": 3,
+    "ui_precious": 1,
     // set a PLAYER_HISTORY key that will then be picked up by the "stinger_gunner_unlocked" predicate in the predicate library
     "use": { "consequent": "AND", "subconsequents": [
         // note that we still use the old player history keys
