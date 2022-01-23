@@ -1,4 +1,4 @@
-name: publish-dashboards
+name: publish-recent-purchases
 
 on:
   schedule:
