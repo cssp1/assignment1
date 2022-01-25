@@ -2869,7 +2869,7 @@ class User:
             allowed_deviation = gamedata['store'].get("microsoft_exchange_deviation_threshold", 0.10)
             last_exchange_rate_date = gamedata['store'].get("microsoft_exchange_date", 'date not set')
             if exchange_rate_deviation > 1 + allowed_deviation or exchange_rate_deviation < 1 - allowed_deviation:
-                gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: receipt price %s currency %s exchange rate exceeded allowed threshold of %s set on %s. store.json may need to be updated with new exchange rates to keep our USD receipts accurate.' % (purchase_id, receipt['price'], currency, str(allowed_deviation), str(last_exchange_rate_date)))
+                gamesite.exception_log.event(server_time, 'Exception Microsoft order %s: receipt price %s currency %s exchange rate (%s) exceeded allowed threshold of %s set on %s. store.json may need to be updated with new exchange rates to keep our USD receipts accurate.' % (purchase_id, receipt['price'], currency, str(exchange_rate_deviation), str(allowed_deviation), str(last_exchange_rate_date)))
 
         # Microsoft store returns the local currency regardless of what we set for the price, so
         # this forces Store.execute_order to accept payment by feeding it the price straight from gamedata
