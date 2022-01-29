@@ -1,4 +1,4 @@
-name: publish-dashboards
+name: publish-dashboards-okr-game-content
 
 on:
   schedule:
@@ -30,7 +30,7 @@ jobs:
         run: >
           /entrypoint-with-aws-tunnel.sh sh -c '
           jupyter nbconvert --execute --no-input --no-prompt --ExecutePreprocessor.timeout=900
-          "${GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard.ipynb"
+          "${GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard-okr-game-content.ipynb"
           --to html --output-dir "${HOME}"
           '
       - name: Publish HTML dashboards to S3
@@ -39,5 +39,5 @@ jobs:
           AWS_ACCESS_KEY_ID="${BATCH_TASKS_AWS_KEY_ID}"
           AWS_SECRET_ACCESS_KEY="${BATCH_TASKS_AWS_SECRET_KEY}"
           AWS_REGION="us-east-1"
-          aws s3 cp "${HOME}/dashboard.html" "s3://dashboards.spinpunch.com/dashboard.html" --content-type "text/html"
+          aws s3 cp "${HOME}/dashboard.html" "s3://dashboards.spinpunch.com/dashboard_okr_game_content.html" --content-type "text/html"
           '
