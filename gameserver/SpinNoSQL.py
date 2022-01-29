@@ -2772,7 +2772,7 @@ if __name__ == '__main__':
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks', 'benchmark',
-                                                        'winners', 'send-prizes', 'prize-item=', 'prize-qty=', 'in-the-money-players=', 'in-the-money-alliances=', 'min-participation=',
+                                                        'winners', 'send-prizes', 'prize-item=', 'prize-qty=', 'in-the-money-players=', 'in-the-money-alliances=', 'min-participation=', 'min-points=',
                                                         'leaders', 'tournament-stat=', 'tournament-stat-challenge-key=', 'week=', 'season=', 'game-id=',
                                                         'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=',
                                                         'recache-alliance-scores', 'test', 'config-name='])
@@ -2784,6 +2784,7 @@ if __name__ == '__main__':
     in_the_money_players = -1 # number of players to split the prize within each winning alliance
     in_the_money_alliances = -1 # number of alliances that place for prizes
     min_participation = -1 # minimum points earned this week to be eligible for prizes
+    min_points = 1 # minimum score this week to be eligible for prizes
     week = -1
     season = -1
     tournament_stat = None
@@ -2810,6 +2811,7 @@ if __name__ == '__main__':
         elif key == '--in-the-money-players': in_the_money_players = int(val)
         elif key == '--in-the-money-alliances': in_the_money_alliances = int(val)
         elif key == '--min-participation': min_participation = int(val)
+        elif key == '--min-points': min_points = int(val)
         elif key == '--leaders': mode = 'leaders'
         elif key == '--week': week = int(val)
         elif key == '--season': season = int(val)
@@ -3035,6 +3037,11 @@ if __name__ == '__main__':
                                    'absolute': scores[x][0]['absolute'] if scores[x][0] is not None else 0,
                                    'participation': scores[x][1]['absolute'] if scores[x][1] is not None else 0,
                                    } for x in xrange(len(members))]
+
+                if min_points > 0:
+                    # filter out members who don't meet the minimum score
+                    scored_members = filter(lambda x: x['absolute'] >= min_points, scored_members)
+                    if len(scored_members) < 1: continue # can't score an alliance with no scoring members
 
                 # XXX super dirty hack - since trophies_pvp weekly stats are anchored to the value at
                 # the beginning of the week, we have to use the battles table to find the true participation
