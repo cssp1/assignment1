@@ -5826,19 +5826,6 @@ Building.prototype.is_security_node_crafting = function() {
     return ret;
 };
 Building.prototype.is_airstrike_building = function() { return this.spec['equip_slots'] && ('combat_air_patrol' in this.spec['equip_slots']); };
-Building.prototype.is_airstrike_building_only = function() {
-    if(!(this.spec['equip_slots'] && ('combat_air_patrol' in this.spec['equip_slots']))) {
-        return false;
-    }
-    var ret = true;
-    goog.object.forEach(this.spec['crafting_categories'], function(cat) {
-        console.log(cat)
-        if(cat && typeof(cat) === 'string' && cat !== 'combat_air_patrols') {
-            ret = false;
-        };
-    });
-    return ret;
-};
 Building.prototype.is_airstrike_building_crafting = function() {
     if(!this.is_airstrike_building()) { return false; }
     var craft_queue = this.get_crafting_queue();
