@@ -37,18 +37,32 @@ if __name__ == '__main__':
         EXTRA_UNITS = [] # units that are not included in units.json but whose icons are needed
         if game_id in ('tr','dv','eg'):
             EXTRA_UNITS += [('ch47', {'art_asset': 'ch47'})]
+            elite_map = {'ah1x':'red','tos1ax':'red'}
             for extra_name in ('ah1x','ah64x','bmp1x','brdm3x','f35x','gaz_tigrx','m109a6x','m1abramsx','mi24x','mq1cx','mq8bx','mstax','oh58x',
                                'strykerx','suicide_truckx','t90x','tos1ax','uh60x'):
-                for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
-                    extra_val = '%s_t%s' % (extra_name, extra_color)
+                for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow'):
+                    color_val = extra_color
+                    if extra_color == 'elite' and extra_name in elite_map:
+                        color_val = elite_map[extra_name]
+                    extra_val = '%s_t%s' % (extra_name, color_val)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
                     key = 'icon_inventory_reskin_%s' % extra_val
                     outkeys.append(key)
                     out[key] = { "states": { "normal": { "subassets": ["inventory_bg_black", "inventory_%s" % extra_val] } } }
+            for extra_name in ('f35x','mq1cx'):
+                extra_val = '%s_tnormal' % extra_name
+                EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
+                key = 'icon_inventory_reskin_%s' % extra_val
+                outkeys.append(key)
+                out[key] = { "states": { "normal": { "subassets": ["inventory_bg_black", "inventory_%s" % extra_val] } } }
         if game_id in ('tr','eg'):
+            elite_map = {'armyguyx':'red', 'armyguy_m240x':'red', 'armyguy_sapperx':'red'}
             for extra_name in ('armyguy_javelinx','armyguy_m240x','armyguy_mortarx','armyguy_sapperx','armyguy_stingerx','armyguy_xm110x','armyguyx'):
-                for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
-                    extra_val = '%s_t%s' % (extra_name, extra_color)
+                for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow'):
+                    color_val = extra_color
+                    if extra_color == 'elite' and extra_name in elite_map:
+                        color_val = elite_map[extra_name]
+                    extra_val = '%s_t%s' % (extra_name, color_val)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
                     key = 'icon_inventory_reskin_%s' % extra_val
                     outkeys.append(key)
@@ -57,8 +71,12 @@ if __name__ == '__main__':
             for extra_name in ('dv_adlerkfz13x','dv_armyguyx','dv_armyguy_javelinx','dv_armyguy_m240x',
                                'dv_armyguy_mortarx','dv_m12x','dv_m26_pershingx','dv_m4a2_shermanx','dv_m4_halftrackx','dv_panzerwerferx','dv_panzer_ivx',
                                'dv_sdkfz234_pumax'):
-                for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
-                    extra_val = '%s_t%s' % (extra_name, extra_color)
+                elite_map = {'dv_armyguyx':'red', 'dv_armyguy_m240x':'red', 'dv_m4a2_shermanx':'red'}
+                for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow'):
+                    color_val = extra_color
+                    if extra_color == 'elite' and extra_name in elite_map:
+                        color_val = elite_map[extra_name]
+                    extra_val = '%s_t%s' % (extra_name, color_val)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
                     key = 'icon_inventory_reskin_%s' % extra_val
                     outkeys.append(key)
