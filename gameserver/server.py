@@ -24271,6 +24271,16 @@ class GAMEAPI(resource.Resource):
 
             session.deferred_stattab_update = True
 
+        if arg.do_replace and delivery == 'unit_equip_slot':
+            target_spec = arg.delivery_address['unit_equip_slot']
+            target_slot = arg.delivery_address['slot_type']
+            if target_spec not in session.player.unit_equipment: session.player.unit_equipment[target_spec] = {}
+            if target_spec in session.player.unit_equipment and target_slot in session.player.unit_equipment[target_spec]:
+                remove_item = session.player.unit_equipment[target_spec][target_slot][0]
+                removed = self.do_equip_unit(session, retmsg, (None, target_spec, (target_slot, 0), -1, None, remove_item))
+                player.inventory_log_event('5131_item_trashed', remove_item, 1, -1, None, reason='replaced')
+            session.deferred_stattab_update = True
+
         if 'on_start' in recipe:
             session.execute_consequent_safe(GameObjectSpec.get_leveled_quantity(recipe['on_start'], arg.recipe_level),
                                             player, retmsg, reason='crafting_recipe:%s:on_start' % recipe['name'])
@@ -24402,6 +24412,18 @@ class GAMEAPI(resource.Resource):
                 except:
                     gamesite.exception_log.event(server_time, 'player %d crafting delivery from %s %r at base_id %r %r target not found for %r, discarding. %s' % \
                                                  (object.owner.user_id, object.spec.name, object.obj_id, session.viewing_base.base_id, bus.craft_state, item, traceback.format_exc().strip())) # OK
+            elif delivery_method == 'unit_equip_slot':
+                assert len(loot) == 1
+                item = loot[0]
+                try:
+                    delivery_address = bus.craft_state['delivery']
+                    assert self.do_equip_unit(session, retmsg, [None, delivery_address['unit_equip_slot'], (delivery_address['slot_type'], 0), -1, item, None, None], force = True)
+                    looted += loot
+                    if session.home_base:
+                        session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='crafted')
+                except:
+                    gamesite.exception_log.event(server_time, 'player %d crafting delivery from %s at base_id %r %r target not found for %r, discarding. %s' % \
+                                                 (object.owner.user_id, delivery_address['unit_equip_slot'], session.viewing_base.base_id, bus.craft_state, item, traceback.format_exc().strip())) # OK
             else:
 
                 # returned "looted" list does include fungible items
@@ -25318,7 +25340,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
         return ret
 
-    def do_equip_unit(self, session, retmsg, arg):
+    def do_equip_unit(self, session, retmsg, arg, force = False):
         dest_spec_name = arg[1]
         dest_addr = arg[2]
         inventory_slot = arg[3]
@@ -25336,7 +25358,7 @@ class GAMEAPI(resource.Resource):
 
         # prepare dict
         if dest_spec_name not in session.player.unit_equipment: session.player.unit_equipment[dest_spec_name] = {}
-        ret = self.do_equip(session, retmsg, dest_spec, tech_level, session.player.unit_equipment[dest_spec_name], dest_addr, inventory_slot, add_item, remove_item)
+        ret = self.do_equip(session, retmsg, dest_spec, tech_level, session.player.unit_equipment[dest_spec_name], dest_addr, inventory_slot, add_item, remove_item, force = force)
         if len(session.player.unit_equipment[dest_spec_name]) < 1: del session.player.unit_equipment[dest_spec_name]
 
         if ret:
