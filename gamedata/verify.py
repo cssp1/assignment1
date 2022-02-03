@@ -1256,6 +1256,9 @@ def check_crafting_category(catname, spec):
             error |= 1; print '%s: invalid delivery_slot_type %s' % (catname, spec['delivery_slot_type'])
         if 'delivery_building_for_ui' not in spec:
             error |= 1; print '%s: delivery_building_For_ui is required' % (catname,)
+    elif spec['delivery'] == 'unit_equip_slot':
+        if spec['delivery_slot_type'] not in gamedata['strings']['equip_slots']:
+            error |= 1; print '%s: invalid delivery_slot_type %s' % (catname, spec['delivery_slot_type'])
     return error
 
 def check_crafting_recipe(recname, spec):
