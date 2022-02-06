@@ -1259,6 +1259,8 @@ def check_crafting_category(catname, spec):
     elif spec['delivery'] == 'unit_equip_slot':
         if spec['delivery_slot_type'] not in gamedata['strings']['equip_slots']:
             error |= 1; print '%s: invalid delivery_slot_type %s' % (catname, spec['delivery_slot_type'])
+    if 'show_if' in spec:
+        error |= check_predicate(spec['show_if'], reason='crafting category:'+spec['name']+':show_if')
     return error
 
 def check_crafting_recipe(recname, spec):
