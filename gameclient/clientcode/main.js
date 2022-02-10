@@ -66,6 +66,7 @@ goog.require('PlayerInfoDialog');
 goog.require('SquadControlDialog');
 goog.require('SquadManageDialog');
 goog.require('MountedWeaponDialog');
+goog.require('ReskinDialog');
 goog.require('ObstacleDialog');
 goog.require('QuestBar');
 goog.require('UpgradeBar');
@@ -5923,6 +5924,42 @@ Building.prototype.is_ambush = function() { return this.spec['equip_slots'] && (
 Building.prototype.is_minefield_armed = function() { return (this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0); };
 Building.prototype.is_ambush_armed = function() { return (this.equipment && this.equipment['ambush'] && this.equipment['ambush'].length > 0); };
 Building.prototype.has_weapon_mount = function() { return (this.spec['equip_slots'] && ('ambush' in this.spec['equip_slots'] || 'mine' in this.spec['equip_slots'] || 'turret_head' in this.spec['equip_slots'] || 'barrier_trap' in this.spec['equip_slots'] || 'building_weapon' in this.spec['equip_slots'] || 'townhall_weapon' in this.spec['equip_slots'] || 'combat_air_patrol' in this.spec['equip_slots'])) };
+
+Building.prototype.is_paint_shop = function() {
+    if(!(this.is_crafter())) { return false; }
+    var is_paint_shop = false;
+    goog.array.forEach(this.spec['crafting_categories'], function(cat) {
+        if(cat && Array.isArray(cat)){
+            var crafting_cat = this.get_leveled_quantity(this.spec['crafting_categories']);
+            goog.array.forEach(crafting_cat, function(leveled_cat) {
+                if(leveled_cat.indexOf('reskin_') == 0) {
+                    is_paint_shop = true;
+                }
+            }, crafting_cat);
+        } else if (cat.indexOf('reskin_') == 0) {
+            is_paint_shop = true;
+        }
+    }, this);
+    return is_paint_shop;
+};
+
+Building.prototype.paint_shop_category = function() {
+    var paint_shop_category = '';
+    if(!(this.is_paint_shop())) { return paint_shop_category; }
+    goog.array.forEach(this.spec['crafting_categories'], function(cat) {
+        if(cat && Array.isArray(cat)){
+            var crafting_cat = this.get_leveled_quantity(this.spec['crafting_categories']);
+            goog.array.forEach(crafting_cat, function(leveled_cat) {
+                if(leveled_cat.indexOf('reskin_') == 0) {
+                    paint_shop_category = leveled_cat;
+                }
+            }, crafting_cat);
+        } else if (cat.indexOf('reskin_') == 0) {
+            paint_shop_category = cat;
+        }
+    }, this);
+    return paint_shop_category;
+};
 
 /** @param {string} slot_name
     @return {string|null}
@@ -24009,6 +24046,25 @@ function invoke_building_context_menu(mouse_xy) {
                 }
             }
 
+            if(session.home_base && obj.is_paint_shop()) {
+                var crafting_category = obj.paint_shop_category();
+                var building_context = 'ui_name_building_context_' + crafting_category;
+                if(!gamedata['spells']['CRAFT_FOR_FREE'][building_context]) {
+                    throw Error('Missing CRAFT_FOR_FREE building context, ' + building_context);
+                }
+                var paint_shop_cat_spec = gamedata['crafting']['categories'][crafting_category];
+                var show_paint_shop = true;
+                if('show_if' in paint_shop_cat_spec && !(read_predicate(paint_shop_cat_spec['show_if']).is_satisfied(player, null))) {
+                    show_paint_shop = false;
+                }
+                if(show_paint_shop){
+                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CRAFT_FOR_FREE'][building_context],
+                                                        onclick: (function (_obj) { return function() {
+                                                            invoke_crafting_dialog(crafting_category);
+                                                        }; })(obj), asset: 'menu_button_resizable'}));
+                }
+            }
+
             if(session.home_base && (obj.is_minefield() || obj.is_ambush())) {
                 var building_context = '';
                 var crafting_category = '';
@@ -36382,6 +36438,10 @@ function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
         // there should be no UI path for any crafting category that has its own custom crafting interface to reach this code
         // in the event of undetected UI pathin, this checks if the category passed has its own custom crafting interface
         // (defined in crafting.json under categories/dialog) and exits the function if it does
+        return;
+    }
+    if(newcategory.indexOf('reskin_') === 0) {
+        ReskinDialog.invoke(newcategory);
         return;
     }
     var dialog = new SPUI.Dialog(gamedata['dialogs']['crafting_dialog']);
