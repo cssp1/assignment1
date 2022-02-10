@@ -37,9 +37,9 @@ if __name__ == '__main__':
         EXTRA_UNITS = [] # units that are not included in units.json but whose icons are needed
         if game_id in ('tr','dv','eg'):
             EXTRA_UNITS += [('ch47', {'art_asset': 'ch47'})]
-            elite_map = {'ah1x':'red','tos1ax':'red'}
+            elite_map = {'ah1x':'red','tos1ax':'red', 'armyguy_sapperx':'red'}
             for extra_name in ('ah1x','ah64x','bmp1x','brdm3x','f35x','gaz_tigrx','m109a6x','m1abramsx','mi24x','mq1cx','mq8bx','mstax','oh58x',
-                               'strykerx','suicide_truckx','t90x','tos1ax','uh60x'):
+                               'strykerx','suicide_truckx','t90x','tos1ax','uh60x','armyguy_stingerx','armyguy_sapperx'):
                 for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow'):
                     color_val = extra_color
                     if extra_color == 'elite' and extra_name in elite_map:
@@ -56,8 +56,8 @@ if __name__ == '__main__':
                 outkeys.append(key)
                 out[key] = { "states": { "normal": { "subassets": ["inventory_bg_black", "inventory_%s" % extra_val] } } }
         if game_id in ('tr','eg'):
-            elite_map = {'armyguyx':'red', 'armyguy_m240x':'red', 'armyguy_sapperx':'red'}
-            for extra_name in ('armyguy_javelinx','armyguy_m240x','armyguy_mortarx','armyguy_sapperx','armyguy_stingerx','armyguy_xm110x','armyguyx'):
+            elite_map = {'armyguyx':'red', 'armyguy_m240x':'red'}
+            for extra_name in ('armyguy_javelinx','armyguy_m240x','armyguy_mortarx','armyguy_xm110x','armyguyx'):
                 for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow'):
                     color_val = extra_color
                     if extra_color == 'elite' and extra_name in elite_map:
