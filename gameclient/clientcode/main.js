@@ -5928,6 +5928,7 @@ Building.prototype.has_weapon_mount = function() { return (this.spec['equip_slot
 Building.prototype.is_paint_shop = function() {
     if(!(this.is_crafter())) { return false; }
     var is_paint_shop = false;
+    if(!('crafting_categories' in this.spec)) { return false; }
     goog.array.forEach(this.spec['crafting_categories'], function(cat) {
         if(cat && Array.isArray(cat)){
             var crafting_cat = this.get_leveled_quantity(this.spec['crafting_categories']);
@@ -8101,7 +8102,7 @@ function get_lab_for(category) {
             return name;
         }
     }
-    if('research_category' in gamedata['crafting']['categories'][category]) {
+    if(category in gamedata['crafting']['categories'] && 'research_category' in gamedata['crafting']['categories'][category]) {
         return get_lab_for(gamedata['crafting']['categories'][category]['research_category']);
     }
     return null;
