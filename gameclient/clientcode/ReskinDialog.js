@@ -167,6 +167,13 @@ ReskinDialog.update_skin_grid = function(dialog) {
                 var unit_spec = gamedata['units'][selected_unit];
                 dialog.widgets[skin_gray_outer].show = false;
                 dialog.widgets[skin_icon].asset = item_spec['icon'];
+                var pred;
+                if('requires' in skin_spec) { pred = read_predicate(skin_spec['requires']); }
+                if(pred && !pred.is_satisfied(player, null)) {
+                    // do something to gray out
+                    //dialog.widgets[skin_icon].alpha = 0.3;
+                    //dialog.widgets[skin_icon].state = 'disabled';
+                }
                 dialog.widgets[skin_frame].tooltip.str = dialog.data['widgets']['skin_frame']['ui_tooltip'].replace('%UNITS', unit_spec['ui_name_plural']).replace('%COLOR', skin_spec['color']);
                 dialog.widgets[skin_frame].onclick = (function (_dialog, _rec_name) { return function(w) {
                     ReskinDialog.select_skin(_dialog, _rec_name);
@@ -197,6 +204,7 @@ ReskinDialog.update_skin_display = function(dialog) {
     dialog.widgets['unit_hero_icon'].show = true;
     dialog.widgets['name'].str = item_spec['ui_name'];
     dialog.widgets['description'].str = item_spec['ui_description'];
+    dialog.widgets['requirements_text'].show = false;
     var pred, req_text;
     if('requires' in skin_spec) { pred = read_predicate(skin_spec['requires']); }
     if(pred && !pred.is_satisfied(player, null)) {
@@ -259,6 +267,8 @@ ReskinDialog.update_skin_build_button = function(dialog) {
     }
     var unit_spec = gamedata['units'][unit_name];
     var unit_category = unit_spec['manufacture_category'];
+    dialog.widgets['apply_paint_button'].str = dialog.data['widgets']['apply_paint_button']['ui_name'];
+    dialog.widgets['apply_paint_button'].state = 'normal';
     if(unit_category === 'rovers' && (gamedata['game_id'] === 'tr' || gamedata['game_id'] === 'dv' || gamedata['game_id'] === 'fs' || gamedata['game_id'] === 'bfm')) {
         dialog.widgets['apply_paint_button'].str = dialog.data['widgets']['apply_paint_button']['ui_name_infantry'];
     }
@@ -276,6 +286,11 @@ ReskinDialog.update_skin_build_button = function(dialog) {
         if(req_text) {
             dialog.widgets['apply_paint_button'].tooltip.str = dialog.data['widgets']['apply_paint_button']['ui_tooltip_unmet'] + '\n' + req_text;
             helper = get_requirements_help(pred, null);
+            dialog.widgets['apply_paint_button'].state = 'disabled';
+            dialog.widgets['apply_paint_button'].str = dialog.data['widgets']['apply_paint_button']['ui_name_unmet'];
+            if(unit_category === 'rovers' && (gamedata['game_id'] === 'tr' || gamedata['game_id'] === 'dv' || gamedata['game_id'] === 'fs' || gamedata['game_id'] === 'bfm')) {
+                dialog.widgets['apply_paint_button'].str = dialog.data['widgets']['apply_paint_button']['ui_name_infantry_unmet'];
+            }
         }
     }
     if(can_cast[0]) {
