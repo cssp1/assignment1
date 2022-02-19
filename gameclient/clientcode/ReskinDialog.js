@@ -25,7 +25,7 @@ ReskinDialog.invoke = function(category) {
     dialog.widgets['close_button'].onclick = function() { change_selection(null); };
     dialog.widgets['dev_title'].show = player.is_cheater;
     dialog.user_data['selected_unit'] = 'none';
-    dialog.user_data['selected_skin'] = 'none'
+    dialog.user_data['selected_skin'] = 'none';
     dialog.user_data['unit_page'] = 0;
     dialog.user_data['max_unit_page'] = 0;
     dialog.user_data['skin_page'] = 0;
@@ -79,6 +79,7 @@ ReskinDialog.scroll_skins = function(dialog, delta) {
     @param {string|null} name */
 ReskinDialog.select_unit = function(dialog, name) {
     dialog.user_data['selected_unit'] = name;
+    dialog.user_data['selected_skin'] = 'none';
     dialog.user_data['skin_page'] = 0;
     for(var x = 0; x < dialog.data['widgets']['skin_frame']['array'][0]; x++) {
         for(var y = 0; y < dialog.data['widgets']['skin_frame']['array'][1]; y++) {
