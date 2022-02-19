@@ -5927,8 +5927,8 @@ Building.prototype.has_weapon_mount = function() { return (this.spec['equip_slot
 
 Building.prototype.is_paint_shop = function() {
     if(!(this.is_crafter())) { return false; }
-    var is_paint_shop = false;
     if(!('crafting_categories' in this.spec)) { return false; }
+    var is_paint_shop = false;
     goog.array.forEach(this.spec['crafting_categories'], function(cat) {
         if(cat && Array.isArray(cat)){
             var crafting_cat = this.get_leveled_quantity(this.spec['crafting_categories']);
