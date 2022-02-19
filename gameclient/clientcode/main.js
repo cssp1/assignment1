@@ -5927,17 +5927,15 @@ Building.prototype.has_weapon_mount = function() { return (this.spec['equip_slot
 
 Building.prototype.is_paint_shop = function() {
     if(!(this.is_crafter())) { return false; }
-    if(!('crafting_categories' in this.spec)) { return false; }
     var is_paint_shop = false;
     goog.array.forEach(this.spec['crafting_categories'], function(cat) {
         if(cat && Array.isArray(cat)){
-            var crafting_cat = this.get_leveled_quantity(this.spec['crafting_categories']);
-            goog.array.forEach(crafting_cat, function(leveled_cat) {
-                if(leveled_cat.indexOf('reskin_') == 0) {
+            goog.array.forEach(cat, function(subcat) {
+                if(subcat.indexOf('reskin_') == 0) {
                     is_paint_shop = true;
                 }
-            }, crafting_cat);
-        } else if (cat.indexOf('reskin_') == 0) {
+            }, cat);
+        } else if (cat && cat.indexOf('reskin_') == 0) {
             is_paint_shop = true;
         }
     }, this);
