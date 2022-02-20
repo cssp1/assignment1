@@ -2514,7 +2514,7 @@
             "unit_hero_icon": { "kind": "ActionButton", "xy": [125,158], "dimensions": [150,125], "bg_image_offset": [0,32], "bg_image_justify": "center",
                                 "bg_image": "", "state": "hero"},
 
-            "requirements_text":  { "show": 0, "kind": "TextField", "xy": [265,115], "dimensions": [170,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
+            "requirements_text":  { "show": 0, "kind": "TextField", "xy": [265,135], "dimensions": [170,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
                                     "text_color": [1,0,0,1] },
 
             "skin_slot": { "kind": "StaticImage", "xy": [455,88], "dimensions": [50,50], "bg_image": "inventory_slot",
