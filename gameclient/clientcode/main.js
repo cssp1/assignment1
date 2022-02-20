@@ -23987,7 +23987,7 @@ function invoke_building_context_menu(mouse_xy) {
                     throw Error('Missing crafting_categories for crafter: ' + obj.spec['ui_name']);
                 }
 
-                if(!obj.is_emplacement() && !obj.is_security_node_only() && !obj.is_airstrike_building() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall()) { // mounted weapons have special case, see below
+                if(!obj.is_emplacement() && !obj.is_security_node_only() && !obj.is_airstrike_building() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall() && !obj.is_paint_shop()) { // mounted weapons have special case, see below
                     buttons.push(new ContextMenuButton({ui_name: cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
                                                         asset: 'action_button_resizable',
                                                         onclick: (function (_cat) { return function() {
