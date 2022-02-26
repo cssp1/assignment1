@@ -388,6 +388,8 @@ def classify_purchase(gamedata, descr):
         skudata = spellarg['skudata']
         if 'item' in skudata and ('expedition' in skudata['item']):
             catname = 'random_items'
+        elif 'item' in skudata and ('reskin' in skudata['item']):
+            catname = 'crafting' # classify reskin items as crafting durables
         else:
             catname = PURCHASE_CATEGORY_MAP.get(cat, None) # 'specific_items'
 
