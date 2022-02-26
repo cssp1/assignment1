@@ -5842,6 +5842,22 @@ Building.prototype.is_airstrike_building_crafting = function() {
     }
     return ret;
 };
+Building.prototype.is_monument_building = function() { return this.spec['equip_slots'] && ('monument' in this.spec['equip_slots']); };
+Building.prototype.is_monument_building_crafting = function() {
+    if(!this.is_monument_building()) { return false; }
+    var craft_queue = this.get_crafting_queue();
+    var ret = false;
+    if(craft_queue && craft_queue.length > 0) {
+        goog.object.forEach(craft_queue, function(craft) {
+            var recipe = craft['craft']['recipe'];
+            var category = gamedata['crafting']['recipes'][recipe]['crafting_category'];
+            if(category === 'monuments') {
+                ret = true;
+            };
+        });
+    }
+    return ret;
+};
 Building.prototype.is_barrier = function() { return this.spec['name'] === 'barrier'; };
 Building.prototype.is_trapped_barrier = function() { return this.spec['equip_slots'] && ('barrier_trap' in this.spec['equip_slots']); };
 Building.prototype.is_armed_building = function() { return this.spec['equip_slots'] && ('building_weapon' in this.spec['equip_slots']); };
@@ -5908,6 +5924,16 @@ Building.prototype.airstrike_building_item = function() {
 };
 /** @return {Object|null} the building weapon item currently being crafted (assumes is_crafting() is true) */
 Building.prototype.airstrike_building_inprogress_item = Building.prototype.first_crafting_inprogress_item;
+
+/** @return {Object|null} the instance of the building weapon item equipped here, if any, otherwise null */
+Building.prototype.monument_building_item = function() {
+    if(this.equipment && this.equipment['monument'] && this.equipment['monument'].length > 0) {
+        return this.equipment['monument'][0] ? player.decode_equipped_item(this.equipment['monument'][0]) : null;
+    }
+    return null;
+};
+/** @return {Object|null} the building weapon item currently being crafted (assumes is_crafting() is true) */
+Building.prototype.monument_building_inprogress_item = Building.prototype.first_crafting_inprogress_item;
 
 /** @return {Object|null} the instance of the townhall weapon item equipped here, if any, otherwise null */
 Building.prototype.townhall_weapon_item = function() {
@@ -22245,6 +22271,10 @@ function do_invoke_speedup_dialog(kind) {
             var product = selection.unit.airstrike_building_inprogress_item();
             var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
             description_finish = gamedata['strings']['speedup']['finish_airstrike'].replace('%s', ui_name);
+        } else if(selection.unit.is_monument_building()) {
+            var product = selection.unit.monument_building_inprogress_item();
+            var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
+            description_finish = gamedata['strings']['speedup']['finish_monument'].replace('%s', ui_name);
         } else if(selection.unit.is_armed_townhall()) {
             var product = selection.unit.townhall_weapon_inprogress_item();
             var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
@@ -23987,7 +24017,7 @@ function invoke_building_context_menu(mouse_xy) {
                     throw Error('Missing crafting_categories for crafter: ' + obj.spec['ui_name']);
                 }
 
-                if(!obj.is_emplacement() && !obj.is_security_node_only() && !obj.is_airstrike_building() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall() && !obj.is_paint_shop()) { // mounted weapons have special case, see below
+                if(!obj.is_emplacement() && !obj.is_security_node_only() && !obj.is_monument_building() && !obj.is_airstrike_building() && !obj.is_trapped_barrier() && !obj.is_armed_building() && !obj.is_armed_townhall() && !obj.is_paint_shop()) { // mounted weapons have special case, see below
                     buttons.push(new ContextMenuButton({ui_name: cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
                                                         asset: 'action_button_resizable',
                                                         onclick: (function (_cat) { return function() {
@@ -24004,7 +24034,7 @@ function invoke_building_context_menu(mouse_xy) {
                 if(obj.is_crafting()) {
                     // for turret emplacements, add the speedup/cancel buttons above the divider
                     var which_buttons;
-                    if(obj.is_emplacement() || obj.is_security_node_crafting() || obj.is_airstrike_building_crafting() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) {
+                    if(obj.is_emplacement() || obj.is_security_node_crafting() || obj.is_monument_building_crafting() || obj.is_airstrike_building_crafting() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) {
                         if(!special_buttons['mounted']) {special_buttons['mounted'] = [];}
                         which_buttons = special_buttons['mounted'];
                     } else {
@@ -24103,7 +24133,7 @@ function invoke_building_context_menu(mouse_xy) {
 
             }
 
-            if((obj.is_emplacement() || obj.is_security_node() || obj.is_airstrike_building() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) && (session.home_base || quarry_upgradable)) { // special case for mounted weapons
+            if((obj.is_emplacement() || obj.is_security_node() || obj.is_monument_building() || obj.is_airstrike_building() || obj.is_trapped_barrier() || obj.is_armed_building() || obj.is_armed_townhall()) && (session.home_base || quarry_upgradable)) { // special case for mounted weapons
                 dialog_name = 'mounted_weapon_context_menu';
                 var cur_item = null;
                 if (obj.is_emplacement()) {
@@ -24118,6 +24148,8 @@ function invoke_building_context_menu(mouse_xy) {
                     cur_item = obj.security_node_item();
                 } else if (obj.is_airstrike_building()) {
                     cur_item = obj.airstrike_building_item();
+                } else if (obj.is_monument_building()) {
+                    cur_item = obj.monument_building_item();
                 }
                 var item_spec = (cur_item ? ItemDisplay.get_inventory_item_spec(cur_item['spec']) : null);
                 var under_leveled = false;
@@ -24139,7 +24171,7 @@ function invoke_building_context_menu(mouse_xy) {
                     }
                 }
 
-                if(obj.time_until_finish() <= 0 || (obj.is_security_node() && !obj.is_security_node_crafting()) || (obj.is_airstrike_building() && !obj.is_airstrike_building_crafting())) {
+                if(obj.time_until_finish() <= 0 || (obj.is_security_node() && !obj.is_security_node_crafting()) || (obj.is_airstrike_building() && !obj.is_airstrike_building_crafting()) || (obj.is_monument_building() && !obj.is_monument_building_crafting())) {
                     var spell = gamedata['spells']['CRAFT_FOR_FREE'];
                     var this_ui_context = 'ui_name_building_context_emplacement';
                     if(!special_buttons['mounted']) {special_buttons['mounted'] = [];}
@@ -24153,6 +24185,8 @@ function invoke_building_context_menu(mouse_xy) {
                         this_ui_context = 'ui_name_building_context_security_node';
                     } else if (obj.is_airstrike_building()) {
                         this_ui_context = 'ui_name_building_context_airstrike';
+                    } else if (obj.is_monument_building()) {
+                        this_ui_context = 'ui_name_building_context_monument';
                     }
                     special_buttons['mounted'].push(new ContextMenuButton({ui_name: spell[this_ui_context],
                                                                            onclick: (function (_obj) { return function(w) { MountedWeaponDialog.invoke(_obj); }; })(obj),
@@ -24346,6 +24380,12 @@ function invoke_building_context_menu(mouse_xy) {
                 cur_item = obj.airstrike_building_inprogress_item();
             } else {
                 cur_item = obj.airstrike_building_item();
+            }
+        } else if (obj.is_monument_building()) {
+            if(obj.is_monument_building_crafting()) {
+                cur_item = obj.monument_building_inprogress_item();
+            } else {
+                cur_item = obj.monument_building_item();
             }
         } else if (obj.is_trapped_barrier()) {
             cur_item = obj.barrier_trap_item() || obj.barrier_trap_inprogress_item();
@@ -47056,7 +47096,7 @@ function update_upgrade_dialog(dialog) {
 
         if(unit.is_researcher()) { feature_list.push('research_level'); }
         if(unit.is_researcher()) { feature_list.push('research_speed'); }
-        if(unit.is_crafter() && !unit.is_emplacement() && !unit.is_security_node() && !unit.is_airstrike_building() && !unit.is_trapped_barrier() && !unit.is_armed_building() && !unit.is_armed_townhall() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
+        if(unit.is_crafter() && !unit.is_emplacement() && !unit.is_security_node() && !unit.is_monument_building() && !unit.is_airstrike_building() && !unit.is_trapped_barrier() && !unit.is_armed_building() && !unit.is_armed_townhall() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
         if(unit.is_crafter() && ('crafting_queue_space' in unit.spec)) { feature_list.push('crafting_queue_space'); }
 
         if('provides_quarry_control' in unit.spec && session.region.map_enabled()) { feature_list.push('provides_quarry_control'); }
@@ -56973,7 +57013,7 @@ Building.prototype.get_idle_state_advanced = function() {
             }
         }
     } else if(this.is_crafter()) {
-        if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item()) && !(this.is_security_node() && this.security_node_item())  && !(this.is_airstrike_building() && this.airstrike_building_item()) && !(this.is_trapped_barrier() && this.barrier_trap_item()) && !(this.is_armed_building() && this.building_weapon_item()) && !(this.is_armed_townhall() && this.townhall_weapon_item())) {
+        if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item()) && !(this.is_security_node() && this.security_node_item()) && !(this.is_monument_building() && this.monument_building_item()) && !(this.is_airstrike_building() && this.airstrike_building_item()) && !(this.is_trapped_barrier() && this.barrier_trap_item()) && !(this.is_armed_building() && this.building_weapon_item()) && !(this.is_armed_townhall() && this.townhall_weapon_item())) {
             var building_cat = this.spec['crafting_categories'];
             goog.array.forEach(this.spec['crafting_categories'], function(cat) {
                 if(cat && Array.isArray(cat)){

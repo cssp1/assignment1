@@ -44,6 +44,10 @@ MountedWeaponDialog.invoke = function(mounting_obj) {
         building_context = 'ui_name_building_context_airstrike';
         crafting_category = 'combat_air_patrols';
         slot_type = 'combat_air_patrol';
+    } else if (mounting_obj.is_monument_building()) {
+        building_context = 'ui_name_building_context_monument';
+        crafting_category = 'monuments';
+        slot_type = 'monument';
     }
     dialog.user_data['dialog'] = 'mounted_weapon_dialog';
     dialog.user_data['emplacement'] = mounting_obj;
@@ -149,6 +153,8 @@ MountedWeaponDialog.ondraw = function(dialog) {
                 mounted = obj.security_node_item() || obj.security_node_inprogress_item();
             } else if (dialog.user_data['crafting_category'] === 'security_nodes' && obj.is_airstrike_building()) {
                 mounted = obj.airstrike_building_item() || obj.airstrike_building_inprogress_item();
+            } else if (dialog.user_data['crafting_category'] === 'monuments' && obj.is_monument_building()) {
+                mounted = obj.monument_building_item() || obj.monument_building_inprogress_item();
             }
             if(mounted) {
                 var mounted_spec = ItemDisplay.get_inventory_item_spec(mounted['spec']);
@@ -345,6 +351,8 @@ MountedWeaponDialog.ondraw = function(dialog) {
         current_item = mounting_obj.security_node_item();
     } else if (mounting_obj.is_airstrike_building()) {
         current_item = mounting_obj.airstrike_building_item();
+    } else if (mounting_obj.is_monument_building()) {
+        current_item = mounting_obj.monument_building_item();
     }
 
     dialog.widgets['no_current'].show = !current_item;
