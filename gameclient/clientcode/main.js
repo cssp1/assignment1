@@ -45350,12 +45350,6 @@ function invoke_build_dialog(newcategory) {
 
     dialog.widgets['inert_button'].show = allow_inert_button;
     dialog.widgets['dev_title'].show = !!player.is_cheater;
-    if(!allow_inert_button) {
-        dialog.widgets['title'].xy = dialog.data['widgets']['title']['xy_no_scenery'];
-        dialog.widgets['resources_button'].xy = dialog.data['widgets']['resources_button']['xy_no_scenery'];
-        dialog.widgets['production_button'].xy = dialog.data['widgets']['production_button']['xy_no_scenery'];
-        dialog.widgets['defense_button'].xy = dialog.data['widgets']['defense_button']['xy_no_scenery'];
-    }
 
     goog.array.forEach(['inert', 'resources', 'production', 'defense'], function(cat) {
         dialog.widgets[cat+'_button'].onclick = (function (_cat) { return function(w) { build_dialog_change_category(w.parent, _cat); }; })(cat);
