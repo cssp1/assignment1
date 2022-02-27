@@ -526,6 +526,17 @@ World.World.prototype.send_and_remove_object = function(obj) {
         this.objects.rem_object(obj);
     }
 };
+
+/**
+    @param {!GameObject} obj */
+World.World.prototype.send_and_remove_inert = function(obj) {
+    if(obj && obj.is_inert() && obj.id && obj.id !== GameObject.DEAD_ID) {
+        send_to_server.func(["REMOVE_INERT", obj.id]);
+        player.army_unit_drop(obj.id);
+        this.objects.rem_object(obj);
+    }
+};
+
 /** @param {!GameObject} victim
     @param {GameObject|null} killer
     @param {string|undefined} method - can be "hostile" for hostile fire, or "retreat" for voluntary retreat

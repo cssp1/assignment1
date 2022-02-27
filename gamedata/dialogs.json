@@ -1784,7 +1784,8 @@
             "sunken_left": {"kind": "StaticImage", "xy":[37,67], "dimensions":[662,344], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "building_sunken": {"kind": "StaticImage", "xy":[50,82], "dimensions":[156,142], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable", "array": [4,2], "array_offset": [160,150] },
 
-            "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+            "title": { "kind": "TextField", "xy": [33,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+                       "xy_no_scenery": [37,14],
                        "text_hjustify": "left", "ui_name": "Buildings" },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
@@ -1793,19 +1794,22 @@
                            "text_hjustify": "left",
                            "ui_name": "You are in DEV Edit mode - unlock/resource requirements are NOT enforced!" },
 
-            "inert_button": { "kind": "ActionButton", "xy": [124,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                              "bg_image": "menu_button_136px", "state": "normal", "ui_name": "DEV Scenery" },
+            "inert_button": { "kind": "ActionButton", "xy": [156,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                              "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Scenery" },
             "inert_button_jewel": { "kind": "Dialog", "xy": [240,20], "dimensions": [17,14], "dialog": "notification_jewel" },
 
-            "resources_button": { "kind": "ActionButton", "xy": [268,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "resources_button": { "kind": "ActionButton", "xy": [292,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                  "xy_no_scenery": [268,22],
                                   "bg_image": "menu_button_136px", "state": "active", "ui_name": "Resources" },
             "resources_button_jewel": { "kind": "Dialog", "xy": [384,20], "dimensions": [17,14], "dialog": "notification_jewel" },
 
-            "production_button": { "kind": "ActionButton", "xy": [412,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "production_button": { "kind": "ActionButton", "xy": [428,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                   "xy_no_scenery": [412,22],
                                    "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Production" },
             "production_button_jewel": { "kind": "Dialog", "xy": [528,20], "dimensions": [17,14], "dialog": "notification_jewel" },
 
-            "defense_button": { "kind": "ActionButton", "xy": [556,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "defense_button": { "kind": "ActionButton", "xy": [564,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                "xy_no_scenery": [556,22],
                                 "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Defense" },
             "defense_button_jewel": { "kind": "Dialog", "xy": [672,20], "dimensions": [17,14], "dialog": "notification_jewel" },
 
