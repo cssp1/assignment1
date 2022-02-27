@@ -14107,6 +14107,9 @@ class LivePlayer(Player):
         # developer access - ignore resource limits and time delays
         self.is_cheater = False
 
+    def can_edit_scenery(self, session):
+        return Predicates.read_predicate(gamedata.get('can_edit_scenery_if', {'predicate':'ALWAYS_FALSE'})).is_satisfied2(session, self, None)
+
     def sync_with_user(self, user):
         super(LivePlayer,self).sync_with_user(user)
         # sync additional LivePlayer fields here
@@ -24631,7 +24634,7 @@ class GAMEAPI(resource.Resource):
             return
 
         if spec.kind == 'inert':
-            if (not session.player.is_cheater) and (not Predicates.read_predicate(gamedata.get('show_scenery_edit_if', {'predicate':'ALWAYS_FALSE'})).is_satisfied2(session, session.player, None)):
+            if (not session.player.is_cheater) and (not session.player.can_edit_scenery(session)):
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 return
             is_instant = True # all inert builds are instant
@@ -24784,7 +24787,7 @@ class GAMEAPI(resource.Resource):
     def do_move_building(self, session, retmsg, object, spellargs):
         j, i = spellargs[0]
 
-        if (not object.is_building()) and (not session.player.is_cheater) and (not Predicates.read_predicate(gamedata.get('show_scenery_edit_if', {'predicate':'ALWAYS_FALSE'})).is_satisfied2(session, session.player, None)):
+        if (not object.is_building()) and (not session.player.is_cheater) and (not session.player.can_edit_scenery(session)):
             retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
             retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
             return
@@ -30201,7 +30204,7 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
         elif arg[0] == "REMOVE_INERT":
-            if not Predicates.read_predicate(gamedata.get('show_scenery_edit_if', {'predicate':'ALWAYS_FALSE'})).is_satisfied2(session, session.player, None):
+            if not session.player.can_edit_scenery(session):
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 return
             id = arg[1]
@@ -32090,7 +32093,7 @@ class GAMEAPI(resource.Resource):
                     return
 
                 object = session.get_object(id)
-                assert (object.owner is session.player) or (session.player.is_cheater) or Predicates.read_predicate(gamedata.get('show_scenery_edit_if', {'predicate':'ALWAYS_FALSE'})).is_satisfied2(session, session.player, None)
+                assert (object.owner is session.player) or (session.player.is_cheater) or session.player.can_edit_scenery(session)
 
             if spellname == "SPEEDUP_FOR_FREE":
                 self.do_speedup_for_free(session, retmsg, object)

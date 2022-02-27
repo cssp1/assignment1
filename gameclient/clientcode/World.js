@@ -532,7 +532,6 @@ World.World.prototype.send_and_remove_object = function(obj) {
 World.World.prototype.send_and_remove_inert = function(obj) {
     if(obj && obj.is_inert() && obj.id && obj.id !== GameObject.DEAD_ID) {
         send_to_server.func(["REMOVE_INERT", obj.id]);
-        player.army_unit_drop(obj.id);
         this.objects.rem_object(obj);
     }
 };

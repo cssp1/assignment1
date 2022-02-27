@@ -6945,6 +6945,9 @@ player.country_tier = 'unknown';
 player.logged_in_times = -1;
 player.creation_time = -1;
 player.chat_seen = {}; // same as server
+player.can_edit_scenery = function() {
+    return ('can_edit_scenery_if' in gamedata && read_predicate(gamedata['can_edit_scenery_if']).is_satisfied(player, null))
+};
 
 function enable_muffins() {
     if(!player.is_developer()) { return; }
@@ -16446,7 +16449,7 @@ function do_build(ji) {
         }
     } else if(player.is_cheater && selection.spellkind in gamedata['inert']) {
         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, selection.spellname, selection.spellkind, ji]);
-    } else if(('show_scenery_edit_if' in gamedata && read_predicate(gamedata['show_scenery_edit_if']).is_satisfied(player,null)) && selection.spellkind in gamedata['inert']) {
+    } else if(player.can_edit_scenery() && selection.spellkind in gamedata['inert']) {
         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, selection.spellname, selection.spellkind, ji]);
     } else {
         throw Error('unhandled BUILD spellkind '+selection.spellkind.toString());
@@ -23752,7 +23755,7 @@ function invoke_building_context_menu(mouse_xy) {
 
     var obj = selection.unit;
 
-    var moveable_inert = (obj.is_inert() && obj.spec['is_removeable'] && ('show_scenery_edit_if' in gamedata && read_predicate(gamedata['show_scenery_edit_if']).is_satisfied(player,null)));
+    var moveable_inert = (obj.is_inert() && obj.spec['is_removeable'] && player.can_edit_scenery());
 
     if(!obj || !(obj.is_building() || (obj.is_inert() && obj.team == 'player') || player.is_cheater || moveable_inert)) {
         throw Error('context menu invoked without a building or player-owned inert object selected');
@@ -24328,8 +24331,9 @@ function invoke_building_context_menu(mouse_xy) {
                                                 change_selection_ui_under(new BuildUICursor(_obj, _obj.spec));
                                             }; })(obj), asset: 'menu_button_resizable'}));
         buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['REMOVE_OBJECT']['ui_name_scenery'],
-                                            onclick: function() { session.get_real_world().send_and_remove_inert(selection.unit); },
-                                            asset: 'menu_button_resizable'}));
+                                            onclick: (function (_unit) { return function() {
+                                                session.get_real_world().send_and_remove_inert(_unit);
+                                            }; })(selection.unit), asset: 'menu_button_resizable'}));
     }
 
     if(player.is_cheater) {
@@ -45346,7 +45350,7 @@ function invoke_build_dialog(newcategory) {
         if(player.tutorial_state != "COMPLETE") { return; }
         change_selection(null);
     };
-    var allow_inert_button = !!player.is_cheater || ('show_scenery_edit_if' in gamedata && read_predicate(gamedata['show_scenery_edit_if']).is_satisfied(player,null));
+    var allow_inert_button = !!player.is_cheater || player.can_edit_scenery();
 
     dialog.widgets['inert_button'].show = allow_inert_button;
     dialog.widgets['dev_title'].show = !!player.is_cheater;
@@ -54299,7 +54303,7 @@ function do_on_mouseup(e, is_touch) {
             do_build(ji);
             return;
         } else if(selection.spellname === "MOVE_BUILDING") {
-            if(selection.unit && ((selection.unit.is_building() && selection.unit.team == 'player') || player.is_cheater || (selection.unit.is_inert() && selection.unit.spec['is_removeable'] && ('show_scenery_edit_if' in gamedata && read_predicate(gamedata['show_scenery_edit_if']).is_satisfied(player,null))))) {
+            if(selection.unit && ((selection.unit.is_building() && selection.unit.team == 'player') || player.is_cheater || (selection.unit.is_inert() && selection.unit.spec['is_removeable'] && player.can_edit_scenery()))) {
                 ji = player.quantize_building_location(ji, selection.unit.spec);
                 if((ji[0] != selection.unit.x || ji[1] != selection.unit.y) &&
                    player.is_building_location_valid(ji, selection.unit.spec, selection.unit, {ignore_perimeter: !!selection.unit.spec['ignore_perimeter']})) {
@@ -54518,7 +54522,7 @@ function do_on_mouseup(e, is_touch) {
             } else if((player.is_cheater) && found.is_inert()) {
                 change_selection(found);
                 invoke_building_context_menu(xy);
-            } else if(('show_scenery_edit_if' in gamedata && read_predicate(gamedata['show_scenery_edit_if']).is_satisfied(player,null)) && found.is_inert() && found.spec['is_removeable']) {
+            } else if(player.can_edit_scenery() && found.is_inert() && found.spec['is_removeable']) {
                 change_selection(found);
                 invoke_building_context_menu(xy);
             }
