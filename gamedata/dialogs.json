@@ -1778,66 +1778,66 @@
     },
 
     "build_dialog": {
-        "dimensions": [736,423],
+        "dimensions": [756,423],
         "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
-            "sunken_left": {"kind": "StaticImage", "xy":[37,67], "dimensions":[662,344], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
-            "building_sunken": {"kind": "StaticImage", "xy":[50,82], "dimensions":[156,142], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable", "array": [4,2], "array_offset": [160,150] },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[756,423], "asset":"dialog_resizable","bg_image_resizable":1 },
+            "sunken_left": {"kind": "StaticImage", "xy":[37,67], "dimensions":[682,344], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "building_sunken": {"kind": "StaticImage", "xy":[50,82], "dimensions":[158,142], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable", "array": [4,2], "array_offset": [165,150] },
 
-            "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+            "title": { "kind": "TextField", "xy": [33,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Buildings" },
-            "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+            "close_button": { "kind": "ActionButton", "xy": [726,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "dev_title": { "show": 0, "kind": "TextField", "xy": [50,50], "dimensions": [221, 41], "text_size": 13,
                            "text_style": "thick", "text_color": [1,0,0,1], "drop_shadow": 1,
                            "text_hjustify": "left",
                            "ui_name": "You are in DEV Edit mode - unlock/resource requirements are NOT enforced!" },
 
-            "inert_button": { "kind": "ActionButton", "xy": [124,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                              "bg_image": "menu_button_136px", "state": "normal", "ui_name": "DEV Scenery" },
-            "inert_button_jewel": { "kind": "Dialog", "xy": [240,20], "dimensions": [17,14], "dialog": "notification_jewel" },
+            "inert_button": { "kind": "ActionButton", "xy": [161,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                              "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Scenery" },
+            "inert_button_jewel": { "kind": "Dialog", "xy": [269,20], "dimensions": [17,14], "dialog": "notification_jewel" },
 
-            "resources_button": { "kind": "ActionButton", "xy": [268,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "resources_button": { "kind": "ActionButton", "xy": [302,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                   "bg_image": "menu_button_136px", "state": "active", "ui_name": "Resources" },
-            "resources_button_jewel": { "kind": "Dialog", "xy": [384,20], "dimensions": [17,14], "dialog": "notification_jewel" },
+            "resources_button_jewel": { "kind": "Dialog", "xy": [410,20], "dimensions": [17,14], "dialog": "notification_jewel" },
 
-            "production_button": { "kind": "ActionButton", "xy": [412,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "production_button": { "kind": "ActionButton", "xy": [443,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                    "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Production" },
-            "production_button_jewel": { "kind": "Dialog", "xy": [528,20], "dimensions": [17,14], "dialog": "notification_jewel" },
+            "production_button_jewel": { "kind": "Dialog", "xy": [551,20], "dimensions": [17,14], "dialog": "notification_jewel" },
 
-            "defense_button": { "kind": "ActionButton", "xy": [556,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "defense_button": { "kind": "ActionButton", "xy": [584,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                 "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Defense" },
-            "defense_button_jewel": { "kind": "Dialog", "xy": [672,20], "dimensions": [17,14], "dialog": "notification_jewel" },
+            "defense_button_jewel": { "kind": "Dialog", "xy": [692,20], "dimensions": [17,14], "dialog": "notification_jewel" },
 
             "scroll_left": { "kind": "ActionButton", "xy": [8,175], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left", "push_bg_image": 1},
             "scroll_left_jewel": { "kind": "Dialog", "xy": [12,200], "dimensions": [17,14], "dialog": "notification_jewel" },
 
-            "scroll_right": { "kind": "ActionButton", "xy": [706,175], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right", "push_bg_image": 1},
-            "scroll_right_jewel": { "kind": "Dialog", "xy": [712,200], "dimensions": [17,14], "dialog": "notification_jewel" },
+            "scroll_right": { "kind": "ActionButton", "xy": [726,175], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right", "push_bg_image": 1},
+            "scroll_right_jewel": { "kind": "Dialog", "xy": [732,200], "dimensions": [17,14], "dialog": "notification_jewel" },
 
             "scroll_text": { "kind": "TextField", "xy": [56,381], "dimensions": [181,17], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.4,0.4,0.4,1] },
 
-            "grid_glow": { "kind": "StaticImage", "xy": [53,84], "dimensions": [151,138], "asset": "inner_glow_resizable", "bg_image_resizable":1,
+            "grid_glow": { "kind": "StaticImage", "xy": [53,84], "dimensions": [154,138], "asset": "inner_glow_resizable", "bg_image_resizable":1,
                            "composite_mode": "lighter", "alpha":0.28,
-                           "array": [4,2], "array_offset": [160,150] },
+                           "array": [4,2], "array_offset": [165,150] },
 
-            "grid": { "kind": "ActionButton", "xy": [54,84], "dimensions": [148,134], "bg_image_offset": [0,20], "bg_image_justify": "center",
+            "grid": { "kind": "ActionButton", "xy": [54,84], "dimensions": [158,134], "bg_image_offset": [0,20], "bg_image_justify": "center",
                       "state": "icon",
                       "ui_tooltip": "TOOLTIP", "tooltip_delay": 0, "push_bg_image": 1, "mouseover_sound": 1,
                       "ui_tooltip_builds_in": "Builds in %s", "ui_tooltip_builds_instantly": "Builds instantly",
                       "ui_tooltip_unmet": "Requires %s", "ui_tooltip_requires_res": "Requires %d %res",
                       "ui_tooltip_requires_power": "Requires %d more power\n(repair/build/upgrade %POWERPLANTS)",
-                      "array": [4,2], "array_offset": [160, 150] },
-            "grid_label": { "kind": "TextField", "xy": [60,86], "dimensions": [129,29], "text_size": 13, "text_style": "thick", "text_hjustify": "left",
+                      "array": [4,2], "array_offset": [165, 150] },
+            "grid_label": { "kind": "TextField", "xy": [60,86], "dimensions": [131,29], "text_size": 13, "text_style": "thick", "text_hjustify": "left",
                             "drop_shadow": 1,
-                            "array": [4,2], "array_offset": [160, 150] },
-            "grid_status": { "kind": "TextField", "xy": [65,168], "dimensions": [129,44], "text_size": 12, "text_hjustify": "right", "text_vjustify": "bottom",
+                            "array": [4,2], "array_offset": [164, 150] },
+            "grid_status": { "kind": "TextField", "xy": [65,168], "dimensions": [131,44], "text_size": 12, "text_hjustify": "right", "text_vjustify": "bottom",
                              "ui_name_upgrade_cc": "Upgrade %TOWNHALL for more",
                              "ui_name_max_built": "Max built (%cur)", "ui_name_x_of_y": "%cur of %max",
                              "ui_name_locked": "Locked",
-                             "array": [4,2], "array_offset": [160, 150] },
+                             "array": [4,2], "array_offset": [165, 150] },
             "grid_jewel": { "kind": "Dialog", "xy": [182,94], "dimensions": [17,14], "dialog": "notification_jewel",
-                            "array": [4,2], "array_offset": [160, 150] }
+                            "array": [4,2], "array_offset": [165, 150] }
         }
     },
 
