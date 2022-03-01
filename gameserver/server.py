@@ -24661,18 +24661,21 @@ class GAMEAPI(resource.Resource):
         fail = False
 
         # check if requirements are satisfied
-        for reqname, reqlist in (('show_if', spec.show_if), ('requires', spec.requires)):
-            if reqlist:
-                req = GameObjectSpec.get_leveled_quantity(reqlist, 1)
-                if spec.kind == 'inert':
-                    req_error = gamedata['inert'][building_type][reqname]
-                else:
-                    req_error = gamedata['buildings'][building_type][reqname]
-                if (not session.player.is_cheater) and (not req.is_satisfied2(session, session.player, None)):
+        if spec.kind == 'inert':
+            if spec.requires:
+                if (not session.player.is_cheater) and (not spec.requires.is_satisfied2(session, session.player, None)):
                     fail = True
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
-                                   req_error])
-                    break
+                                   gamedata['inert'][building_type]['requires']])
+        else:
+            for reqname, reqlist in (('show_if', spec.show_if), ('requires', spec.requires)):
+                if reqlist:
+                    req = GameObjectSpec.get_leveled_quantity(reqlist, 1)
+                    if (not session.player.is_cheater) and (not req.is_satisfied2(session, session.player, None)):
+                        fail = True
+                        retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
+                                       gamedata['buildings'][building_type][reqname]])
+                        break
 
         cost = {}
         for res in gamedata['resources']:
