@@ -9074,16 +9074,15 @@ function find_object_at_screen_pixel(world, xy, ji, include_unselectable) {
     world.objects.for_each(function(temp) {
         var objji = temp.interpolate_pos(world);
 
-        if(temp.is_inert() && (!player.is_cheater || !player.can_edit_scenery())) {
+        if(temp.is_inert() && !player.is_cheater) {
             if(temp.spec['is_scenery'] && !temp.spec['has_tooltip']) {
-                return;
+                if(!temp.spec['is_removeable']) { return; }
+                if(!player.can_edit_scenery()) { return; }
             }
             if(!include_unselectable && !temp.spec['selectable']) {
-                return;
+                if(!temp.spec['is_removeable']) { return; }
+                if(!player.can_edit_scenery()) { return; }
             }
-        }
-        if(temp.is_inert() && player.can_edit_scenery() && !temp.spec['is_removeable']) {
-            return;
         }
 
         if(temp.is_invisible() && (temp.team !== 'player' || session.is_replay())) { return; }
