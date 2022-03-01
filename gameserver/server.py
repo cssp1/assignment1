@@ -24664,9 +24664,10 @@ class GAMEAPI(resource.Resource):
         for reqname, reqlist in (('show_if', spec.show_if), ('requires', spec.requires)):
             if reqlist:
                 req = GameObjectSpec.get_leveled_quantity(reqlist, 1)
-                req_error = gamedata['buildings'][building_type][reqname]
                 if spec.kind == 'inert':
                     req_error = gamedata['inert'][building_type][reqname]
+                else:
+                    req_error = gamedata['buildings'][building_type][reqname]
                 if (not session.player.is_cheater) and (not req.is_satisfied2(session, session.player, None)):
                     fail = True
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
