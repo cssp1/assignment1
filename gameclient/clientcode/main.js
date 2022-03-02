@@ -45608,6 +45608,24 @@ function build_dialog_scroll(dialog, page) {
                 dialog.widgets['grid'+widget_name].transform = (spec['gridsize'][0] > 8 ?  [0.2,0,0,0.2,dialog.data['widgets']['grid']['dimensions'][0]/2,dialog.data['widgets']['grid']['dimensions'][1]/2] : null);
                 dialog.widgets['grid'+widget_name].onclick = build_closure('inert', name);
                 dialog.widgets['grid'+widget_name].tooltip.str = null;
+                // get list of any unsatisfied requirements
+                if('requires' in spec && !player.is_cheater) {
+                    var tooltip_text = [];
+                    var pred = read_predicate(get_leveled_quantity(spec['requires'], 1));
+                    var req = pred.ui_describe(player);
+                    if(req) {
+                        tooltip_text.push(dialog.data['widgets']['grid']['ui_tooltip_unmet'].replace('%s',req));
+                        able_to_build = false;
+                        unlocked = false;
+                        var helper = get_requirements_help(pred, null);
+                        dialog.widgets['grid'+widget_name].tooltip.str = tooltip_text.join('\n');
+                        dialog.widgets['grid'+widget_name].onclick = helper;
+                        dialog.widgets['grid_status'+widget_name].show = true;
+                        dialog.widgets['grid_status'+widget_name].str = dialog.data['widgets']['grid_status']['ui_name_locked'];
+                        var color = SPUI.error_text_color;
+                        dialog.widgets['grid_status'+widget_name].text_color = color;
+                    }
+                }
             } else {
                 var spec = gamedata['buildings'][name];
                 var widget = dialog.widgets['grid'+widget_name];
