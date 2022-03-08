@@ -45602,7 +45602,9 @@ function build_dialog_scroll(dialog, page) {
                 dialog.widgets['grid_status'+widget_name].show = false;
                 dialog.widgets['grid_jewel'+widget_name].show = false;
                 dialog.widgets['grid'+widget_name].show = true;
-                dialog.widgets['grid'+widget_name].bg_image = get_current_art_asset(spec);
+                var bg_image = get_current_art_asset(spec);
+                if('build_asset' in spec) { bg_image = spec['build_asset']; }
+                dialog.widgets['grid'+widget_name].bg_image = bg_image;
                 dialog.widgets['grid'+widget_name].state = 'normal';
                 // shrink large sprites
                 dialog.widgets['grid'+widget_name].transform = (spec['gridsize'][0] > 8 ?  [0.2,0,0,0.2,dialog.data['widgets']['grid']['dimensions'][0]/2,dialog.data['widgets']['grid']['dimensions'][1]/2] : null);
