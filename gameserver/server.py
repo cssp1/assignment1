@@ -24281,6 +24281,8 @@ class GAMEAPI(resource.Resource):
             if target_spec in session.player.unit_equipment and target_slot in session.player.unit_equipment[target_spec]:
                 remove_item = session.player.unit_equipment[target_spec][target_slot][0]
                 removed = self.do_equip_unit(session, retmsg, (None, target_spec, (target_slot, 0), -1, None, remove_item))
+                if isinstance(remove_item, dict):
+                    remove_item = remove_item['spec']
                 player.inventory_log_event('5131_item_trashed', remove_item, 1, -1, None, reason='replaced')
             session.deferred_stattab_update = True
 
