@@ -21184,9 +21184,10 @@ class GAMEAPI(resource.Resource):
                         # squad is still on the map. update space and icon stats.
                         update_icon = session.player.get_squad_icon(squad_id)
                         feature_update = {'total_space': total_space_by_squad_id.get(squad_id, 0),
-                                          'base_icon': update_icon,
-                                          'base_icon_asset': session.player.get_unit_icon(update_icon),
                                           'alive_space': alive_space_by_squad_id.get(squad_id, 0)}
+                        if update_icon:
+                            feature_update['base_icon_asset'] = session.player.get_unit_icon(update_icon)
+                            feature_update['base_icon'] = update_icon
                         if feature_update:
                             if gamedata['server'].get('log_nosql_squad_space',0) >= 2:
                                 gamesite.exception_log.event(server_time, 'squad space update - %s/%s - complete_attack(defender): %r' % \
