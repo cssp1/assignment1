@@ -2296,7 +2296,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             // draw base icon
             if(feature['base_type'] == 'squad' && ('base_icon' in feature)) {
                 var icon_scale = 0.75, icon_offset = [0.5,0.5];
-                var assetname = get_leveled_quantity(gamedata['units'][feature['base_icon']]['art_asset'], 1);
+                var assetname = (feature['base_icon_asset'] && feature['base_icon_asset'] in gamedata['art']) ? feature['base_icon_asset'] : get_leveled_quantity(gamedata['units'][feature['base_icon']]['art_asset'], 1);
 
                 if(is_guard) {
                     show_label = false;

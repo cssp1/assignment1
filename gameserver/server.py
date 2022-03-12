@@ -11159,6 +11159,28 @@ class Player(AbstractPlayer):
             rollback_feature['base_map_path'] = squad.get('map_path',None) # same here
         return rollback_feature
 
+    def get_unit_icon(self, name):
+        spec = gamedata['units'][name]
+        asset = spec['art_asset']
+        if self.stattab and self.stattab.units and name in self.stattab.units and 'art_asset' in self.stattab.units[name]:
+            asset = self.stattab.units[name]['art_asset']['val']
+        return asset
+
+    def get_squad_icon(self, squad_id):
+        icon_unit_specname = None
+        highest_space = 0
+        min_hp_pct = gamedata.get('squad_icon_min_hp_pct', 0.25) # unit must have a minimum pct of its max HP to show up, default to 25%
+        for object in self.home_base_iter():
+            if object.is_mobile() and (object.squad_id or 0) == squad_id:
+                hp = float(object.hp)
+                max_hp = float(object.get_leveled_quantity(object.spec.max_hp))
+                hp_pct = hp / max_hp
+                space = object.get_leveled_quantity(object.spec.consumes_space)
+                if (hp_pct >= min_hp_pct and space > highest_space) or (icon_unit_specname is None):
+                    highest_space = space
+                    icon_unit_specname = object.spec.name
+        return icon_unit_specname
+
     def squad_enter_map(self, session, squad_id, coords, raid_mode):
         if raid_mode and not self.raids_enabled(): return False, [], ["SERVER_PROTOCOL"]
         if self.isolate_pvp: return False, [], ["CANNOT_DEPLOY_SQUAD_YOU_ARE_ISOLATED", squad_id]
@@ -11230,12 +11252,14 @@ class Player(AbstractPlayer):
                     if amount > 0:
                         max_cargo[res] = max_cargo.get(res,0) + amount
 
+        icon_unit_specname = self.get_squad_icon(squad_id)
         if len(to_remove) < 1: return False, [rollback_feature], ["INVALID_SQUAD"] # cannot deploy empty squad
         if total_hp < 1: return False, [rollback_feature], ["CANNOT_DEPLOY_SQUAD_DEAD", squad_id] # cannot deploy dead squad
 
         feature = {'base_id': self.squad_base_id(squad_id),
                    'base_type': 'squad',
                    'base_icon': icon_unit_specname,
+                   'base_icon_asset': self.get_unit_icon(icon_unit_specname),
                    'base_ui_name': squad['ui_name'], # denormalized for ease of querying
                    'base_landlord_id': self.user_id,
                    'base_map_loc': coords,
@@ -21157,8 +21181,11 @@ class GAMEAPI(resource.Resource):
                              session.viewing_squad_locks[squad_lock_id] <= -2: # tombstone - see forget_base_lock()
                             continue # squad is gone off the map. Skip.
 
-                        # squad is still on the map. update space stats.
+                        # squad is still on the map. update space and icon stats.
+                        update_icon = session.player.get_squad_icon(squad_id)
                         feature_update = {'total_space': total_space_by_squad_id.get(squad_id, 0),
+                                          'base_icon': update_icon,
+                                          'base_icon_asset': session.player.get_unit_icon(update_icon),
                                           'alive_space': alive_space_by_squad_id.get(squad_id, 0)}
                         if feature_update:
                             if gamedata['server'].get('log_nosql_squad_space',0) >= 2:
