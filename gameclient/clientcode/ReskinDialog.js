@@ -296,13 +296,14 @@ ReskinDialog.update_skin_build_button = function(dialog) {
     }
     if(can_cast[0]) {
         // the real build function
-        build_cb = (function (_builder, _skin_spec, _unit_name, _delivery_slot_type) { return function() {
+        build_cb = (function (_builder, _skin_spec, _unit_name, _delivery_slot_type, _dialog) { return function() {
                     var extra_params = {'delivery': {'unit_equip_slot':_unit_name, 'slot_type':_delivery_slot_type, 'slot_index': 0, 'replace':1 }, 'level': 1 };
                     start_crafting(_builder, _skin_spec, extra_params);
+                    invoke_ui_locker(_builder.request_sync(), (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog))
                     // play sound effect
                     GameArt.play_canned_sound('action_button_134px');
                     return true;
-                }; })(builder, skin_spec, unit_name, delivery_slot_type);
+                }; })(builder, skin_spec, unit_name, delivery_slot_type, dialog);
     } else if(can_cast[2]) {
         var helper = get_requirements_help(can_cast[2][0], can_cast[2][1], can_cast[2][2]);
         build_cb = (helper ? (function (_helper) { return function() { _helper(); return false; }; })(helper) : null);
