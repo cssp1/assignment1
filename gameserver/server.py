@@ -11159,7 +11159,7 @@ class Player(AbstractPlayer):
             rollback_feature['base_map_path'] = squad.get('map_path',None) # same here
         return rollback_feature
 
-    def (self, name):
+    def get_unit_icon(self, name):
         spec = gamedata['units'][name]
         asset = spec['art_asset']
         if self.stattab and self.stattab.units and name in self.stattab.units and 'art_asset' in self.stattab.units[name]:
@@ -11259,7 +11259,7 @@ class Player(AbstractPlayer):
         feature = {'base_id': self.squad_base_id(squad_id),
                    'base_type': 'squad',
                    'base_icon': icon_unit_specname,
-                   'base_icon_asset': self.(icon_unit_specname),
+                   'base_icon_asset': self.get_unit_icon(icon_unit_specname),
                    'base_ui_name': squad['ui_name'], # denormalized for ease of querying
                    'base_landlord_id': self.user_id,
                    'base_map_loc': coords,
