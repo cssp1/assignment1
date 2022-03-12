@@ -11159,7 +11159,7 @@ class Player(AbstractPlayer):
             rollback_feature['base_map_path'] = squad.get('map_path',None) # same here
         return rollback_feature
 
-    def get_unit_icon(self, name):
+    def (self, name):
         spec = gamedata['units'][name]
         asset = spec['art_asset']
         if self.stattab and self.stattab.units and name in self.stattab.units and 'art_asset' in self.stattab.units[name]:
@@ -11259,7 +11259,7 @@ class Player(AbstractPlayer):
         feature = {'base_id': self.squad_base_id(squad_id),
                    'base_type': 'squad',
                    'base_icon': icon_unit_specname,
-                   'base_icon_asset': self.get_unit_icon(icon_unit_specname),
+                   'base_icon_asset': self.(icon_unit_specname),
                    'base_ui_name': squad['ui_name'], # denormalized for ease of querying
                    'base_landlord_id': self.user_id,
                    'base_map_loc': coords,
@@ -21184,9 +21184,10 @@ class GAMEAPI(resource.Resource):
                         # squad is still on the map. update space and icon stats.
                         update_icon = session.player.get_squad_icon(squad_id)
                         feature_update = {'total_space': total_space_by_squad_id.get(squad_id, 0),
-                                          'base_icon': update_icon,
-                                          'base_icon_asset': session.player.get_unit_icon(update_icon),
                                           'alive_space': alive_space_by_squad_id.get(squad_id, 0)}
+                        if update_icon:
+                            feature_update['base_icon_asset'] = session.player.get_unit_icon(update_icon)
+                            feature_update['base_icon'] = update_icon
                         if feature_update:
                             if gamedata['server'].get('log_nosql_squad_space',0) >= 2:
                                 gamesite.exception_log.event(server_time, 'squad space update - %s/%s - complete_attack(defender): %r' % \
