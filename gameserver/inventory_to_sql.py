@@ -98,6 +98,10 @@ if __name__ == '__main__':
 
                 if row['sum'].get('developer',False): continue # skip events by developers
 
+                # fix mal-formed events
+                if isinstance(row['spec'], dict) and 'spec' in row['spec']:
+                    row['spec'] = row['spec']['spec']
+
                 keyvals = [('time',row['time']),
                            ('user_id',row['user_id']),
                            ('event_name',row['event_name'])] + \
