@@ -1,0 +1,43 @@
+name: publish-dashboards-okr-maintenance_4
+
+on:
+  schedule:
+    # Fridays at 8:00 UTC
+    - cron: 0 8 * * 5
+  push:
+    branches:
+      - github-automation-dashboards
+  workflow_dispatch:
+
+jobs:
+  publish_dashboards:
+    name: Publish analytics dashboards using Jupyter
+    runs-on: ubuntu-latest
+    container:
+      image: docker://ghcr.io/spinpunch/game-jupyter:latest
+      credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        ENVKEY: ${{ secrets.ENVKEY_MANAGEMENT }}
+    steps:
+      - name: Check out game repository
+        uses: actions/checkout@v2
+        with:
+          # note: always check out the master branch, to get the latest notebooks
+          ref: master
+      - name: Execute dashboard notebook(s)
+        run: >
+          /entrypoint-with-aws-tunnel.sh sh -c '
+          jupyter nbconvert --execute --no-input --no-prompt --ExecutePreprocessor.timeout=900
+          "${GITHUB_WORKSPACE}/gameserver/analytics-env/notebooks/dashboard-okr-maintenance_4.ipynb"
+          --to html --output-dir "${HOME}"
+          '
+      - name: Publish HTML dashboards to S3
+        run: >
+          /entrypoint.sh sh -c '
+          AWS_ACCESS_KEY_ID="${BATCH_TASKS_AWS_KEY_ID}"
+          AWS_SECRET_ACCESS_KEY="${BATCH_TASKS_AWS_SECRET_KEY}"
+          AWS_REGION="us-east-1"
+          aws s3 cp "${HOME}/dashboard-okr-maintenance_4.html" "s3://dashboards.spinpunch.com/dashboard_okr_maintenance_4.html" --content-type "text/html"
+          '
