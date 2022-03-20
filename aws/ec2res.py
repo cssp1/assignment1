@@ -76,7 +76,8 @@ def ec2_inst_is_vpc(inst):
 
 def ec2_res_is_vpc(res):
     """ Is this EC2 reservation for a VPC instance? """
-    return ('VPC' in res['ProductDescription'])
+    # note: As of March, 2022, AWS has made all reservations VPC reservations
+    return True # ('VPC' in res['ProductDescription'])
 
 def ec2_res_match(res, inst):
     """ Return true if this EC2 reservation can cover this EC2 instance. """
