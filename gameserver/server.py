@@ -11169,7 +11169,7 @@ class Player(AbstractPlayer):
     def get_squad_icon(self, squad_id):
         icon_unit_specname = None
         highest_space = 0
-        min_hp_pct = gamedata.get('squad_icon_min_hp_pct', 0.25) # unit must have a minimum pct of its max HP to show up, default to 25%
+        min_hp_pct = gamedata.get('squad_icon_min_hp_pct', 0.05) # unit must have a minimum pct of its max HP to show up, default to 5%
         for object in self.home_base_iter():
             if object.is_mobile() and (object.squad_id or 0) == squad_id:
                 hp = float(object.hp)
