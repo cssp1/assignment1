@@ -40,7 +40,7 @@ if __name__ == '__main__':
             elite_map = {'ah1x':'red','tos1ax':'red', 'armyguy_sapperx':'red'}
             for extra_name in ('ah1x','ah64x','bmp1x','brdm3x','f35x','gaz_tigrx','m109a6x','m1abramsx','mi24x','mq1cx','mq8bx','mstax','oh58x',
                                'strykerx','suicide_truckx','t90x','tos1ax','uh60x','armyguy_stingerx','armyguy_sapperx','ka50x','hz9x'):
-                for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow'):
+                for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow','babyblue','hotpink'):
                     color_val = extra_color
                     if extra_color == 'elite' and extra_name in elite_map:
                         color_val = elite_map[extra_name]
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         if game_id in ('tr','eg'):
             elite_map = {'armyguyx':'red', 'armyguy_m240x':'red'}
             for extra_name in ('armyguy_javelinx','armyguy_m240x','armyguy_mortarx','armyguy_xm110x','armyguyx'):
-                for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow'):
+                for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow','babyblue','hotpink'):
                     color_val = extra_color
                     if extra_color == 'elite' and extra_name in elite_map:
                         color_val = elite_map[extra_name]
@@ -72,7 +72,7 @@ if __name__ == '__main__':
                                'dv_armyguy_mortarx','dv_m12x','dv_m26_pershingx','dv_m4a2_shermanx','dv_m4_halftrackx','dv_panzerwerferx','dv_panzer_ivx',
                                'dv_sdkfz234_pumax'):
                 elite_map = {'dv_armyguyx':'red', 'dv_armyguy_m240x':'red', 'dv_m4a2_shermanx':'red'}
-                for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow'):
+                for extra_color in ('elite','black','blue','brown','green','orange','purple','yellow','babyblue','hotpink'):
                     color_val = extra_color
                     if extra_color == 'elite' and extra_name in elite_map:
                         color_val = elite_map[extra_name]
@@ -83,7 +83,7 @@ if __name__ == '__main__':
                     out[key] = { "states": { "normal": { "subassets": ["inventory_bg_black", "inventory_%s" % extra_val] } } }
         if game_id in ('bfm','mf2','eg'):
             for extra_name in ('bfm_centurionx','bfm_elevated_cannon_six_wheels_flamingx','bfm_hellhoundx','bfm_kitbashed_curiosityx','bfm_liberatorx','bfm_maulerx','bfm_mech_on_wheelsx','bfm_missile_carx','bfm_pencil_nosex','bfm_rainmakerx','bfm_two_thrusters_two_cannonsx','bfm_warbirdx','bfm_wombatx','bfm_wreckerx'):
-                for extra_color in ('black','blue','brown','green','orange','purple','yellow'):
+                for extra_color in ('black','blue','brown','green','orange','purple','yellow','babyblue','hotpink'):
                     extra_val = '%s_t%s' % (extra_name, extra_color)
                     EXTRA_UNITS += [(extra_val, {'art_asset': extra_val})]
                     key = 'icon_inventory_reskin_%s' % extra_val
