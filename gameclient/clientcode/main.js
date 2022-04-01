@@ -1829,6 +1829,7 @@ function CombatStats() {
     this.extra_armor = 0;
     this.anti_air = 0;
     this.anti_missile = 1; // note! this is the chance that a missile is NOT intercepted
+    this.anti_missile_range = 0;
     this.turn_rate = 1;
     this.ice_effects = 1;
     this.swamp_effects = 1;
@@ -1867,6 +1868,7 @@ CombatStats.prototype.clear = function() {
     this.extra_armor = 0;
     this.anti_air = 0;
     this.anti_missile = 1; // note! this is the chance that a missile is NOT intercepted
+    this.anti_missile_range = 0;
     this.turn_rate = 1;
     this.ice_effects = 1;
     this.swamp_effects = 1;
@@ -1907,6 +1909,7 @@ CombatStats.prototype.serialize = function() {
     if(this.extra_armor != 0) { ret['extra_armor'] = this.extra_armor; }
     if(this.anti_air) { ret['anti_air'] = this.anti_air; }
     if(this.anti_missile != 1) { ret['anti_missile'] = this.anti_missile; }
+    if(this.anti_missile_range != 0) { ret['anti_missile_range'] = this.anti_missile_range; }
     if(this.turn_rate != 1) { ret['turn_rate'] = this.turn_rate; }
     if(this.ice_effects != 1) { ret['ice_effects'] = this.ice_effects; }
     if(this.swamp_effects != 1) { ret['swamp_effects'] = this.swamp_effects; }
@@ -1943,6 +1946,7 @@ CombatStats.prototype.apply_snapshot = function(snap) {
     if('extra_armor' in snap) { this.extra_armor = snap['extra_armor']; }
     if('anti_air' in snap) { this.anti_air = snap['anti_air']; }
     if('anti_missile' in snap) { this.anti_missile = snap['anti_missile']; }
+    if('anti_missile_range' in snap) { this.anti_missile_range = snap['anti_missile_range']; }
     if('turn_rate' in snap) { this.turn_rate = snap['turn_rate']; }
     if('ice_effects' in snap) { this.ice_effects = snap['ice_effects']; }
     if('swamp_effects' in snap) { this.swamp_effects = snap['swamp_effects']; }
@@ -2019,6 +2023,8 @@ GameObject.prototype.modify_stats_by_modstats_table = function(table) {
     }
     if('anti_air' in table) { this.combat_stats.anti_air = Math.max(this.combat_stats.anti_air, table['anti_air']['val']); }
     if('anti_missile' in table) { this.combat_stats.anti_missile *= table['anti_missile']['val']; }
+    if('anti_missile_range' in table) { this.combat_stats.anti_missile_range *= table['anti_missile_range']['val']; }
+
     if('splash_range' in table) { this.combat_stats.splash_range *= table['splash_range']['val']; }
 
     if('weapon_facing_fudge' in table) { this.combat_stats.weapon_facing_fudge = table['weapon_facing_fudge']['val']; }
@@ -2537,6 +2543,7 @@ function get_weapon_range(stats, level, spell) {
     return [spell, range, (spell && ('splash_range' in spell)), trigger_range, min_range];
 };
 
+GameObject.prototype.is_missile_defender = function() { return this.combat_stats.anti_missile_range > 0; };
 GameObject.prototype.is_shooter = function() { return (this.get_auto_spell() != null); };
 GameObject.prototype.weapon_range = function() {
     var spell = this.get_auto_spell();
@@ -52405,14 +52412,19 @@ function handle_server_message(data) {
                             // check for anti-missile defenses
                             var interceptor = /** @type {GameObject|null} */ (session.for_each_real_object(function(obj) {
                                 if(obj.is_building() && !obj.is_destroyed() && !obj.disarmed && !obj.combat_stats.stunned && (obj.team !== 'player') &&
-                                   obj.equipment && obj.is_shooter()) {
+                                   (obj.equipment || obj.is_missile_defender()) && (obj.is_shooter() || obj.is_missile_defender())) {
                                     var chance = 1 - obj.combat_stats.anti_missile;
                                     if('allow_intercept' in spell && !(spell['allow_intercept'])) {
                                         chance = 0;
                                     }
                                     if(chance > 0) {
                                         // check range
-                                        var range = obj.weapon_range()[1];
+                                        var range = 0;
+                                        if(obj.is_missile_defender()) {
+                                            range = obj.combat_stats.anti_missile_range;
+                                        } else {
+                                            range = obj.weapon_range()[1];
+                                        }
                                         if(range < 1 && 'minimum_anti_missile_range' in gamedata && gamedata['minimum_anti_missile_range'] > 0) {
                                             range = gamedata['minimum_anti_missile_range'];
                                         }
