@@ -6954,6 +6954,7 @@ player.logged_in_times = -1;
 player.creation_time = -1;
 player.chat_seen = {}; // same as server
 player.can_edit_scenery = function() {
+    if(session.viewing_base.base_landlord_id != session.user_id) { return false; }
     return ('can_edit_scenery_if' in gamedata && read_predicate(gamedata['can_edit_scenery_if']).is_satisfied(player, null))
 };
 
