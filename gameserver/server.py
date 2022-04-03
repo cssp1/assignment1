@@ -6969,6 +6969,7 @@ class GameObjectSpec(Spec):
         ["kind", "REQUIRED"],
         ["max_hp", "REQUIRED"],
         ["armor", 0],
+        ["anti_missile_range", 0],
         ["maxvel", 0],
         ["travel_speed", 0],
         ["gridsize", [0,0]],

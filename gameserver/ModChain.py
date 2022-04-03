@@ -20,6 +20,8 @@ def get_base_value(stat, spec, level):
                 return val
         else:
             return None
+    elif stat == 'anti_missile_range':
+        return get_leveled_quantity(spec.anti_missile_range, level)
     elif hasattr(spec, stat): return get_leveled_quantity(getattr(spec, stat), level)
     elif stat == 'armor': # XXX annoying special case
         return 0
