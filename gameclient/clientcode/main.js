@@ -2544,7 +2544,7 @@ function get_weapon_range(stats, level, spell) {
     return [spell, range, (spell && ('splash_range' in spell)), trigger_range, min_range];
 };
 
-GameObject.prototype.is_missile_defender = function() { return this.combat_stats.anti_missile_range > 0; };
+GameObject.prototype.is_missile_defender = function() { return this.get_auto_spell() == null && this.combat_stats.anti_missile_range > 0; };
 GameObject.prototype.is_shooter = function() { return (this.get_auto_spell() != null); };
 GameObject.prototype.weapon_range = function() {
     var spell = this.get_auto_spell();
