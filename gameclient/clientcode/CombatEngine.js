@@ -381,8 +381,14 @@ CombatEngine.ProjectileEffect.prototype.apply = function(world) {
     if(this.interceptor_id) {
         // intecepting shot effect
         var interceptor = world.objects.get_object(this.interceptor_id); // will fail for dead mobile interceptors
+        var interceptor_spell = interceptor.get_auto_spell();
+        var interceptor_spell_level = interceptor.get_auto_spell_level();
+        if(!interceptor_spell) {
+            interceptor_spell = gamedata['spells']['DEFAULT_INTERCEPTOR_SHOOT'];
+            interceptor_spell_level = 1;
+        }
         // hack - don't bother computing the actual fire time
-        interceptor.fire_projectile(world, new GameTypes.TickCount(hit_tick.get()-1), hit_time-0.25, hit_tick, hit_time, interceptor.get_auto_spell(), interceptor.get_auto_spell_level(), null, this.target_pos, this.target_height);
+        interceptor.fire_projectile(world, new GameTypes.TickCount(hit_tick.get()-1), hit_time-0.25, hit_tick, hit_time, interceptor_spell, interceptor_spell_level, null, this.target_pos, this.target_height);
     }
 };
 
