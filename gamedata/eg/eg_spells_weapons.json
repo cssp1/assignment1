@@ -394,4 +394,41 @@
                       "duration": 1.0, // must be longer than "cooldown" above
                       "always_friendly_fire": 1 // affect all units
                      }]
+},
+
+"DEFAULT_INTERCEPTOR_SHOOT": {
+    "name": "DEFAULT_INTERCEPTOR_SHOOT",
+    "ui_name": "CIWS",
+    "activation": "auto",
+    "targets_air": 1,
+    "targets_ground": 0,
+    "projectile_speed": 48.0,
+    "projectile_glow": 1,
+    "projectile_burst_size": 8,
+    "projectile_burst_interval": 0.10,
+    "projectile_impact_spread": 2.0,
+    "projectile_size": 2,
+    "projectile_arc": 0,
+    "projectile_color": [1,0,0],
+    "projectile_particles": {"emit_rate": 10, "max_count": 10, "speed": 12.0, "width": 1, "randomize_vel": 0.17,  "max_age": 0.05, "color": [0.7,0.7,1.0,1] },
+    "projectile_composite_mode": "lighter",
+    "damage": 1,
+    "damage_vs": {"rover": 1,"transport": 1,"starcraft": 1,"building": 1},
+    "cooldown": 0.5,
+    "range":200,
+    "muzzle_flash_effect": {
+        "type": "combine", "effects": [
+            { "type": "explosion", "sprite": "muzzle_flash_big_burst" },
+            { "type": "sound", "assets": ["machinegunner_shoot_machinegun_1", "machinegunner_shoot_machinegun_2","machinegunner_shoot_machinegun_3"] }
+        ]
+    },
+    "impact_visual_effect": {
+        "type": "combine", "effects": [
+            { "type": "explosion", "sprite": "fx/spark1" },
+            { "type": "particles",
+              "require_detail": 2,
+              "random_chance": 0.34,
+              "emit_instant": 12, "max_count": 12, "radius": 0.9, "speed": 25.0, "max_age": 0.12, "color": [1,1,0.5,1] }
+        ]
+    }
 }
