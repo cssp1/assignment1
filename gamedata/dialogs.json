@@ -868,6 +868,23 @@
         }
     },
 
+    "playfield_edit_bar": {
+        "xy": [0,195],
+        "dimensions": [43,68],
+        "spacing": [0,6],
+        "transparent_to_mouse": 1,
+        "widgets": {
+            "edit_bg": {"kind": "SolidRect", "xy":[0,0],
+                         "dimensions":[43,68],
+                         "color":[0.066,0.066,0.066,0.86], "bevel":4 },
+            "edit_label": { "kind": "TextField", "xy": [0,8], "dimensions": [43,20], "text_size": 11, "text_style": "normal", "drop_shadow": 1,
+                             "text_hjustify": "center", "ui_name": "Edit\nScenery", "ui_name_editing": "Editing\nScenery",
+                             "text_color_zero": [0.8,0.8,0.8,1], "text_color_nonzero": [0.8,0.8,0.8,1] },
+            "scenery_button": { "kind": "ActionButton", "xy": [10,40], "dimensions": [24,24], "bg_image": "scenery_button", "push_bg_image": 1,
+                                "ui_tooltip": "Click to Edit Scenery", "ui_tooltip_turn_off": "Click to Disable Scenery Editing", "tooltip_delay": 0, "fixed_tooltip_offset": [-163,42] }
+        }
+    },
+
     // minimalist leaderboard just for skill challenges
     "skill_challenge_standings_dialog": {
         "xy": [0,180],
