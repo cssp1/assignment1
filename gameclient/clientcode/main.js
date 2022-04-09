@@ -6954,8 +6954,18 @@ player.logged_in_times = -1;
 player.creation_time = -1;
 player.chat_seen = {}; // same as server
 player.can_edit_scenery = function() {
+    if(!(player.can_see_edit_scenery_controls())) { return false; }
     if(session.viewing_base.base_landlord_id != session.user_id) { return false; }
+    if(!('playfield_base_edit' in player.preferences)) { return false; }
+    if(player.preferences['playfield_base_edit'] === 0) { return false; }
     return ('can_edit_scenery_if' in gamedata && read_predicate(gamedata['can_edit_scenery_if']).is_satisfied(player, null))
+};
+
+player.can_see_edit_scenery_controls = function() {
+    if(session.viewing_base.base_landlord_id != session.user_id) { return false; }
+    if(!('can_edit_scenery_if' in gamedata && read_predicate(gamedata['can_edit_scenery_if']).is_satisfied(player, null))) { return false; }
+    if(!('playfield_speed_bar' in desktop_dialogs)) { return true; }
+    return !desktop_dialogs['playfield_speed_bar'].show;
 };
 
 function enable_muffins() {
@@ -11264,6 +11274,44 @@ function update_playfield_speed_bar(dialog) {
     dialog.show = !!session.enable_combat_resource_bars;
 }
 
+function invoke_playfield_edit_bar() {
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['playfield_edit_bar']);
+    dialog.user_data['dialog'] = 'playfield_edit_bar';
+    dialog.ondraw = update_playfield_edit_bar;
+    if(!('playfield_base_edit' in player.preferences)) {
+        player.preferences['playfield_base_edit'] = 0;
+        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+    }
+    return dialog;
+}
+function update_playfield_edit_bar(dialog) {
+
+    // attach to right side of desktop, underneath zoom bar
+    dialog.xy = vec_add(dialog.data['spacing'], [canvas_width-dialog.wh[0], Math.floor((canvas_height/2) + gamedata['dialogs']['playfield_edit_bar']['dimensions'][1])]);
+    dialog.widgets['scenery_button'].state = (player.can_edit_scenery() ? 'active' : 'inactive');
+    if(player.can_edit_scenery()) {
+        dialog.widgets['scenery_button'].state = 'active';
+        dialog.widgets['edit_label'].str = dialog.data['widgets']['edit_label']['ui_name_editing'];
+        dialog.widgets['scenery_button'].tooltip.str = dialog.data['widgets']['scenery_button']['ui_tooltip_turn_off'];
+    } else {
+        dialog.widgets['scenery_button'].state = 'inactive';
+        dialog.widgets['edit_label'].str = dialog.data['widgets']['edit_label']['ui_name'];
+        dialog.widgets['scenery_button'].tooltip.str = dialog.data['widgets']['scenery_button']['ui_tooltip'];
+    }
+    dialog.widgets['scenery_button'].onclick = function(w) {
+        if(player.preferences['playfield_base_edit'] === 0) { // off, so turn on
+            player.preferences['playfield_base_edit'] = 1;
+        }
+        else if(player.preferences['playfield_base_edit'] === 1) { // on, so turn off
+            player.preferences['playfield_base_edit'] = 0;
+        }
+        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+    };
+
+    // hide if not at home and out of combat and if scenery editing is not enabled for game
+    dialog.show = player.can_see_edit_scenery_controls();
+}
+
 var last_flush_time = 0;
 
 // test server robustness against lag by adding delay to AJAX transmissions
@@ -12444,6 +12492,14 @@ function init_desktop_dialogs() {
         var zoombar = invoke_playfield_zoom_bar();
         desktop_dialogs['playfield_zoom_bar'] = zoombar;
         SPUI.root.add_under(zoombar);
+    }
+
+    // scenery edit bar
+    if(session.home_base) {
+        var scenery_edit_bar = invoke_playfield_edit_bar();
+        scenery_edit_bar.show = false; // turn off initially so it doesn't flash on session change
+        desktop_dialogs['scenery_edit_bar'] = scenery_edit_bar;
+        SPUI.root.add_under(scenery_edit_bar);
     }
 
     // playfield controls bar
@@ -45361,7 +45417,7 @@ function invoke_build_dialog(newcategory) {
         if(player.tutorial_state != "COMPLETE") { return; }
         change_selection(null);
     };
-    var allow_inert_button = !!player.is_cheater || player.can_edit_scenery();
+    var allow_inert_button = !!player.is_cheater || player.can_see_edit_scenery_controls();
 
     dialog.widgets['inert_button'].show = allow_inert_button;
     dialog.widgets['dev_title'].show = !!player.is_cheater;

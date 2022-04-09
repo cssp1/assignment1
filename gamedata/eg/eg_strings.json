@@ -750,6 +750,13 @@
                             ],
                             "show_if": {"predicate": "ALWAYS_FALSE"}, // internal use only
                             "choices": []},
+        "playfield_base_edit": {"name": "playfield_base_edit",
+                            "ui_description": "Playfield Base Edit:", "preference_key": "playfield_base_edit", "requires_reload": 0,
+                            "default_val": [
+                                [{"predicate": "ALWAYS_TRUE"}, 0]
+                            ],
+                            "show_if": {"predicate": "ALWAYS_FALSE"}, // internal use only
+                            "choices": []},
         "repair_control_squad_id": {"name": "repair_control_squad_id",
                                     "ui_description": "Repair Control Dialog Default Battalion ID:", "preference_key": "repair_control_squad_id", "requires_reload": 0,
                                     "default_val": [
