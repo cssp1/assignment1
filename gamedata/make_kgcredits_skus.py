@@ -12,7 +12,7 @@ import AtomicFileWrite
 import sys, re, os, getopt
 
 import locale # for pretty number printing only
-locale.setlocale(locale.LC_ALL, '')
+locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 # regular expression that matches C++-style comments
 comment_remover = re.compile('//.*?$') # |/\*.*?/*/
