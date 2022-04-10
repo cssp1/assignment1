@@ -16516,7 +16516,7 @@ function do_build(ji) {
         }
     } else if(player.is_cheater && selection.spellkind in gamedata['inert']) {
         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, selection.spellname, selection.spellkind, ji]);
-    } else if(player.can_edit_scenery() && selection.spellkind in gamedata['inert']) {
+    } else if(player.can_see_edit_scenery_controls() && selection.spellkind in gamedata['inert']) {
         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, selection.spellname, selection.spellkind, ji]);
     } else {
         throw Error('unhandled BUILD spellkind '+selection.spellkind.toString());
