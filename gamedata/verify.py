@@ -1708,9 +1708,10 @@ def check_item(itemname, spec):
                                                     if aura['aura_name'] not in gamedata['auras']:
                                                         error |= 1; print '%s\'s apply_auras unit %s has an invalid aura, %s.' % (itemname,unit,aura['aura_name'])
                 if effect['stat'] == 'anti_missile' and ('strength' in effect):
-                    for entry in effect['strength']:
+                    strength_list = effect['strength'] if isinstance(effect['strength'], list) else [effect['strength']]
+                    for entry in strength_list:
                         if not isinstance(entry,float):
-                            error |= 1; print '%s\'s anti_missile has an invalid strength, %r. It should be a float between 0.99 and 0.01' % (itemname,effect['strength'])
+                            error |= 1; print '%s\'s anti_missile has an invalid strength, %r. All values should be floats between 0.99 and 0.01' % (itemname,effect['strength'])
                         elif isinstance(entry,float):
                             if entry < 0.01 and entry > 0.99:
                                 error |= 1; print '%s\'s anti_missile strength should be no higher than 0.99 (1% chance to intercept) and no lower than 0.01 (99% chance to intercept). It is %f.' % (itemname, entry)
