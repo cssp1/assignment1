@@ -2023,7 +2023,7 @@ GameObject.prototype.modify_stats_by_modstats_table = function(table) {
     }
     if('anti_air' in table) { this.combat_stats.anti_air = Math.max(this.combat_stats.anti_air, table['anti_air']['val']); }
     if('anti_missile' in table) { this.combat_stats.anti_missile *= table['anti_missile']['val']; }
-    if('anti_missile_range' in table) { this.combat_stats.anti_missile_range *= table['anti_missile_range']['val']; }
+    if('anti_missile_range' in table) { this.combat_stats.anti_missile_range = table['anti_missile_range']['val']; } // anti-missile range gets modified by +=
 
     if('splash_range' in table) { this.combat_stats.splash_range *= table['splash_range']['val']; }
 
