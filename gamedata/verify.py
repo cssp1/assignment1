@@ -2010,7 +2010,7 @@ def check_cond_chain(chain, **kwargs):
     return error
 
 PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTORIAL_COMPLETE', 'ACCOUNT_CREATION_TIME', 'HAS_ALTS',
-                   'ALL_BUILDINGS_UNDAMAGED', 'OBJECT_UNDAMAGED', 'OBJECT_UNBUSY', 'BUILDING_DESTROYED', 'BUILDING_QUANTITY',
+                   'ALL_BUILDINGS_UNDAMAGED', 'OBJECT_UNDAMAGED', 'OBJECT_UNBUSY', 'BUILDING_DESTROYED', 'BUILDING_QUANTITY', 'SCENERY_QUANTITY',
                    'BUILDING_LEVEL', 'UNIT_QUANTITY', 'TECH_LEVEL', 'ENHANCEMENT_LEVEL', 'QUEST_COMPLETED', 'QUEST_ACTIVE', 'COOLDOWN_ACTIVE', 'COOLDOWN_INACTIVE',
                    'ABTEST', 'ANY_ABTEST', 'RANDOM', 'LIBRARY', 'AI_BASE_ACTIVE', 'AI_BASE_SHOWN', 'PLAYER_HISTORY', 'GAMEDATA_VAR',
                    'RETAINED', 'TIME_IN_GAME', 'PLAYER_PREFERENCE',
@@ -2113,6 +2113,10 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             if not gamedata['buildings'][pred['building_type']].get('track_level_in_player_history',False):
                 error |= 1
                 print '%s: %s predicate requires building "%s" track_level_in_player_history' % (reason, pred['predicate'], pred['building_type'])
+    elif pred['predicate'] == 'SCENERY_QUANTITY':
+        if pred.get('scenery_type', False) and pred['scenery_type'] not in gamedata['inert']:
+            error |= 1
+            print '%s: %s predicate refers to nonexistent scenery "%s"' % (reason, pred['predicate'], pred['scenery_type'])
     elif pred['predicate'] == 'OBJECT_UNDAMAGED':
         if pred['spec'] not in gamedata['buildings']:
             error |= 1
