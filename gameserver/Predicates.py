@@ -351,6 +351,22 @@ class BuildingLevelPredicate(Predicate):
 
         return count >= self.trigger_qty
 
+class SceneryQuantityPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.scenery_type = data.get('scenery_type', None)
+        self.trigger_qty = data['trigger_qty']
+
+    def is_satisfied(self, player, qdata):
+        howmany = 0
+        for obj in player.home_base_iter():
+            if obj.spec.kind == 'inert':
+                if self.scenery_type == None:
+                    howmany += 1
+                elif obj.spec.name == self.scenery_type:
+                    howmany += 1
+        return (howmany >= self.trigger_qty)
+
 class UnitQuantityPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1132,6 +1148,7 @@ def read_predicate(data):
     elif kind == 'BASE_RICHNESS': return BaseRichnessPredicate(data)
     elif kind == 'BUILDING_QUANTITY': return BuildingQuantityPredicate(data)
     elif kind == 'BUILDING_LEVEL': return BuildingLevelPredicate(data)
+    elif kind == 'SCENERY_QUANTITY': return SceneryQuantityPredicate(data)
     elif kind == 'UNIT_QUANTITY': return UnitQuantityPredicate(data)
     elif kind == 'TECH_LEVEL': return TechLevelPredicate(data)
     elif kind == 'ENHANCEMENT_LEVEL': return EnhancementLevelPredicate(data)

@@ -466,6 +466,63 @@ BuildingQuantityPredicate.prototype.do_ui_help = function(player) {
     return null;
 };
 
+/** @constructor @struct
+  * @extends Predicate */
+function SceneryQuantityPredicate(data) {
+    goog.base(this, data);
+    this.scenery_type = data['scenery_type'];
+    this.trigger_qty = data['trigger_qty'];
+}
+goog.inherits(SceneryQuantityPredicate, Predicate);
+SceneryQuantityPredicate.prototype.is_satisfied = function(player, qdata) {
+    var howmany = 0;
+    session.for_each_real_object(function(obj) {
+        if(obj.is_inert()) {
+            if(this.scenery_type) {
+                if(obj.spec['name'] === this.scenery_type && obj.team === 'player') {
+                    howmany += 1;
+                }
+            } else {
+                howmany += 1;
+            }
+        }
+    }, this);
+    return (howmany >= this.trigger_qty);
+};
+SceneryQuantityPredicate.prototype.do_ui_describe = function(player) {
+    var scenery_spec = gamedata['inert'][this.scenery_type];
+    if(('show_if' in scenery_spec) && !read_predicate(scenery_spec['show_if']).is_satisfied(player, null)) {
+        return null;
+    }
+    var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
+    ret = ret.replace('%s', scenery_spec['ui_name']);
+    var qty_string;
+    if(this.trigger_qty > 1) {
+        qty_string = this.trigger_qty.toString()+'x ';
+    } else {
+        qty_string = '';
+    }
+    ret = ret.replace('%d ', qty_string);
+    return new PredicateUIDescription(ret);
+};
+SceneryQuantityPredicate.prototype.ui_progress = function(player, qdata) {
+    var ret = gamedata['strings']['predicates'][this.kind]['ui_progress'];
+    var howmany = 0;
+    session.for_each_real_object(function(obj) {
+        if(obj.is_inert()) {
+            if(this.scenery_type) {
+                if(obj.spec['name'] === this.scenery_type && obj.team === 'player') {
+                    howmany += 1;
+                }
+            } else {
+                howmany += 1;
+            }
+        }
+    }, this);
+    ret = ret.replace('%d1', howmany.toString());
+    ret = ret.replace('%d2', this.trigger_qty.toString());
+    return ret;
+};
 
 /** @constructor @struct
   * @extends Predicate */
@@ -2473,6 +2530,7 @@ function read_predicate(data) {
     else if(kind === 'BUILDING_DESTROYED') { return new BuildingDestroyedPredicate(data); }
     else if(kind === 'BUILDING_QUANTITY') { return new BuildingQuantityPredicate(data); }
     else if(kind === 'BUILDING_LEVEL') { return new BuildingLevelPredicate(data); }
+    else if(kind === 'SCENERY_QUANTITY') { return new SceneryQuantityPredicate(data); }
     else if(kind === 'UNIT_QUANTITY') { return new UnitQuantityPredicate(data); }
     else if(kind === 'TECH_LEVEL') { return new TechLevelPredicate(data); }
     else if(kind === 'ENHANCEMENT_LEVEL') { return new EnhancementLevelPredicate(data); }
