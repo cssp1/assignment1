@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # Report coverage of reserved instances in Amazon EC2 and RDS.
 

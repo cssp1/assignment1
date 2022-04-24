@@ -9,6 +9,7 @@ awscli>=1.16.9
 bcrypt==3.1.7
 beautifulsoup4>=4.9.3
 botocore>=1.11.9
+boto>=2.49.0
 boto3>=1.8.9
 Brotli==1.0.9
 brotlipy==0.7.0
@@ -21,7 +22,7 @@ geoip2==3.0.0
 google_api_python_client==1.12.8
 ipaddress==1.0.23
 Jinja2==2.11.3
-lz4==0.18.1
+lz4==2.2.1
 maxminddb==1.5.4
 matplotlib>=2.0.2
 
