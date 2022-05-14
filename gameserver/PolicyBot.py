@@ -101,6 +101,7 @@ class AntiVPNPolicy(Policy):
         # find pro- and anti-VPN regions in the same continent
         anti_vpn_regions = filter(lambda x: is_anti_vpn_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
         pro_vpn_regions = filter(lambda x: not is_anti_vpn_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
+        prison_regions = filter(lambda x: 'prison' in x.get('id',''), gamedata['regions'].itervalues())
 
         assert len(anti_vpn_regions) >= 1 and len(pro_vpn_regions) >= 1
         is_majority_anti_vpn_game = (len(anti_vpn_regions) > len(pro_vpn_regions))
@@ -130,6 +131,11 @@ class AntiVPNPolicy(Policy):
             assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION}) == 'ok'
 
             if is_repeat_offender:
+                # repeat offenders go to prison now
+                if len(prison_regions) > 0:
+                    new_region = prison_regions[random.randint(0, len(prison_regions)-1)]
+                    if not self.test:
+                        assert new_region['id'] != cur_region_name
                 # only repeat offenders get the banishment aura
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
                                       'duration': self.REGION_BANISH_DURATION,
@@ -641,6 +647,11 @@ class AltPolicy(Policy):
             assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION}) == 'ok'
 
             if is_repeat_offender:
+                # repeat offenders go to prison now
+                if len(prison_regions) > 0:
+                    new_region = prison_regions[random.randint(0, len(prison_regions)-1)]
+                    if not self.test:
+                        assert new_region['id'] != cur_region_name
                 # only repeat offenders get the banishment aura
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
                                       'duration': self.REGION_BANISH_DURATION,
