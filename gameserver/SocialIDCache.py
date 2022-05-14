@@ -52,7 +52,7 @@ class SocialIDCache:
                 ret[index[i]] = result
         return ret
 
-    def update_social_id_to_spinpunch_cache(self, social_id):
+    def invalidate_social_id_to_spinpunch_cache(self, social_id):
         social_id = str(social_id)
         result = self.db_client.social_id_to_spinpunch_single(social_id, False)
         if result < 0:
@@ -60,7 +60,7 @@ class SocialIDCache:
         else:
             self.cache[social_id] = result
 
-    def update_social_id_to_spinpunch_cache_all(self):
+    def invalidate_social_id_to_spinpunch_cache_all(self):
         social_ids = self.cache.keys()
         self.cache = {}
         query = []

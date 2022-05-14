@@ -778,8 +778,7 @@ def controlapi_handle_proxyserver(args):
         return defer.succeed('ok\n')
     elif method == 'social_id_update':
         social_id = args['social_id']
-        social_id_table.update_social_id_to_spinpunch_cache(social_id)
-        controlapi_handle_broadcast(args) # pass on to all servers too
+        social_id_table.invalidate_social_id_to_spinpunch_cache(social_id)
     else:
         raise Exception('unhandled method '+method)
 
@@ -3579,7 +3578,7 @@ def reconfig():
         global ip_rep_checker
         ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config.get('ip_reputation_database'))
 
-        social_id_table.update_social_id_to_spinpunch_cache()
+        social_id_table.invalidate_social_id_to_spinpunch_cache()
 
         reload_static_includes()
         proxysite.proxy_root.rescan_static_gamedata_resources()
@@ -3739,7 +3738,7 @@ def do_main():
             if ip_rep_checker.reload():
                 exception_log.event(proxy_time, 'Updated SpinIPReputation database (proxyserver)')
 
-            social_id_table.update_social_id_to_spinpunch_cache()
+            social_id_table.invalidate_social_id_to_spinpunch_cache()
             exception_log.event(proxy_time, 'Updated SocialIDCache database (proxyserver)')
 
         except:

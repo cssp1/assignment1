@@ -487,6 +487,8 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = do_CONTROLAPI({'method':args['method'], 'idnum':args['idnum']})
 
             elif method in ('reconfig','change_state','maint_kick','panic_kick','shutdown','social_id_update'):
+                if method == 'social_id_update':
+                    result = do_CONTROLAPI(control_args)
                 server_name = args['server']
                 row = nosql_client.server_status_query_one({'_id':server_name}, {'hostname':1, 'internal_listen_host': 1,
                                                                                  'game_http_port':1, 'game_ssl_port': 1,

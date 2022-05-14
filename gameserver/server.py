@@ -34155,7 +34155,7 @@ class GameSite(server.Site):
             self.nosql_client = None
 
     def update_social_id_table_cache(self):
-        self.social_id_table.update_social_id_to_spinpunch_cache()
+        self.social_id_table.invalidate_social_id_to_spinpunch_cache()
 
     def do_log_adnetwork_event(self, api, props):
         if not gamedata['server']['enable_adnetwork_logs']: return
@@ -34215,7 +34215,7 @@ class GameSite(server.Site):
         return status_json
 
     def update_social_id(self, social_id):
-        self.social_id_table.update_social_id_to_spinpunch_cache(social_id)
+        self.social_id_table.invalidate_social_id_to_spinpunch_cache(social_id)
 
     # send logged-in players maintenance warnings, then kick all after 5 minutes
     # note: this does not prevent NEW log-ins, so make sure the proxyserver is not routing any new logins here
