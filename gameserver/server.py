@@ -34307,7 +34307,7 @@ class GameSite(server.Site):
                 gamesite.exception_log.event(server_time, 'Error reloading SpinIPReputation database: %r' % e)
 
         try:
-            config.update_social_id_table()
+            gamesite.config.update_social_id_table()
             gamesite.exception_log.event(server_time, 'Updated SocialIDCache database (gameserver %s)' % spin_server_name)
         except Exception as e:
             gamesite.exception_log.event(server_time, 'Error reloading SocialIDCache database: %r' % e)
