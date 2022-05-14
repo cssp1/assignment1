@@ -59,8 +59,6 @@ class SocialIDCache:
             result = None
         else:
             self.cache[social_id] = result
-        cached_ids = self.cache.keys()
-        self.cache = {}
 
     def update_social_id_to_spinpunch_cache_all(self):
         social_ids = self.cache.keys()
