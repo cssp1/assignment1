@@ -34151,6 +34151,9 @@ class GameSite(server.Site):
             if self.pcache_client is self.nosql_client: self.pcache_client = None
             self.nosql_client = None
 
+    def update_social_id_table(self):
+        self.social_id_table = SocialIDCache.SocialIDCache(self.db_client)
+
     def do_log_adnetwork_event(self, api, props):
         if not gamedata['server']['enable_adnetwork_logs']: return
         if api not in self.adnetworks_logs:
@@ -34204,6 +34207,7 @@ class GameSite(server.Site):
         if self.nosql_client:
             self.nosql_client.update_dbconfig(SpinConfig.get_mongodb_config(game_id))
             self.nosql_client.server_status_update(spin_server_name, status_json, reason='reconfig')
+        self.update_social_id_table()
         self.reset_interval(False)
         return status_json
 
@@ -34301,6 +34305,12 @@ class GameSite(server.Site):
                     gamesite.exception_log.event(server_time, 'Updated SpinIPReputation database (gameserver %s)' % spin_server_name)
             except Exception as e:
                 gamesite.exception_log.event(server_time, 'Error reloading SpinIPReputation database: %r' % e)
+
+        try:
+            config.update_social_id_table()
+            gamesite.exception_log.event(server_time, 'Updated SocialIDCache database (gameserver %s)' % spin_server_name)
+        except Exception as e:
+            gamesite.exception_log.event(server_time, 'Error reloading SocialIDCache database: %r' % e)
 
         # if we're about to go down for maintenance, kick all logged-in players
         maint_kicks = 0

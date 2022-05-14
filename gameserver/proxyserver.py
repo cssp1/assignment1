@@ -3575,6 +3575,9 @@ def reconfig():
         global ip_rep_checker
         ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config.get('ip_reputation_database'))
 
+        global social_id_table
+        social_id_table = SocialIDCache.SocialIDCache(db_client)
+
         reload_static_includes()
         proxysite.proxy_root.rescan_static_gamedata_resources()
         status_json = admin_stats.get_server_status_json()
@@ -3732,6 +3735,10 @@ def do_main():
             # check for IP reputation DB update
             if ip_rep_checker.reload():
                 exception_log.event(proxy_time, 'Updated SpinIPReputation database (proxyserver)')
+
+            global social_id_table
+            social_id_table = SocialIDCache.SocialIDCache(db_client)
+            exception_log.event(proxy_time, 'Updated SocialIDCache database (proxyserver)')
 
         except:
             exception_log.event(proxy_time, 'proxyserver bgfunc Exception: ' + traceback.format_exc())
