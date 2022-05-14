@@ -51,3 +51,29 @@ class SocialIDCache:
                     self.cache[query[i]] = result
                 ret[index[i]] = result
         return ret
+
+    def update_social_id_to_spinpunch_cache(self, social_id):
+        social_id = str(social_id)
+        result = self.db_client.social_id_to_spinpunch_single(social_id, False)
+        if result < 0:
+            result = None
+        else:
+            self.cache[social_id] = result
+        cached_ids = self.cache.keys()
+        self.cache = {}
+
+    def update_social_id_to_spinpunch_cache_all(self):
+        social_ids = self.cache.keys()
+        self.cache = {}
+        query = []
+        for id in social_ids:
+            if id not in (-1, '-1', 0, '0', None): # AIs
+                query.append(str(id))
+        if len(query) > 0:
+            query_ret = self.db_client.social_id_to_spinpunch_batch(query)
+            for i in range(len(query)):
+                result = query_ret[i]
+                if result < 0:
+                    result = None
+                else:
+                    self.cache[query[i]] = result
