@@ -17561,7 +17561,8 @@ class CONTROLAPI(resource.Resource):
     def handle_reconfig(self, request):
         return SpinJSON.dumps({'result':gamesite.reconfig()}, newline=True)
     def handle_social_id_update(self, request, social_id):
-        return SpinJSON.dumps({'result':gamesite.update_social_id(social_id)}, newline=True)
+        gamesite.update_social_id(social_id)
+        return SpinJSON.dumps({'result':'ok'})
     def handle_shutdown(self, request, force = False):
         if (not force) and len(session_table) > 0:
             return SpinJSON.dumps({'error':'not shutting down - %d sessions still active\n' % len(session_table)})
