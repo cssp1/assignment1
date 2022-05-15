@@ -17561,8 +17561,9 @@ class CONTROLAPI(resource.Resource):
         return SpinJSON.dumps({'result':gamesite.change_state(state)}, newline=True)
     def handle_reconfig(self, request):
         return SpinJSON.dumps({'result':gamesite.reconfig()}, newline=True)
-    def handle_social_id_update(self, request, social_id):
-        gamesite.update_social_id(social_id)
+    def handle_invalidate_social_id(self, request):
+        social_id = request['social_id']
+        gamesite.invalidate_social_id_to_spinpunch_cache_entry(social_id)
         return SpinJSON.dumps({'result':'ok'})
     def handle_shutdown(self, request, force = False):
         if (not force) and len(session_table) > 0:
@@ -34156,7 +34157,7 @@ class GameSite(server.Site):
             self.nosql_client = None
 
     def update_social_id_table_cache(self):
-        self.social_id_table.invalidate_social_id_to_spinpunch_cache()
+        self.social_id_table.invalidate_social_id_to_spinpunch_cache_all()
 
     def do_log_adnetwork_event(self, api, props):
         if not gamedata['server']['enable_adnetwork_logs']: return
@@ -34215,8 +34216,8 @@ class GameSite(server.Site):
         self.reset_interval(False)
         return status_json
 
-    def update_social_id(self, social_id):
-        self.social_id_table.invalidate_social_id_to_spinpunch_cache(social_id)
+    def invalidate_social_id_to_spinpunch_cache_entry(self, social_id):
+        self.social_id_table.invalidate_social_id_to_spinpunch_cache_entry(social_id)
 
     # send logged-in players maintenance warnings, then kick all after 5 minutes
     # note: this does not prevent NEW log-ins, so make sure the proxyserver is not routing any new logins here
@@ -34315,7 +34316,7 @@ class GameSite(server.Site):
 
         try:
             gamesite.config.update_social_id_table_cache()
-            gamesite.exception_log.event(server_time, 'Updated SocialIDCache database (gameserver %s)' % spin_server_name)
+            gamesite.exception_log.event(server_time, 'Cleared SocialIDCache database (gameserver %s)' % spin_server_name)
         except Exception as e:
             gamesite.exception_log.event(server_time, 'Error reloading SocialIDCache database: %r' % e)
 

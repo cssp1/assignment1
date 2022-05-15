@@ -415,6 +415,27 @@ class HandleClearAlias(Handler):
         self.update_player_cache_ui_name(new_ui_name)
         return ReturnValue(result = 'ok')
 
+class HandleMigrateSpinID(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.old_spin_id = int(self.args['spin_id'])
+        self.new_spin_id = int(self.args['new_spin_id'])
+        self.new_social_id = self.gamesite.nosql_client.spinpunch_to_social_id_single(new_spin_id)
+
+    def do_exec_online(self):
+        if self.new_social_id:
+            self.gamesite.nosql_client.mutate_social_id_to_spinpunch_single(self.new_social_id, self.old_spin_id, reason='PCHECK migration')
+            return ReturnValue(result = 'ok')
+        else:
+            return ReturnValue(error = 'cannot find social ID for target user ID %i' % self.new_spin_id)
+
+    def do_exec_offline(self):
+        if self.new_social_id:
+            self.gamesite.nosql_client.mutate_social_id_to_spinpunch_single(self.new_social_id, self.old_spin_id, reason='PCHECK migration')
+            return ReturnValue(result = 'ok')
+        else:
+            return ReturnValue(error = 'cannot find social ID for target user ID %i' % self.new_spin_id)
+
 class HandleMarkUninstalled(Handler):
     # mark account as uninstalled and scrub PII
     def record_deauthorized_metric(self, social_id, summary_props, reason):
@@ -2224,6 +2245,7 @@ methods = {
     'ignore_alt': HandleIgnoreAlt,
     'unignore_alt': HandleUnignoreAlt,
     'clear_alias': HandleClearAlias,
+    'migrate_spin_id': HandleMigrateSpinID,
     'chat_block': HandleChatBlock,
     'chat_unblock': HandleChatUnblock,
     'chat_official': HandleChatOfficial,

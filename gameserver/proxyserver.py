@@ -776,9 +776,10 @@ def controlapi_handle_proxyserver(args):
         test_response = SpinJSON.loads('''{"id":"example_payment","user":{"name":"Frank","id":"example3"},"actions":[{"type":"charge","status":"completed","currency":"USD","amount":"50.00","time_created":"2014-02-09T16:34:55+0000","time_updated":"2014-02-09T16:34:55+0000"}],"refundable_amount":{"currency":"USD","amount":"50.00"},"items":[{"type":"IN_APP_PURCHASE","product":"http:\/\/trprod.spinpunch.com\/OGPAPI?spellname=BUY_GAMEBUCKS_5000_FBP_P100M_USD&type=tr_sku","quantity":1}],"country":"US","request_id":"tr_1102945_8f64174bf243e51fedfeb2f468dcccb6_1541","created_time":"2014-02-09T16:34:55+0000","payout_foreign_exchange_rate":1,"disputes":[{"user_comment":"I bougth 50 dollars and press the x in the corner so I took me back to the game so I triedgain it did give me my 50 dollars worth in  gold I had a hundred in card so I tried again to get my other 50 dollars in gold and it declined my card that means that one of the payments went tru but I didn\'t got my gold!! pls help me","time_created":"2014-02-10T23:12:49+0000","user_email":"asdf\u0040example.com"}]}''')
         send_payment_dispute_notification(test_response, 1112, dry_run = True)
         return defer.succeed('ok\n')
-    elif method == 'social_id_update':
+    elif method == 'invalidate_social_id':
         social_id = args['social_id']
-        social_id_table.invalidate_social_id_to_spinpunch_cache(social_id)
+        social_id_table.invalidate_social_id_to_spinpunch_cache_entry(social_id)
+        return defer.succeed('ok\n')
     else:
         raise Exception('unhandled method '+method)
 
