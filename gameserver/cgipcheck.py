@@ -429,9 +429,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     if not social_id:
                         social_id = new_player.get('facebook_id', None)
                     invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': social_id}
-                    result = do_CONTROLAPI(invalidate_args, host = row.get('internal_listen_host', row['hostname']),
-                                           http_port = row.get('game_http_port',None) or row.get('external_http_port',None),
-                                           ssl_port = row.get('game_ssl_port',None) or row.get('external_ssl_port',None))
+                    result = do_action(path, 'invalidate_social_id', invalidate_args, spin_token_data, nosql_client) # pass back to do_action to handle invalidation broadcast
                 else:
                     result = initial_result
             else:
@@ -500,7 +498,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             elif method == 'setup_ai_base':
                 result = do_CONTROLAPI({'method':args['method'], 'idnum':args['idnum']})
 
-            elif method in ('reconfig','change_state','maint_kick','panic_kick','shutdown'):
+            elif method in ('reconfig','change_state','maint_kick','panic_kick','shutdown', 'invalidate_social_id'):
                 server_name = args['server']
                 row = nosql_client.server_status_query_one({'_id':server_name}, {'hostname':1, 'internal_listen_host': 1,
                                                                                  'game_http_port':1, 'game_ssl_port': 1,

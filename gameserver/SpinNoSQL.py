@@ -1095,7 +1095,7 @@ class NoSQLClient (object):
 
     def mutate_social_id_to_spinpunch_single(self, socid, spinid, reason=''):
         return self.instrument('mutate_social_id_to_spinpunch_single(%s)' % reason, self._mutate_social_id_to_spinpunch_single, (socid, spinid))
-    def _mutate_social_id_to_spinpunch_single(self, socid, intrusive):
+    def _mutate_social_id_to_spinpunch_single(self, socid, spinid):
         socid = self.social_id_key(socid)
         spinid = int(spinid)
         tbl = self.facebook_id_table()
