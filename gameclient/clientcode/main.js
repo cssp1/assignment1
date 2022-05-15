@@ -1587,6 +1587,7 @@ function GameObject() {
     // combat stats - pulled from gamedata but modified by auras
     /** @type {!CombatStats} */
     this.combat_stats = new CombatStats();
+    this.use_secondary_weapon = false;
 
     /** @type {Array.<Aura>} */
     this.auras = [];
@@ -1845,6 +1846,7 @@ function CombatStats() {
     this.muzzle_height = 0;
     this.flying = false;
     this.altitude = 0;
+    this.current_weapon = 0;
 
     // Mobile only
 
@@ -1886,6 +1888,7 @@ CombatStats.prototype.clear = function() {
     this.muzzle_height = 0;
     this.flying = false;
     this.altitude = 0;
+    this.current_weapon = 0;
 };
 
 /** @override */
@@ -1926,6 +1929,7 @@ CombatStats.prototype.serialize = function() {
     if(this.muzzle_height) { ret['muzzle_height'] = this.muzzle_height; }
     if(this.altitude) { ret['altitude'] = this.altitude; }
     if(this.flying) { ret['flying'] = this.flying; }
+    if(this.current_weapon) { ret['current_weapon'] = this.current_weapon; }
     return ret;
 };
 
@@ -1963,6 +1967,7 @@ CombatStats.prototype.apply_snapshot = function(snap) {
     if('muzzle_height' in snap) { this.muzzle_height = snap['muzzle_height']; }
     if('altitude' in snap) { this.altitude = snap['altitude']; }
     if('flying' in snap) { this.flying = snap['flying']; }
+    if('current_weapon' in snap) { this.current_weapon = snap['current_weapon']; }
 };
 
 // "merge" together two damage_vs tables, returning a table that has
@@ -2082,6 +2087,7 @@ GameObject.prototype.update_aura_effects = function(world) {
     @param {World.World|null} world - null for phantom/scenery objects */
 GameObject.prototype.update_stats = function(world) {
     this.combat_stats.clear();
+    this.combat_stats.current_weapon = (this.use_secondary_weapon ? 1 : 0);
     this.combat_stats.invisible = this.is_invisible_default();
     this.combat_stats.weapon_facing_fudge = this.spec['weapon_facing_fudge'] || 0;
     this.combat_stats.muzzle_offset = this.spec['muzzle_offset'] || [0,0,0];
@@ -2771,18 +2777,40 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
 
             world.send_and_destroy_object(this, this, 'retreat');
 
-            if('muzzle_flash_effect' in spell) {
-                // instance properties passed to vfx system
-                var vfx_props = {'heading': this.cur_facing,
-                                 'tick_offset': 0,
-                                 'my_next_pos': this.next_pos};
-                var muzzle_vfx = spell['muzzle_flash_effect'];
-                world.fxworld.add_visual_effect_at_tick(this.interpolate_pos(world), (this.is_flying() ? this.combat_stats.altitude : 0),
-                                                        [Math.cos(this.cur_facing), 0, Math.sin(this.cur_facing)],
-                                                        world.combat_engine.cur_tick, 0,
-                                                        muzzle_vfx, true, vfx_props);
+        } else if(code === 'toggle_weapon') {
+            if(this.is_mobile() && this.has_secondary_weapon()) {
+                this.use_secondary_weapon = !this.use_secondary_weapon;
+                var owner = (this.team === 'player' ? player : enemy);
+                var weapon_index = 0;
+                if(this.use_secondary_weapon) { weapon_index = 1 }
+                var weapon_stat = { 0: 'weapon', 1: 'secondary_weapon' }[weapon_index];
+                var spellname = get_unit_stat(owner.stattab, this.spec['name'], weapon_stat, this.spec['spells'][weapon_index]);
+                if(spellname) {
+                    var weapon_spell = gamedata['spells'][spellname];
+                    var weapon_name = "Weapon Ready: " + weapon_spell['ui_name'];
+                    var muzzle_vfx = { "type": "combat_text", "ui_name": weapon_name, "text_color":[1,0,0], "drop_shadow":1 };
+                    var vfx_props = {'heading': this.cur_facing,
+                                     'tick_offset': 0,
+                                     'my_next_pos': this.next_pos};
+                    world.fxworld.add_visual_effect_at_tick(this.interpolate_pos(world), (this.is_flying() ? this.combat_stats.altitude : 0),
+                                                            [Math.cos(this.cur_facing), 0, Math.sin(this.cur_facing)],
+                                                            world.combat_engine.cur_tick, 0,
+                                                            muzzle_vfx, true, vfx_props);
+                }
             }
         }
+    }
+
+    if('muzzle_flash_effect' in spell) {
+        // instance properties passed to vfx system
+        var vfx_props = {'heading': this.cur_facing,
+                         'tick_offset': 0,
+                         'my_next_pos': this.next_pos};
+        var muzzle_vfx = spell['muzzle_flash_effect'];
+        world.fxworld.add_visual_effect_at_tick(this.interpolate_pos(world), (this.is_flying() ? this.combat_stats.altitude : 0),
+                                                [Math.cos(this.cur_facing), 0, Math.sin(this.cur_facing)],
+                                                world.combat_engine.cur_tick, 0,
+                                                muzzle_vfx, true, vfx_props);
     }
 
     var visual_cooldown = 0;
@@ -9487,6 +9515,18 @@ Mobile.prototype.on_removed_from_world = function(world) {
     }
 };
 
+Mobile.prototype.has_secondary_weapon = function() {
+    var owner = (this.team === 'player' ? player : enemy);
+    var specname = this.spec['name'];
+    if(owner.stattab && 'units' in owner.stattab && specname in owner.stattab['units'] && 'secondary_weapon' in owner.stattab['units'][specname]) { return true; }
+    var weapon_count = 0;
+    goog.array.forEach(this.spec['spells'], function(spellname) {
+        var spell = gamedata['spells'][spellname];
+        if(spell['activation'] === 'auto') { weapon_count += 1; }
+    });
+    return weapon_count > 1;
+ };
+
 Mobile.prototype.is_temporary = function() { return !!this.temporary; };
 Mobile.prototype.is_flying = function() { return this.combat_stats.flying || false; };
 Mobile.prototype.is_flying_default = function() { return this.spec['flying'] || false; };
@@ -9580,9 +9620,15 @@ function get_auto_spell_raw(spec) {
 }
 
 // includes player or enemy modstats
-function get_auto_spell_for_unit(player_or_enemy, unit_spec) {
+/** @param {!Object} player_or_enemy
+    @param {!Object} unit_spec
+    @param {Object|null=} combat_stats */
+function get_auto_spell_for_unit(player_or_enemy, unit_spec, combat_stats) {
+    var weapon_index = 0;
+    if(combat_stats && combat_stats.current_weapon && combat_stats.current_weapon < unit_spec.spells.length) { weapon_index = combat_stats.current_weapon; }
+    var weapon_stat = { 0: 'weapon', 1: 'secondary_weapon' }[weapon_index];
     if(('spells' in unit_spec) && (unit_spec['spells'].length > 0)) {
-        var spellname = get_unit_stat(player_or_enemy.stattab, unit_spec['name'], 'weapon', unit_spec['spells'][0]);
+        var spellname = get_unit_stat(player_or_enemy.stattab, unit_spec['name'], weapon_stat, unit_spec['spells'][weapon_index]);
         if(spellname) {
             var auto_spell = gamedata['spells'][spellname];
             if(auto_spell['activation'] === 'auto') {
@@ -9592,19 +9638,30 @@ function get_auto_spell_for_unit(player_or_enemy, unit_spec) {
     }
     return null;
 }
-function get_auto_spell_level_for_unit(player_or_enemy, unit_spec, unit_level) {
+
+// includes player or enemy modstats
+/** @param {!Object} player_or_enemy
+    @param {!Object} unit_spec
+    @param {number} unit_level
+    @param {Object|null=} combat_stats */
+function get_auto_spell_level_for_unit(player_or_enemy, unit_spec, unit_level, combat_stats) {
+    var unit_weapon = get_auto_spell_for_unit(player_or_enemy, unit_spec, combat_stats);
+    if(unit_weapon && 'associated_tech' in unit_weapon) { // equipped secondary weapons take their level from a researchable tech
+        var weapon_tech = unit_weapon['associated_tech'];
+        return Math.max(player_or_enemy.tech[weapon_tech], 1);
+    }
     return get_unit_stat(player_or_enemy.stattab, unit_spec['name'], 'weapon_level', unit_level);
 }
 
 /** @override */
 Mobile.prototype.get_auto_spell = function() {
     var owner = (this.team === 'player' ? player : enemy);
-    return get_auto_spell_for_unit(owner, this.spec);
+    return get_auto_spell_for_unit(owner, this.spec, this.combat_stats);
 };
 /** @override */
 Mobile.prototype.get_auto_spell_level = function() {
     var owner = (this.team === 'player' ? player : enemy);
-    return get_auto_spell_level_for_unit(owner, this.spec, this.level);
+    return get_auto_spell_level_for_unit(owner, this.spec, this.level, this.combat_stats);
 };
 
 function get_auto_spell_for_item(item_spec) {
@@ -35807,7 +35864,7 @@ function manufacture_dialog_select_unit(dialog, name) {
     dialog.widgets['unit_hero_icon'].bg_image_offset = hero_offset;
 
     // fill in unit stats
-    var auto_spell = get_auto_spell_for_unit(player, spec);
+    var auto_spell = get_auto_spell_for_unit(player, spec, null);
     var auto_spell_level = Math.max(level, 1);
 
     var features = ['max_hp'];
@@ -47106,7 +47163,7 @@ function update_upgrade_dialog(dialog) {
             var spec = gamedata['units'][tech['associated_unit']];
             feature_list.push('max_hp');
             if(gamedata['show_armor_in_ui']) { feature_list.push('armor'); }
-            feature_list = feature_list.concat(get_weapon_spell_features2(spec, get_auto_spell_for_unit(player, spec), new_level));
+            feature_list = feature_list.concat(get_weapon_spell_features2(spec, get_auto_spell_for_unit(player, spec, null), new_level));
             feature_list.push('maxvel');
             if(get_leveled_quantity(spec['consumes_space']||0, 1) > 0) {
                 feature_list.push('consumes_space');
@@ -47602,7 +47659,7 @@ function update_upgrade_dialog(dialog) {
         var old_targeted_spell, new_targeted_spell, item_not_tech_spec = {};
         if(tech) {
             if('associated_unit' in tech || 'affects_unit' in tech) {
-                old_auto_spell = new_auto_spell = get_auto_spell_for_unit(player, spec);
+                old_auto_spell = new_auto_spell = get_auto_spell_for_unit(player, spec, null);
             } else if('associated_item' in tech) {
                 old_auto_spell = get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.max(1,old_level))));
                 new_auto_spell = get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level,max_level))));
@@ -47912,7 +47969,7 @@ function update_upgrade_dialog(dialog) {
         var spell = get_auto_spell_raw(unit.spec);
         init_damage_vs_icons(dialog, unit.spec, spell);
     } else if(tech['associated_unit']) {
-        init_damage_vs_icons(dialog, gamedata['units'][tech['associated_unit']], get_auto_spell_for_unit(player, gamedata['units'][tech['associated_unit']]));
+        init_damage_vs_icons(dialog, gamedata['units'][tech['associated_unit']], get_auto_spell_for_unit(player, gamedata['units'][tech['associated_unit']], null));
     } else if(tech['associated_item']) {
         var spell = get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'],Math.min(new_level, max_level))));
         init_damage_vs_icons(dialog, {'name': tech['name'], 'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
