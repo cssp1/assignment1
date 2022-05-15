@@ -9625,7 +9625,7 @@ function get_auto_spell_raw(spec) {
     @param {Object|null=} combat_stats */
 function get_auto_spell_for_unit(player_or_enemy, unit_spec, combat_stats) {
     var weapon_index = 0;
-    if(combat_stats && combat_stats.current_weapon && combat_stats.current_weapon < unit_spec.spells.length) { weapon_index = combat_stats.current_weapon; }
+    if(combat_stats && combat_stats.current_weapon && combat_stats.current_weapon < unit_spec['spells'].length) { weapon_index = combat_stats.current_weapon; }
     var weapon_stat = { 0: 'weapon', 1: 'secondary_weapon' }[weapon_index];
     if(('spells' in unit_spec) && (unit_spec['spells'].length > 0)) {
         var spellname = get_unit_stat(player_or_enemy.stattab, unit_spec['name'], weapon_stat, unit_spec['spells'][weapon_index]);
