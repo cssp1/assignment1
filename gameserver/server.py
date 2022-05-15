@@ -7024,6 +7024,7 @@ class GameObjectSpec(Spec):
         ["remove_ingredients", None],
         ["remove_requires", None],
         ["spells", []],
+        ["secondary_weapon", None],
         ["level_determined_by_tech", None],
         ["limit", -1],
         ["limit_requires", None],
