@@ -420,7 +420,7 @@ class HandleMigrateSpinID(Handler):
         Handler.__init__(self, *args, **kwargs)
         self.old_spin_id = int(self.args['spin_id'])
         self.new_spin_id = int(self.args['new_spin_id'])
-        self.new_social_id = self.gamesite.nosql_client.spinpunch_to_social_id_single(new_spin_id)
+        self.new_social_id = self.gamesite.nosql_client.spinpunch_to_social_id_single(self.new_spin_id)
 
     def do_exec_online(self):
         if self.new_social_id:
