@@ -34156,7 +34156,7 @@ class GameSite(server.Site):
             if self.pcache_client is self.nosql_client: self.pcache_client = None
             self.nosql_client = None
 
-    def update_social_id_table_cache(self):
+    def invalidate_social_id_table_cache(self):
         self.social_id_table.invalidate_social_id_to_spinpunch_cache_all()
 
     def do_log_adnetwork_event(self, api, props):
@@ -34314,11 +34314,8 @@ class GameSite(server.Site):
             except Exception as e:
                 gamesite.exception_log.event(server_time, 'Error reloading SpinIPReputation database: %r' % e)
 
-        try:
-            gamesite.config.update_social_id_table_cache()
-            gamesite.exception_log.event(server_time, 'Cleared SocialIDCache database (gameserver %s)' % spin_server_name)
-        except Exception as e:
-            gamesite.exception_log.event(server_time, 'Error reloading SocialIDCache database: %r' % e)
+        gamesite.invalidate_social_id_table_cache()
+        gamesite.exception_log.event(server_time, 'Cleared SocialIDCache database (gameserver %s)' % spin_server_name)
 
         # if we're about to go down for maintenance, kick all logged-in players
         maint_kicks = 0

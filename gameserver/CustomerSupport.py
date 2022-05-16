@@ -425,16 +425,23 @@ class HandleMigrateSpinID(Handler):
     def do_exec_online(self):
         if self.new_social_id:
             check_result = self.gamesite.nosql_client.mutate_social_id_to_spinpunch_single(self.new_social_id, self.old_spin_id, reason='PCHECK migration')
-            if check_result == 'ok': return ReturnValue(result = 'ok')
-            else: return ReturnValue(error = check_result)
+            if check_result == 'ok':
+                invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': self.new_social_id}
+                check_result = self.gamesite.do_CONTROLAPI(None, invalidate_args) # broadcast invalidation broadcast
+                if check_result == 'ok':
+                    return ReturnValue(result = 'ok')
+            return ReturnValue(error = check_result)
         else:
             return ReturnValue(error = 'cannot find social ID for target user ID %i' % self.new_spin_id)
 
     def do_exec_offline(self):
         if self.new_social_id:
             check_result = self.gamesite.nosql_client.mutate_social_id_to_spinpunch_single(self.new_social_id, self.old_spin_id, reason='PCHECK migration')
-            if check_result == 'ok': return ReturnValue(result = 'ok')
-            else: return ReturnValue(error = check_result)
+            if check_result == 'ok':
+                invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': self.new_social_id}
+                check_result = self.gamesite.do_CONTROLAPI(None, invalidate_args) # broadcast invalidation broadcast
+                if check_result == 'ok':
+                    return ReturnValue(result = 'ok')
         else:
             return ReturnValue(error = 'cannot find social ID for target user ID %i' % self.new_spin_id)
 

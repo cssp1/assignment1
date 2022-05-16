@@ -1099,9 +1099,8 @@ class NoSQLClient (object):
         socid = self.social_id_key(socid)
         spinid = int(spinid)
         tbl = self.facebook_id_table()
-        row = tbl.find_one({'_id':socid})
-        if row:
-            tbl.update({'_id': socid}, {'$set': {'user_id': spinid}})
+        success = tbl.update_one({'_id': socid}, {'$set': {'user_id': spinid}}).matched_count > 0
+        if success:
             return 'ok'
         else:
             return 'social id %s not found' % socid

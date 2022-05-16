@@ -377,7 +377,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result':chat_abuse_violate(control_args, 'violate', control_args['ui_player_reason'], None, None)}
             elif method == 'chat_abuse_clear':
                 result = {'result':chat_abuse_clear(control_args)}
-            elif method in ('give_item','send_message','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','unban','vpn_excuse','vpn_unexcuse','make_developer','unmake_developer',
+            elif method in ('give_item','send_message','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','unban','vpn_excuse','vpn_unexcuse','make_developer','unmake_developer', 'migrate_spin_id',
                             'clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member','change_alliance_info','change_player_alias','add_note'):
                 result = do_CONTROLAPI(control_args)
             elif method in ('chat_gag','chat_ungag','ban','change_region'):
@@ -420,18 +420,6 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                             result['error'] = '\n%s' % error_string
                 else:
                     result = do_CONTROLAPI(control_args)
-            elif method == 'migrate_spin_id':
-                initial_result = do_CONTROLAPI(control_args)
-                if 'result' in initial_result and initial_result['result'] == 'ok': # broadcast invalidation to proxyserver and servers if migration succeeded
-                    new_spin_id = control_args['new_spin_id']
-                    new_player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': new_spin_id})['result'])
-                    social_id = new_player.get('bh_id', None)
-                    if not social_id:
-                        social_id = new_player.get('facebook_id', None)
-                    invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': social_id}
-                    result = do_action(path, 'invalidate_social_id', invalidate_args, spin_token_data, nosql_client) # pass back to do_action to handle invalidation broadcast
-                else:
-                    result = initial_result
             else:
                 raise Exception('unknown player method '+method)
 
@@ -498,7 +486,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             elif method == 'setup_ai_base':
                 result = do_CONTROLAPI({'method':args['method'], 'idnum':args['idnum']})
 
-            elif method in ('reconfig','change_state','maint_kick','panic_kick','shutdown', 'invalidate_social_id'):
+            elif method in ('reconfig','change_state','maint_kick','panic_kick','shutdown'):
                 server_name = args['server']
                 row = nosql_client.server_status_query_one({'_id':server_name}, {'hostname':1, 'internal_listen_host': 1,
                                                                                  'game_http_port':1, 'game_ssl_port': 1,
