@@ -691,7 +691,7 @@ def controlapi_handle(request):
         raise Exception('unauthorized')
 
     if request.args['method'] == 'invalidate_social_id':
-        social_id = args['social_id']
+        social_id = request.args['social_id']
         social_id_table.invalidate_social_id_to_spinpunch_cache_entry(social_id)
 
     if 'broadcast' in request.args:
