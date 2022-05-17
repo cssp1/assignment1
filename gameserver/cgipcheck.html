@@ -423,7 +423,7 @@ var method_unban = function() {
 };
 var method_vpn_excuse = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#alts_vpn_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
     args = {'ui_reason': ui_reason};
 
     if(ident && ui_reason) {
@@ -432,7 +432,7 @@ var method_vpn_excuse = function() {
 };
 var method_vpn_unexcuse = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#alts_vpn_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
     if(ident && ui_reason) {
         send_request('player', 'vpn_unexcuse', $.extend(ident, {'ui_reason':ui_reason}), function(result) { display_response("Success!"); });
     }
@@ -487,9 +487,26 @@ var method_unmake_developer = function() {
     }
 };
 
+var method_migrate_spin_id = function(new_spin_id) {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
+    if(ident && ui_reason) {
+        if(!ident['user_id']) {
+            display_error('Please look up this player by User ID');
+            return;
+        }
+        var spin_id = ident['user_id'];
+        if(!new_spin_id) {
+            display_error("Please fill in the ID of the player's new account");
+            return;
+        }
+        send_request('player', 'migrate_spin_id', $.extend(ident, {'spin_id': spin_id, 'new_spin_id': new_spin_id, 'ui_reason': ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+
 var method_ignore_or_unignore_alt = function(other_id, method_name) {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#alts_vpn_reason")[0].value);
+    var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
     if(ident && ui_reason) {
         if(!ident['user_id']) {
             display_error('Please look up this player by User ID');
@@ -1918,7 +1935,7 @@ $(function() {
     <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Tools/Abuse</a></li>
     <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
     <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
-    <li><a href="#player_tools_alts_vpn" id="player_tools_alts_vpn_header">Alts/VPN</a></li>
+    <li><a href="#player_tools_alts_vpn_migrate" id="player_tools_alts_vpn_migrate_header">Alts/VPN/Migrate</a></li>
     <li><a href="#player_tools_change_region" id="player_tools_change_region_header">Map Region</a></li>
     <li><a href="#player_tools_alliance_player" id="player_tools_alliance_player_header">Player/Clan</a></li>
     <li><a href="#player_tools_privacy" id="player_tools_privacy_header">Privacy</a></li>
@@ -2071,7 +2088,7 @@ $(function() {
         </p>
     </div>
 
-    <div id="player_tools_alts_vpn">
+    <div id="player_tools_alts_vpn_migrate">
         <p>
             Other Player ID: <input type="text" id="ignore_alt_other_id" name="ignore_alt_other_id">
             <button onclick="method_ignore_alt($('#ignore_alt_other_id').spinner('value'))" class="spin_button" style="width:250px;">Ignore (mark as non-alt)</button>
@@ -2082,9 +2099,13 @@ $(function() {
             <button onclick="method_vpn_unexcuse()" class="spin_button">Disallow VPN</button>
         </p>
         <p>
+            Migration Player ID: <input type="text" id="migrate_account_other_id" name="migrate_account_other_id">
+            <button onclick="method_migrate_spin_id($('#migrate_account_other_id').spinner('value'))" class="spin_button" style="width:250px;">Migrate</button>
+        </p>
+        <p>
             Reason for this action:
             <br>
-            <input type="text" id="alts_vpn_reason" style="width:500px;">
+            <input type="text" id="alts_vpn_migrate_reason" style="width:500px;">
         </p>
     </div>
     <div id="player_tools_ban">
