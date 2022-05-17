@@ -34314,9 +34314,6 @@ class GameSite(server.Site):
             except Exception as e:
                 gamesite.exception_log.event(server_time, 'Error reloading SpinIPReputation database: %r' % e)
 
-        gamesite.invalidate_social_id_to_spinpunch_cache_all()
-        gamesite.exception_log.event(server_time, 'Cleared SocialIDCache database (gameserver %s)' % spin_server_name)
-
         # if we're about to go down for maintenance, kick all logged-in players
         maint_kicks = 0
         if self.maint_kick_time > 0 and server_time >= self.maint_kick_time:
