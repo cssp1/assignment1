@@ -3739,9 +3739,6 @@ def do_main():
             if ip_rep_checker.reload():
                 exception_log.event(proxy_time, 'Updated SpinIPReputation database (proxyserver)')
 
-            social_id_table.invalidate_social_id_to_spinpunch_cache()
-            exception_log.event(proxy_time, 'Updated SocialIDCache database (proxyserver)')
-
         except:
             exception_log.event(proxy_time, 'proxyserver bgfunc Exception: ' + traceback.format_exc())
 
