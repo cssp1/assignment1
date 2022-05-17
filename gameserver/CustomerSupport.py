@@ -440,6 +440,7 @@ class HandleMigrateSpinID(Handler):
                 invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': self.new_social_id}
                 self.gamesite.do_CONTROLAPI(None, invalidate_args) # broadcast invalidation order so servers clear social ID cache
                 return ReturnValue(result = 'ok')
+            return ReturnValue(error = check_result)
         else:
             return ReturnValue(error = 'cannot find social ID for target user ID %i' % self.new_spin_id)
 
