@@ -6950,6 +6950,7 @@ player.cooldowns = {};
 // NOTE! global_cooldown is relative to client_time, NOT server_time like all other cooldowns!
 player.global_cooldown = {'start':-1, 'end':-1}; // the GCD is client-side only for now
 player.developer = false; // developer access ON LIVE SERVER (e.g. shows chat gagging options)
+player.patron = 0; // patron level
 player.is_suspicious = false; // extra logging to track suspected hackers
 player.is_chat_mod = false; // whether player has chat moderation authority
 player.isolate_pvp = 0; // same as server's isolate_pvp flag
@@ -51390,6 +51391,7 @@ function handle_server_message(data) {
         var daily_banner = data[23];
         var fb_likes_preload = data[24];
         player.vpn_status = (data.length >= 26 ? data[25] : null);
+        player.patron = (data.length >= 27 ? data[26] : 0);
 
         ChatFilter.init(gamedata['client']['chat_filter']);
 

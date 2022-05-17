@@ -1153,6 +1153,42 @@ PlayerHistoryPredicate.prototype.ui_difficulty = function() {
 
 /** @constructor @struct
   * @extends Predicate */
+function PatronPredicate(data, value, method) {
+    goog.base(this, data);
+    this.value = value;
+    this.method = method;
+}
+goog.inherits(PatronPredicate, Predicate);
+PatronPredicate.prototype.is_satisfied = function(player, qdata) {
+    if(this.method == '>=') {
+        return player.patron >= this.value;
+    } else if(this.method == '==') {
+        return player.patron == this.value;
+    } else if(this.method == '<') {
+        return player.patron < this.value;
+    } else {
+        throw Error('unknown method '+this.method);
+    }
+};
+PatronPredicate.prototype.do_ui_describe = function(player) {
+    var ret;
+    var patron_tier = 'Captain or higher';
+    if(this.value == 2) {
+        patron_tier = 'Major or higher';
+    } else if (this.value == 3) {
+        patron_tier = 'Colonel'
+    }
+    if('ui_name' in this.data) {
+        ret = this.data['ui_name'];
+    } else {
+        ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
+    }
+    ret = ret.replace('%s', patron_tier);
+    return new PredicateUIDescription(ret);
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function PlayerPreferencePredicate(data) {
     goog.base(this, data);
     this.key = data['key'];
@@ -2685,6 +2721,8 @@ function read_predicate(data) {
         return new ClientVersionPredicate(data);
     } else if (kind === 'HAS_ALTS') {
         return new HasAltsPredicate(data);
+    } else if(kind === 'PATRON') {
+        return new PatronPredicate(data, data['value'], data['method']);
     } else {
         throw Error('unknown predicate '+JSON.stringify(data));
     }

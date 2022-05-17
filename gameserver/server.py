@@ -1474,6 +1474,9 @@ class User:
         # 1 if player is a developer (access to special functions and exclude from metrics)
         self.developer = None
 
+        # 0 = Non-Patron 1 = Captain, 2 = Major, 3 = Colonel
+        self.patron = 0
+
         # this holds any unrecognized JSON data from the saved file
         # necessary to preserve forwards-compatibility in case we load a file
         # that contains data from a future version of the server
@@ -9677,6 +9680,9 @@ class Player(AbstractPlayer):
         self.trust_level = None
         self.developer = None
 
+        # 0 = Non-Patron 1 = Captain, 2 = Major, 3 = Colonel
+        self.patron = 0
+
         self.mentor_player_id_cache = None
         self.trainee_player_ids_cache = None
 
@@ -9879,6 +9885,7 @@ class Player(AbstractPlayer):
         self.price_region = SpinConfig.price_region_map.get(self.country, 'unknown')
         self.country_tier = SpinConfig.country_tier_map.get(self.country, 4)
         self.developer = user.developer
+        self.patron = user.patron
         self.locale = user.locale
         self.trust_level = user.get_trust_level()
         self.mentor_player_id_cache = user.bh_mentor_player_id_cache
@@ -13976,6 +13983,7 @@ class Player(AbstractPlayer):
                'ct': self.country,
                'tier': self.country_tier}
         if self.developer: ret['developer'] = self.developer # also insert "developer" flag here in case ETL scripts want to ignore these
+        if self.patron: ret['patron'] = self.patron
         return ret
 
     def alt_record_attack(self, other_id): pass
@@ -28983,7 +28991,8 @@ class GAMEAPI(resource.Resource):
                        session.user.is_chat_mod(),
                        session.player.get_daily_banner(session, retmsg),
                        session.user.get_fb_likes_preload(),
-                       session.user.vpn_status
+                       session.user.vpn_status,
+                       session.player.patron
                        ])
         retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
         retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])

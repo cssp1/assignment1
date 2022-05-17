@@ -595,6 +595,25 @@ class HandleUnmakeDeveloper(Handler):
         if 'developer' in user: del user['developer']
         return ReturnValue(result = 'ok')
 
+class HandleMakePatron(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.patron_level = int(self.args['patron_level'])
+
+    def do_exec_online(self, session, retmsg):
+        session.user.patron = session.player.patron = self.patron_level # note: update Player as well as User
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        user['patron'] = self.patron_level
+        return ReturnValue(result = 'ok')
+class HandleUnmakePatron(Handler):
+    def do_exec_online(self, session, retmsg):
+        session.user.patron = session.player.patron = 0 # note: update Player as well as User
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        if 'patron' in user: del user['patron']
+        return ReturnValue(result = 'ok')
+
 class HandleChatOfficial(Handler):
     def do_exec_online(self, session, retmsg):
         session.player.chat_official = 1
@@ -2250,6 +2269,8 @@ methods = {
     'record_alt_login': HandleRecordAltLogin,
     'make_developer': HandleMakeDeveloper,
     'unmake_developer': HandleUnmakeDeveloper,
+    'make_patron': HandleMakePatron,
+    'unmake_patron': HandleUnmakePatron,
     'ignore_alt': HandleIgnoreAlt,
     'unignore_alt': HandleUnignoreAlt,
     'clear_alias': HandleClearAlias,
