@@ -800,9 +800,9 @@ if __name__ == '__main__':
         if user.get('patron',0):
             patron_level = user['patron']
             patron_title = 'Captain'
-            if patron_level = 2:
+            if patron_level == 2:
                 patron_title = 'Major'
-            elif patron_level = 3:
+            elif patron_level == 3:
                 patron_title = 'Colonel'
             print fmt % ('Patron: %s' % patron_title, '')
         if player.get('chat_official',0):
