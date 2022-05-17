@@ -1093,6 +1093,18 @@ class NoSQLClient (object):
         else:
             return -1
 
+    def mutate_social_id_to_spinpunch_single(self, socid, spinid, reason=''):
+        return self.instrument('mutate_social_id_to_spinpunch_single(%s)' % reason, self._mutate_social_id_to_spinpunch_single, (socid, spinid))
+    def _mutate_social_id_to_spinpunch_single(self, socid, spinid):
+        socid = self.social_id_key(socid)
+        spinid = int(spinid)
+        tbl = self.facebook_id_table()
+        success = tbl.update_one({'_id': socid}, {'$set': {'user_id': spinid}}).matched_count > 0
+        if success:
+            return 'ok'
+        else:
+            return 'social id %s not found' % socid
+
     def facebook_id_to_spinpunch_batch(self, fbid_list, reason=''):
         return self.social_id_to_spinpunch_batch(['fb'+str(x) for x in fbid_list], reason=reason)
     def social_id_to_spinpunch_batch(self, socid_list, reason=''):

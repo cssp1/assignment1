@@ -690,6 +690,10 @@ def controlapi_handle(request):
     if 'secret' not in request.args or request.args['secret'][-1] != SpinConfig.config['proxy_api_secret'] or 'method' not in request.args:
         raise Exception('unauthorized')
 
+    if request.args['method'] == 'invalidate_social_id':
+        social_id = request.args['social_id']
+        social_id_table.invalidate_social_id_to_spinpunch_cache_entry(social_id)
+
     if 'broadcast' in request.args:
         return controlapi_handle_broadcast(request.args)
 
@@ -3575,6 +3579,8 @@ def reconfig():
         global ip_rep_checker
         ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config.get('ip_reputation_database'))
 
+        social_id_table.invalidate_social_id_to_spinpunch_cache()
+
         reload_static_includes()
         proxysite.proxy_root.rescan_static_gamedata_resources()
         status_json = admin_stats.get_server_status_json()
@@ -3732,6 +3738,9 @@ def do_main():
             # check for IP reputation DB update
             if ip_rep_checker.reload():
                 exception_log.event(proxy_time, 'Updated SpinIPReputation database (proxyserver)')
+
+            social_id_table.invalidate_social_id_to_spinpunch_cache()
+            exception_log.event(proxy_time, 'Updated SocialIDCache database (proxyserver)')
 
         except:
             exception_log.event(proxy_time, 'proxyserver bgfunc Exception: ' + traceback.format_exc())
