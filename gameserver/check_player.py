@@ -797,6 +797,14 @@ if __name__ == '__main__':
             print fmt % ('Player is a chat moderator', '')
         if user.get('developer',0):
             print fmt % ('DEVELOPER account', '')
+        if user.get('patron',0):
+            patron_level = user['patron']
+            patron_title = 'Captain'
+            if patron_level == 2:
+                patron_title = 'Major'
+            elif patron_level == 3:
+                patron_title = 'Colonel'
+            print fmt % ('Patron: %s' % patron_title, '')
         if player.get('chat_official',0):
             print fmt % ('CHAT OFFICIAL (blue text) account', '')
 

@@ -487,6 +487,21 @@ var method_unmake_developer = function() {
     }
 };
 
+var method_make_patron = function(patron_level) {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#make_patron_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'make_patron', $.extend(ident, {'patron_level':patron_level}), function(result) { alert("Success!"); });
+    }
+};
+var method_unmake_patron = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#make_patron_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'unmake_patron', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+
 var method_migrate_spin_id = function(new_spin_id) {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
@@ -1940,6 +1955,7 @@ $(function() {
     <li><a href="#player_tools_alliance_player" id="player_tools_alliance_player_header">Player/Clan</a></li>
     <li><a href="#player_tools_privacy" id="player_tools_privacy_header">Privacy</a></li>
     <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
+    <li><a href="#player_tools_patron" id="player_tools_patron_header">Patron</a></li>
     <li><a href="#player_tools_developer" id="player_tools_developer_header">Developer</a></li>
   </ul>
     <div id="player_tools_add_note">
@@ -2179,6 +2195,18 @@ $(function() {
       Reason for this action:
       <br>
       <input type="text" id="make_developer_reason" style="width:500px;">
+    </div>
+
+    <div id="player_tools_patron">
+      &quot;Patron Flag&quot; enables in-game content and monthly gold.<p>
+      <button onclick="method_make_patron(1)" class="spin_button" style="width:200px;">Make Patron (Captain)</button>
+      <button onclick="method_make_patron(2)" class="spin_button" style="width:200px;">Make Patron (Major)</button><p>
+      <button onclick="method_make_patron(3)" class="spin_button" style="width:200px;">Make Patron (Colonel)</button>
+      <button onclick="method_unmake_patron()" class="spin_button" style="width:200px;">Patron OFF</button>
+    <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="make_patron_reason" style="width:500px;">
     </div>
   </div>
 </div>

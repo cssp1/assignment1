@@ -702,6 +702,22 @@ class PlayerHistoryPredicate(Predicate):
         if self.relative:
             qdata[self.key] = player.history.get(self.key, 0)
 
+class PatronPredicate(Predicate):
+    def __init__(self, data, value, method):
+        Predicate.__init__(self, data)
+        self.value = value
+        self.method = method
+
+    def is_satisfied(self, player, qdata):
+        if self.method == '>=':
+            return player.patron >= self.value
+        elif self.method == '==':
+            return player.patron == self.value
+        elif self.method == '<':
+            return player.patron < self.value
+        else:
+            raise Exception('unknown method '+self.method)
+
 class AIInstanceGenerationPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1281,6 +1297,8 @@ def read_predicate(data):
         return HasAltsPredicate(data)
     elif kind == 'OBJECT_OWNERSHIP':
         return ObjectOwnershipPredicate(data)
+    elif kind == 'PATRON':
+        return PatronPredicate(data, data['value'], data['method'])
     raise Exception('unknown predicate %s' % repr(data))
 
 # evaluate a "cond" expression in the form of [[pred1,val1], [pred2,val2], ...]
