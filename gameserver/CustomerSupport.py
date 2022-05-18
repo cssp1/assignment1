@@ -604,14 +604,14 @@ class HandleMakePatron(Handler):
         session.user.patron = session.player.patron = self.patron_level # note: update Player as well as User
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
-        user['patron'] = self.patron_level
+        user['patron'] = player['patron'] = self.patron_level
         return ReturnValue(result = 'ok')
 class HandleUnmakePatron(Handler):
     def do_exec_online(self, session, retmsg):
         session.user.patron = session.player.patron = 0 # note: update Player as well as User
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
-        if 'patron' in user: del user['patron']
+        user['patron'] = player['patron'] = 0
         return ReturnValue(result = 'ok')
 
 class HandleChatOfficial(Handler):

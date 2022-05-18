@@ -1199,6 +1199,7 @@ class UserTable:
               ('chat_gagged', int), # read-only for legacy data
               ('chat_mod', None),
               ('developer', None),
+              ('patron', int),
               ]
 
     def __init__(self):
@@ -3445,6 +3446,7 @@ class PlayerTable:
               ('unit_repair_queue', None, None),
               ('unit_equipment', None, None),
 
+              ('patron', int, int),
               ('mentor_player_id_cache', None, None), # not authoritative - must query bhlogin server
               ('trainee_player_ids_cache', None, None), # not authoritative - must query bhlogin server
               ]
