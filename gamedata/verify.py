@@ -2279,7 +2279,7 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
     elif pred['predicate'] == 'PATRON':
         if 'method' not in pred or pred['method'] not in ('>=', '==', '<'):
             error |= 1; print '%s: %s predicate must have "method" value of ">=", "==", or "<"' % (reason, pred['predicate'])
-        if 'value' not in pred or not isinstance(pred['value'], int), or not pred['value'] in (0, 1, 2, 3):
+        if 'value' not in pred or not isinstance(pred['value'], int) or not pred['value'] in (0, 1, 2, 3):
             error |= 1; print '%s: %s predicate must have "value" value that is an integer between 0 and 3' % (reason, pred['predicate'])
     return error
 
