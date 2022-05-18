@@ -3579,7 +3579,7 @@ def reconfig():
         global ip_rep_checker
         ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config.get('ip_reputation_database'))
 
-        social_id_table.invalidate_social_id_to_spinpunch_cache()
+        social_id_table.invalidate_social_id_to_spinpunch_cache_all()
 
         reload_static_includes()
         proxysite.proxy_root.rescan_static_gamedata_resources()
