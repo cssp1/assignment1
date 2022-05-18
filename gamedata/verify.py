@@ -2015,7 +2015,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'ABTEST', 'ANY_ABTEST', 'RANDOM', 'LIBRARY', 'AI_BASE_ACTIVE', 'AI_BASE_SHOWN', 'PLAYER_HISTORY', 'GAMEDATA_VAR',
                    'RETAINED', 'TIME_IN_GAME', 'PLAYER_PREFERENCE',
                    'ATTACKS_LAUNCHED', 'ATTACKS_VICTORY', 'CONQUESTS', 'UNITS_MANUFACTURED', 'LOGGED_IN_TIMES',
-                   'RESOURCE_STORAGE_CAPACITY',
+                   'RESOURCE_STORAGE_CAPACITY', 'PATRON',
                    'RESOURCES_HARVESTED_TOTAL', 'RESOURCES_HARVESTED_AT_ONCE', 'FRIENDS_JOINED', 'FACEBOOK_APP_NAMESPACE', 'FACEBOOK_LIKES_SERVER',
                    'FACEBOOK_LIKES_CLIENT', 'PRICE_REGION', 'COUNTRY', 'COUNTRY_TIER', 'PRIVACY_CONSENT', 'LOCALE', 'EVENT_TIME', 'ABSOLUTE_TIME', 'TIME_OF_DAY', 'BROWSER_HARDWARE', 'BROWSER_STANDALONE_MODE',
                    'BROWSER_OS', 'BROWSER_NAME', 'BROWSER_VERSION', 'SELECTED', 'REGION_MAP_SELECTED', 'SQUAD_IS_MOVING', 'SQUAD_IS_DEPLOYED', 'SQUAD_LOCATION', 'UI_CLEAR', 'QUEST_CLAIMABLE', 'HOME_BASE', 'HAS_ATTACKED', 'HAS_DEPLOYED',
@@ -2276,6 +2276,11 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             error |= 1; print '%s: %s predicate must have "method" value of ">=", "==", or "<"' % (reason, pred['predicate'])
         if 'version' not in pred or not isinstance(pred['version'], int):
             error |= 1; print '%s: %s predicate must have "version" value that is an integer' % (reason, pred['predicate'])
+    elif pred['predicate'] == 'PATRON':
+        if 'method' not in pred or pred['method'] not in ('>=', '==', '<'):
+            error |= 1; print '%s: %s predicate must have "method" value of ">=", "==", or "<"' % (reason, pred['predicate'])
+        if 'value' not in pred or not isinstance(pred['value'], int), or not pred['value'] in (0, 1, 2, 3):
+            error |= 1; print '%s: %s predicate must have "value" value that is an integer between 0 and 3' % (reason, pred['predicate'])
     return error
 
 # check old-style "logic" blocks which are if/then/else compositions of predicates and consequents (used for quest tips)
