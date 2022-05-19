@@ -15921,6 +15921,10 @@ class LivePlayer(Player):
                    new_zero_points:
                     # switching out of ladder - reset scores
                     ladder_reset = True
+                    change_score_log = {'time':server_time, 'spin_user':'score_keeper', 'method':'change_region', 'ui_reason':'Zeroed out PvP score due to region change. Old score was %r.' % self.ladder_points() }
+                    if 'customer_support' not in self.history:
+                        self.history['customer_support'] = []
+                    self.history['customer_support'].append(change_score_log)
                     self.modify_scores({'trophies_pvp':gamedata['trophy_floor']['pvp']}, method='=', reason = 'change_region')
 
                 if self.my_home.base_region:
