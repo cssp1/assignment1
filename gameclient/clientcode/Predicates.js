@@ -2143,6 +2143,19 @@ RegionPropertyPredicate.prototype.ui_time_range = function(player) { return [-1,
 
 /** @constructor @struct
   * @extends Predicate */
+function NoRegionPredicate(data) {
+    goog.base(this, data);
+}
+goog.inherits(NoRegionPredicate, Predicate);
+NoRegionPredicate.prototype.is_satisfied = function(player, qdata) {
+    if(!session.region.data) { return true; }
+    return false
+};
+/** @override */
+NoRegionPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+/** @constructor @struct
+  * @extends Predicate */
 function InventoryPredicate(data) {
     goog.base(this, data);
     this.num = data['num'];
@@ -2701,6 +2714,8 @@ function read_predicate(data) {
         return new HomeRegionPredicate(data);
     } else if(kind === 'REGION_PROPERTY') {
         return new RegionPropertyPredicate(data);
+    } else if(kind === 'NO_REGION') {
+        return new NoRegionPredicate(data);
     } else if(kind === 'MAIL_ATTACHMENTS_WAITING') {
         return new MailAttachmentsPredicate(data);
     } else if(kind === 'ARMY_SIZE') {
