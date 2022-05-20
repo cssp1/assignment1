@@ -931,6 +931,16 @@ class RegionPropertyPredicate(Predicate):
         if not data: return False
         return data.get(self.key, self.default) == self.value
 
+class NoRegionPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+    def is_satisfied(self, player, qdata):
+        if (not player.home_region): return True
+        return False
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        if (not session.player.home_region): return True
+        return False
+
 class GamebucksBalancePredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1245,6 +1255,8 @@ def read_predicate(data):
         return HomeRegionPredicate(data)
     elif kind == 'REGION_PROPERTY':
         return RegionPropertyPredicate(data)
+    elif kind == 'NO_REGION':
+        return NoRegionPredicate(data)
     elif kind == 'GAMEBUCKS_BALANCE':
         return GamebucksBalancePredicate(data)
     elif kind == 'HAS_ITEM':
