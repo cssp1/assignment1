@@ -1588,6 +1588,7 @@ function GameObject() {
     /** @type {!CombatStats} */
     this.combat_stats = new CombatStats();
     this.use_secondary_weapon = false;
+    this.player_toggled_secondary_weapon = false;
 
     /** @type {Array.<Aura>} */
     this.auras = [];
@@ -2779,24 +2780,8 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
 
         } else if(code === 'toggle_weapon') {
             if(this.is_mobile() && this.has_secondary_weapon()) {
-                this.use_secondary_weapon = !this.use_secondary_weapon;
-                var owner = (this.team === 'player' ? player : enemy);
-                var weapon_index = 0;
-                if(this.use_secondary_weapon) { weapon_index = 1 }
-                var weapon_stat = { 0: 'weapon', 1: 'secondary_weapon' }[weapon_index];
-                var spellname = get_unit_stat(owner.stattab, this.spec['name'], weapon_stat, this.spec['spells'][weapon_index]);
-                if(spellname) {
-                    var weapon_spell = gamedata['spells'][spellname];
-                    var weapon_name = "Weapon Ready: " + weapon_spell['ui_name'];
-                    var muzzle_vfx = { "type": "combat_text", "ui_name": weapon_name, "text_color":[1,0,0], "drop_shadow":1 };
-                    var vfx_props = {'heading': this.cur_facing,
-                                     'tick_offset': 0,
-                                     'my_next_pos': this.next_pos};
-                    world.fxworld.add_visual_effect_at_tick(this.interpolate_pos(world), (this.is_flying() ? this.combat_stats.altitude : 0),
-                                                            [Math.cos(this.cur_facing), 0, Math.sin(this.cur_facing)],
-                                                            world.combat_engine.cur_tick, 0,
-                                                            muzzle_vfx, true, vfx_props);
-                }
+                this.player_toggled_secondary_weapon = !this.player_toggled_secondary_weapon;
+                this.toggle_secondary_weapon(world);
             }
         }
     }
@@ -5069,6 +5054,54 @@ GameObject.prototype.run_ai = function(world) {
        this.ai_state === ai_states.AI_ATTACK_MOVE || this.ai_state === ai_states.AI_ATTACK_MOVE_AGGRO || this.ai_state === ai_states.AI_DEFEND_MOVE) {
         if(!auto_spell) {
             throw Error('AI_ATTACK state but unit has no auto-cast spell');
+        }
+
+        // if unit has a secondary weapon and player has not manually toggled it, check if secondary weapon is better and switch
+        if (this.is_mobile() && this.has_secondary_weapon() && !this.player_toggled_secondary_weapon && this.ai_target) {
+            var owner = (this.team === 'player' ? player : enemy);
+            var primary_weapon_name = get_unit_stat(owner.stattab, this.spec['name'], 'weapon', this.spec['spells'][0]);
+            var secondary_weapon_name = get_unit_stat(owner.stattab, this.spec['name'], 'secondary_weapon', this.spec['spells'][1]);
+            if(primary_weapon_name && secondary_weapon_name) {
+                var primary_weapon = gamedata['spells'][primary_weapon_name];
+                var primary_weapon_level = 1;
+                if(primary_weapon && 'associated_tech' in primary_weapon) {
+                    var primary_weapon_tech = primary_weapon['associated_tech'];
+                    primary_weapon_level = Math.max(owner.tech[primary_weapon_tech], 1);
+                } else {
+                    primary_weapon_level = get_unit_stat(owner.stattab, this.spec['name'], 'weapon_level', this.level);
+                }
+                var secondary_weapon = gamedata['spells'][secondary_weapon_name];
+                var secondary_weapon_level = 1;
+                if(primary_weapon && 'associated_tech' in secondary_weapon) {
+                    var secondary_weapon_tech = secondary_weapon['associated_tech'];
+                    secondary_weapon_level = Math.max(owner.tech[secondary_weapon_tech], 1);
+                } else {
+                    secondary_weapon_level = get_unit_stat(owner.stattab, this.spec['name'], 'weapon_level', this.level);
+                }
+                var primary_mod = get_damage_modifier(primary_weapon['damage_vs'], this.ai_target);
+                var secondary_mod = get_damage_modifier(secondary_weapon['damage_vs'], this.ai_target);
+                var primary_dmg = get_leveled_quantity(primary_weapon['damage'], primary_weapon_level) * primary_mod;
+                var secondary_dmg = get_leveled_quantity(secondary_weapon['damage'], secondary_weapon_level) * secondary_mod;
+                if(this.use_secondary_weapon && primary_dmg > secondary_dmg) { // using secondary, and primary is better. Can primary shoot target?
+                    if(this.ai_target.is_flying() && (primary_weapon['targets_air'] || this.combat_stats.anti_air)) { // flying target, can shoot air
+                        this.toggle_secondary_weapon(world); // switch weapons
+                    } else if (!this.ai_target.is_flying() && primary_weapon['targets_ground']) { //ground target, can shoot ground
+                        this.toggle_secondary_weapon(world); // switch weapons
+                    }
+                } else if(!this.use_secondary_weapon && secondary_dmg > primary_dmg) { // using primary, secondary is better. Can secondary shoot target?
+                    if(this.ai_target.is_flying() && (secondary_weapon['targets_air'] || this.combat_stats.anti_air)) { // flying target, can shoot air
+                        this.toggle_secondary_weapon(world); // switch weapons
+                    } else if (!this.ai_target.is_flying() && secondary_weapon['targets_ground']) { //ground target, can shoot ground
+                        this.toggle_secondary_weapon(world); // switch weapons
+                    }
+                }
+                // recaculate spell, level, and ranges after toggle check
+                auto_spell = this.get_auto_spell();
+                auto_spell_level = this.get_auto_spell_level();
+                auto_spell_range = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
+                auto_spell_eff_range = ('effective_range' in auto_spell) ? gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['effective_range'], auto_spell_level) * this.combat_stats.effective_weapon_range : auto_spell_range;
+                auto_spell_min_range = ('min_range' in auto_spell) ? gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['min_range'], auto_spell_level) : -1; // * Math.max(1,this.combat_stats.weapon_range); ?
+            }
         }
 
         var shoot_range = auto_spell_range;
@@ -9527,6 +9560,27 @@ Mobile.prototype.has_secondary_weapon = function() {
     });
     return weapon_count > 1;
  };
+
+Mobile.prototype.toggle_secondary_weapon = function(world) {
+    this.use_secondary_weapon = !this.use_secondary_weapon;
+    var owner = (this.team === 'player' ? player : enemy);
+    var weapon_index = 0;
+    if(this.use_secondary_weapon) { weapon_index = 1 }
+    var weapon_stat = { 0: 'weapon', 1: 'secondary_weapon' }[weapon_index];
+    var spellname = get_unit_stat(owner.stattab, this.spec['name'], weapon_stat, this.spec['spells'][weapon_index]);
+    if(spellname) {
+        var weapon_spell = gamedata['spells'][spellname];
+        var weapon_name = "Weapon Ready: " + weapon_spell['ui_name'];
+        var muzzle_vfx = { "type": "combat_text", "ui_name": weapon_name, "text_color":[1,0,0], "drop_shadow":1 };
+        var vfx_props = {'heading': this.cur_facing,
+                         'tick_offset': 0,
+                         'my_next_pos': this.next_pos};
+        world.fxworld.add_visual_effect_at_tick(this.interpolate_pos(world), (this.is_flying() ? this.combat_stats.altitude : 0),
+                                                [Math.cos(this.cur_facing), 0, Math.sin(this.cur_facing)],
+                                                world.combat_engine.cur_tick, 0,
+                                                muzzle_vfx, true, vfx_props);
+    }
+}
 
 Mobile.prototype.is_temporary = function() { return !!this.temporary; };
 Mobile.prototype.is_flying = function() { return this.combat_stats.flying || false; };
