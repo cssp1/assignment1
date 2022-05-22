@@ -5008,6 +5008,10 @@ GameObject.prototype.run_ai = function(world) {
         // deactivate AI for friendly units on the battlefield before battle start
         return;
     }
+    if(this.is_mobile() && this.has_secondary_weapon() && this.use_secondary_weapon && !this.player_toggled_secondary_weapon && !this.ai_target) {
+        // return to primary weapon if no target and not selected by player
+        this.toggle_secondary_weapon(world);
+    }
 
     var auto_spell = this.get_auto_spell();
     var auto_spell_level = this.get_auto_spell_level();
