@@ -1186,6 +1186,7 @@ PatronPredicate.prototype.do_ui_describe = function(player) {
     ret = ret.replace('%s', patron_tier);
     return new PredicateUIDescription(ret);
 };
+PatronPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor @struct
   * @extends Predicate */
