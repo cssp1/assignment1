@@ -2880,7 +2880,7 @@ if __name__ == '__main__':
         print '    --recache-alliance-scores --week N --season S         Recalculate all alliance scores for week N season S'
         print '    --winners --week N --season N --tournament-stat STAT  Report Alliance Tournament winners for week N (or season N) and trophy type TYPE (pve or pvp)'
         print '                       ^ if season is missing or < 0, then weekly score is used for standings, otherwise seasonal score is used'
-        print '    --patrons                                             Reward patrons with their monthly gold'
+        print '    --patron-rewards                                      Reward patrons with their monthly gold'
         print '    --benchmark                                           Run MongoDB benchmark'
         print '    --test                                                Run regression test code (DESTROYS DATA)'
         sys.exit(1)
@@ -2890,7 +2890,7 @@ if __name__ == '__main__':
     id_generator = SpinNoSQLId.Generator()
     id_generator.set_time(time_now)
 
-    if mode in ('maint', 'winners', 'leaders', 'recache-alliance-scores', 'test', 'patrons'):
+    if mode in ('maint', 'winners', 'leaders', 'recache-alliance-scores', 'test', 'patron-rewards'):
         # these modes need access to gamedata for season/week or gamebucks info
         import SpinJSON
         gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
@@ -2904,17 +2904,17 @@ if __name__ == '__main__':
     elif mode == 'maint':
         with SpinSingletonProcess.SingletonProcess('SpinNoSQL-global-maint-%s' % (game_id)):
             client.do_maint(time_now, cur_season, cur_week)
-    elif mode == 'patrons':
-        captains = player_cache_query_by_patron_level(self, 1, reason = 'Monthly reward script: Captains')
+    elif mode == 'patron-rewards':
+        captains = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Captains')
         captain_prize = gamedata['server'].get('patron_captain_monthly_prize', 500)
-        majors = player_cache_query_by_patron_level(self, 1, reason = 'Monthly reward script: Majors')
+        majors = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Majors')
         major_prize = gamedata['server'].get('patron_major_monthly_prize', 1050)
-        colonels = player_cache_query_by_patron_level(self, 1, reason = 'Monthly reward script: Colonels')
+        colonels = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Colonels')
         colonel_prize = gamedata['server'].get('patron_colonel_monthly_prize', 1050)
         commands = []
-        for patron_list, prize, patron_level in ((captains, captain_prize, 'Captain'), (majors, major_prize, 'Major'), (colonels, colonel_prize, 'Colonel'))
+        for patron_list, prize, patron_level in ((captains, captain_prize, 'Captain'), (majors, major_prize, 'Major'), (colonels, colonel_prize, 'Colonel')):
             for player in patron_list:
-                commands.append(['./check_player.py', '%d' % member['user_id'],
+                commands.append(['./check_player.py', '%d' % player['user_id'],
                                  '--give-item', 'gamebucks', '--melt-hours', '-1',
                                  '--item-stack', '%d' % (prize),
                                  '--give-item-subject', 'Monthly Patron Reward: %s' % patron_level,
