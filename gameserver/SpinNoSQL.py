@@ -1484,7 +1484,7 @@ class NoSQLClient (object):
             return None
 
     def player_cache_query_by_patron_level(self, patron_level, reason = None):
-        qs = {'patron': {'$gt': patron_level}, # has patron_level value
+        qs = {'patron': {'$eq': patron_level}, # has patron_level value
               }
 
         return self.instrument('player_cache_query_by_patron_level(%s)'%reason,
