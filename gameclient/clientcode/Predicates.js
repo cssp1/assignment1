@@ -2142,6 +2142,10 @@ RegionPropertyPredicate.prototype.is_satisfied = function(player, qdata) {
 /** @override */
 RegionPropertyPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
+RegionPropertyPredicate.prototype.do_ui_describe = function(player) {
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
+};
+
 /** @constructor @struct
   * @extends Predicate */
 function NoRegionPredicate(data) {
@@ -2154,6 +2158,10 @@ NoRegionPredicate.prototype.is_satisfied = function(player, qdata) {
 };
 /** @override */
 NoRegionPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+NoRegionPredicate.prototype.do_ui_describe = function(player) {
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
+};
 
 /** @constructor @struct
   * @extends Predicate */
