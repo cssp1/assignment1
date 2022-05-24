@@ -1483,6 +1483,13 @@ class NoSQLClient (object):
                 return ret_list[0]
             return None
 
+    def player_cache_query_by_patron_level(self, patron_level, reason = None):
+        qs = {'patron': {'$eq': patron_level}, # has patron_level value
+              }
+
+        return self.instrument('player_cache_query_by_patron_level(%s)'%reason,
+                               lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
+
     # only used for PCHECK customer support purposes. NOT INDEXED!
     def player_cache_query_by_social_id(self, social_id, reason = None):
         return self.instrument('player_cache_query_by_social_id(%s)'%reason, self._player_cache_query_by_social_id, (social_id,))
@@ -2868,13 +2875,14 @@ if __name__ == '__main__':
     if mode is None:
         print 'usage: SpinNoSQL.py MODE'
         print 'Modes:'
-        print '    --maint                             Prune stale/invalid data from global tables'
-        print '    --region-maint REGION_ID            Prune stale/invalid data from region tables'
-        print '    --recache-alliance-scores --week N --season S  Recalculate all alliance scores for week N season S'
+        print '    --maint                                               Prune stale/invalid data from global tables'
+        print '    --region-maint REGION_ID                              Prune stale/invalid data from region tables'
+        print '    --recache-alliance-scores --week N --season S         Recalculate all alliance scores for week N season S'
         print '    --winners --week N --season N --tournament-stat STAT  Report Alliance Tournament winners for week N (or season N) and trophy type TYPE (pve or pvp)'
         print '                       ^ if season is missing or < 0, then weekly score is used for standings, otherwise seasonal score is used'
-        print '    --benchmark                Run MongoDB benchmark'
-        print '    --test                     Run regression test code (DESTROYS DATA)'
+        print '    --patron-rewards                                      Reward patrons with their monthly gold'
+        print '    --benchmark                                           Run MongoDB benchmark'
+        print '    --test                                                Run regression test code (DESTROYS DATA)'
         sys.exit(1)
 
     client = NoSQLClient(SpinConfig.get_mongodb_config(config_name or game_instance))
@@ -2882,7 +2890,7 @@ if __name__ == '__main__':
     id_generator = SpinNoSQLId.Generator()
     id_generator.set_time(time_now)
 
-    if mode in ('maint', 'winners', 'leaders', 'recache-alliance-scores', 'test'):
+    if mode in ('maint', 'winners', 'leaders', 'recache-alliance-scores', 'test', 'patron-rewards'):
         # these modes need access to gamedata for season/week or gamebucks info
         import SpinJSON
         gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
@@ -2896,6 +2904,34 @@ if __name__ == '__main__':
     elif mode == 'maint':
         with SpinSingletonProcess.SingletonProcess('SpinNoSQL-global-maint-%s' % (game_id)):
             client.do_maint(time_now, cur_season, cur_week)
+    elif mode == 'patron-rewards':
+        captains = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Captains')
+        captain_prize = gamedata['server'].get('patron_captain_monthly_prize', 500)
+        majors = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Majors')
+        major_prize = gamedata['server'].get('patron_major_monthly_prize', 1050)
+        colonels = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Colonels')
+        colonel_prize = gamedata['server'].get('patron_colonel_monthly_prize', 1050)
+        commands = []
+        for patron_list, prize, patron_level in ((captains, captain_prize, 'Captain'), (majors, major_prize, 'Major'), (colonels, colonel_prize, 'Colonel')):
+            for player in patron_list:
+                commands.append(['./check_player.py', '%d' % player['user_id'],
+                                 '--give-item', 'gamebucks', '--melt-hours', '-1',
+                                 '--item-stack', '%d' % (prize),
+                                 '--give-item-subject', 'Monthly Patron Reward: %s' % patron_level,
+                                 '--give-item-body', 'Congratulations, here is your Patron reward for %s! Click the reward to collect it.' % (datetime.datetime.now().strftime('%B'),),
+                                 '--item-log-reason', 'patreon_reward_%s_%s' % (patron_level.lower(), datetime.datetime.now().strftime('%Y-%m'))])
+        if len(commands) > 0:
+            print "COMMANDS"
+            def quote(s):
+                if ' ' in s: return "'"+s+"'"
+                return s
+            print '\n'.join(' '.join(quote(word) for word in cmd) for cmd in commands)
+
+            import subprocess, os
+            print "SENDING PATREON MONTHLY REWARDS"
+            for cmd in commands:
+                subprocess.check_call(cmd, stdout=open(os.devnull,"w"))
+            print "REWARDS ALL SENT OK"
 
     elif mode == 'clear-locks':
         ID_LIST = range(SpinConfig.config.get('min_user_id',1111),

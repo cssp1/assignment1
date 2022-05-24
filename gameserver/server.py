@@ -29529,7 +29529,8 @@ class GAMEAPI(resource.Resource):
                        'last_mtime': server_time,
                        'money_spent': session.player.history.get('money_spent',0.0),
                        'ui_name': session.user.get_ui_name(session.player),
-                       'ui_name_searchable': session.user.get_ui_name_searchable(session.player)
+                       'ui_name_searchable': session.user.get_ui_name_searchable(session.player),
+                       'patron': session.player.patron
                        }
         if reason.startswith('log_out'):
             cache_props['last_logout_time'] = session.user.last_logout_time
