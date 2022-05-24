@@ -14,3 +14,6 @@ RANDOM_DELAY=10	# 10-minute slop offset
 
 # send memory statistics to CloudWatch every minute
 * * * * * ec2-user /usr/local/bin/ec2-send-memory-metrics.py
+
+# run Patreon rewards every first of the month at midnight
+# XXX enable manually 0 0 1 * * ec2-user /etc/cron.patreon/patreon-rewards.sh
