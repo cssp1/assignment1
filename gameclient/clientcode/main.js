@@ -15916,18 +15916,37 @@ function update_unit_deployment_bar_batch_or_drip(dialog) {
 
 function init_combat_item_bar() {
     if(!('combat_item_bar' in desktop_dialogs)) {
-        var dialog = invoke_combat_item_bar();
+        var dialog = invoke_combat_item_bar('normal');
         if(dialog) {
             desktop_dialogs['combat_item_bar'] = dialog;
             SPUI.root.add_under(dialog);
         }
     }
+    if(!('combat_missile_item_bar' in desktop_dialogs)) {
+        var dialog = invoke_combat_item_bar('missile');
+        if(dialog) {
+            desktop_dialogs['combat_missile_item_bar'] = dialog;
+            SPUI.root.add_under(dialog);
+        }
+    }
+    if(!('combat_non_missile_item_bar' in desktop_dialogs)) {
+        var dialog = invoke_combat_item_bar('non_missile');
+        if(dialog) {
+            desktop_dialogs['combat_non_missile_item_bar'] = dialog;
+            SPUI.root.add_under(dialog);
+        }
+    }
 }
 
-function invoke_combat_item_bar() {
+function invoke_combat_item_bar(mode) {
     var dialog_data = gamedata['dialogs']['combat_item_bar'];
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'combat_item_bar';
+    if(mode === 'missile') {
+        dialog.user_data['dialog'] = 'combat_missile_item_bar';
+    } else if(mode === 'non_missile') {
+        dialog.user_data['dialog'] = 'combat_non_missile_item_bar';
+    }
     dialog.user_data['context'] = null;
     dialog.user_data['scroll_pos'] = 0;
     dialog.transparent_to_mouse = true;
@@ -16033,11 +16052,21 @@ function inventory_item_is_usable_in_combat(spec, session) {
 
 /** @param {SPUI.Dialog} dialog */
 function update_combat_item_bar(dialog) {
+    var show_classic = !!!player.preferences['missile_bar_enabled']; // track if using one bar or two
     var indices_by_spec = {}; // mapping from specname to index within entry_list
     var entry_list = [];
+    var alt_entry_list = [];
 
     var add_item = function(item, i) { // "i" is integer for ordinary inventory items, and {'obj_id':..., 'slot_type':..., 'slot_index':...} for equipped items
         if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.NOT_USABLE) {
+            if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.USABLE_MISSILE) {
+                alt_entry_list.push(item); // tracks non missile, just need a count.
+            }
+            if(dialog.user_data['dialog'] === 'combat_missile_item_bar' && (inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.USABLE_MISSILE)) {
+                return;
+            } else if(dialog.user_data['dialog'] === 'combat_non_missile_item_bar' && (inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.USABLE_BOOST)) {
+                return;
+            }
             if(item['spec'] in indices_by_spec) {
                 // merge items of identical specs into a single entry in entry_list
                 // note: the 'pending'/'pending_time' flags will only be taken from one item, the next one "in line" to be used
@@ -16055,6 +16084,11 @@ function update_combat_item_bar(dialog) {
         }
     }
     goog.array.forEach(player.inventory, add_item);
+    if(dialog.user_data['dialog'] === 'combat_missile_item_bar' && alt_entry_list.length > 0) {
+        dialog.data['xy'] = dialog.data['missile_xy'];
+    } else {
+        dialog.data['xy'] = dialog.data['non_missile_xy'];
+    }
     goog.array.forEach(session.home_equip_items, function(entry) {
         // note: because the "entry" itself is used as the "slot" below, and is checked for identity
         // against any existing inventory_context dialog, we have to use the "entry" object itself
@@ -16140,7 +16174,19 @@ function update_combat_item_bar(dialog) {
         dialog.show = false;
         return;
     } else {
-        dialog.show = true;
+        if(dialog.user_data['dialog'] === 'combat_item_bar' && show_classic) {
+            dialog.show = true;
+        } else if (dialog.user_data['dialog'] === 'combat_item_bar' && !show_classic) {
+            dialog.show = false;
+        } else if (dialog.user_data['dialog'] === 'combat_missile_item_bar' && !show_classic) {
+            dialog.show = true;
+        } else if (dialog.user_data['dialog'] === 'combat_missile_item_bar' && show_classic) {
+            dialog.show = false;
+        } else if (dialog.user_data['dialog'] === 'combat_non_missile_item_bar' && !show_classic) {
+            dialog.show = true;
+        } else if (dialog.user_data['dialog'] === 'combat_non_missile_item_bar' && show_classic) {
+            dialog.show = false;
+        }
     }
 
     dialog.xy = vec_copy(dialog.data['xy']);
@@ -55001,6 +55047,10 @@ function create_mouse_tooltip() {
 
                 if(equip) {
                     for(var slot_type in equip) {
+                        if(!(slot_type in gamedata['strings']['equip_slots'])) {
+                            console.log(slot_type + ' missing from gamedata["strings"]["equip_slots"]');
+                            window.alert(slot_type + ' missing from gamedata["strings"]["equip_slots"]');
+                        }
                         if(!player.is_cheater &&
                            ((('show' in gamedata['strings']['equip_slots'][slot_type]) && !gamedata['strings']['equip_slots'][slot_type]['show']) ||
                             (('show_if' in gamedata['strings']['equip_slots'][slot_type]) &&
