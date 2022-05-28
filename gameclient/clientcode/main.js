@@ -16064,7 +16064,7 @@ function update_combat_item_bar(dialog) {
     var add_item = function(item, i) { // "i" is integer for ordinary inventory items, and {'obj_id':..., 'slot_type':..., 'slot_index':...} for equipped items
         var item_type = inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session);
         if(item_type === UsableInCombat.NOT_USABLE) { return; }
-        if(item_type === UsableInCombat.USABLE_MISSILE) { alt_entry_list.push(item); } // tracks non missile, just need a count.
+        if(item_type != UsableInCombat.USABLE_MISSILE) { alt_entry_list.push(item); } // tracks non missile, just need a count.
         if(dialog.user_data['dialog'] === 'combat_missile_item_bar' && item_type != UsableInCombat.USABLE_MISSILE) {
             return;
         } else if(dialog.user_data['dialog'] === 'combat_non_missile_item_bar' && item_type === UsableInCombat.USABLE_MISSILE) {
