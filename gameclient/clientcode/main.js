@@ -15922,17 +15922,17 @@ function init_combat_item_bar() {
             SPUI.root.add_under(dialog);
         }
     }
-    if(!('combat_missile_item_bar' in desktop_dialogs)) {
-        var dialog = invoke_combat_item_bar('missile');
-        if(dialog) {
-            desktop_dialogs['combat_missile_item_bar'] = dialog;
-            SPUI.root.add_under(dialog);
-        }
-    }
     if(!('combat_non_missile_item_bar' in desktop_dialogs)) {
         var dialog = invoke_combat_item_bar('non_missile');
         if(dialog) {
             desktop_dialogs['combat_non_missile_item_bar'] = dialog;
+            SPUI.root.add_under(dialog);
+        }
+    }
+    if(!('combat_missile_item_bar' in desktop_dialogs)) {
+        var dialog = invoke_combat_item_bar('missile');
+        if(dialog) {
+            desktop_dialogs['combat_missile_item_bar'] = dialog;
             SPUI.root.add_under(dialog);
         }
     }
@@ -15965,7 +15965,8 @@ function invoke_combat_item_bar(mode) {
 var UsableInCombat = {
     NOT_USABLE : 0,
     USABLE_BOOST : 1, // aura applier (low priority)
-    USABLE_MISSILE : 2 // missile (high priority)
+    USABLE_REPAIR : 2, // repair item (medium priority)
+    USABLE_MISSILE : 3 // missile (high priority)
 };
 
 /** Determine if an item of this spec can be used during the current
@@ -16020,8 +16021,11 @@ function inventory_item_is_usable_in_combat(spec, session) {
                 // hide projectile_attack items if the current climate has an exclude_missiles flag
                 if(spell['code'] == 'projectile_attack' && session.viewing_base.base_climate_data['exclude_missiles']) {
                     return UsableInCombat.NOT_USABLE;
-                } else if(spell['code'] === 'instant_combat_repair' && session.home_base) {
-                    return UsableInCombat.NOT_USABLE;
+                } else if(spell['code'] === 'instant_combat_repair') {
+                    if(session.home_base) {
+                        return UsableInCombat.NOT_USABLE;
+                    }
+                    return UsableInCombat.USABLE_REPAIR;
                 }
                 return UsableInCombat.USABLE_MISSILE;
             }
@@ -16058,29 +16062,27 @@ function update_combat_item_bar(dialog) {
     var alt_entry_list = [];
 
     var add_item = function(item, i) { // "i" is integer for ordinary inventory items, and {'obj_id':..., 'slot_type':..., 'slot_index':...} for equipped items
-        if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.NOT_USABLE) {
-            if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.USABLE_MISSILE) {
-                alt_entry_list.push(item); // tracks non missile, just need a count.
-            }
-            if(dialog.user_data['dialog'] === 'combat_missile_item_bar' && (inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.USABLE_MISSILE)) {
-                return;
-            } else if(dialog.user_data['dialog'] === 'combat_non_missile_item_bar' && (inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.USABLE_BOOST)) {
-                return;
-            }
-            if(item['spec'] in indices_by_spec) {
-                // merge items of identical specs into a single entry in entry_list
-                // note: the 'pending'/'pending_time' flags will only be taken from one item, the next one "in line" to be used
-                var index = indices_by_spec[item['spec']];
-                entry_list[index]['stack'] += (item['stack']||1);
-                entry_list[index]['individual_stacks'].push([item, i, (item['stack']||1), ('expire_time' in item ? item['expire_time'] : -1)]);
-            } else {
-                indices_by_spec[item['spec']] = entry_list.length;
-                entry_list.push({'item': item, 'slot': i, 'stack': (item['stack']||1),
-                                 // list of data on about stack contributing to this entry: [item, slot, stack count, expire time]
-                                 // will be used for sorting later
-                                 'individual_stacks': [[item, i, (item['stack']||1), ('expire_time' in item ? item['expire_time'] : -1)]]
-                                });
-            }
+        var item_type = inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session);
+        if(item_type === UsableInCombat.NOT_USABLE) { return; }
+        if(item_type === UsableInCombat.USABLE_MISSILE) { alt_entry_list.push(item); } // tracks non missile, just need a count.
+        if(dialog.user_data['dialog'] === 'combat_missile_item_bar' && item_type != UsableInCombat.USABLE_MISSILE) {
+            return;
+        } else if(dialog.user_data['dialog'] === 'combat_non_missile_item_bar' && item_type === UsableInCombat.USABLE_MISSILE) {
+            return;
+        }
+        if(item['spec'] in indices_by_spec) {
+            // merge items of identical specs into a single entry in entry_list
+            // note: the 'pending'/'pending_time' flags will only be taken from one item, the next one "in line" to be used
+            var index = indices_by_spec[item['spec']];
+            entry_list[index]['stack'] += (item['stack']||1);
+            entry_list[index]['individual_stacks'].push([item, i, (item['stack']||1), ('expire_time' in item ? item['expire_time'] : -1)]);
+        } else {
+            indices_by_spec[item['spec']] = entry_list.length;
+            entry_list.push({'item': item, 'slot': i, 'stack': (item['stack']||1),
+                             // list of data on about stack contributing to this entry: [item, slot, stack count, expire time]
+                             // will be used for sorting later
+                             'individual_stacks': [[item, i, (item['stack']||1), ('expire_time' in item ? item['expire_time'] : -1)]]
+                            });
         }
     }
     goog.array.forEach(player.inventory, add_item);
@@ -55047,10 +55049,6 @@ function create_mouse_tooltip() {
 
                 if(equip) {
                     for(var slot_type in equip) {
-                        if(!(slot_type in gamedata['strings']['equip_slots'])) {
-                            console.log(slot_type + ' missing from gamedata["strings"]["equip_slots"]');
-                            window.alert(slot_type + ' missing from gamedata["strings"]["equip_slots"]');
-                        }
                         if(!player.is_cheater &&
                            ((('show' in gamedata['strings']['equip_slots'][slot_type]) && !gamedata['strings']['equip_slots'][slot_type]['show']) ||
                             (('show_if' in gamedata['strings']['equip_slots'][slot_type]) &&
