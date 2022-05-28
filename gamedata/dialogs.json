@@ -9643,6 +9643,8 @@
     "combat_item_bar": {
         "dimensions": [60,87],
         "xy": [10,346],
+        "non_missile_xy": [10,346],
+        "missile_xy": [80,346],
         "clip_children": 0,
         "widgets": {
             "bgrect": { "kind":"SolidRect", "xy":[0,0], "dimensions": [60,87], "color": [0.005,0.01,0.03,0.75], "bevel": 2 },
