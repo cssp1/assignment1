@@ -698,19 +698,6 @@ class AltPolicy(Policy):
         return new_region['id']
 
 class WarMapPolicy(Policy):
-    # ensure clan war event is actually present
-    if not gamedata['event_schedule'].get('clan_war_interbellum', False):
-        return
-    war_interval = gamedata['event_schedule']['clan_war_interbellum']
-    interval_start = war_interval['start_time']
-    interval_end = war_interval['end_time']
-    repeat_interval = war_interval.get('repeat_interval', 1814400)
-    while time_now > interval_start:
-        interval_start += repeat_interval
-        interval_end += repeat_interval
-
-    if time_now < interval_start or time_now > interval_end:
-        return # if we're not in the clan_war_interbellum, skip, login consequents will handle relocation
 
     # query for candidate violators from player cache
     @classmethod
@@ -721,6 +708,20 @@ class WarMapPolicy(Policy):
                                                                    include_home_regions = war_region_names)
 
     def check_player(self, user_id, player):
+
+        # ensure clan war event is actually present
+        if not gamedata['event_schedule'].get('clan_war_interbellum', False):
+            return
+        war_interval = gamedata['event_schedule']['clan_war_interbellum']
+        interval_start = war_interval['start_time']
+        interval_end = war_interval['end_time']
+        repeat_interval = war_interval.get('repeat_interval', 1814400)
+        while time_now > interval_start:
+            interval_start += repeat_interval
+            interval_end += repeat_interval
+
+        if time_now < interval_start or time_now > interval_end:
+            return # if we're not in the clan_war_interbellum, skip, login consequents will handle relocation
 
         # possible race condition after player cache lookup (?)
         if not player.get('home_region', False) or player['home_region'] not in war_region_names: return
