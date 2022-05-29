@@ -4670,6 +4670,9 @@ def main(args):
                     for level in xrange(my_level, my_level+1):
                         expect_player_history_keys.add(thing+'_blueprint_unlocked'+('_L%d' % level))
 
+        if name == "clan_war_unlocked": # exception for clan war invite item
+            expect_player_history_keys = None
+
         error |= check_predicate(pred, reason='predicate_library:'+name, expect_player_history_keys = expect_player_history_keys)
 
     for name, cons in gamedata['consequent_library'].iteritems():
