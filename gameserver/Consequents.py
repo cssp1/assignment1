@@ -898,11 +898,12 @@ class SendMessageConsequent(Consequent):
 class ChangeRegionConsequent(Consequent):
     def execute(self, session, player, retmsg, context=None):
         regions = self.data['regions']
+        limbo_on_fail = self.data.get('limbo_on_fail', False)
         success = None
         for region in regions:
             success = self.change_region(region, None, None, session, retmsg, reason='CHANGE_REGION consequent')
             if success: break
-        if not success:
+        if not success and limbo_on_fail:
             self.change_region(None, None, None, session, retmsg, reason='CHANGE_REGION consequent fallback to None')
 
 class LibraryConsequent(Consequent):
