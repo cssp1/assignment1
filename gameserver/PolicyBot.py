@@ -713,12 +713,9 @@ class WarMapPolicy(Policy):
         if not gamedata['event_schedule'].get('clan_war_interbellum', False):
             return
         war_interval = gamedata['event_schedule']['clan_war_interbellum']
-        interval_start = war_interval['start_time']
-        interval_end = war_interval['end_time']
-        repeat_interval = war_interval.get('repeat_interval', 1814400)
-        while time_now > interval_start:
-            interval_start += repeat_interval
-            interval_end += repeat_interval
+        if time_now < war_interval['start_time']: return
+        delta = (time_now - war_interval['start_time']) % war_interval['repeat_interval']
+        if delta < (war_interval['end_time'] - war_interval['start_time']): return
 
         if time_now < interval_start or time_now > interval_end:
             return # if we're not in the clan_war_interbellum, skip, login consequents will handle relocation
