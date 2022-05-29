@@ -624,6 +624,7 @@
         "HAS_ATTACKED": { "ui_name": "You must be in combat to do this" },
         "HAS_DEPLOYED": { "ui_name": "You must be in combat and have deployed units to do this" },
         "HAS_TITLE": { "ui_name": "Unlock title: %s" },
+        "ALLIANCE_ID": { "ui_name": "Currently limited to specific Clans" },
         "PLAYER_LEVEL": { "ui_name": "Achieve Level %d" }
     },
 
