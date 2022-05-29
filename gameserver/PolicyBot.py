@@ -30,10 +30,12 @@ def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
 def is_alt_policy_region(region): return 'anti_alt' in region.get('tags',[]) or region.get('alt_limit',0) > 0
 def is_anti_vpn_region(region): return 'anti_vpn' in region.get('tags',[])
 def is_anti_refresh_region(region): return 'anti_refresh' in region.get('tags',[])
+def is_war_region(region): return 'clan_war' in region.get('tags',[])
 
 anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
 alt_policy_region_names = [name for name, data in gamedata['regions'].iteritems() if is_alt_policy_region(data)]
 anti_vpn_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_vpn_region(data)]
+war_region_names = [name for name, data in gamedata['regions'].iteritems() if is_war_region(data)]
 ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config['ip_reputation_database'])
 anti_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_refresh_region(data)]
 allow_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if not is_anti_refresh_region(data)]
@@ -695,6 +697,86 @@ class AltPolicy(Policy):
 
         return new_region['id']
 
+class WarMapPolicy(Policy):
+
+    # query for candidate violators from player cache
+    @classmethod
+    def player_cache_query(cls, db_client, time_range, verbose = 0):
+        return db_client.player_cache_query_mtime_or_ctime_between([time_range], [],
+                                                                   townhall_name = gamedata['townhall'],
+                                                                   min_townhall_level = 1,
+                                                                   include_home_regions = war_region_names)
+
+    def check_player(self, user_id, player):
+
+        # ensure clan war event is actually present
+        if not gamedata['event_schedule'].get('clan_war_interbellum', False):
+            return
+        war_interval = gamedata['event_schedule']['clan_war_interbellum']
+        if time_now < war_interval['start_time']: return
+        delta = (time_now - war_interval['start_time']) % war_interval['repeat_interval']
+        if delta < (war_interval['end_time'] - war_interval['start_time']): return # if we're not in the clan_war_interbellum, skip, login consequents will handle relocation
+
+        # possible race condition after player cache lookup (?)
+        if not player.get('home_region', False) or player['home_region'] not in war_region_names: return
+
+        print >> self.msg_fd, 'relocating player %d from clan war map...' % (user_id),
+        try:
+            # update the alt's home region so next pass will get the right data
+            new_region_name = self.punish_player(user_id, player['home_region'])
+            print >> self.msg_fd, 'moved to region %s' % (new_region_name)
+        except:
+            sys.stderr.write(('error relocating %s user %d: '%(SpinConfig.game(), user_id)) + traceback.format_exc())
+
+    def punish_player(self, user_id, cur_region_name):
+
+        if 'prison' in cur_region_name: return cur_region_name # there should never be a situation where a player in a prison is being punished. Just leave them in prison.
+
+        cur_region = gamedata['regions'][cur_region_name]
+        cur_continent_id = cur_region.get('continent_id',None)
+
+        # find non-war regions
+        non_war_regions = filter(lambda x: not is_war_region(x) and 'prison' not in x.get('id','') and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
+
+        assert len(non_war_regions) >= 1
+
+        # pick destination region
+        new_region = None
+
+        candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
+                                   x.get('auto_join',1) and x.get('enable_map',1) and \
+                                   not x.get('developer_only',0), gamedata['regions'].itervalues())
+        if self.verbose >= 2:
+            print >> self.msg_fd, 'continent %r candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
+
+        assert len(candidate_regions) >= 1
+        new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
+
+        if not self.test:
+            assert new_region['id'] != cur_region_name
+
+        if not self.dry_run:
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
+
+        # player message notes no punishment, just relocation because the war is over
+        message_body = 'Thank you for participating in the clan war!  Now that the war is over, we have relocated your base to %s. We hope to see you return for another battle!' % (new_region['ui_name'])
+
+        if not self.dry_run:
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'send_message',
+                                  'message_body': message_body,
+                                  'message_subject': 'Clan War Complete!',
+                                  }) == 'ok'
+
+        event_props = {'user_id': user_id, 'event_name': '7301_policy_bot_punished', 'code':7301,
+                       'old_region': cur_region_name, 'new_region': new_region['id'],
+                       'reason':'clan_war_interbellum'}
+        if not self.dry_run:
+            self.policy_bot_log.event(time_now, event_props)
+        else:
+            print >> self.msg_fd, event_props
+
+        return new_region['id']
+
 def connect_to_db():
     return SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']), identity = 'PolicyBot')
 
@@ -711,6 +793,8 @@ if alt_policy_region_names:
     POLICIES.append(AltPolicy)
 if anti_vpn_region_names:
     POLICIES.append(AntiVPNPolicy)
+if war_region_names:
+    POLICIES.append(WarMapPolicy)
 if anti_refresh_region_names:
     POLICIES += [IdleCheckAntiRefreshPolicy, LoginPatternAntiRefreshPolicy]
 
