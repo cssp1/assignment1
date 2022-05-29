@@ -2009,7 +2009,7 @@ def check_cond_chain(chain, **kwargs):
         error |= check_predicate(pred, **kwargs)
     return error
 
-PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTORIAL_COMPLETE', 'ACCOUNT_CREATION_TIME', 'HAS_ALTS',
+PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTORIAL_COMPLETE', 'ACCOUNT_CREATION_TIME', 'HAS_ALTS', 'ALLIANCE_ID',
                    'ALL_BUILDINGS_UNDAMAGED', 'OBJECT_UNDAMAGED', 'OBJECT_UNBUSY', 'BUILDING_DESTROYED', 'BUILDING_QUANTITY', 'SCENERY_QUANTITY',
                    'BUILDING_LEVEL', 'UNIT_QUANTITY', 'TECH_LEVEL', 'ENHANCEMENT_LEVEL', 'QUEST_COMPLETED', 'QUEST_ACTIVE', 'COOLDOWN_ACTIVE', 'COOLDOWN_INACTIVE',
                    'ABTEST', 'ANY_ABTEST', 'RANDOM', 'LIBRARY', 'AI_BASE_ACTIVE', 'AI_BASE_SHOWN', 'PLAYER_HISTORY', 'GAMEDATA_VAR',
@@ -2137,6 +2137,17 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             error |= check_unit_name(pred['spec'], reason)
         if 'qty' not in pred:
             error |= 1; print '%s: %s predicate is missing "qty"' % (reason, pred['predicate'])
+    elif pred['predicate'] == 'ALLIANCE_ID':
+        if 'ids' not in pred:
+            error |= 1; print '%s: %s predicate does not have an "ids" key, should be a list of integers' % (reason, pred['predicate'])
+        elif not isinstance(pred['ids'], list):
+            error |= 1; print '%s: %s predicate "ids" key should be list of integers, not a %s' % (reason, pred['predicate'], str(type(pred['ids'])))
+        else:
+            for id in pred['ids']:
+                if not isinstance(id, int):
+                    error |= 1; print '%s: %s predicate "ids" key contains invalid value, %r' % (reason, pred['predicate'], id)
+            if 'ALLIANCE_ID' not in gamedata['strings']['predicates']:
+                error |= 1; print '%s: %s predicate: not present in gamedata["strings"]["predicates"]' % (reason, pred['predicate'])
 
     elif pred['predicate'] in ('AURA_ACTIVE', 'AURA_INACTIVE'):
         if pred['aura_name'] not in gamedata['auras']:
