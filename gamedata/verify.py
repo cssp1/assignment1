@@ -2315,7 +2315,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG', 'INVOKE_MISSIONS_DIALOG', 'INVOKE_MAIL_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_UPGRADE_DIALOG', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_LOTTERY_DIALOG', 'INVOKE_MANUFACTURE_DIALOG',
                         'INVOKE_CHANGE_REGION_DIALOG', 'INVOKE_BLUEPRINT_CONGRATS', 'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_INVENTORY_DIALOG', 'MARK_BIRTHDAY',
                         'OPEN_URL', 'FOCUS_CHAT_GUI', 'FACEBOOK_PERMISSIONS_PROMPT', 'DAILY_TIP_UNDERSTOOD', 'RANDOM', 'FORCE_SCROLL',
-                        'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
+                        'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS', 'CHANGE_REGION',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_PROGRESS_TIMERS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'BH_BOOKMARK_PROMPT', 'BH_WEB_PUSH_INIT', 'HELP_REQUEST_REMINDER', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER', 'UI_NOTIFY',
                         'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE', 'INVOKE_LOGIN_INCENTIVE_DIALOG', 'INVOKE_PRIVACY_DIALOG', 'INVOKE_INGAME_TIP', 'INVOKE_VIDEO_WIDGET',
@@ -2569,6 +2569,16 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
 
     elif cons['consequent'] == 'UI_NOTIFY':
         error |= check_consequent(cons['action'], reason = reason, context = context, context_data = context_data)
+
+    elif cons['consequent'] == 'CHANGE_REGION':
+        if 'regions' not in cons:
+            error |= 1; print '%s: consequent %s has no "regions" key, which should be a list of valid regions' % (reason, cons['consequent'])
+        elif not isinstance(cons['regions'], list):
+            error |= 1; print '%s: consequent %s "regions" key should be a list of valid regions' % (reason, cons['consequent'])
+        else:
+            for region in cons['regions']:
+                if region not in gamedata['regions']:
+                    error |= 1; print '%s: consequent %s list invalid region, %r' % (reason, cons['consequent'], region)
 
     elif cons['consequent'] == 'INVOKE_SKILL_CHALLENGE_STANDINGS_DIALOG':
         for FIELD in ('stat_name', 'challenge_key'):
