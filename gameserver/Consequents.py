@@ -895,6 +895,16 @@ class SendMessageConsequent(Consequent):
         # ensure it's delivered quickly
         session.do_CONTROLAPI(session.user.user_id, {'user_id':recipient_user_id,'method':'receive_mail'})
 
+class ChangeRegionConsequent(Consequent):
+    def execute(self, session, player, retmsg, context=None):
+        regions = self.data['regions']
+        success = None
+        for region in regions:
+            success = self.change_region(region, None, None, session, retmsg, reason='CHANGE_REGION consequent')
+            if success: break
+        if not success:
+            self.change_region(None, None, None, session, retmsg, reason='CHANGE_REGION consequent fallback to None')
+
 class LibraryConsequent(Consequent):
     def __init__(self, data):
         Consequent.__init__(self, data)
@@ -938,6 +948,7 @@ def read_consequent(data):
     elif kind == 'HEAL_ALL_UNITS': return HealAllUnitsConsequent(data)
     elif kind == 'HEAL_ALL_BUILDINGS': return HealAllBuildingsConsequent(data)
     elif kind == 'SEND_MESSAGE': return SendMessageConsequent(data)
+    elif kind == 'CHANGE_REGION': return ChangeRegionConsequent(data)
     elif kind == 'LIBRARY': return LibraryConsequent(data)
     elif kind in ('INVOKE_UPGRADE_DIALOG', 'INVOKE_SKILL_CHALLENGE_STANDINGS_DIALOG',
                   'INVOKE_BLUEPRINT_CONGRATS','INVOKE_BUY_GAMEBUCKS_DIALOG','INVOKE_LOTTERY_DIALOG',
