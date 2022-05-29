@@ -2568,6 +2568,23 @@ HasAltsPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
     Never relevant mentioning this to the player. */
 HasAltsPredicate.prototype.do_ui_describe = function(player) { return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']); };
 
+/** @constructor @struct
+  * @extends Predicate */
+function AllianceIDPredicate(data) {
+    goog.base(this, data);
+    this.ids = data['ids'];
+}
+goog.inherits(AllianceIDPredicate, Predicate);
+AllianceIDPredicate.prototype.is_satisfied = function(player, qdata) {
+    //var alliance_info = AllianceCache.query_info_sync(d.parent.user_data['alliance_id']); do each clan ID
+    return goog.array.contains(this.ids, session.alliance_id)
+};
+/** @override */
+AllianceIDPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+/** @override
+    Never relevant mentioning this to the player. */
+AllianceIDPredicate.prototype.do_ui_describe = function(player) { return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']); };
+
 /** @param {!Object} data
     @return {!Predicate} */
 function read_predicate(data) {
@@ -2745,6 +2762,8 @@ function read_predicate(data) {
         return new ClientVersionPredicate(data);
     } else if (kind === 'HAS_ALTS') {
         return new HasAltsPredicate(data);
+    } else if (kind === 'ALLIANCE_ID') {
+        return new AllianceIDPredicate(data);
     } else if(kind === 'PATRON') {
         return new PatronPredicate(data, data['value'], data['method']);
     } else {

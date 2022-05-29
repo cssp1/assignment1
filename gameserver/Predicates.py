@@ -1151,6 +1151,13 @@ class ObjectOwnershipPredicate(Predicate):
             return player.is_ai() and player.is_ai_user_id_range() and self.team == qdata['source_obj'].team
         return self.team == qdata['source_obj'].team
 
+class AllianceIDPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.ids = data['ids']
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        return session.get_alliance_id(reason='ALLIANCE_ID predicate') in self.ids
+
 # instantiate a Predicate object from JSON
 def read_predicate(data):
     kind = data['predicate']
@@ -1309,6 +1316,8 @@ def read_predicate(data):
         return HasAltsPredicate(data)
     elif kind == 'OBJECT_OWNERSHIP':
         return ObjectOwnershipPredicate(data)
+    elif kind == 'ALLIANCE_ID':
+        return AllianceIDPredicate(data)
     elif kind == 'PATRON':
         return PatronPredicate(data, data['value'], data['method'])
     raise Exception('unknown predicate %s' % repr(data))
