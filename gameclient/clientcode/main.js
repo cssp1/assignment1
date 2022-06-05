@@ -51550,7 +51550,7 @@ function handle_server_message(data) {
 
         console.log('GameArt settings: low_gfx '+use_low_gfx+' audio_driver '+(audio_driver ? audio_driver.toString() : null));
 
-        GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, audio_driver, use_low_gfx, force_lazy_sound, player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx']));
+        GameArt.init(client_time, canvas, ctx, gamedata['art'], gamedata['tints'], gameart_onload, audio_driver, use_low_gfx, force_lazy_sound, player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx']));
 
         if(!ctx) { throw Error('ctx not initialized'); }
         SPFX.init(ctx, use_low_gfx, false);
@@ -53897,7 +53897,7 @@ function handle_server_message(data) {
 
         // XXX hack - make sure GameArt is set up to be able to display errors pre-login
         if(!GameArt.initialized) {
-            GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, null, true, true, false);
+            GameArt.init(client_time, canvas, ctx, gamedata['art'], gamedata['tints'], gameart_onload, null, true, true, false);
         }
 
         if(name.indexOf("CANNOT_LOG_IN_") == 0) {
@@ -54098,7 +54098,7 @@ function invoke_timeout_message(event_name, props, options) {
 
     // XXX hack - make sure GameArt is set up to be able to display errors pre-login
     if(!GameArt.initialized) {
-        GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, null, true, true, false);
+        GameArt.init(client_time, canvas, ctx, gamedata['art'], gamedata['tints'], gameart_onload, null, true, true, false);
     }
 
     var dialog = invoke_message_dialog(title, descr, options);
@@ -58210,7 +58210,12 @@ function draw_unit(world, unit) {
         }
 
         // special movement states
-        var sprite_data = gamedata['art'][sprite];
+        var sprite_data;
+        if(sprite in gamedata['tints']) {
+            sprite_data = clone_spritedata(sprite);
+        } else {
+            sprite_data = gamedata['art'][sprite];
+        }
         var mystates = sprite_data['states'];
         if((unit.control_state === control_states.CONTROL_SHOOT) && unit.control_spellname && ('melee_cycle' in sprite_data)) {
             // melee strikes
@@ -59114,6 +59119,21 @@ function draw_debug_map(world) {
     ctx.restore();
 
     if(world.astar_context) { world.astar_context.debug_draw(ctx); }
+}
+
+function clone_spritedata(name) {
+    var t_data = gamedata['tints'][name];
+    var t_name = t_data['asset'];
+    var data = {};
+    Object.assign(data, gamedata['art'][t_name]);
+    for(var state in t_data) {
+        if(state == 'asset') { continue; }
+        var statedata = t_data[state];
+        if('tint' in statedata) { data['states'][state]['tint'] = statedata['tint']; }
+        if('saturation' in statedata) { data['states'][state]['saturation'] = statedata['saturation']; }
+        if('tint_mask' in statedata) { data['states'][state]['tint_mask'] = statedata['tint_mask']; }
+    }
+    return data;
 }
 
 function test_consequent(cons) {

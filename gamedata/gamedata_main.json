@@ -974,6 +974,9 @@
     "art":
 #include "$GAME_ID/$GAME_ID_art.json"
     ,
+    "tints":
+#include "$GAME_ID/$GAME_ID_tints.json"
+    ,
     "daily_tips":
 #include "$GAME_ID/$GAME_ID_daily_tips.json"
     ,

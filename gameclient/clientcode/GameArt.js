@@ -336,7 +336,7 @@ GameArt.set_audio_channel_max = function(num) {
     if(GameArt.channel_governor) { GameArt.channel_governor.max_chan = num; }
 };
 
-GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_name, use_low_gfx, force_lazy_sound, enable_pixel_manipulation_in_low_gfx) {
+GameArt.init = function(time, canvas, ctx, art_json, tint_json, dl_callback, audio_driver_name, use_low_gfx, force_lazy_sound, enable_pixel_manipulation_in_low_gfx) {
     GameArt.initialized = true;
     GameArt.time = time;
     GameArt.canvas = canvas;
@@ -436,6 +436,20 @@ GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_n
     GameArt.assets = {};
     for(var name in art_json) {
         var data = art_json[name];
+        GameArt.assets[name] = new GameArt.Asset(name, data);
+    }
+    for(var name in tint_json) {
+        var t_data = tint_json[name];
+        var t_name = t_data['asset'];
+        var data = {};
+        Object.assign(data, art_json[t_name]);
+        for(var state in t_data) {
+            if(state == 'asset') { continue; }
+            var statedata = t_data[state];
+            if('tint' in statedata) { data['states'][state]['tint'] = statedata['tint']; }
+            if('saturation' in statedata) { data['states'][state]['saturation'] = statedata['saturation']; }
+            if('tint_mask' in statedata) { data['states'][state]['tint_mask'] = statedata['tint_mask']; }
+        }
         GameArt.assets[name] = new GameArt.Asset(name, data);
     }
 
