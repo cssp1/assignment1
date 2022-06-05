@@ -59126,8 +59126,7 @@ function clone_spritedata(name) {
     var t_name = t_data['asset'];
     var data = {};
     Object.assign(data, gamedata['art'][t_name]);
-    for(var state in t_data) {
-        if(state == 'asset') { continue; }
+    for(var state in t_data['states']) {
         var statedata = t_data[state];
         if('tint' in statedata) { data['states'][state]['tint'] = statedata['tint']; }
         if('saturation' in statedata) { data['states'][state]['saturation'] = statedata['saturation']; }

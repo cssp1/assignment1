@@ -4782,16 +4782,22 @@ def main(args):
     tints = {}
     for name, data in gamedata['tints'].iteritems():
         t_name = data['asset']
-        template = deepcopy(gamedata['art'][t_name])
-        #print(template)
-        for state, statedata in data.iteritems():
-            if 'tint' in statedata:
-                template['states'][state]['tint'] = statedata['tint']
-            if 'saturation' in statedata:
-                template['states'][state]['saturation'] = statedata['saturation']
-            if 'tint_mask' in statedata:
-                template['states'][state]['tint_mask'] = statedata['tint_mask']
-                require_art_asset(template[state]['tint_mask'], '%s tint variant: %s' % (t_name, name))
+        if in gamedata['art']:
+            template = deepcopy(gamedata['art'][t_name])
+            for state, statedata in data['states'].iteritems():
+                if state not in template['states']:
+                    error |= 1; print 'gamedata["tints"] entry %s overrides state %s, but that state is not in its gamedata["art"] template, %s' % (name,state,t_name)
+                else:
+                    if 'tint' in statedata:
+                        template['states'][state]['tint'] = statedata['tint']
+                    if 'saturation' in statedata:
+                        template['states'][state]['saturation'] = statedata['saturation']
+                    if 'tint_mask' in statedata:
+                        template['states'][state]['tint_mask'] = statedata['tint_mask']
+                        require_art_asset(template[state]['tint_mask'], '%s tint variant: %s' % (t_name, name))
+        else:
+            error |= 1; print 'gamedata["tints"] entry %s requires "asset" %s, but it is not in gamedata["art"]' % (name,t_name)
+
         tints[name] = template
 
     # this must come last, because it depends on required_art_assets being filled out by previous code

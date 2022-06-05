@@ -443,8 +443,7 @@ GameArt.init = function(time, canvas, ctx, art_json, tint_json, dl_callback, aud
         var t_name = t_data['asset'];
         var data = {};
         Object.assign(data, art_json[t_name]);
-        for(var state in t_data) {
-            if(state == 'asset') { continue; }
+        for(var state in t_data['states']) {
             var statedata = t_data[state];
             if('tint' in statedata) { data['states'][state]['tint'] = statedata['tint']; }
             if('saturation' in statedata) { data['states'][state]['saturation'] = statedata['saturation']; }
