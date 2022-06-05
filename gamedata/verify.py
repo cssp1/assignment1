@@ -4782,7 +4782,7 @@ def main(args):
     tints = {}
     for name, data in gamedata['tints'].iteritems():
         t_name = data['asset']
-        if in gamedata['art']:
+        if t_name in gamedata['art']:
             template = deepcopy(gamedata['art'][t_name])
             for state, statedata in data['states'].iteritems():
                 if state not in template['states']:
