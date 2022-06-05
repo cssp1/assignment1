@@ -100,6 +100,7 @@
     "equip_slots": { "defense": {"ui_name": "Defense"},
                      "offense": {"ui_name": "Offense"},
                      "utility": {"ui_name": "Utility"},
+                     "secondary_Weapon": {"ui_name": "Secondary Weapon", "show": 0},
                      "ANY": {"ui_name": "Any"},
                      "leader": {"ui_name": "Leader"},
                      "mine": {"ui_name": "Mine"},
