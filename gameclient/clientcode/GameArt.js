@@ -439,17 +439,10 @@ GameArt.init = function(time, canvas, ctx, art_json, tint_json, dl_callback, aud
         GameArt.assets[name] = new GameArt.Asset(name, data);
     }
     for(var name in tint_json) {
-        var t_data = tint_json[name];
-        var t_name = t_data['asset'];
-        var data = {};
-        Object.assign(data, art_json[t_name]);
-        for(var state in t_data['states']) {
-            var statedata = t_data[state];
-            if('tint' in statedata) { data['states'][state]['tint'] = statedata['tint']; }
-            if('saturation' in statedata) { data['states'][state]['saturation'] = statedata['saturation']; }
-            if('tint_mask' in statedata) { data['states'][state]['tint_mask'] = statedata['tint_mask']; }
+        var data = tint_json[name];
+        if(!(name in GameArt.assets)) {
+            GameArt.assets[name] = new GameArt.Asset(name, data);
         }
-        GameArt.assets[name] = new GameArt.Asset(name, data);
     }
 
     // sort download requests by priority
@@ -602,8 +595,14 @@ GameArt.image_ontimeout = function(filename, url) {
  */
 GameArt.Asset = function(name, data) {
     this.name = name;
+    this.data = data;
     /** @type {!Object.<string, !GameArt.AbstractSprite>} */
     this.states = {};
+    var parent_data = {};
+    if(data['is_tint']) {
+        var parent_name = data['asset'];
+        parent_data = GameArt.assets[parent_name].get_data();
+    }
     for(var statename in data['states']) {
         var src_statename = statename;
 
@@ -619,8 +618,13 @@ GameArt.Asset = function(name, data) {
         var spr;
         if('subassets' in spr_data) {
             spr = new GameArt.CompoundSprite(spr_name, spr_data);
+        } else if (data['is_tint']) {
+            spr_data = parent_data['states'][src_statename];
+            var variant_data = null;
+            if(src_statename in data['states']) { variant_data = data['states'][src_statename]; }
+            spr = new GameArt.Sprite(spr_name, spr_data, variant_data);
         } else {
-            spr = new GameArt.Sprite(spr_name, spr_data);
+            spr = new GameArt.Sprite(spr_name, spr_data, null);
         }
         this.states[statename] = spr;
     }
@@ -633,6 +637,15 @@ GameArt.Asset.prototype.get_state = function(state) {
         throw Error('request for invalid art asset state '+this.name+'.'+state);
     }
     return this.states[state];
+};
+
+/** @return {!Object}  */
+GameArt.Asset.prototype.get_data = function() {
+    if(this.data['is_tint']) {
+        var parent_name = this.data['asset'];
+        return GameArt.assets[parent_name].get_data();
+    }
+    return this.data;
 };
 
 // Start all necessary delay loading. Return true if ready to draw.
@@ -769,8 +782,9 @@ GameArt.AbstractSprite.prototype.detect_rect = function(xy, facing, time, mouser
 // Sprites are initialized directly from the gamedata JSON
 /** @constructor @struct
   * @extends GameArt.AbstractSprite */
-GameArt.Sprite = function(name, data) {
+GameArt.Sprite = function(name, data, variant_data) {
     goog.base(this, name, data);
+    if(!variant_data) { variant_data = {}; } // populate null variants with empty dict to make later checks easier
 
     if('style' in data) {
         this.style = data['style'];
@@ -849,11 +863,15 @@ GameArt.Sprite = function(name, data) {
         // for packed sprites, unless "tint_share" is enabled, which
         // shares one tinted image element for the whole sheet.
         var tint = data['tint'] || null;
+        if('tint' in variant_data) { tint = variant_data['tint']; }
         if(tint && tint.length < 4) {
             tint = goog.array.clone(tint); // do not mutate gamedata!
             while(tint.length < 4) { tint.push(1); }
         }
         var saturation = ('saturation' in data) ? data['saturation'] : 1;
+        if('saturation' in variant_data) { saturation = variant_data['saturation']; }
+        var tint_mask = ('tint_mask' in data) ? data['tint_mask'] : 0;
+        if('tint_mask' in variant_data) { tint_mask = variant_data['tint_mask']; }
 
         var imgname = data['images'][0];
         for(var i = 0; i < n_images; i++) {
@@ -874,8 +892,8 @@ GameArt.Sprite = function(name, data) {
                                                    load_priority,
                                                    delay_load,
                                                    tint, saturation,
-                                                   ('tint_share' in data ? data['tint_share'] : ((n_images>1) || !!data['tint_mask'])),
-                                                   (data['tint_mask'] ? new GameArt.Image(data['tint_mask'], null, this.wh, load_priority, delay_load) : null)
+                                                   ('tint_share' in data ? data['tint_share'] : ((n_images>1) || !!tint_mask)),
+                                                   (tint_mask ? new GameArt.Image(tint_mask, null, this.wh, load_priority, delay_load) : null)
                                                   );
             } else {
                 instance = new GameArt.Image(imgname,

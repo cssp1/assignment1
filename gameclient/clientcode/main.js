@@ -58210,12 +58210,7 @@ function draw_unit(world, unit) {
         }
 
         // special movement states
-        var sprite_data;
-        if(sprite in gamedata['tints']) {
-            sprite_data = clone_spritedata(sprite);
-        } else {
-            sprite_data = gamedata['art'][sprite];
-        }
+        var sprite_data = GameArt.assets[sprite].get_data();
         var mystates = sprite_data['states'];
         if((unit.control_state === control_states.CONTROL_SHOOT) && unit.control_spellname && ('melee_cycle' in sprite_data)) {
             // melee strikes
@@ -59119,20 +59114,6 @@ function draw_debug_map(world) {
     ctx.restore();
 
     if(world.astar_context) { world.astar_context.debug_draw(ctx); }
-}
-
-function clone_spritedata(name) {
-    var t_data = gamedata['tints'][name];
-    var t_name = t_data['asset'];
-    var data = {};
-    Object.assign(data, gamedata['art'][t_name]);
-    for(var state in t_data['states']) {
-        var statedata = t_data[state];
-        if('tint' in statedata) { data['states'][state]['tint'] = statedata['tint']; }
-        if('saturation' in statedata) { data['states'][state]['saturation'] = statedata['saturation']; }
-        if('tint_mask' in statedata) { data['states'][state]['tint_mask'] = statedata['tint_mask']; }
-    }
-    return data;
 }
 
 function test_consequent(cons) {
