@@ -51550,7 +51550,7 @@ function handle_server_message(data) {
 
         console.log('GameArt settings: low_gfx '+use_low_gfx+' audio_driver '+(audio_driver ? audio_driver.toString() : null));
 
-        GameArt.init(client_time, canvas, ctx, gamedata['art'], gamedata['tints'], gameart_onload, audio_driver, use_low_gfx, force_lazy_sound, player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx']));
+        GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, audio_driver, use_low_gfx, force_lazy_sound, player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx']));
 
         if(!ctx) { throw Error('ctx not initialized'); }
         SPFX.init(ctx, use_low_gfx, false);
@@ -53897,7 +53897,7 @@ function handle_server_message(data) {
 
         // XXX hack - make sure GameArt is set up to be able to display errors pre-login
         if(!GameArt.initialized) {
-            GameArt.init(client_time, canvas, ctx, gamedata['art'], gamedata['tints'], gameart_onload, null, true, true, false);
+            GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, null, true, true, false);
         }
 
         if(name.indexOf("CANNOT_LOG_IN_") == 0) {
@@ -54098,7 +54098,7 @@ function invoke_timeout_message(event_name, props, options) {
 
     // XXX hack - make sure GameArt is set up to be able to display errors pre-login
     if(!GameArt.initialized) {
-        GameArt.init(client_time, canvas, ctx, gamedata['art'], gamedata['tints'], gameart_onload, null, true, true, false);
+        GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, null, true, true, false);
     }
 
     var dialog = invoke_message_dialog(title, descr, options);

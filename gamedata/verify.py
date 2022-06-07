@@ -57,10 +57,8 @@ def require_art_asset(name, reason):
     error = 0
     if type(name) not in (str,unicode):
         error |= 1; print '%s bad asset "%s"' % (reason, repr(name))
-    elif name not in gamedata['art'] and name not in gamedata['tints']:
+    elif name not in gamedata['art']:
         error |= 1; print '%s references missing art asset "%s"' % (reason, name)
-    elif name in gamedata['art'] and name in gamedata['tints']:
-        error |= 1; print '%s references art asset "%s", which is in both gamedata["art"] and gamedata["tints"]. It should be in only one' % (reason, name)
     else:
         required_art_assets.add(name)
     return error
@@ -4185,10 +4183,7 @@ def get_art_source_files(name, asset, ref_list):
                     substate = 'normal'
                 error |= require_art_asset(subname, name+':'+statename+':subassets')
                 if not error:
-                    if subname in gamedata['art']:
-                        data = gamedata['art'][subname]['states']
-                    else:
-                        data = gamedata['tints'][subname]
+                    data = gamedata['art'][subname]['states']
                     if substate not in data:
                         error |= 1; print 'art asset %s references missing subasset %s (state %s)' % (name, subname, substate)
 
@@ -4216,7 +4211,7 @@ def inventory_art(dir, root):
         else:
             yield relpath
 
-def check_art(art, tints, report_unreferenced_art_files = True, report_unreferenced_art_assets = True):
+def check_art(art, report_unreferenced_art_files = True, report_unreferenced_art_assets = True):
     # optionally also warn about extra files found in art/ that aren't referenced or assets in gamedata.art that aren't referenced
 
     # build list of files in the 'gameclient/art' directory
@@ -4249,8 +4244,6 @@ def check_art(art, tints, report_unreferenced_art_files = True, report_unreferen
     #ref_list |= set(['art/facebook_assets/'+viral['image'] for viral in gamedata['virals'].itervalues() if (type(viral) is dict and ('image' in viral))])
 
     for name, asset in art.iteritems():
-        error |= get_art_source_files(name, asset, ref_list)
-    for name, asset in tints.iteritems():
         error |= get_art_source_files(name, asset, ref_list)
 
     # check for missing files referenced by art.json
@@ -4779,28 +4772,9 @@ def main(args):
     for name, data in gamedata['fb_notifications']['notifications'].iteritems():
         error |= check_notification(name, data)
 
-    tints = {}
-    for name, data in gamedata['tints'].iteritems():
-        t_name = data['asset']
-        if t_name in gamedata['art']:
-            template = deepcopy(gamedata['art'][t_name])
-            tints[name] = template
-            for state, statedata in data['states'].iteritems():
-                if state not in template['states']:
-                    error |= 1; print 'gamedata["tints"] entry %s overrides state %s, but that state is not in its gamedata["art"] template, %s' % (name,state,t_name)
-                else:
-                    if 'tint' in statedata:
-                        template['states'][state]['tint'] = statedata['tint']
-                    if 'saturation' in statedata:
-                        template['states'][state]['saturation'] = statedata['saturation']
-                    if 'tint_mask' in statedata:
-                        template['states'][state]['tint_mask'] = statedata['tint_mask']
-                        require_art_asset(template[state]['tint_mask'], '%s tint variant: %s' % (t_name, name))
-        else:
-            error |= 1; print 'gamedata["tints"] entry %s requires "asset" %s, but it is not in gamedata["art"]' % (name,t_name)
 
     # this must come last, because it depends on required_art_assets being filled out by previous code
-    error |= check_art(gamedata['art'], tints,
+    error |= check_art(gamedata['art'],
                        report_unreferenced_art_files = report_unreferenced_art_files,
                        report_unreferenced_art_assets = report_unreferenced_art_assets)
 

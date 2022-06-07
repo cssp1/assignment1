@@ -336,7 +336,7 @@ GameArt.set_audio_channel_max = function(num) {
     if(GameArt.channel_governor) { GameArt.channel_governor.max_chan = num; }
 };
 
-GameArt.init = function(time, canvas, ctx, art_json, tint_json, dl_callback, audio_driver_name, use_low_gfx, force_lazy_sound, enable_pixel_manipulation_in_low_gfx) {
+GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_name, use_low_gfx, force_lazy_sound, enable_pixel_manipulation_in_low_gfx) {
     GameArt.initialized = true;
     GameArt.time = time;
     GameArt.canvas = canvas;
@@ -437,12 +437,6 @@ GameArt.init = function(time, canvas, ctx, art_json, tint_json, dl_callback, aud
     for(var name in art_json) {
         var data = art_json[name];
         GameArt.assets[name] = new GameArt.Asset(name, data);
-    }
-    for(var name in tint_json) {
-        var data = tint_json[name];
-        if(!(name in GameArt.assets)) {
-            GameArt.assets[name] = new GameArt.Asset(name, data);
-        }
     }
 
     // sort download requests by priority
@@ -599,8 +593,8 @@ GameArt.Asset = function(name, data) {
     /** @type {!Object.<string, !GameArt.AbstractSprite>} */
     this.states = {};
     var parent_data = {};
-    if(data['is_tint']) {
-        var parent_name = data['asset'];
+    if(data['is_variant']) {
+        var parent_name = data['parent_name'];
         parent_data = GameArt.assets[parent_name].get_data();
     }
     for(var statename in data['states']) {
@@ -618,7 +612,7 @@ GameArt.Asset = function(name, data) {
         var spr;
         if('subassets' in spr_data) {
             spr = new GameArt.CompoundSprite(spr_name, spr_data);
-        } else if (data['is_tint']) {
+        } else if (data['is_variant']) {
             spr_data = parent_data['states'][src_statename];
             var variant_data = null;
             if(src_statename in data['states']) { variant_data = data['states'][src_statename]; }
@@ -641,7 +635,7 @@ GameArt.Asset.prototype.get_state = function(state) {
 
 /** @return {!Object}  */
 GameArt.Asset.prototype.get_data = function() {
-    if(this.data['is_tint']) {
+    if(this.data['is_variant']) {
         var parent_name = this.data['asset'];
         return GameArt.assets[parent_name].get_data();
     }
