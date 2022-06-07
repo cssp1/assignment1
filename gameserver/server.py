@@ -12605,6 +12605,7 @@ class Player(AbstractPlayer):
                         # exponential decay constant
                         decay_k = -math.log(2)/gamedata['matchmaking'].get('ladder_point_decay_halflife', 86400)
                         self.modify_scores({'trophies_pvp':0}, method = 'decay', trophy_decay_k = decay_k, trophy_decay_elapsed = elapsed, reason = 'ladder_point_decay_check')
+                        self.modify_scores({'trophies_icw':0}, method = 'decay', trophy_decay_k = decay_k, trophy_decay_elapsed = elapsed, reason = 'invitational_clan_war_point_decay_check')
                         aura['start_time'] += elapsed # reset start time
 
         # check if decay aura should be applied
@@ -12634,6 +12635,7 @@ class Player(AbstractPlayer):
         loss = int(fraction * cur_points)
         if loss <= 0: return 0
         self.modify_scores({'trophies_pvp':-loss}, reason = 'alliance_leave_point_loss')
+        self.modify_scores({'trophies_icw':0}, reason = 'alliance_leave_point_loss') # clan war always gets zeroed on leaving
         self.mailbox_append(self.make_system_mail(gamedata['strings']['alliance_leave_point_loss_mail'],
                                                   replacements = {'%LOSS': '%d' % loss,
                                                                   '%ALLIANCE_NAME': alliance_ui_name}))
@@ -13357,7 +13359,7 @@ class Player(AbstractPlayer):
 
             if name.startswith('trophies_'):
                 assert not has_extra_axes
-                kind = name[9:12]; assert kind in ('pve','pvp','pvv')
+                kind = name[9:12]; assert kind in ('pve','pvp','pvv','icw')
                 floor = gamedata['trophy_floor'].get(kind,0)
                 affects_alliance = True
                 if trophy_decay_k != 0:
@@ -20838,6 +20840,11 @@ class GAMEAPI(resource.Resource):
                 if (not session.viewing_player.isolate_pvp):
                     for stat in ('trophies_pvp', 'trophies_pvv'):
                         session.viewing_player.modify_scores({stat: session.loot.get('viewing_'+stat, 0)}, reason = 'complete_attack(defender)')
+                    if session.loot.get('viewing_trophies_pvp', 0):
+                        if session.viewing_player.home_region:
+                            viewing_region_data = session.viewing_player.get_abtest_region(session.viewing_player.home_region)
+                            if viewing_region_data.get('clan_war', 0): #invitational clan war points
+                                session.viewing_player.modify_scores({'trophies_icw': session.loot.get('viewing_trophies_pvp', 0)}, reason = 'complete_attack(defender)')
 
                 if (outcome != 'victory' and gamedata.get('pvp_repair_on_defeat', False)) or gamedata.get('pvp_repair_on_victory', False):
                     session.viewing_base.reset_to_full_health()
@@ -21116,6 +21123,11 @@ class GAMEAPI(resource.Resource):
                     stats['battle_duration'] = {('challenge', 'key', timed_challenge): int(server_time - session.attack_log.log_time)}
 
                 session.player.modify_scores(stats, reason = 'complete_attack(attacker)')
+                if session.loot.get('trophies_pvp', 0):
+                    if session.player.home_region:
+                        player_region_data = session.player.get_abtest_region(session.player.home_region)
+                        if player_region_data.get('clan_war', 0):  # invitational clan war points
+                            session.viewing_player.modify_scores({'trophies_icw': session.loot.get('trophies_pvp', 0)}, reason = 'complete_attack(attacker)')
 
             # finalize battle summary
             if summary:
