@@ -9938,7 +9938,7 @@ class Player(AbstractPlayer):
 
         return False
 
-    def validate_migrate_spin_id(self, args):
+    def request_migrate_spin_id(self, args):
         new_spin_id = args.get('new_spin_id', False)
         if not new_spin_id:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id without providing a new ID value.' % (self.user_id))
@@ -9946,21 +9946,20 @@ class Player(AbstractPlayer):
         if new_spin_id not in self.known_alt_accounts:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id to the one assigned to %s. This is not a valid alt.' % (self.user_id, new_spin_id))
             return 'error: not a valid alt'
-        pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch([int(new_spin_id)], fields = ['banned_until'], reason = 'self_service_migrate_spin_id')
-        for alt_id, alt_pcache in zip(alt_id_list, pcache_result_list):
-            if alt_pcache and alt_pcache.get('banned_until', -1) > server_time:
-                gamesite.exception_log.event(server_time, 'warning: player %d attempting to migrate spin_id to the one assigned to %d. Account %d is banned!' % (self.user_id, alt_id, alt_id))
-                return 'error: alt is banned'
+        pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch([int(new_spin_id)], fields = ['banned_until'], reason = 'request_migrate_spin_id')
+        if len(pcache_result_list) > 0 and pcache_result_list[0].get('banned_until', -1) > server_time:
+            gamesite.exception_log.event(server_time, 'warning: player %d attempting to migrate spin_id to the one assigned to %d. Account %d is banned!' % (self.user_id, new_spin_id, new_spin_id))
+            return 'error: alt is banned'
         # send migration item to target user ID in mail, flag user account with migration target
-        gamesite.do_CONTROLAPI(session.user.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id})
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id})
         return 'ok'
 
-    def migrate_spin_id(self, args):
-        old_spin_id = self.history.get('self_service_migration', 0)
+    def confirm_migrate_spin_id(self, args):
+        old_spin_id = self.history.get('self_service_migrate_spin_id', 0)
         if not old_spin_id:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to confirm spin_id migration but has no valid self_service_migration key in their history. This should not be possible!' % (self.user_id))
             return 'error: this account has no old spin ID'
-        gamesite.do_CONTROLAPI(session.user.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': old_spin_id,'new_spin_id':str(self.user_id)})
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': old_spin_id,'new_spin_id':str(self.user_id)})
         return 'ok'
 
     def log_suspicious_alts(self):
@@ -32184,16 +32183,16 @@ class GAMEAPI(resource.Resource):
                 spell = gamedata['spells'][spellname]
                 assert self.execute_spell(session, retmsg, spell['effect']['spellname'], spell['effect']['spellarg'])
 
-            elif spellname == "REQUEST_SELF_SERVICE_MIGRATION":
-                result = session.player.validate_migrate_spin_id(spellargs)
+            elif spellname == "REQUEST_MIGRATE_SPIN_ID":
+                result = session.player.request_migrate_spin_id(spellargs)
                 if result != 'ok':
-                    retmsg.append(["ERROR", "MIGRATE_SPIN_ID_FAILED"])
+                    retmsg.append(["ERROR", "REQUEST_MIGRATE_SPIN_ID_FAILED"])
                 return
 
-            elif spellname == "DO_SELF_SERVICE_MIGRATION":
-                result = session.player.migrate_spin_id(spellargs)
+            elif spellname == "CONFIRM_MIGRATE_SPIN_ID":
+                result = session.player.confirm_migrate_spin_id(spellargs)
                 if result != 'ok':
-                    retmsg.append(["ERROR", "MIGRATE_SPIN_ID_FAILED"])
+                    retmsg.append(["ERROR", "CONFIRM_MIGRATE_SPIN_ID_FAILED"])
                 return
 
             elif spellname == "REPAIR":
