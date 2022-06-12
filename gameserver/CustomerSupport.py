@@ -451,7 +451,7 @@ class HandleSelfServiceMigrateSpinID(Handler):
         self.old_spin_id = int(self.args['old_spin_id'])
 
     def make_message(self):
-        assert 'complete_self_service_migration' in gamedata['items']
+        assert 'complete_self_service_migration' in self.gamedata['items']
         msg_id = str(self.time_now)+'-'+str(int(1000*random.random()))
         item = {'spec':'complete_self_service_migration', 'stack': 1, 'level': 1, 'undiscardable':1} # note: ALL games will need this item, which will cast spell DO_SELF_SERVICE_MIGRATION
         body = 'Using this item will complete your requested migration of account %d.\n\nClick the item to collect it.\n\nIMPORTANT: You will lose access to this alt account when you use the item!' % self.old_spin_id
