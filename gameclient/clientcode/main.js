@@ -49041,7 +49041,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
 
     if(spellname == "GIVE_UNITS_LIMIT_BREAK" || spellname == "CHANGE_ALIAS" || spellname == "REQUEST_MIGRATE_SPIN_ID") {
         // always OK
-    } else if(spellname == "SHOW_STORE" || spellname == "CLIENT_CONSEQUENT") {
+    } else if(spellname == "SHOW_STORE" || spellname == "CLIENT_CONSEQUENT" || spellname == "CONFIRM_MIGRATE_SPIN_ID") {
         // always OK
     } else if(spellname.indexOf("BUY_RANDOM_") == 0 || spellname.indexOf("FREE_RANDOM_") == 0) {
         // always OK (when not on cooldown)
@@ -54046,7 +54046,10 @@ function handle_server_message(data) {
             notification_queue.push(cb);
         } else if(name == "INSUFFICIENT_RESOURCES_TO_REPAIR") {
             invoke_insufficient_resources_for_repair_message(argument || {}, data[0] || null);
-        } else if(name.indexOf("CANNOT_CREATE_ALLIANCE")==0 || name == "ALLIANCES_OFFLINE" || name == "CANNOT_JOIN_ALLIANCE" || name == "ALIAS_BAD" || name == "ALIAS_TAKEN") {
+        } else if(name.indexOf("CANNOT_CREATE_ALLIANCE")==0 || name == "ALLIANCES_OFFLINE" || name == "CANNOT_JOIN_ALLIANCE"
+                               || name == "ALIAS_BAD" || name == "ALIAS_TAKEN" || name == "REQUEST_MIGRATE_SPIN_ID_FAILED_NO_NEW_ID"
+                               || name == "REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT" || name == "REQUEST_MIGRATE_SPIN_ID_FAILED_BANNED_ALT"
+                               || name == "CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID") {
             invoke_child_message_dialog(display_title, display_string, {'dialog': 'message_dialog_big'});
         } else if(name == "CANNOT_AUTO_RESOLVE_DEFENDER_TOO_MUCH_SPACE") {
             notification_queue.push_with_priority((function(display_title, display_string) { return function () {
