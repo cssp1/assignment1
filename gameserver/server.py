@@ -9938,6 +9938,30 @@ class Player(AbstractPlayer):
 
         return False
 
+    def request_migrate_spin_id(self, args):
+        new_spin_id_str = base64.b64decode(args[0])
+        if not new_spin_id_str:
+            gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id without providing a new ID value.' % (self.user_id))
+            return 'REQUEST_MIGRATE_SPIN_ID_FAILED_NO_NEW_ID'
+        if int(new_spin_id_str) not in self.known_alt_accounts:
+            gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id to the one assigned to %s. This is not a valid alt.' % (self.user_id, new_spin_id_str))
+            return 'REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT'
+        pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch([int(new_spin_id_str)], fields = ['banned_until'], reason = 'request_migrate_spin_id')
+        if len(pcache_result_list) > 0 and pcache_result_list[0].get('banned_until', -1) > server_time:
+            gamesite.exception_log.event(server_time, 'warning: player %d attempting to migrate spin_id to the one assigned to %d. Account %d is banned!' % (self.user_id, new_spin_id_str, new_spin_id_str))
+            return 'REQUEST_MIGRATE_SPIN_ID_FAILED_BANNED_ALT'
+        # send migration item to target user ID in mail, flag user account with migration target
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id_str})
+        return 'ok'
+
+    def confirm_migrate_spin_id(self):
+        old_spin_id = self.history.get('self_service_migrate_spin_id', 0)
+        if not old_spin_id:
+            gamesite.exception_log.event(server_time, 'warning: player %d attempted to confirm spin_id migration but has no valid self_service_migration key in their history. This should not be possible!' % (self.user_id))
+            return 'CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID'
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': old_spin_id,'new_spin_id':str(self.user_id)})
+        return 'ok'
+
     def log_suspicious_alts(self):
         # Check if any of this player's known alts are banned,
         # or are marked "inactive" yet present in a monitored region,
@@ -23063,6 +23087,20 @@ class GAMEAPI(resource.Resource):
             if on_purchase_cons:
                 session.execute_consequent_safe(on_purchase_cons, session.player, retmsg, reason='on_purchase')
 
+        elif spellname == "REQUEST_MIGRATE_SPIN_ID":
+            result = session.player.request_migrate_spin_id(spellarg)
+            if result != 'ok':
+                retmsg.append(["ERROR", result])
+                return False
+            return True
+
+        elif spellname == "CONFIRM_MIGRATE_SPIN_ID":
+            result = session.player.confirm_migrate_spin_id()
+            if result != 'ok':
+                retmsg.append(["ERROR", result])
+                return False
+            return True
+
         elif ('code' in spell) and (spell['code'] == 'projectile_attack'):
             if not session.has_attacked:
                 retmsg.append(["ERROR", "CANNOT_USE_ITEM_OUTSIDE_OF_COMBAT"])
@@ -32158,6 +32196,20 @@ class GAMEAPI(resource.Resource):
             elif spellname == "DISABLE_MINEFIELDS":
                 spell = gamedata['spells'][spellname]
                 assert self.execute_spell(session, retmsg, spell['effect']['spellname'], spell['effect']['spellarg'])
+
+            elif spellname == "REQUEST_MIGRATE_SPIN_ID":
+                result = session.player.request_migrate_spin_id(spellarg)
+                if result != 'ok':
+                    retmsg.append(["ERROR", result])
+                    return False
+                return True
+
+            elif spellname == "CONFIRM_MIGRATE_SPIN_ID":
+                result = session.player.confirm_migrate_spin_id()
+                if result != 'ok':
+                    retmsg.append(["ERROR", result])
+                    return False
+                return True
 
             elif spellname == "REPAIR":
                 self.do_start_repairs(session, retmsg, spellargs[0])
