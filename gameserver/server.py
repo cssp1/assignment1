@@ -9939,22 +9939,22 @@ class Player(AbstractPlayer):
         return False
 
     def request_migrate_spin_id(self, args):
-        new_spin_id = args.get('new_spin_id_str', False)
-        if not new_spin_id:
+        new_spin_id_str = args[0]
+        if not new_spin_id_str:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id without providing a new ID value.' % (self.user_id))
             return 'error: no new_spin_id'
-        if new_spin_id not in self.known_alt_accounts:
-            gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id to the one assigned to %s. This is not a valid alt.' % (self.user_id, new_spin_id))
+        if int(new_spin_id_str) not in self.known_alt_accounts:
+            gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id to the one assigned to %s. This is not a valid alt.' % (self.user_id, new_spin_id_str))
             return 'error: not a valid alt'
-        pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch([int(new_spin_id)], fields = ['banned_until'], reason = 'request_migrate_spin_id')
+        pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch([int(new_spin_id_str)], fields = ['banned_until'], reason = 'request_migrate_spin_id')
         if len(pcache_result_list) > 0 and pcache_result_list[0].get('banned_until', -1) > server_time:
-            gamesite.exception_log.event(server_time, 'warning: player %d attempting to migrate spin_id to the one assigned to %d. Account %d is banned!' % (self.user_id, new_spin_id, new_spin_id))
+            gamesite.exception_log.event(server_time, 'warning: player %d attempting to migrate spin_id to the one assigned to %d. Account %d is banned!' % (self.user_id, new_spin_id_str, new_spin_id_str))
             return 'error: alt is banned'
         # send migration item to target user ID in mail, flag user account with migration target
-        gamesite.do_CONTROLAPI(self.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id})
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id_str})
         return 'ok'
 
-    def confirm_migrate_spin_id(self, args):
+    def confirm_migrate_spin_id(self):
         old_spin_id = self.history.get('self_service_migrate_spin_id', 0)
         if not old_spin_id:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to confirm spin_id migration but has no valid self_service_migration key in their history. This should not be possible!' % (self.user_id))
@@ -32194,7 +32194,7 @@ class GAMEAPI(resource.Resource):
                 return
 
             elif spellname == "CONFIRM_MIGRATE_SPIN_ID":
-                result = session.player.confirm_migrate_spin_id(spellargs)
+                result = session.player.confirm_migrate_spin_id()
                 if result == 'error: no old ID':
                     retmsg.append(["ERROR", "CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID"])
                 return
