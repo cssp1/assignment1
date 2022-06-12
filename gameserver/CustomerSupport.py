@@ -444,6 +444,38 @@ class HandleMigrateSpinID(Handler):
         else:
             return ReturnValue(error = 'cannot find social ID for target user ID %i' % self.new_spin_id)
 
+class HandleSelfServiceMigrateSpinID(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.spin_id = int(self.args['spin_id'])
+        self.old_spin_id = int(self.args['old_spin_id'])
+
+    def make_message(self):
+        assert 'complete_self_service_migration' in self.gamedata['items']
+        msg_id = str(self.time_now)+'-'+str(int(1000*random.random()))
+        item = {'spec':'complete_self_service_migration', 'stack': 1, 'level': 1, 'undiscardable':1} # note: ALL games will need this item, which will cast spell DO_SELF_SERVICE_MIGRATION
+        body = 'Using this item will complete your requested migration of account %d.\n\nClick the item to collect it.\n\nIMPORTANT: You will lose access to this alt account when you use the item!' % self.old_spin_id
+        return {'type':'mail',
+                'expire_time': -1,
+                'msg_id': msg_id,
+                'from_name': 'Customer Support',
+                'to': [self.spin_id],
+                'subject':self.args.get('message_subject', 'Special Item'),
+                'attachments': [item],
+                'body': body}
+
+    def do_exec_online(self, session, retmsg):
+        session.player.history['self_service_migrate_spin_id'] = self.old_spin_id
+        session.player.mailbox_append(self.make_message(), safe_not_to_copy = True)
+        session.player.send_mailbox_update(retmsg)
+        return ReturnValue(result = 'ok')
+
+    def do_exec_offline(self, user, player):
+        player['history']['self_service_migrate_spin_id'] = self.old_spin_id
+        if 'mailbox' not in player: player['mailbox'] = []
+        player['mailbox'].append(self.make_message())
+        return ReturnValue(result = 'ok')
+
 class HandleMarkUninstalled(Handler):
     # mark account as uninstalled and scrub PII
     def record_deauthorized_metric(self, social_id, summary_props, reason):
@@ -2275,6 +2307,7 @@ methods = {
     'unignore_alt': HandleUnignoreAlt,
     'clear_alias': HandleClearAlias,
     'migrate_spin_id': HandleMigrateSpinID,
+    'request_self_service_migrate_spin_id': HandleSelfServiceMigrateSpinID,
     'chat_block': HandleChatBlock,
     'chat_unblock': HandleChatUnblock,
     'chat_official': HandleChatOfficial,

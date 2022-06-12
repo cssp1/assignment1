@@ -28399,6 +28399,12 @@ function inventory_action(item, slot, action, options) {
                             return true;
                         }; })(item, slot, action, options), spellname);
                         return true;
+                    } else if(spellname === "REQUEST_MIGRATE_SPIN_ID") {
+                        invoke_request_migrate_spin_id_dialog((function (_item, _slot, _action, _options) { return function(spellarg) {
+                            inventory_send_request(_item, _slot, _action, spellarg, _options);
+                            return true;
+                        }; })(item, slot, action, options), spellname);
+                        return true;
                     } else if(spellname === "APPLY_AURA") {
                         var aura_name = spellarg[1];
                         var overlap = null;
@@ -45429,6 +45435,8 @@ function update_new_store_sku(d) {
                 invoke_change_region_dialog(order_cb, order_spell);
             } else if(order_spell == "CHANGE_ALIAS") {
                 invoke_change_alias_dialog(order_cb, order_spell);
+            } else if(order_spell == "REQUEST_MIGRATE_SPIN_ID") {
+                invoke_request_migrate_spin_id_dialog(order_cb, order_spell);
             } else {
                 throw Error('unhandled order_spell '+order_spell.toString());
             }
@@ -49031,9 +49039,9 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
         return [false, 'On Cooldown: '+pretty_print_time(to_go), null];
     }
 
-    if(spellname == "GIVE_UNITS_LIMIT_BREAK" || spellname == "CHANGE_ALIAS") {
+    if(spellname == "GIVE_UNITS_LIMIT_BREAK" || spellname == "CHANGE_ALIAS" || spellname == "REQUEST_MIGRATE_SPIN_ID") {
         // always OK
-    } else if(spellname == "SHOW_STORE" || spellname == "CLIENT_CONSEQUENT") {
+    } else if(spellname == "SHOW_STORE" || spellname == "CLIENT_CONSEQUENT" || spellname == "CONFIRM_MIGRATE_SPIN_ID") {
         // always OK
     } else if(spellname.indexOf("BUY_RANDOM_") == 0 || spellname.indexOf("FREE_RANDOM_") == 0) {
         // always OK (when not on cooldown)
@@ -54038,7 +54046,10 @@ function handle_server_message(data) {
             notification_queue.push(cb);
         } else if(name == "INSUFFICIENT_RESOURCES_TO_REPAIR") {
             invoke_insufficient_resources_for_repair_message(argument || {}, data[0] || null);
-        } else if(name.indexOf("CANNOT_CREATE_ALLIANCE")==0 || name == "ALLIANCES_OFFLINE" || name == "CANNOT_JOIN_ALLIANCE" || name == "ALIAS_BAD" || name == "ALIAS_TAKEN") {
+        } else if(name.indexOf("CANNOT_CREATE_ALLIANCE")==0 || name == "ALLIANCES_OFFLINE" || name == "CANNOT_JOIN_ALLIANCE"
+                               || name == "ALIAS_BAD" || name == "ALIAS_TAKEN" || name == "REQUEST_MIGRATE_SPIN_ID_FAILED_NO_NEW_ID"
+                               || name == "REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT" || name == "REQUEST_MIGRATE_SPIN_ID_FAILED_BANNED_ALT"
+                               || name == "CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID") {
             invoke_child_message_dialog(display_title, display_string, {'dialog': 'message_dialog_big'});
         } else if(name == "CANNOT_AUTO_RESOLVE_DEFENDER_TOO_MUCH_SPACE") {
             notification_queue.push_with_priority((function(display_title, display_string) { return function () {
@@ -59114,6 +59125,66 @@ function draw_debug_map(world) {
     ctx.restore();
 
     if(world.astar_context) { world.astar_context.debug_draw(ctx); }
+}
+
+/** @param {function()} callback
+    @param {string} spellname */
+function invoke_request_migrate_spin_id_dialog(callback, spellname) {
+    var spell = gamedata['spells'][spellname];
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['request_migrate_spin_id_dialog']);
+    dialog.user_data['dialog'] = 'request_migrate_spin_id_dialog';
+    dialog.user_data['spellname'] = spellname;
+    dialog.user_data['callback'] = callback;
+    dialog.user_data['pending'] = false;
+    install_child_dialog(dialog);
+    dialog.auto_center();
+    dialog.modal = true;
+    dialog.widgets['close_button'].onclick =
+        dialog.widgets['cancel_button'].onclick = close_parent_dialog;
+    dialog.widgets['title'].str = spell['ui_name'];
+    dialog.widgets['input'].str = player.alias || '';
+    dialog.widgets['input'].disallowed_chars = ['\\', '/', ' ', '.', ':', ';', '+', '*', '(', ')', '<',
+                                                '>', '[', ']', '{', '}', ',', '|', '"', "'", '_', '&',
+                                                '^', '%', '$', '#', '@', '!', '~', '?', '`', '-', '=',
+                                                'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+                                                'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
+                                                'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
+                                                'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
+                                                's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
+    dialog.widgets['description'].set_text_with_linebreaking(spell['ui_description']);
+    dialog.widgets['ok_button'].onclick = dialog.widgets['input'].ontextready = function(w) {
+        var dialog = w.parent;
+        var new_spin_id_str = dialog.widgets['input'].str;
+        var cb = dialog.user_data['callback'];
+        var spell = gamedata['spells'][dialog.user_data['spellname']];
+
+        if(!dialog.user_data['pending'] && new_spin_id_str && new_spin_id_str.length >= 4) {
+            var do_it = (function (_new_spin_id_str, _cb) { return function() {
+                close_parent_dialog(w);
+                _cb([SPHTTP.wrap_string(_new_spin_id_str)]);
+            }; })(new_spin_id_str, cb);
+
+            dialog.user_data['pending'] = true; // prevent successive Enter presses from re-entering here
+            invoke_child_message_dialog(spell['ui_name']+'?', spell['ui_confirm'].replace('%s', new_spin_id_str),
+                                        {'cancel_button': true,
+                                         'on_cancel': (function(_dialog) { return function() { dialog.user_data['pending'] = false; }; })(dialog),
+                                         'on_ok': do_it});
+        }
+    };
+    SPUI.set_keyboard_focus(dialog.widgets['input']);
+    dialog.ondraw = update_change_alias_dialog;
+    return dialog;
+}
+
+/** @param {SPUI.Dialog} dialog */
+function update_request_migrate_spin_id_dialog(dialog) {
+    var ok = true;
+    var s = dialog.widgets['input'].str;
+    if(s.length < 4 || s.length >= 15) {
+        ok = false;
+    }
+
+    dialog.widgets['ok_button'].state = (ok ? 'normal' : 'disabled');
 }
 
 function test_consequent(cons) {
