@@ -9939,7 +9939,7 @@ class Player(AbstractPlayer):
         return False
 
     def request_migrate_spin_id(self, args):
-        new_spin_id = args.get('new_spin_id', False)
+        new_spin_id = args.get('new_spin_id_str', False)
         if not new_spin_id:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id without providing a new ID value.' % (self.user_id))
             return 'error: no new_spin_id'
@@ -9958,7 +9958,7 @@ class Player(AbstractPlayer):
         old_spin_id = self.history.get('self_service_migrate_spin_id', 0)
         if not old_spin_id:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to confirm spin_id migration but has no valid self_service_migration key in their history. This should not be possible!' % (self.user_id))
-            return 'error: this account has no old spin ID'
+            return 'error: no old ID'
         gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': old_spin_id,'new_spin_id':str(self.user_id)})
         return 'ok'
 
@@ -32185,14 +32185,18 @@ class GAMEAPI(resource.Resource):
 
             elif spellname == "REQUEST_MIGRATE_SPIN_ID":
                 result = session.player.request_migrate_spin_id(spellargs)
-                if result != 'ok':
-                    retmsg.append(["ERROR", "REQUEST_MIGRATE_SPIN_ID_FAILED"])
+                if result == 'error: no new_spin_id':
+                    retmsg.append(["ERROR", "REQUEST_MIGRATE_SPIN_ID_FAILED_NO_NEW_ID"])
+                elif result == 'error: not a valid alt':
+                    retmsg.append(["ERROR", "REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT"])
+                elif result == 'error: alt is banned':
+                    retmsg.append(["ERROR", "REQUEST_MIGRATE_SPIN_ID_FAILED_BANNED_ALT"])
                 return
 
             elif spellname == "CONFIRM_MIGRATE_SPIN_ID":
                 result = session.player.confirm_migrate_spin_id(spellargs)
-                if result != 'ok':
-                    retmsg.append(["ERROR", "CONFIRM_MIGRATE_SPIN_ID_FAILED"])
+                if result == 'error: no old ID':
+                    retmsg.append(["ERROR", "CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID"])
                 return
 
             elif spellname == "REPAIR":

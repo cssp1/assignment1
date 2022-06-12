@@ -449,9 +449,9 @@ class HandleSelfServiceMigrateSpinID(Handler):
         Handler.__init__(self, *args, **kwargs)
         self.spin_id = int(self.args['spin_id'])
         self.old_spin_id = int(self.args['old_spin_id'])
-        self.make_message()
 
     def make_message(self):
+        assert 'complete_self_service_migration' in gamedata['items']
         msg_id = str(self.time_now)+'-'+str(int(1000*random.random()))
         item = {'spec':'complete_self_service_migration', 'stack': 1, 'level': 1, 'undiscardable':1} # note: ALL games will need this item, which will cast spell DO_SELF_SERVICE_MIGRATION
         body = 'Using this item will complete your requested migration of account %d.\n\nClick the item to collect it.\n\nIMPORTANT: You will lose access to this alt account when you use the item!' % self.old_spin_id
@@ -464,18 +464,17 @@ class HandleSelfServiceMigrateSpinID(Handler):
                 'attachments': [item],
                 'body': body}
 
-    def exec_online(self, session, retmsg):
-        ret = self.do_exec_online(session, retmsg)
+    def do_exec_online(self, session, retmsg):
         session.player.history['self_service_migrate_spin_id'] = self.old_spin_id
         session.player.mailbox_append(self.make_message(), safe_not_to_copy = True)
         session.player.send_mailbox_update(retmsg)
-        return ret
-    def exec_offline(self, user, player):
-        ret = self.do_exec_offline(user, player)
+        return ReturnValue(result = 'ok')
+
+    def do_exec_offline(self, user, player):
         player['history']['self_service_migrate_spin_id'] = self.old_spin_id
         if 'mailbox' not in player: player['mailbox'] = []
         player['mailbox'].append(self.make_message())
-        return ret
+        return ReturnValue(result = 'ok')
 
 class HandleMarkUninstalled(Handler):
     # mark account as uninstalled and scrub PII
