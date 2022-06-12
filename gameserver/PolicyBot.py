@@ -30,6 +30,7 @@ def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
 def is_alt_policy_region(region): return 'anti_alt' in region.get('tags',[]) or region.get('alt_limit',0) > 0
 def is_anti_vpn_region(region): return 'anti_vpn' in region.get('tags',[])
 def is_anti_refresh_region(region): return 'anti_refresh' in region.get('tags',[])
+def is_tutorial_region(region): return 'tutorial' in region.get('tags',[])
 def is_war_region(region): return 'clan_war' in region.get('tags',[])
 
 anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
@@ -101,8 +102,8 @@ class AntiVPNPolicy(Policy):
         cur_continent_id = cur_region.get('continent_id',None)
 
         # find pro- and anti-VPN regions in the same continent
-        anti_vpn_regions = filter(lambda x: is_anti_vpn_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
-        pro_vpn_regions = filter(lambda x: not is_anti_vpn_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
+        anti_vpn_regions = filter(lambda x: is_anti_vpn_region(x) and x.get('continent_id',None) and not is_tutorial_region(x) == cur_continent_id, gamedata['regions'].itervalues())
+        pro_vpn_regions = filter(lambda x: not is_anti_vpn_region(x) and x.get('continent_id',None) and not is_tutorial_region(x) == cur_continent_id, gamedata['regions'].itervalues())
         prison_regions = filter(lambda x: 'prison' in x.get('id',''), gamedata['regions'].itervalues())
 
         assert len(anti_vpn_regions) >= 1 and len(pro_vpn_regions) >= 1
@@ -118,7 +119,7 @@ class AntiVPNPolicy(Policy):
         candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
                                        (is_majority_anti_vpn_game or x.get('auto_join',1)) and \
                                        x.get('open_join',1) and x.get('enable_map',1) and \
-                                       not x.get('developer_only',0),
+                                       not x.get('developer_only',0) and not is_tutorial_region(x),
                                        pro_vpn_regions)
         if self.verbose >= 2:
             print >> self.msg_fd, 'continent %r candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
@@ -213,7 +214,7 @@ class AntiRefreshPolicy(Policy):
                 # pick any pro-refresh region (which will usually be prison)
                 candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
                                            x.get('open_join',1) and x.get('enable_map',1) and \
-                                           not x.get('developer_only',0),
+                                           not x.get('developer_only',0) and not is_tutorial_region(x),
                                            pro_refresh_regions)
                 assert len(candidate_regions) >= 1
                 new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
@@ -582,8 +583,8 @@ class AltPolicy(Policy):
         cur_continent_id = cur_region.get('continent_id',None)
 
         # find pro- and anti-alt regions in the same continent
-        anti_alt_regions = filter(lambda x: is_anti_alt_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
-        pro_alt_regions = filter(lambda x: not is_anti_alt_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
+        anti_alt_regions = filter(lambda x: is_anti_alt_region(x) and x.get('continent_id',None) and not is_tutorial_region(x) == cur_continent_id, gamedata['regions'].itervalues())
+        pro_alt_regions = filter(lambda x: not is_anti_alt_region(x) and x.get('continent_id',None) and not is_tutorial_region(x) == cur_continent_id, gamedata['regions'].itervalues())
         prison_regions = filter(lambda x: 'prison' in x.get('id',''), gamedata['regions'].itervalues())
 
         if len(anti_alt_regions) < 1 or len(pro_alt_regions) < 1:
@@ -610,7 +611,7 @@ class AltPolicy(Policy):
             # pick any other region, including anti-alt regions, as long as player has no OTHER alts there
             candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
                                        x.get('auto_join',1) and x.get('enable_map',1) and \
-                                       not x.get('developer_only',0) and \
+                                       not x.get('developer_only',0) and not is_tutorial_region(x) and \
                                        x['id'] not in other_alt_region_names, gamedata['regions'].itervalues())
             if self.verbose >= 2:
                 print >> self.msg_fd, 'continent %r first-pass candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
@@ -623,7 +624,7 @@ class AltPolicy(Policy):
             candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
                                        (is_majority_anti_alt_game or x.get('auto_join',1)) and \
                                        x.get('open_join',1) and x.get('enable_map',1) and \
-                                       not x.get('developer_only',0),
+                                       not x.get('developer_only',0) and not is_tutorial_region(x),
                                        pro_alt_regions)
             if self.verbose >= 2:
                 print >> self.msg_fd, 'continent %r second-pass candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
@@ -634,7 +635,7 @@ class AltPolicy(Policy):
         if new_region['id'] == cur_region_name:
             # pick a prison region on third pass
             candidate_regions = filter(lambda x: x.get('open_join',1) and x.get('enable_map',1) and \
-                                       not x.get('developer_only',0),
+                                       not x.get('developer_only',0) and not is_tutorial_region(x),
                                        prison_regions)
             if self.verbose >= 2:
                 print >> self.msg_fd, 'continent %r third-pass candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
@@ -745,7 +746,7 @@ class WarMapPolicy(Policy):
 
         candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
                                    x.get('auto_join',1) and x.get('enable_map',1) and \
-                                   not x.get('developer_only',0), gamedata['regions'].itervalues())
+                                   not x.get('developer_only',0) and not is_tutorial_region(x), gamedata['regions'].itervalues())
         if self.verbose >= 2:
             print >> self.msg_fd, 'continent %r candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
 
