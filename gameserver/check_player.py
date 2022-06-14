@@ -958,13 +958,22 @@ if __name__ == '__main__':
 
         if 'customer_support' in player['history']:
             print fmt % ('Customer Support history', '')
+            cs_cutoff_time = 0 # only gets set if long CS entry count
+            cs_cutoff_counter = 0
+            if len(player['history']['customer_support']) > 25:
+                cs_cutoff_time = int(time.time()) - 365 * 24 * 60 * 60
             for entry in player['history']['customer_support']:
                 if entry['method'] in ('record_alt_login', 'reset_idle_check_state'): continue # don't bother printing these
                 if entry['spin_user'] == 'maptool' and entry['method'] == 'repair_base': continue # skip maptool repairs. It clutters customer history on elder players
                 if entry['spin_user'] == 'unknown' and entry['method'].upper() == 'MARK_UNINSTALLED': continue # skip mark uninstall notices. It clutters customer history on elder players
-                print '    At %s by %s: %s %s' % (time.strftime('%Y%m%d %H:%M GMT', time.gmtime(entry['time'])), entry['spin_user'], entry['method'].upper(), SpinJSON.dumps(entry.get('args',{})))
-                if 'ui_reason' in entry:
-                    print '        Reason: %s' % entry['ui_reason'].replace('\n','\n                ')
+                if entry['time'] > cs_cutoff_time:
+                    print '    At %s by %s: %s %s' % (time.strftime('%Y%m%d %H:%M GMT', time.gmtime(entry['time'])), entry['spin_user'], entry['method'].upper(), SpinJSON.dumps(entry.get('args',{})))
+                    if 'ui_reason' in entry:
+                        print '        Reason: %s' % entry['ui_reason'].replace('\n','\n                ')
+                else:
+                    cs_cutoff_counter += 1
+            if cs_cutoff_counter > 0:
+                print fmt % ('Customer Support history has %d additional entries prior to %s which were truncated. Download the playerdb file for the full CS history' % (cs_cutoff_counter, time.strftime('%Y%m%d %H:%M GMT', time.gmtime(cs_cutoff_time))), '')
 
         if bloat:
             # check for bloat
