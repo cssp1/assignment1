@@ -1882,6 +1882,7 @@ $(function() {
     }
 
     $('#gamebucks_amount').spinner({max:50000, min:0, step:100});
+    $('#pvp_score_amount').spinner({max:500, min:0, step:1});
     $('#item_to_give_qty').spinner({max:50, min:1, step:1});
     $('#item_to_give_level').spinner({max:100, min:1, step:1});
     spin_giveable_items.forEach(function(entry) {
@@ -2030,21 +2031,17 @@ $(function() {
         Quantity: <input type="text" id="item_to_give_qty" name="item_to_give_qty" value="1" style="width:80px;">
         Level: <input type="text" id="item_to_give_level" name="item_to_give_level" value="1" style="width:80px;">
         <button onclick="method_give_item()" class="spin_button">Give</button>
-        <br><hr>
+        <br><br><hr><br>
         $GAMEBUCKS_NAME$ amount: <input type="text" id="gamebucks_amount" name="gamebucks_amount" value="100">
-        <button onclick="method_give_gamebucks()" class="spin_button">Give</button>
-        <br><hr>
-        Modify PvP score: <input type="text" id="pvp_score_amount" name="pvp_score_amount" value="0">
+        <button onclick="method_give_gamebucks()" class="spin_button">Give</button> <button onclick="method_fbpayments_get()" class="spin_button" style="width:200px;">List Recent FB Payments</button>
+        <br><br><hr><br>
+        Modify PvP score: <input type="text" id="pvp_score_amount" name="pvp_score_amount" value="1">
         <button onclick="method_set_pvp_score()" class="spin_button">Set Score</button> <button onclick="method_add_pvp_score()" class="spin_button">Add Score</button>
         <p>
             Reason for this action:
             <br>
             <input type="text" id="give_item_gamebucks_score_reason" style="width:500px;">
         </p>
-        <p>
-            <button onclick="method_fbpayments_get()" class="spin_button" style="width:200px;">List Recent FB Payments</button>
-        </p>
-
     </div>
     <div id="player_tools_send_message">
 <table cellpadding="5">
