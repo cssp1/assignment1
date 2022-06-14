@@ -247,11 +247,28 @@ var method_lookup = function() {
 var method_give_gamebucks = function() {
     var ident = get_ident();
     var amount = $("#gamebucks_amount").spinner("value");
-    var ui_reason = check_ui_reason($("#give_gamebucks_reason")[0].value);
+    var ui_reason = check_ui_reason($("#give_item_gamebucks_score_reason")[0].value);
     if(ident && !isNaN(amount) && amount > 0 && ui_reason) {
         send_request('player', 'give_item', $.extend(ident, {'spec':'$GAMEBUCKS_ITEM$', 'stack':amount, 'undiscardable':1, 'log':'PCHECK', 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
+var method_set_pvp_score = function() {
+    var ident = get_ident();
+    var amount = $("#pvp_score_amount").spinner("value");
+    var ui_reason = check_ui_reason($("#give_item_gamebucks_score_reason")[0].value);
+    if(ident && !isNaN(amount) && amount > 0 && ui_reason) {
+        send_request('player', 'modify_scores', $.extend(ident, {'stat':'trophies_pvp', 'value':amount, 'update_method':'=', 'log':'PCHECK', 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_add_pvp_score = function() {
+    var ident = get_ident();
+    var amount = $("#pvp_score_amount").spinner("value");
+    var ui_reason = check_ui_reason($("#give_item_gamebucks_score_reason")[0].value);
+    if(ident && !isNaN(amount) && amount > 0 && ui_reason) {
+        send_request('player', 'modify_scores', $.extend(ident, {'stat':'trophies_pvp', 'value':amount, 'update_method':'+=', 'log':'PCHECK', 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+
 var method_check_idle = function() {
     var ident = get_ident();
     if(ident) {
@@ -337,7 +354,7 @@ var method_change_region = function() {
 };
 var method_give_item = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#item_to_give_reason")[0].value);
+    var ui_reason = check_ui_reason($("#give_item_gamebucks_score_reason")[0].value);
     var spec = $("#item_to_give_text")[0].value || $("#item_to_give")[0].value;
     var stack = $("#item_to_give_qty").spinner("value");
     var level = $("#item_to_give_level").spinner("value");
@@ -1797,10 +1814,8 @@ $(function() {
         $('#mode_payment').remove();
         $('#player_tools_developer').remove();
         $('#player_tools_developer_header').remove();
-        $('#player_tools_give_item').remove();
-        $('#player_tools_give_item_header').remove();
-        $('#player_tools_give_gamebucks').remove();
-        $('#player_tools_give_gamebucks_header').remove();
+        $('#player_tools_give_item_gamebucks_score').remove();
+        $('#player_tools_give_item_gamebucks_score_header').remove();
         $('#player_tools_send_message').remove();
         $('#player_tools_send_message_header').remove();
         $('#player_tools_clear_cooldown').remove();
@@ -1945,8 +1960,7 @@ $(function() {
 <div id="player_tools" style="display:none;">
   <ul>
     <li><a href="#player_tools_add_note" id="player_tools_add_note_header">Add Note</a></li>
-    <li><a href="#player_tools_give_item" id="player_tools_give_item_header">Give Item</a></li>
-    <li><a href="#player_tools_give_gamebucks" id="player_tools_give_gamebucks_header">Give $GAMEBUCKS_NAME$</a></li>
+    <li><a href="#player_tools_give_item_gamebucks_score" id="player_tools_give_item_gamebucks_score_header">Give Item/$GAMEBUCKS_NAME$/Score</a></li>
     <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Tools/Abuse</a></li>
     <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
     <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
@@ -1964,17 +1978,6 @@ $(function() {
       <textarea id="add_note_body" name="add_note_body" value="" style="width:600px;height:100px"></textarea>
       <p>
       <button onclick="method_add_note()" class="spin_button" style="width:200px;">Add Note</button><p>
-    </div>
-    <div id="player_tools_give_gamebucks">
-      $GAMEBUCKS_NAME$ amount: <input type="text" id="gamebucks_amount" name="gamebucks_amount" value="100">
-      <button onclick="method_give_gamebucks()" class="spin_button">Give</button>
-      <p>
-      Reason for this action:
-      <br>
-      <input type="text" id="give_gamebucks_reason" style="width:500px;">
-      <p>
-      <button onclick="method_fbpayments_get()" class="spin_button" style="width:200px;">List Recent FB Payments</button><p>
-
     </div>
     <div id="player_tools_chat_gag">
         <p>
@@ -2015,26 +2018,34 @@ $(function() {
             <input type="text" id="chat_reason" style="width:500px;">
         </p>
     </div>
-    <div id="player_tools_give_item">
-      Pick an item from the list:
-      <br>
-      <select id="item_to_give" name="item_to_give" class="spin_select"></select>
-      <br><br>
-      Or type the internal item name (from items.json) below:
-      <br>
-      <input type="text" id="item_to_give_text" onkeyup="update_item_to_give_widget_state()" style="width:250px;">
-      <br><br>
-      Quantity: <input type="text" id="item_to_give_qty" name="item_to_give_qty" value="1" style="width:80px;">
-      Level: <input type="text" id="item_to_give_level" name="item_to_give_level" value="1" style="width:80px;">
-
-      <button onclick="method_give_item()" class="spin_button">Give</button>
-      <p>
-      Reason for this action:
-      <br>
-      <input type="text" id="item_to_give_reason" style="width:500px;">
+    <div id="player_tools_give_item_gamebucks_score">
+        Pick an item from the list:
+        <br>
+        <select id="item_to_give" name="item_to_give" class="spin_select"></select>
+        <br><br>
+        Or type the internal item name (from items.json) below:
+        <br>
+        <input type="text" id="item_to_give_text" onkeyup="update_item_to_give_widget_state()" style="width:250px;">
+        <br><br>
+        Quantity: <input type="text" id="item_to_give_qty" name="item_to_give_qty" value="1" style="width:80px;">
+        Level: <input type="text" id="item_to_give_level" name="item_to_give_level" value="1" style="width:80px;">
+        <button onclick="method_give_item()" class="spin_button">Give</button>
+        <br><hr>
+        $GAMEBUCKS_NAME$ amount: <input type="text" id="gamebucks_amount" name="gamebucks_amount" value="100">
+        <button onclick="method_give_gamebucks()" class="spin_button">Give</button>
+        <br><hr>
+        Modify PvP score: <input type="text" id="pvp_score_amount" name="pvp_score_amount" value="0">
+        <button onclick="method_set_pvp_score()" class="spin_button">Set Score</button> <button onclick="method_add_pvp_score()" class="spin_button">Add Score</button>
+        <p>
+            Reason for this action:
+            <br>
+            <input type="text" id="give_item_gamebucks_score_reason" style="width:500px;">
+        </p>
+        <p>
+            <button onclick="method_fbpayments_get()" class="spin_button" style="width:200px;">List Recent FB Payments</button>
+        </p>
 
     </div>
-
     <div id="player_tools_send_message">
 <table cellpadding="5">
 <tr><td>From:</td><td><input type="text" id="send_message_sender" name="send_message_sender" value="Customer Support" style="width:200px"></td></tr>
