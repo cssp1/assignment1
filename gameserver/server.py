@@ -9951,7 +9951,7 @@ class Player(AbstractPlayer):
             gamesite.exception_log.event(server_time, 'warning: player %d attempting to migrate spin_id to the one assigned to %d. Account %d is banned!' % (self.user_id, new_spin_id_str, new_spin_id_str))
             return 'REQUEST_MIGRATE_SPIN_ID_FAILED_BANNED_ALT'
         # send migration item to target user ID in mail, flag user account with migration target
-        gamesite.do_CONTROLAPI(self.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id_str,'user_id':str(self.user_id)})
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id_str,'user_id':new_spin_id_str})
         return 'ok'
 
     def confirm_migrate_spin_id(self):
@@ -9959,7 +9959,7 @@ class Player(AbstractPlayer):
         if not old_spin_id:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to confirm spin_id migration but has no valid self_service_migration key in their history. This should not be possible!' % (self.user_id))
             return 'CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID'
-        gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': old_spin_id,'new_spin_id':str(self.user_id),'user_id':str(old_spin_id)})
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': str(old_spin_id),'new_spin_id':str(self.user_id),'user_id':str(old_spin_id)})
         return 'ok'
 
     def log_suspicious_alts(self):
