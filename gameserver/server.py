@@ -9943,7 +9943,7 @@ class Player(AbstractPlayer):
         if not new_spin_id_str:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id without providing a new ID value.' % (self.user_id))
             return 'REQUEST_MIGRATE_SPIN_ID_FAILED_NO_NEW_ID'
-        if int(new_spin_id_str) not in self.known_alt_accounts:
+        if new_spin_id_str not in self.known_alt_accounts:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id to the one assigned to %s. This is not a valid alt.' % (self.user_id, new_spin_id_str))
             return 'REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT'
         pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch([int(new_spin_id_str)], fields = ['banned_until'], reason = 'request_migrate_spin_id')
