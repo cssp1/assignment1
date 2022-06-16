@@ -377,9 +377,16 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result':chat_abuse_violate(control_args, 'violate', control_args['ui_player_reason'], None, None)}
             elif method == 'chat_abuse_clear':
                 result = {'result':chat_abuse_clear(control_args)}
-            elif method in ('give_item','send_message','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','unban','vpn_excuse','vpn_unexcuse','make_developer','unmake_developer', 'migrate_spin_id', 'make_patron', 'unmake_patron', 'modify_scores',
+            elif method in ('give_item','send_message','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','unban','vpn_excuse','vpn_unexcuse','make_developer','unmake_developer', 'make_patron', 'unmake_patron', 'modify_scores',
                             'clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member','change_alliance_info','change_player_alias','add_note'):
                 result = do_CONTROLAPI(control_args)
+            elif method == 'migrate_spin_id':
+                pcache = nosql_client.player_cache_lookup_batch([int(control_args['new_spin_id'])], fields = ['social_id'])[0]
+                if pcache and pcache.get('social_id','') != '':
+                    control_args['new_social_id'] = pcache['social_id']
+                    result = do_CONTROLAPI(control_args)
+                else:
+                    result['error'] = 'Unable to get social ID for new spin ID %s' % control_args['new_spin_id']
             elif method in ('chat_gag','chat_ungag','ban','change_region'):
                 if ('include_alts' in control_args and control_args['include_alts'] == '1') or ('include_alts_recursive' in control_args and control_args['include_alts_recursive'] == '1'):
                     aggressive_alt_identification = False
