@@ -17600,6 +17600,10 @@ class CONTROLAPI(resource.Resource):
     def handle_invalidate_social_id(self, request):
         social_id = request['social_id']
         gamesite.invalidate_social_id_to_spinpunch_cache_entry(social_id)
+        gamesite.exception_log.event(server_time, 'invalidated social_id %s' % social_id)
+        return SpinJSON.dumps({'result':'ok'})
+    def handle_invalidate_social_id_cache(self, request):
+        gamesite.invalidate_social_id_to_spinpunch_cache_all()
         return SpinJSON.dumps({'result':'ok'})
     def handle_shutdown(self, request, force = False):
         if (not force) and len(session_table) > 0:
