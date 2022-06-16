@@ -9959,7 +9959,7 @@ class Player(AbstractPlayer):
         if not old_spin_id:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to confirm spin_id migration but has no valid self_service_migration key in their history. This should not be possible!' % (self.user_id))
             return 'CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID'
-        gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': str(old_spin_id),'new_spin_id':str(self.user_id),'user_id':str(old_spin_id)})
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': str(old_spin_id),'new_spin_id':str(self.user_id),'user_id':str(old_spin_id),'new_social_id':str(session.user.social_id)})
         return 'ok'
 
     def log_suspicious_alts(self):
