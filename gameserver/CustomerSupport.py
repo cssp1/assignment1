@@ -423,7 +423,7 @@ class HandleMigrateSpinID(Handler):
         self.new_social_id = self.args['new_social_id']
         self.check_social_id = self.gamesite.social_id_table.social_id_to_spinpunch(self.new_spin_id, False)
 
-    def do_exec_online(self):
+    def do_exec_online(self, session, retmsg):
         if self.new_social_id == self.check_social_id:
             check_result = self.gamesite.nosql_client.mutate_social_id_to_spinpunch_single(self.new_social_id, self.old_spin_id, reason='PCHECK migration')
             if check_result == 'ok':
@@ -434,7 +434,7 @@ class HandleMigrateSpinID(Handler):
         else:
             return ReturnValue(error = 'cannot verify social ID %s for target user ID %i' % (self.new_social_id, self.new_spin_id))
 
-    def do_exec_offline(self):
+    def do_exec_offline(self, user, player):
         if self.new_social_id == self.check_social_id:
             check_result = self.gamesite.nosql_client.mutate_social_id_to_spinpunch_single(self.new_social_id, self.old_spin_id, reason='PCHECK migration')
             if check_result == 'ok':
