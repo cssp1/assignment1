@@ -9954,12 +9954,12 @@ class Player(AbstractPlayer):
         gamesite.do_CONTROLAPI(self.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id_str,'user_id':new_spin_id_str})
         return 'ok'
 
-    def confirm_migrate_spin_id(self):
+    def confirm_migrate_spin_id(self, social_id):
         old_spin_id = self.history.get('self_service_migrate_spin_id', 0)
         if not old_spin_id:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to confirm spin_id migration but has no valid self_service_migration key in their history. This should not be possible!' % (self.user_id))
             return 'CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID'
-        gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': str(old_spin_id),'new_spin_id':str(self.user_id),'user_id':str(old_spin_id),'new_social_id':str(session.user.social_id)})
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': str(old_spin_id),'new_spin_id':str(self.user_id),'user_id':str(old_spin_id),'new_social_id':social_id})
         return 'ok'
 
     def log_suspicious_alts(self):
@@ -23095,7 +23095,7 @@ class GAMEAPI(resource.Resource):
             return True
 
         elif spellname == "CONFIRM_MIGRATE_SPIN_ID":
-            result = session.player.confirm_migrate_spin_id()
+            result = session.player.confirm_migrate_spin_id(str(session.user.social_id))
             if result != 'ok':
                 retmsg.append(["ERROR", result])
                 return False
@@ -32205,7 +32205,7 @@ class GAMEAPI(resource.Resource):
                 return True
 
             elif spellname == "CONFIRM_MIGRATE_SPIN_ID":
-                result = session.player.confirm_migrate_spin_id()
+                result = session.player.confirm_migrate_spin_id(str(session.user.social_id))
                 if result != 'ok':
                     retmsg.append(["ERROR", result])
                     return False
