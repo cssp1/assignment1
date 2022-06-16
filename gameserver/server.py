@@ -17597,7 +17597,7 @@ class CONTROLAPI(resource.Resource):
         return SpinJSON.dumps({'result':gamesite.change_state(state)}, newline=True)
     def handle_reconfig(self, request):
         return SpinJSON.dumps({'result':gamesite.reconfig()}, newline=True)
-    def handle_invalidate_social_id(self, request):
+    def handle_invalidate_social_id(self, request, social_id = None):
         social_id = request.args['social_id']
         gamesite.invalidate_social_id_to_spinpunch_cache_entry(social_id)
         gamesite.exception_log.event(server_time, 'invalidated social_id %s' % social_id)
