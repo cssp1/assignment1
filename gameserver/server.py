@@ -21712,6 +21712,12 @@ class GAMEAPI(resource.Resource):
             for base_id, feature in session.defending_squads.iteritems():
                 squad_id = feature['squad_id']
                 if SQUAD_IDS.is_mobile_squad_id(squad_id):
+                    do_weak_unit_debuffs = True
+                    if viewing_player.squads.get(str(squad_id), None):
+                        squad_data = viewing_player.squads[str(squad_id)]
+                        if squad_data.get('map_loc', None):
+                            if hex_distance(viewing_player.my_home.base_map_loc, squad_data['map_loc']) <= 1:
+                                do_weak_unit_debuffs = False # squads immediately next to their home base do not get weak zombie.
                     for state in gamesite.nosql_client.get_mobile_objects_by_base(session.player.home_region, session.viewing_player.squad_base_id(squad_id), reason='change_session(defending_squads)'):
                         assert state['kind'] == 'mobile'
                         assert state['owner_id'] == session.viewing_player.user_id
@@ -21721,7 +21727,7 @@ class GAMEAPI(resource.Resource):
                         obj.ensure_level(session.viewing_player.tech.get(obj.spec.level_determined_by_tech, 1))
                         obj.ensure_mobile_position(session.viewing_base.ncells())
                         if (not obj.is_destroyed()):
-                            obj.apply_weak_unit_debuffs(False)
+                            obj.apply_weak_unit_debuffs(do_weak_unit_debuffs)
                         session.add_object(obj)
                         obj_states.append(obj.serialize_state())
                         if obj.auras: aura_states.append(obj.serialize_auras())
