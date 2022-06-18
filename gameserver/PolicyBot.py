@@ -47,6 +47,7 @@ class Policy(object):
 
     # duration of banishment from prohibited regions
     REGION_BANISH_DURATION = 90*86400
+    IMPRISON_AURA_DURATION = int(gamedata['server'].get('default_ban_time', 10 * 365 * 86400)) # Repeat offenders get banished for as long as they would be banned
 
     def __init__(self, db_client, dry_run = True, test = False, msg_fd = None, verbose = 0):
         self.db_client = db_client
@@ -143,6 +144,9 @@ class AntiVPNPolicy(Policy):
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
                                       'duration': self.REGION_BANISH_DURATION,
                                       'data':SpinJSON.dumps({'tag':'anti_vpn', 'region': cur_region_name})}) == 'ok'
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
+                                      'duration': self.IMPRISON_AURA_DURATION,
+                                      'data':SpinJSON.dumps({'tag':'imprisoned', 'region': cur_region_name})}) == 'ok'
 
             assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
 
@@ -659,6 +663,9 @@ class AltPolicy(Policy):
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
                                       'duration': self.REGION_BANISH_DURATION,
                                       'data':SpinJSON.dumps({'tag':'anti_alt', 'region': cur_region_name})}) == 'ok'
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
+                                      'duration': self.IMPRISON_AURA_DURATION,
+                                      'data':SpinJSON.dumps({'tag':'imprisoned', 'region': cur_region_name})}) == 'ok'
 
             assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
 
