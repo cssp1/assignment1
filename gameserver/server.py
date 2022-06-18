@@ -9939,10 +9939,18 @@ class Player(AbstractPlayer):
         return False
 
     def request_migrate_spin_id(self, args):
-        new_spin_id_str = base64.b64decode(args[0])
+        try:
+            new_spin_id_str = base64.b64decode(args[0])
+        except:
+            gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id but provided string that could not be decoded.' % (self.user_id))
+            return 'REQUEST_MIGRATE_SPIN_ID_FAILED_BAD_INPUT'
         if not new_spin_id_str:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id without providing a new ID value.' % (self.user_id))
             return 'REQUEST_MIGRATE_SPIN_ID_FAILED_NO_NEW_ID'
+        for char in new_spin_id_str:
+            if char not in '0123456789':
+                gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id but provided %r as target ID.' % (self.user_id, new_spin_id_str))
+                return 'REQUEST_MIGRATE_SPIN_ID_FAILED_BAD_INPUT'
         if new_spin_id_str not in self.known_alt_accounts:
             gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id to the one assigned to %s. This is not a valid alt.' % (self.user_id, new_spin_id_str))
             return 'REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT'

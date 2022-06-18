@@ -54049,7 +54049,7 @@ function handle_server_message(data) {
         } else if(name.indexOf("CANNOT_CREATE_ALLIANCE")==0 || name == "ALLIANCES_OFFLINE" || name == "CANNOT_JOIN_ALLIANCE"
                                || name == "ALIAS_BAD" || name == "ALIAS_TAKEN" || name == "REQUEST_MIGRATE_SPIN_ID_FAILED_NO_NEW_ID"
                                || name == "REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT" || name == "REQUEST_MIGRATE_SPIN_ID_FAILED_BANNED_ALT"
-                               || name == "CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID") {
+                               || name == "CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID" || name == "REQUEST_MIGRATE_SPIN_ID_FAILED_BAD_INPUT") {
             invoke_child_message_dialog(display_title, display_string, {'dialog': 'message_dialog_big'});
         } else if(name == "CANNOT_AUTO_RESOLVE_DEFENDER_TOO_MUCH_SPACE") {
             notification_queue.push_with_priority((function(display_title, display_string) { return function () {
