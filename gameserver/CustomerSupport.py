@@ -420,10 +420,11 @@ class HandleMigrateSpinID(Handler):
         Handler.__init__(self, *args, **kwargs)
         self.old_spin_id = int(self.args['spin_id'])
         self.new_spin_id = int(self.args['new_spin_id'])
-        self.new_social_id = self.gamesite.nosql_client.spinpunch_to_social_id_single(self.new_spin_id)
+        self.new_social_id = self.args['new_social_id']
+        self.check_new_spin_id = int(self.gamesite.social_id_table.social_id_to_spinpunch(self.new_social_id, False))
 
-    def do_exec_online(self):
-        if self.new_social_id:
+    def do_exec_online(self, session, retmsg):
+        if self.new_spin_id == self.check_new_spin_id:
             check_result = self.gamesite.nosql_client.mutate_social_id_to_spinpunch_single(self.new_social_id, self.old_spin_id, reason='PCHECK migration')
             if check_result == 'ok':
                 invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': self.new_social_id}
@@ -431,10 +432,10 @@ class HandleMigrateSpinID(Handler):
                 return ReturnValue(result = 'ok')
             return ReturnValue(error = check_result)
         else:
-            return ReturnValue(error = 'cannot find social ID for target user ID %i' % self.new_spin_id)
+            return ReturnValue(error = 'cannot verify social ID %s for target user ID %i, got %i when validating' % (self.new_social_id, self.new_spin_id, self.check_new_spin_id))
 
-    def do_exec_offline(self):
-        if self.new_social_id:
+    def do_exec_offline(self, user, player):
+        if self.new_spin_id == self.check_new_spin_id:
             check_result = self.gamesite.nosql_client.mutate_social_id_to_spinpunch_single(self.new_social_id, self.old_spin_id, reason='PCHECK migration')
             if check_result == 'ok':
                 invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': self.new_social_id}
@@ -442,7 +443,7 @@ class HandleMigrateSpinID(Handler):
                 return ReturnValue(result = 'ok')
             return ReturnValue(error = check_result)
         else:
-            return ReturnValue(error = 'cannot find social ID for target user ID %i' % self.new_spin_id)
+            return ReturnValue(error = 'cannot verify social ID %s for target user ID %i, got %i when validating' % (self.new_social_id, self.new_spin_id, self.check_new_spin_id))
 
 class HandleSelfServiceMigrateSpinID(Handler):
     def __init__(self, *args, **kwargs):

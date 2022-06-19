@@ -896,15 +896,18 @@ class SendMessageConsequent(Consequent):
         session.do_CONTROLAPI(session.user.user_id, {'user_id':recipient_user_id,'method':'receive_mail'})
 
 class ChangeRegionConsequent(Consequent):
+    def __init__(self, data):
+        Consequent.__init__(self, data)
+        self.regions = data['regions']
+        self.limbo_on_fail = data.get('limbo_on_fail', False)
+
     def execute(self, session, player, retmsg, context=None):
-        regions = self.data['regions']
-        limbo_on_fail = self.data.get('limbo_on_fail', False)
         success = None
-        for region in regions:
-            success = self.change_region(region, None, None, session, retmsg, reason='CHANGE_REGION consequent')
+        for region in self.regions:
+            success = session.player.change_region(region, None, None, session, retmsg, reason='CHANGE_REGION consequent')
             if success: break
-        if not success and limbo_on_fail:
-            self.change_region(None, None, None, session, retmsg, reason='CHANGE_REGION consequent fallback to None')
+        if not success and self.limbo_on_fail:
+            session.player.change_region(None, None, None, session, retmsg, reason='CHANGE_REGION consequent fallback to None')
 
 class LibraryConsequent(Consequent):
     def __init__(self, data):

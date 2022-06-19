@@ -302,6 +302,7 @@
     // keep in sync with loginserver.py, server.py, main.js, and errors.json ALIAS_BAD
     "ALIAS_TAKEN": { "ui_title": "Call Sign taken", "ui_name": "Another player is already using this Call Sign. Please choose a different one." },
 
+    "REQUEST_MIGRATE_SPIN_ID_FAILED_BAD_INPUT": { "ui_name": "Your target player ID is not valid. It must be all numbers." },
     "REQUEST_MIGRATE_SPIN_ID_FAILED_NO_NEW_ID": { "ui_name": "Your target player ID is not valid. Please contact customer support for assistance." },
     "REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT": { "ui_name": "Your target player ID is not a valid alt account. Please contact customer support for assistance." },
     "REQUEST_MIGRATE_SPIN_ID_FAILED_BANNED_ALT": { "ui_name": "You cannot migrate to a banned account. Please contact customer support for assistance." },
