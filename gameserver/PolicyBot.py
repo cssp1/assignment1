@@ -47,6 +47,7 @@ class Policy(object):
 
     # duration of banishment from prohibited regions
     REGION_BANISH_DURATION = 90*86400
+    IMPRISON_AURA_DURATION = int(gamedata['server'].get('default_ban_time', 10 * 365 * 86400)) # Repeat offenders get banished for as long as they would be banned
 
     def __init__(self, db_client, dry_run = True, test = False, msg_fd = None, verbose = 0):
         self.db_client = db_client
@@ -143,6 +144,9 @@ class AntiVPNPolicy(Policy):
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
                                       'duration': self.REGION_BANISH_DURATION,
                                       'data':SpinJSON.dumps({'tag':'anti_vpn', 'region': cur_region_name})}) == 'ok'
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
+                                      'duration': self.IMPRISON_AURA_DURATION,
+                                      'data':SpinJSON.dumps({'tag':'imprisoned', 'region': cur_region_name})}) == 'ok'
 
             assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
 
@@ -506,12 +510,24 @@ class AltPolicy(Policy):
 
         if not alt_accounts or not isinstance(alt_accounts, dict): return
 
+        ignore_age = self.IGNORE_AGE
+        repeat_offender_override = False
+
+        # update ignore age if player is on a VPN
+        last_login_ip = player['history'].get('last_login_ip', 0)
+        if last_login_ip:
+            ip_rep_result = ip_rep_checker.query(last_login_ip)
+            if bool(ip_rep_result) and (ip_rep_result.is_proxy() or ip_rep_result.is_datacenter()) and not player['history'].get('vpn_excused', 0):
+                ignore_age = 50 * 365 * 86400 # go back 50 years if player is using a VPN, code below will ensure it stays at 0 or higher
+                repeat_offender_override = True # enable repeat offender override if player is using a VPN. VPN usage will always result in prison for alt violations
+
+
         alt_ids = []
 
         for salt_id, alt_data in alt_accounts.iteritems():
             if alt_data.get('ignore',0): continue
             if alt_data.get('logins',0) < self.MIN_LOGINS: continue
-            if alt_data.get('last_login',0) < time_now - self.IGNORE_AGE: continue
+            if alt_data.get('last_login',0) < max(time_now - ignore_age, 0): continue
 
             # last-chance check for any IGNORE_ALT instructions that were dumped out of alt_account_data
             # but still logged in customer support history
@@ -567,7 +583,7 @@ class AltPolicy(Policy):
 
                 # update the alt's home region so next pass will get the right data
                 new_region_name = self.punish_player(alt_pcache['user_id'], master_pcache['user_id'], master_pcache['home_region'], other_alt_region_names,
-                                                     [pc['user_id'] for pc in pcaches_list if pc is not master_pcache]+[user_id,], region_alt_limit)
+                                                     [pc['user_id'] for pc in pcaches_list if pc is not master_pcache]+[user_id,], repeat_offender_override, region_alt_limit)
 
                 our_pcache['home_region'] = new_region_name
                 print >> self.msg_fd, 'moved to region %s' % (new_region_name)
@@ -575,7 +591,7 @@ class AltPolicy(Policy):
             except:
                 sys.stderr.write(('error punishing %s user %d: '%(SpinConfig.game(), alt_pcache['user_id'])) + traceback.format_exc())
 
-    def punish_player(self, user_id, master_id, cur_region_name, other_alt_region_names, all_alt_ids, alt_limit = 0):
+    def punish_player(self, user_id, master_id, cur_region_name, other_alt_region_names, all_alt_ids, repeat_offender_override, alt_limit = 0):
 
         if 'prison' in cur_region_name: return cur_region_name # there should never be a situation where a player in a prison is being punished. Just leave them in prison.
 
@@ -602,7 +618,7 @@ class AltPolicy(Policy):
 
         # check repeat offender status via cooldown
         togo = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_togo', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})
-        is_repeat_offender = (togo > 0)
+        is_repeat_offender = (togo > 0) or repeat_offender_override # allow override if account is using a VPN to cheat on alt limits
 
         # pick destination region
         new_region = None
@@ -659,6 +675,9 @@ class AltPolicy(Policy):
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
                                       'duration': self.REGION_BANISH_DURATION,
                                       'data':SpinJSON.dumps({'tag':'anti_alt', 'region': cur_region_name})}) == 'ok'
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
+                                      'duration': self.IMPRISON_AURA_DURATION,
+                                      'data':SpinJSON.dumps({'tag':'imprisoned', 'region': cur_region_name})}) == 'ok'
 
             assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
 

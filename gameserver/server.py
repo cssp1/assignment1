@@ -9939,27 +9939,35 @@ class Player(AbstractPlayer):
         return False
 
     def request_migrate_spin_id(self, args):
-        new_spin_id_str = base64.b64decode(args[0])
+        try:
+            new_spin_id_str = base64.b64decode(args[0])
+        except:
+            # gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id but provided string that could not be decoded.' % (self.user_id))
+            return 'REQUEST_MIGRATE_SPIN_ID_FAILED_BAD_INPUT'
         if not new_spin_id_str:
-            gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id without providing a new ID value.' % (self.user_id))
+            # gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id without providing a new ID value.' % (self.user_id))
             return 'REQUEST_MIGRATE_SPIN_ID_FAILED_NO_NEW_ID'
-        if int(new_spin_id_str) not in self.known_alt_accounts:
-            gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id to the one assigned to %s. This is not a valid alt.' % (self.user_id, new_spin_id_str))
+        for char in new_spin_id_str:
+            if char not in '0123456789':
+                # gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id but provided %r as target ID.' % (self.user_id, new_spin_id_str))
+                return 'REQUEST_MIGRATE_SPIN_ID_FAILED_BAD_INPUT'
+        if new_spin_id_str not in self.known_alt_accounts:
+            # gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id to the one assigned to %s. This is not a valid alt.' % (self.user_id, new_spin_id_str))
             return 'REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT'
         pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch([int(new_spin_id_str)], fields = ['banned_until'], reason = 'request_migrate_spin_id')
         if len(pcache_result_list) > 0 and pcache_result_list[0].get('banned_until', -1) > server_time:
-            gamesite.exception_log.event(server_time, 'warning: player %d attempting to migrate spin_id to the one assigned to %d. Account %d is banned!' % (self.user_id, new_spin_id_str, new_spin_id_str))
+            # gamesite.exception_log.event(server_time, 'warning: player %d attempting to migrate spin_id to the one assigned to %d. Account %d is banned!' % (self.user_id, new_spin_id_str, new_spin_id_str))
             return 'REQUEST_MIGRATE_SPIN_ID_FAILED_BANNED_ALT'
         # send migration item to target user ID in mail, flag user account with migration target
-        gamesite.do_CONTROLAPI(self.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id_str})
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id_str,'user_id':new_spin_id_str})
         return 'ok'
 
-    def confirm_migrate_spin_id(self):
+    def confirm_migrate_spin_id(self, social_id):
         old_spin_id = self.history.get('self_service_migrate_spin_id', 0)
         if not old_spin_id:
-            gamesite.exception_log.event(server_time, 'warning: player %d attempted to confirm spin_id migration but has no valid self_service_migration key in their history. This should not be possible!' % (self.user_id))
+            # gamesite.exception_log.event(server_time, 'warning: player %d attempted to confirm spin_id migration but has no valid self_service_migration key in their history. This should not be possible!' % (self.user_id))
             return 'CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID'
-        gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': old_spin_id,'new_spin_id':str(self.user_id)})
+        gamesite.do_CONTROLAPI(self.user_id, {'method':'migrate_spin_id','reliable':1,'spin_id': str(old_spin_id),'new_spin_id':str(self.user_id),'user_id':str(old_spin_id),'new_social_id':social_id})
         return 'ok'
 
     def log_suspicious_alts(self):
@@ -17597,9 +17605,11 @@ class CONTROLAPI(resource.Resource):
         return SpinJSON.dumps({'result':gamesite.change_state(state)}, newline=True)
     def handle_reconfig(self, request):
         return SpinJSON.dumps({'result':gamesite.reconfig()}, newline=True)
-    def handle_invalidate_social_id(self, request):
-        social_id = request['social_id']
+    def handle_invalidate_social_id(self, request, social_id = None):
         gamesite.invalidate_social_id_to_spinpunch_cache_entry(social_id)
+        return SpinJSON.dumps({'result':'ok'})
+    def handle_invalidate_social_id_cache(self, request):
+        gamesite.invalidate_social_id_to_spinpunch_cache_all()
         return SpinJSON.dumps({'result':'ok'})
     def handle_shutdown(self, request, force = False):
         if (not force) and len(session_table) > 0:
@@ -21709,6 +21719,12 @@ class GAMEAPI(resource.Resource):
             for base_id, feature in session.defending_squads.iteritems():
                 squad_id = feature['squad_id']
                 if SQUAD_IDS.is_mobile_squad_id(squad_id):
+                    do_weak_unit_debuffs = True
+                    if session.viewing_player.squads.get(str(squad_id), None):
+                        squad_data = session.viewing_player.squads[str(squad_id)]
+                        if squad_data.get('map_loc', None):
+                            if hex_distance(session.viewing_player.my_home.base_map_loc, squad_data['map_loc']) <= 1:
+                                do_weak_unit_debuffs = False # squads immediately next to their home base do not get weak zombie.
                     for state in gamesite.nosql_client.get_mobile_objects_by_base(session.player.home_region, session.viewing_player.squad_base_id(squad_id), reason='change_session(defending_squads)'):
                         assert state['kind'] == 'mobile'
                         assert state['owner_id'] == session.viewing_player.user_id
@@ -21718,7 +21734,7 @@ class GAMEAPI(resource.Resource):
                         obj.ensure_level(session.viewing_player.tech.get(obj.spec.level_determined_by_tech, 1))
                         obj.ensure_mobile_position(session.viewing_base.ncells())
                         if (not obj.is_destroyed()):
-                            obj.apply_weak_unit_debuffs(False)
+                            obj.apply_weak_unit_debuffs(do_weak_unit_debuffs)
                         session.add_object(obj)
                         obj_states.append(obj.serialize_state())
                         if obj.auras: aura_states.append(obj.serialize_auras())
@@ -23095,7 +23111,7 @@ class GAMEAPI(resource.Resource):
             return True
 
         elif spellname == "CONFIRM_MIGRATE_SPIN_ID":
-            result = session.player.confirm_migrate_spin_id()
+            result = session.player.confirm_migrate_spin_id(str(session.user.social_id))
             if result != 'ok':
                 retmsg.append(["ERROR", result])
                 return False
@@ -32205,7 +32221,7 @@ class GAMEAPI(resource.Resource):
                 return True
 
             elif spellname == "CONFIRM_MIGRATE_SPIN_ID":
-                result = session.player.confirm_migrate_spin_id()
+                result = session.player.confirm_migrate_spin_id(str(session.user.social_id))
                 if result != 'ok':
                     retmsg.append(["ERROR", result])
                     return False

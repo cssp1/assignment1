@@ -693,6 +693,10 @@ def controlapi_handle(request):
     if request.args['method'] == 'invalidate_social_id':
         social_id = request.args['social_id']
         social_id_table.invalidate_social_id_to_spinpunch_cache_entry(social_id)
+        # exception_log.event(proxy_time, 'proxyserver: invalidated social_id: %s"' % social_id)
+
+    if request.args['method'] == 'invalidate_social_id_cache':
+        social_id_table.invalidate_social_id_to_spinpunch_cache_all()
 
     if 'broadcast' in request.args:
         return controlapi_handle_broadcast(request.args)
