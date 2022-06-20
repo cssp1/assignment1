@@ -305,6 +305,7 @@
     "REQUEST_MIGRATE_SPIN_ID_FAILED_BAD_INPUT": { "ui_name": "Your target player ID is not valid. It must be all numbers." },
     "REQUEST_MIGRATE_SPIN_ID_FAILED_NO_NEW_ID": { "ui_name": "Your target player ID is not valid. Please contact customer support for assistance." },
     "REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT": { "ui_name": "Your target player ID is not a valid alt account. Please contact customer support for assistance." },
+    "REQUEST_MIGRATE_SPIN_ID_FAILED_ALT_NOT_BH_ACCT": { "ui_name": "Your target player ID is not an account created with the downloadable client account.\nMigration should only be used to make your downloadable client account access your main account.\nIf you really want to merge these accounts, please contact customer support for assistance." },
     "REQUEST_MIGRATE_SPIN_ID_FAILED_BANNED_ALT": { "ui_name": "You cannot migrate to a banned account. Please contact customer support for assistance." },
     "CONFIRM_MIGRATE_SPIN_ID_FAILED_NO_OLD_ID": { "ui_name": "Your main account was not correctly recorded to this account. Please contact customer support for assistance." },
 

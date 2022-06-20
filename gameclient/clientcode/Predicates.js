@@ -2560,7 +2560,13 @@ function HasAltsPredicate(data) {
 }
 goog.inherits(HasAltsPredicate, Predicate);
 HasAltsPredicate.prototype.is_satisfied = function(player, qdata) {
-    return player.has_alts;
+    if(!player.has_alts) { return false; }
+    if('platforms' in qdata) {
+        for(var platform in qdata['platforms']) {
+            if(!(platform in player.alt_platforms)) { return false; }
+        }
+    }
+    return true;
 };
 /** @override */
 HasAltsPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
