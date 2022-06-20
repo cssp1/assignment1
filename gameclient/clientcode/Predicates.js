@@ -2561,8 +2561,11 @@ function HasAltsPredicate(data) {
 goog.inherits(HasAltsPredicate, Predicate);
 HasAltsPredicate.prototype.is_satisfied = function(player, qdata) {
     if(!player.has_alts) { return false; }
-    if('platforms' in qdata) {
-        for(var platform in qdata['platforms']) {
+    if('platforms' in qdata && qdata['platforms']) {
+        if(!player.alt_platforms) { return false; }
+        var platforms = qdata['platforms'];
+        for(var i = 0; i < platforms.length; i++) {
+            var platform = platforms[i];
             if(!(platform in player.alt_platforms)) { return false; }
         }
     }
