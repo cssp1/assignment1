@@ -2558,7 +2558,6 @@ ClientVersionPredicate.prototype.do_ui_describe = function(player) { return null
 function HasAltsPredicate(data) {
     goog.base(this, data);
     this.platforms = data['platforms'] || false;
-    }
 }
 goog.inherits(HasAltsPredicate, Predicate);
 HasAltsPredicate.prototype.is_satisfied = function(player, qdata) {
