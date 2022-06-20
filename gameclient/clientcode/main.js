@@ -8788,7 +8788,7 @@ function home_base_id(user_id) { return 'h' + user_id.toString(); }
     @param {number} user_id
     @param {boolean} is_real_friend
     @param {!Object<string,?>} info
-    @param {string|null} relationship (null, 'mentor', or 'trainee')
+    @param {string|null} relationship (null, 'mentor', 'trainee', 'clan')
  */
 function Friend(user_id, is_real_friend, info, relationship) {
     this.user_id = user_id;
@@ -8814,6 +8814,7 @@ Friend.prototype.is_giftable = function() {
 };
 Friend.prototype.is_mentor = function() { return this.relationship === 'mentor'; };
 Friend.prototype.is_trainee = function() { return this.relationship === 'trainee'; };
+Friend.prototype.is_clan_member = function() { return this.relationship === 'clan'; };
 Friend.prototype.is_bh_invite_complete = function() {
     var complete_pred = gamedata['predicate_library']['bh_invite_complete'];
     if(!complete_pred || complete_pred['predicate'] !== 'PLAYER_HISTORY' ||
