@@ -70,14 +70,13 @@ class HasAltsPredicate(Predicate):
         Predicate.__init__(self, data)
         self.platforms = data.get('platforms', False)
     def is_satisfied(self, player, qdata):
-        if not player.has_alts()[0]:
+        has_alts, alt_platforms = player.has_alts()
+        if not has_alts:
             return False
         if self.platforms:
-            has_alts, platform_data = player.has_alts()
             for platform in self.platforms:
-                if platform not in platform_data or platform_data[platform] == 0:
+                if platform not in alt_platforms:
                     return False
-            return True
         return True
 
 class RandomPredicate(Predicate):

@@ -2557,16 +2557,16 @@ ClientVersionPredicate.prototype.do_ui_describe = function(player) { return null
   * @extends Predicate */
 function HasAltsPredicate(data) {
     goog.base(this, data);
+    this.platforms = data['platforms'] || false;
 }
 goog.inherits(HasAltsPredicate, Predicate);
 HasAltsPredicate.prototype.is_satisfied = function(player, qdata) {
     if(!player.has_alts) { return false; }
-    if(qdata && 'platforms' in qdata && qdata['platforms']) {
+    if(this.platforms) {
         if(!player.alt_platforms) { return false; }
-        var platforms = qdata['platforms'];
-        for(var i = 0; i < platforms.length; i++) {
-            var platform = platforms[i];
-            if(!(platform in player.alt_platforms)) { return false; }
+        for(var i = 0; i < this.platforms.length; i++) {
+            var platform = this.platforms[i];
+            if(!goog.array.contains(player.alt_platforms, platform)) { return false; }
         }
     }
     return true;
