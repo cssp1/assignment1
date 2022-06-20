@@ -70,7 +70,7 @@ class HasAltsPredicate(Predicate):
         Predicate.__init__(self, data)
         self.platforms = data.get('platforms', False)
     def is_satisfied(self, player, qdata):
-        has_alts, alt_platforms = session.player.has_alts()
+        has_alts, alt_platforms = player.has_alts()
         if not has_alts:
             return False
         if self.platforms:
