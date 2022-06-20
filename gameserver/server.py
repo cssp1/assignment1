@@ -9933,13 +9933,12 @@ class Player(AbstractPlayer):
             if SpinHTTP.is_private_ip(entry.get('last_ip', 'Unknown')): continue
             alt_ids.append(int(s_other_id))
         if len(alt_ids) > alt_ignore_how_many:
-            alt_platforms = {}
+            alt_platforms = []
             pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch(alt_ids, fields = ['social_id'], reason = 'has_alts_data_update')
             for result in pcache_result_list:
                 platform = result['social_id'][:2]
                 if platform not in alt_platforms:
-                    alt_platforms[platform] = 0
-                alt_platforms[platform] += 1
+                    alt_platforms.append(platform)
             return (1, alt_platforms)
         return (0, {})
 
@@ -29219,6 +29218,8 @@ class GAMEAPI(resource.Resource):
 
         # tell the browser what we think of the player's alt status
         has_alts, alt_platforms = session.player.has_alts()
+        if game_id == 'tr':
+            gamesite.exception_log.event(server_time, '%d logging in, has_alts is %r, alt_platforms is %r.' % (session.player.user_id, has_alts, alt_platforms))
         retmsg.append(["HAS_ALTS_UPDATE", has_alts, alt_platforms])
 
         if gamedata['server'].get('track_countries_seen', False):
