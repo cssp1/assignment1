@@ -8815,7 +8815,7 @@ Friend.prototype.is_giftable = function() {
 };
 Friend.prototype.is_mentor = function() { return this.relationship === 'mentor'; };
 Friend.prototype.is_trainee = function() { return this.relationship === 'trainee'; };
-Friend.prototype.is_clan_member = function() { return this.relationship === 'clan'; };
+Friend.prototype.is_alliance_member = function() { return this.relationship === 'alliance'; };
 Friend.prototype.is_bh_invite_complete = function() {
     var complete_pred = gamedata['predicate_library']['bh_invite_complete'];
     if(!complete_pred || complete_pred['predicate'] !== 'PLAYER_HISTORY' ||

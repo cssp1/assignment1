@@ -1843,12 +1843,22 @@ class User:
 
         # batch query for game player IDs
         social_id_list = []
+        alliance_friend_ids = []
         if self.facebook_friends:
             social_id_list += ['fb'+str(friend['id']) for friend in self.facebook_friends]
         if self.kg_friend_ids:
             social_id_list += ['kg'+str(x) for x in self.kg_friend_ids]
         if self.ag_friend_ids:
             social_id_list += ['ag'+str(x) for x in self.ag_friend_ids]
+
+        if game_id == 'tr' and Predicates.read_predicate({'predicate':'LIBRARY', 'name':'internal_tester'}).is_satisfied2(session, self, None):
+            alliance_id = session.get_alliance_id(reason='populate_friends_who_play')
+            if alliance_id >= 0 and gamesite.sql_client:
+                alliance_friend_ids = gamesite.sql_client.get_alliance_member_ids(alliance_id, reason = 'populate_friends_who_play')
+                #alliance_friend_ids.remove(self.user_id) # skip self, should not show up as a friend
+                alliance_friend_pcache_list = gamesite.pcache_client.player_cache_lookup_batch(alliance_friend_ids, fields = ['social_id'], reason = 'populate_friends_who_play')
+                for result in alliance_friend_pcache_list:
+                    social_id_list.append(result['social_id'])
 
         # note: this call is free if social_id_list is empty, it won't hit the database
         friend_id_list = gamesite.social_id_table.social_id_to_spinpunch_batch(social_id_list)
@@ -1891,6 +1901,8 @@ class User:
                 relationship = 'mentor'
             elif self.bh_trainee_player_ids_cache and (friend_id in self.bh_trainee_player_ids_cache):
                 relationship = 'trainee'
+            elif friend_id in alliance_friend_ids:
+                relationship = 'alliance'
 
             session.send([["ADD_FRIEND", friend_id,
                            True, # is a real Facebook friend (not a stranger)
