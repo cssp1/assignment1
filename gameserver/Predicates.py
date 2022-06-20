@@ -68,8 +68,17 @@ class ClientVersionPredicate(Predicate):
 class HasAltsPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
+        self.platforms = data.get('platforms', False)
     def is_satisfied(self, player, qdata):
-        return player.has_alts()
+        if not player.has_alts()[0]:
+            return False
+        if self.platforms:
+            has_alts, platform_data = player.has_alts()
+            for platform in self.platforms:
+                if platform not in platform_data or platform_data[platform] == 0:
+                    return False
+            return True
+        return True
 
 class RandomPredicate(Predicate):
     def __init__(self, data):
