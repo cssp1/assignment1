@@ -429,6 +429,8 @@ class HandleMigrateSpinID(Handler):
             if check_result == 'ok':
                 invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': self.new_social_id}
                 self.gamesite.do_CONTROLAPI(None, invalidate_args) # broadcast invalidation order so servers clear social ID cache
+                ignore_alt_args = {'method': 'ignore_alt', 'user_id':str(self.old_spin_id), 'other_id':str(self.new_spin_id), 'ui_reason': 'Autoignore by CustomerSupport due to social ID migration'}
+                self.gamesite.do_CONTROLAPI(None, ignore_alt_args) # ignore alt as new_spin_id is no longer accessible
                 return ReturnValue(result = 'ok')
             return ReturnValue(error = check_result)
         else:
@@ -440,6 +442,8 @@ class HandleMigrateSpinID(Handler):
             if check_result == 'ok':
                 invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': self.new_social_id}
                 self.gamesite.do_CONTROLAPI(None, invalidate_args) # broadcast invalidation order so servers clear social ID cache
+                ignore_alt_args = {'method': 'ignore_alt', 'user_id':str(self.old_spin_id), 'other_id':str(self.new_spin_id), 'ui_reason': 'Autoignore by CustomerSupport due to social ID migration'}
+                self.gamesite.do_CONTROLAPI(None, ignore_alt_args) # ignore alt as new_spin_id is no longer accessible
                 return ReturnValue(result = 'ok')
             return ReturnValue(error = check_result)
         else:
