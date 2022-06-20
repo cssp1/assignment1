@@ -9926,6 +9926,7 @@ class Player(AbstractPlayer):
         alt_ignore_age = gamedata['server'].get('alt_ignore_age', 28*86400) # default to alts in the last 28 days
         alt_ignore_how_many = gamedata['server'].get('alt_ignore_how_many', 0) # optionally allow server to ignore up to an arbitrary number of alts
         alt_ids = []
+        alt_platforms = []
         for s_other_id, entry in self.known_alt_accounts.iteritems():
             if entry.get('logins', 0) < alt_min_logins: continue
             if entry.get('ignore',False): continue
@@ -9933,14 +9934,13 @@ class Player(AbstractPlayer):
             if SpinHTTP.is_private_ip(entry.get('last_ip', 'Unknown')): continue
             alt_ids.append(int(s_other_id))
         if len(alt_ids) > alt_ignore_how_many:
-            alt_platforms = []
             pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch(alt_ids, fields = ['social_id'], reason = 'has_alts_data_update')
             for result in pcache_result_list:
                 platform = result['social_id'][:2]
                 if platform not in alt_platforms:
                     alt_platforms.append(platform)
             return (1, alt_platforms)
-        return (0, {})
+        return (0, alt_platforms)
 
     def request_migrate_spin_id(self, args):
         try:
@@ -29218,8 +29218,6 @@ class GAMEAPI(resource.Resource):
 
         # tell the browser what we think of the player's alt status
         has_alts, alt_platforms = session.player.has_alts()
-        if game_id == 'tr':
-            gamesite.exception_log.event(server_time, '%d logging in, has_alts is %r, alt_platforms is %r.' % (session.player.user_id, has_alts, alt_platforms))
         retmsg.append(["HAS_ALTS_UPDATE", has_alts, alt_platforms])
 
         if gamedata['server'].get('track_countries_seen', False):
