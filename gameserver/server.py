@@ -34649,19 +34649,33 @@ class GameSite(server.Site):
                                                                                      (_method, _user_id, err)))),
                                                 max_tries = max_tries)
 
+        # broadcasts return as a list, so check_result needs to know if it is a broadcast
+        # to correctly handle the result
+        is_broadcast = args.get('broadcast', 0)
         # error handling note: it's not necessary to attach an errback here.
         # If caller attaches an errback, that will be used, otherwise
         # an error will fall back to the default "Unhandled error in deferred" path
         # d.addErrback(report_and_reraise_deferred_failure, session)
 
         # assumes modern CustomerSupport return conventions
-        def check_result(result, user_id):
+        def check_result(result, user_id, is_broadcast):
+
             ret = SpinJSON.loads(result)
-            if 'error' in ret:
-                raise Exception('AsyncHTTP_CONTROLAPI %r error on behalf of player %d: %r' % \
-                                (caller_args['method'], user_id, ret))
-            return ret['result']
-        d.addCallback(check_result, on_behalf_of_user_id)
+            if is_broadcast:
+                # ret will be a list of result dicts
+                ret_list = ret
+            else:
+                # ret will be just one individual result
+                ret_list = [ret,]
+            for entry in ret_list:
+                if 'error' in entry:
+                    raise Exception('AsyncHTTP_CONTROLAPI %r error on behalf of player %d: %r' % \
+                                    (caller_args['method'], user_id, entry))
+            if is_broadcast:
+                return [entry['result'] for entry in ret_list]
+            else:
+                return ret_list[0]['result']
+        d.addCallback(check_result, on_behalf_of_user_id, is_broadcast)
 
         return d
 
