@@ -9934,7 +9934,7 @@ class Player(AbstractPlayer):
             alt_ids.append(int(s_other_id))
         if len(alt_ids) > alt_ignore_how_many:
             alt_platforms = {}
-            pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch([alt_ids], fields = ['social_id'], reason = 'has_alts_data_update')
+            pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch(alt_ids, fields = ['social_id'], reason = 'has_alts_data_update')
             for result in pcache_result_list:
                 platform = result['social_id'][:2]
                 if platform not in alt_platforms:
