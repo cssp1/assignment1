@@ -9925,18 +9925,22 @@ class Player(AbstractPlayer):
         alt_min_logins = gamedata['server'].get('alt_min_logins', 5) # default to 5 logins for an alt to be considered
         alt_ignore_age = gamedata['server'].get('alt_ignore_age', 28*86400) # default to alts in the last 28 days
         alt_ignore_how_many = gamedata['server'].get('alt_ignore_how_many', 0) # optionally allow server to ignore up to an arbitrary number of alts
-        total_alts = 0
-
+        alt_ids = []
+        alt_platforms = []
         for s_other_id, entry in self.known_alt_accounts.iteritems():
             if entry.get('logins', 0) < alt_min_logins: continue
             if entry.get('ignore',False): continue
             if entry.get('last_login', server_time) < (server_time - alt_ignore_age): continue
             if SpinHTTP.is_private_ip(entry.get('last_ip', 'Unknown')): continue
-            total_alts += 1
-            if total_alts > alt_ignore_how_many:
-                return True
-
-        return False
+            alt_ids.append(int(s_other_id))
+        if len(alt_ids) > alt_ignore_how_many:
+            pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch(alt_ids, fields = ['social_id'], reason = 'has_alts_data_update')
+            for result in pcache_result_list:
+                platform = result['social_id'][:2]
+                if platform not in alt_platforms:
+                    alt_platforms.append(platform)
+            return (1, alt_platforms)
+        return (0, alt_platforms)
 
     def request_migrate_spin_id(self, args):
         try:
@@ -9954,10 +9958,13 @@ class Player(AbstractPlayer):
         if new_spin_id_str not in self.known_alt_accounts:
             # gamesite.exception_log.event(server_time, 'warning: player %d attempted to migrate spin_id to the one assigned to %s. This is not a valid alt.' % (self.user_id, new_spin_id_str))
             return 'REQUEST_MIGRATE_SPIN_ID_FAILED_NOT_VALID_ALT'
-        pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch([int(new_spin_id_str)], fields = ['banned_until'], reason = 'request_migrate_spin_id')
+        pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch([int(new_spin_id_str)], fields = ['banned_until','social_id'], reason = 'request_migrate_spin_id')
         if len(pcache_result_list) > 0 and pcache_result_list[0].get('banned_until', -1) > server_time:
             # gamesite.exception_log.event(server_time, 'warning: player %d attempting to migrate spin_id to the one assigned to %d. Account %d is banned!' % (self.user_id, new_spin_id_str, new_spin_id_str))
             return 'REQUEST_MIGRATE_SPIN_ID_FAILED_BANNED_ALT'
+        if len(pcache_result_list) > 0 and not pcache_result_list[0].get('social_id', '').startswith('bh'):
+            # gamesite.exception_log.event(server_time, 'warning: player %d attempting to migrate spin_id to the one assigned to %d. Account %d is banned!' % (self.user_id, new_spin_id_str, new_spin_id_str))
+            return 'REQUEST_MIGRATE_SPIN_ID_FAILED_ALT_NOT_BH_ACCT'
         # send migration item to target user ID in mail, flag user account with migration target
         gamesite.do_CONTROLAPI(self.user_id, {'method':'request_self_service_migrate_spin_id','reliable':1,'old_spin_id':str(self.user_id),'spin_id':new_spin_id_str,'user_id':new_spin_id_str})
         return 'ok'
@@ -29210,7 +29217,8 @@ class GAMEAPI(resource.Resource):
         session.player.log_suspicious_alts()
 
         # tell the browser what we think of the player's alt status
-        retmsg.append(["HAS_ALTS_UPDATE", session.player.has_alts()])
+        has_alts, alt_platforms = session.player.has_alts()
+        retmsg.append(["HAS_ALTS_UPDATE", has_alts, alt_platforms])
 
         if gamedata['server'].get('track_countries_seen', False):
             if 'country_history' not in session.player.history:
