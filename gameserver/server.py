@@ -29218,8 +29218,6 @@ class GAMEAPI(resource.Resource):
 
         # tell the browser what we think of the player's alt status
         has_alts, alt_platforms = session.player.has_alts()
-        if game_id == 'tr':
-            gamesite.exception_log.event(server_time, '%d logging in, has_alts is %r, alt_platforms is %r.' % (session.player.user_id, has_alts, alt_platforms))
         retmsg.append(["HAS_ALTS_UPDATE", has_alts, alt_platforms])
 
         if gamedata['server'].get('track_countries_seen', False):
