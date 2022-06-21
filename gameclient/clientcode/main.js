@@ -30,6 +30,7 @@ goog.require('BattleLog');
 goog.require('RaidBattleLog');
 goog.require('BattleReplay');
 goog.require('BattleReplayGUI');
+goog.require('BHSendRequests');
 goog.require('ChatFilter');
 goog.require('Congrats');
 goog.require('GameArt');
@@ -20273,6 +20274,10 @@ function invoke_gift_prompt_dialog() {
  * @param {(!Array.<Object>|null)=} info_list - list of PlayerCache entries for giftable friends (if null, we will query)
  */
 function invoke_send_gifts(to_user, reason, info_list) {
+    if(read_predicate({'predicate':'LIBRARY', 'name': 'internal_tester'}).is_satisfied(player, null)) {
+        BHSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list);
+        return null;
+    }
     if(spin_frame_platform === 'fb') {
         call_with_facebook_permissions('user_friends', (function (_to_user, _reason, _info_list) { return function() {
             FBSendRequests.invoke_send_gifts_dialog(_to_user, _reason, _info_list);

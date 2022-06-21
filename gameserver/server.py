@@ -1855,7 +1855,7 @@ class User:
             alliance_id = session.get_alliance_id(reason='populate_friends_who_play')
             if alliance_id >= 0 and gamesite.sql_client:
                 alliance_friend_ids = gamesite.sql_client.get_alliance_member_ids(alliance_id, reason = 'populate_friends_who_play')
-                #alliance_friend_ids.remove(self.user_id) # skip self, should not show up as a friend
+                alliance_friend_ids.remove(self.user_id) # skip self, should not show up as a friend
                 alliance_friend_pcache_list = gamesite.pcache_client.player_cache_lookup_batch(alliance_friend_ids, fields = ['social_id'], reason = 'populate_friends_who_play')
                 for result in alliance_friend_pcache_list:
                     social_id_list.append(result['social_id'])
@@ -26428,9 +26428,13 @@ class GAMEAPI(resource.Resource):
 
         return d
 
-    def do_send_gifts_bh(self, session, client_id_list):
+    def do_send_gifts_bh(self, session, arg):
+        client_id_list = arg[1]
         if session.user.frame_platform != 'bh':
             session.send([["ERROR", "SERVER_PROTOCOL"]])
+            return None
+        if 'electron' in session.user.spin_client_platform:
+            self.do_send_gifts(session, retmsg, arg)
             return None
 
         replacements = {'%MY_UI_NAME': session.user.get_ui_name(session.player),
@@ -26504,7 +26508,7 @@ class GAMEAPI(resource.Resource):
         return None
 
     def do_send_gifts(self, session, retmsg, arg):
-        if session.user.frame_platform == 'bh':
+        if session.user.frame_platform == 'bh' and 'electron' not in session.user.client_platform:
             session.send([["ERROR", "SERVER_PROTOCOL"]])
             return None
 
@@ -30710,7 +30714,7 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "SEND_GIFTS2":
             self.do_send_gifts(session, retmsg, arg)
         elif arg[0] == "SEND_GIFTS_BH":
-            return self.do_send_gifts_bh(session, arg[1])
+            return self.do_send_gifts_bh(session, retmsg, arg)
 
         elif arg[0] == "LEVEL_ME_UP":
             self.do_level_up(session, retmsg, arg)
