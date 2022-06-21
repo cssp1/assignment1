@@ -26428,7 +26428,7 @@ class GAMEAPI(resource.Resource):
 
         return d
 
-    def do_send_gifts_bh(self, session, arg):
+    def do_send_gifts_bh(self, session, retmsg, arg):
         client_id_list = arg[1]
         if session.user.frame_platform != 'bh':
             session.send([["ERROR", "SERVER_PROTOCOL"]])
