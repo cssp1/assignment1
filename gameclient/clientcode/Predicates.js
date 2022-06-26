@@ -1636,25 +1636,25 @@ FramePlatformPredicate.prototype.do_ui_describe = function(player) { return null
 
 /** @constructor @struct
   * @extends Predicate */
-function FramePlatformPredicate(data) {
+function SocialPlatformPredicate(data) {
     goog.base(this, data);
     this.allow = [];
     if('allow' in data && data['allow']) { this.allow = data['allow']; }
     this.block = [];
     if('block' in data && data['block']) { this.block = data['block']; }
 }
-goog.inherits(FramePlatformPredicate, Predicate);
+goog.inherits(SocialPlatformPredicate, Predicate);
 SocialPlatformPredicate.prototype.is_satisfied = function(player, qdata) {
     if(this.block.length > 0) {
         for(var i = 0; i < this.block.length; i++) {
             var platform = this.block[i];
-            if goog.array.contains(player.social_platforms, platform) { return false; }
+            if(goog.array.contains(player.social_platforms, platform)) { return false; }
         }
     }
     if(this.allow.length > 0) {
         for(var i = 0; i < this.allow.length; i++) {
             var platform = this.allow[i];
-            if goog.array.contains(player.social_platforms, platform) { return true; }
+            if(goog.array.contains(player.social_platforms, platform)) { return true; }
         }
     }
     return true;
