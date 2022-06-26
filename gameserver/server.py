@@ -9944,7 +9944,7 @@ class Player(AbstractPlayer):
 
     def social_platforms(self):
         social_platforms = []
-        social_ids = return gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='player.social_platforms() check')
+        social_ids = gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='player.social_platforms() check')
         for entry in social_ids:
             social_platform = entry['_id'][:2]
             if social_platform not in ('kg','ag','bh'):
