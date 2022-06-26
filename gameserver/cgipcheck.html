@@ -536,6 +536,24 @@ var method_migrate_spin_id = function(new_spin_id) {
     }
 };
 
+var method_force_migrate_spin_id = function() {
+    var ident = get_ident();
+    var new_bh_id = $("#migrate_account_battlehouse_id")[0].value;
+    var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
+    if(ident && ui_reason) {
+        if(!ident['user_id']) {
+            display_error('Please look up this player by User ID');
+            return;
+        }
+        var spin_id = ident['user_id'];
+        if(!new_bh_id) {
+            display_error("Please fill in the Battlehouse ID of the player's new account");
+            return;
+        }
+        send_request('player', 'force_migrate_spin_id', $.extend(ident, {'spin_id': spin_id, 'new_bh_id': new_bh_id, 'ui_reason': ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+
 var method_ignore_or_unignore_alt = function(other_id, method_name) {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
@@ -2127,6 +2145,8 @@ $(function() {
             Migration Player ID: <input type="text" id="migrate_account_other_id" name="migrate_account_other_id">
             <button onclick="method_migrate_spin_id($('#migrate_account_other_id').spinner('value'))" class="spin_button" style="width:250px;">Migrate</button>
         </p>
+        <p>
+            Migration Battlehouse ID: <input type="text" id="migrate_account_battlehouse_id" name="migrate_account_battlehouse_id"><button onclick="method_force_migrate_spin_id()" class="spin_button">Force Migrate</button>
         <p>
             Reason for this action:
             <br>
