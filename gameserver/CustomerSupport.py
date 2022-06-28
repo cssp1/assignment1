@@ -508,7 +508,7 @@ class HandleUnmergeBHID(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         self.user_id = self.args['user_id']
-        self.bh_ids = [entry['_id'] for entry in gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='player.social_platforms() check') if entry['_id'].startswith('bh')]
+        self.bh_ids = [entry['_id'] for entry in self.gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='player.social_platforms() check') if entry['_id'].startswith('bh')]
         self.deferred = TwistedLatency.InstrumentedDeferred('customer_support_unmerge_bh_id')
 
     def do_exec_loginserver(self, bh_id):
