@@ -32,6 +32,7 @@ import os
 import twisted.internet.reactor
 import twisted.internet.error
 import twisted.internet.protocol
+import TwistedLatency
 
 def get_leveled_quantity(qty, level): # XXX duplicate
     if type(qty) == list:
@@ -502,6 +503,42 @@ class HandleForceMigrateSpinID(Handler):
             self.gamesite.do_CONTROLAPI(None, invalidate_args) # broadcast invalidation order so servers clear social ID cache
             return ReturnValue(result = 'ok')
         return ReturnValue(error = check_result)
+
+class HandleUnmergeBHID(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.user_id = self.args['user_id']
+        self.bh_ids = [entry['_id'] for entry in gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='player.social_platforms() check') if entry['_id'].startswith('bh')]
+        self.deferred = TwistedLatency.InstrumentedDeferred('customer_support_unmerge_bh_id')
+
+    def do_exec_loginserver(self, bh_id):
+        self.gamesite.AsyncHTTP_Battlehouse.queue_request(self.time_now, SpinConfig.config['battlehouse_api_path']+('/account_unmerge/%s/' % bh_id) + '?service=' + SpinConfig.game(),
+                                                          lambda result, _d=self.deferred, _bh_id=bh_id: self.exec_complete(_d, _bh_id, result),
+                                                          headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
+
+    def update_bh_user_spend_complete(self, d, bh_id, result):
+        self.deferred.callback(True)
+        return result
+
+    def do_exec_online(self, session, retmsg):
+        errors = 'Errors:'
+        for bh_id in self.bh_ids:
+            result = SpinJSON.loads(self.do_exec_loginserver(bh_id))
+            if 'error' in result:
+                errors += '\n' + result['error']
+        if errors != 'Errors:':
+            return ReturnValue(error = errors)
+        return ReturnValue(result = 'ok')
+
+    def do_exec_offline(self, user, player):
+        errors = 'Errors:'
+        for bh_id in self.bh_ids:
+            result = SpinJSON.loads(self.do_exec_loginserver(bh_id))
+            if 'error' in result:
+                errors += '\n' + result['error']
+        if errors != 'Errors:':
+            return ReturnValue(error = errors)
+        return ReturnValue(result = 'ok')
 
 class HandleMarkUninstalled(Handler):
     # mark account as uninstalled and scrub PII
@@ -2377,5 +2414,6 @@ methods = {
     'modify_scores': HandleModifyScores,
     'player_batch': HandlePlayerBatch,
     'change_player_alias': HandleRenamePlayer,
+    'unmerge_bh_id': HandleUnmergeBHID,
     # not implemented yet: join_abtest, clear_abtest
 }

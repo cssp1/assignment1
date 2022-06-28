@@ -438,6 +438,14 @@ var method_unban = function() {
         send_request('player', 'unban', $.extend(ident, {'ui_reason':ui_reason}), function(result) { display_response("Success!"); });
     }
 };
+var method_unmerge_bh_id = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
+    args = {'ui_reason': ui_reason};
+    if(ident && ui_reason) {
+        send_request('player', 'unmerge_bh_id', $.extend(ident, args), function(result) { display_response("Success!"); });
+    }
+}
 var method_vpn_excuse = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
@@ -2151,6 +2159,9 @@ $(function() {
             Reason for this action:
             <br>
             <input type="text" id="alts_vpn_migrate_reason" style="width:500px;">
+        </p>
+        <p>
+            <button onclick="method_unmerge_bh_id()" class="spin_button">Unmerge BH IDs</button>
         </p>
     </div>
     <div id="player_tools_ban">
