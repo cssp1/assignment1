@@ -539,7 +539,7 @@ class SocialPlatformPredicate(Predicate):
         for platform in self.allow:
             if platform in player.social_platforms():
                 return True
-        return True
+        return False
 
 class FacebookLikesPredicate(Predicate):
     def __init__(self, data):

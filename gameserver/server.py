@@ -1843,12 +1843,23 @@ class User:
 
         # batch query for game player IDs
         social_id_list = []
+        alliance_friend_ids = []
         if self.facebook_friends:
             social_id_list += ['fb'+str(friend['id']) for friend in self.facebook_friends]
         if self.kg_friend_ids:
             social_id_list += ['kg'+str(x) for x in self.kg_friend_ids]
         if self.ag_friend_ids:
             social_id_list += ['ag'+str(x) for x in self.ag_friend_ids]
+
+        if game_id == 'tr' and Predicates.read_predicate({'predicate':'LIBRARY', 'name':'internal_tester'}).is_satisfied2(session, self, None):
+            alliance_id = session.get_alliance_id(reason='populate_friends_who_play')
+            if alliance_id >= 0 and gamesite.sql_client:
+                alliance_friend_ids = gamesite.sql_client.get_alliance_member_ids(alliance_id, reason = 'populate_friends_who_play')
+                if self.user_id in alliance_friend_ids:
+                    alliance_friend_ids.remove(self.user_id) # skip self, should not show up as a friend
+                alliance_friend_pcache_list = gamesite.pcache_client.player_cache_lookup_batch(alliance_friend_ids, fields = ['social_id'], reason = 'populate_friends_who_play')
+                for result in alliance_friend_pcache_list:
+                    social_id_list.append(result['social_id'])
 
         # note: this call is free if social_id_list is empty, it won't hit the database
         friend_id_list = gamesite.social_id_table.social_id_to_spinpunch_batch(social_id_list)
@@ -1891,6 +1902,8 @@ class User:
                 relationship = 'mentor'
             elif self.bh_trainee_player_ids_cache and (friend_id in self.bh_trainee_player_ids_cache):
                 relationship = 'trainee'
+            elif friend_id in alliance_friend_ids:
+                relationship = 'alliance'
 
             session.send([["ADD_FRIEND", friend_id,
                            True, # is a real Facebook friend (not a stranger)
@@ -9943,15 +9956,14 @@ class Player(AbstractPlayer):
         return (0, alt_platforms)
 
     def social_platforms(self):
-        social_platforms = []
+        social_platforms = set()
         social_ids = gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='player.social_platforms() check')
         for entry in social_ids:
-            social_platform = entry['_id'][:2]
+            social_platform = entry[:2]
             if social_platform not in ('kg','ag','bh'):
                 social_platform = 'fb'
-            if social_platform not in social_platforms:
-                social_platforms.append(social_platform)
-        return social_platforms
+            social_platforms.add(social_platform)
+        return list(social_platforms)
 
     def request_migrate_spin_id(self, args):
         try:
@@ -12655,6 +12667,7 @@ class Player(AbstractPlayer):
                         # exponential decay constant
                         decay_k = -math.log(2)/gamedata['matchmaking'].get('ladder_point_decay_halflife', 86400)
                         self.modify_scores({'trophies_pvp':0}, method = 'decay', trophy_decay_k = decay_k, trophy_decay_elapsed = elapsed, reason = 'ladder_point_decay_check')
+                        self.modify_scores({'trophies_icw':0}, method = 'decay', trophy_decay_k = decay_k, trophy_decay_elapsed = elapsed, reason = 'invitational_clan_war_point_decay_check')
                         aura['start_time'] += elapsed # reset start time
 
         # check if decay aura should be applied
@@ -12684,6 +12697,7 @@ class Player(AbstractPlayer):
         loss = int(fraction * cur_points)
         if loss <= 0: return 0
         self.modify_scores({'trophies_pvp':-loss}, reason = 'alliance_leave_point_loss')
+        self.modify_scores({'trophies_icw':0, 'method': '='}, reason = 'alliance_leave_point_loss') # clan war always gets zeroed on leaving
         self.mailbox_append(self.make_system_mail(gamedata['strings']['alliance_leave_point_loss_mail'],
                                                   replacements = {'%LOSS': '%d' % loss,
                                                                   '%ALLIANCE_NAME': alliance_ui_name}))
@@ -13407,7 +13421,7 @@ class Player(AbstractPlayer):
 
             if name.startswith('trophies_'):
                 assert not has_extra_axes
-                kind = name[9:12]; assert kind in ('pve','pvp','pvv')
+                kind = name[9:12]; assert kind in ('pve','pvp','pvv','icw')
                 floor = gamedata['trophy_floor'].get(kind,0)
                 affects_alliance = True
                 if trophy_decay_k != 0:
@@ -20890,6 +20904,11 @@ class GAMEAPI(resource.Resource):
                 if (not session.viewing_player.isolate_pvp):
                     for stat in ('trophies_pvp', 'trophies_pvv'):
                         session.viewing_player.modify_scores({stat: session.loot.get('viewing_'+stat, 0)}, reason = 'complete_attack(defender)')
+                    if session.loot.get('viewing_trophies_pvp', 0):
+                        if session.viewing_player.home_region:
+                            viewing_region_data = session.viewing_player.get_abtest_region(session.viewing_player.home_region)
+                            if viewing_region_data.get('clan_war', 0): #invitational clan war points
+                                session.viewing_player.modify_scores({'trophies_icw': session.loot.get('viewing_trophies_pvp', 0)}, reason = 'complete_attack(defender)')
 
                 if (outcome != 'victory' and gamedata.get('pvp_repair_on_defeat', False)) or gamedata.get('pvp_repair_on_victory', False):
                     session.viewing_base.reset_to_full_health()
@@ -21168,6 +21187,11 @@ class GAMEAPI(resource.Resource):
                     stats['battle_duration'] = {('challenge', 'key', timed_challenge): int(server_time - session.attack_log.log_time)}
 
                 session.player.modify_scores(stats, reason = 'complete_attack(attacker)')
+                if session.loot.get('trophies_pvp', 0):
+                    if session.player.home_region:
+                        player_region_data = session.player.get_abtest_region(session.player.home_region)
+                        if player_region_data.get('clan_war', 0):  # invitational clan war points
+                            session.viewing_player.modify_scores({'trophies_icw': session.loot.get('trophies_pvp', 0)}, reason = 'complete_attack(attacker)')
 
             # finalize battle summary
             if summary:
@@ -26427,9 +26451,13 @@ class GAMEAPI(resource.Resource):
 
         return d
 
-    def do_send_gifts_bh(self, session, client_id_list):
+    def do_send_gifts_bh(self, session, retmsg, arg):
+        client_id_list = arg[1]
         if session.user.frame_platform != 'bh':
             session.send([["ERROR", "SERVER_PROTOCOL"]])
+            return None
+        if 'electron' in session.user.spin_client_platform:
+            self.do_send_gifts(session, retmsg, arg)
             return None
 
         replacements = {'%MY_UI_NAME': session.user.get_ui_name(session.player),
@@ -26503,7 +26531,7 @@ class GAMEAPI(resource.Resource):
         return None
 
     def do_send_gifts(self, session, retmsg, arg):
-        if session.user.frame_platform == 'bh':
+        if session.user.frame_platform == 'bh' and 'electron' not in session.user.client_platform:
             session.send([["ERROR", "SERVER_PROTOCOL"]])
             return None
 
@@ -30713,7 +30741,7 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "SEND_GIFTS2":
             self.do_send_gifts(session, retmsg, arg)
         elif arg[0] == "SEND_GIFTS_BH":
-            return self.do_send_gifts_bh(session, arg[1])
+            return self.do_send_gifts_bh(session, retmsg, arg)
 
         elif arg[0] == "LEVEL_ME_UP":
             self.do_level_up(session, retmsg, arg)

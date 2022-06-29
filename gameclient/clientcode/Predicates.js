@@ -1657,7 +1657,7 @@ SocialPlatformPredicate.prototype.is_satisfied = function(player, qdata) {
             if(goog.array.contains(player.social_platforms, platform)) { return true; }
         }
     }
-    return true;
+    return false;
 };
 /** @override */
 SocialPlatformPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
