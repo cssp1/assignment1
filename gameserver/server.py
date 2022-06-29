@@ -9956,14 +9956,13 @@ class Player(AbstractPlayer):
         return (0, alt_platforms)
 
     def social_platforms(self):
-        social_platforms = []
+        social_platforms = set()
         social_ids = gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='player.social_platforms() check')
         for entry in social_ids:
-            social_platform = entry['_id'][:2]
+            social_platform = entry[:2]
             if social_platform not in ('kg','ag','bh'):
                 social_platform = 'fb'
-            if social_platform not in social_platforms:
-                social_platforms.append(social_platform)
+            social_platforms.add(social_platform)
         return social_platforms
 
     def request_migrate_spin_id(self, args):
