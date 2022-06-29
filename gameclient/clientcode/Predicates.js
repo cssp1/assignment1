@@ -1636,6 +1636,37 @@ FramePlatformPredicate.prototype.do_ui_describe = function(player) { return null
 
 /** @constructor @struct
   * @extends Predicate */
+function SocialPlatformPredicate(data) {
+    goog.base(this, data);
+    this.allow = [];
+    if('allow' in data && data['allow']) { this.allow = data['allow']; }
+    this.block = [];
+    if('block' in data && data['block']) { this.block = data['block']; }
+}
+goog.inherits(SocialPlatformPredicate, Predicate);
+SocialPlatformPredicate.prototype.is_satisfied = function(player, qdata) {
+    if(this.block.length > 0) {
+        for(var i = 0; i < this.block.length; i++) {
+            var platform = this.block[i];
+            if(goog.array.contains(player.social_platforms, platform)) { return false; }
+        }
+    }
+    if(this.allow.length > 0) {
+        for(var i = 0; i < this.allow.length; i++) {
+            var platform = this.allow[i];
+            if(goog.array.contains(player.social_platforms, platform)) { return true; }
+        }
+    }
+    return false;
+};
+/** @override */
+SocialPlatformPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+/** @override
+    Never relevant mentioning this to the player. */
+SocialPlatformPredicate.prototype.do_ui_describe = function(player) { return null; };
+
+/** @constructor @struct
+  * @extends Predicate */
 function FacebookAppNamespacePredicate(data) {
     goog.base(this, data);
     this.namespace = data['namespace'];
@@ -2649,6 +2680,8 @@ function read_predicate(data) {
         return new FriendsJoinedPredicate(data, 'friends_in_game', data['number'], '', data['number'].toString(), '>=');
     } else if(kind === 'FRAME_PLATFORM') {
         return new FramePlatformPredicate(data);
+    } else if(kind === 'SOCIAL_PLATFORM') {
+        return new SocialPlatformPredicate(data);
     } else if(kind === 'FACEBOOK_LIKES_SERVER') {
         return new AlwaysFalsePredicate(data);
     } else if(kind === 'FACEBOOK_LIKES_CLIENT') {
