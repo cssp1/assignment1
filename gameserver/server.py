@@ -9963,7 +9963,7 @@ class Player(AbstractPlayer):
             if social_platform not in ('kg','ag','bh'):
                 social_platform = 'fb'
             social_platforms.add(social_platform)
-        return social_platforms
+        return list(social_platforms)
 
     def request_migrate_spin_id(self, args):
         try:
