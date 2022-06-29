@@ -2557,10 +2557,19 @@ ClientVersionPredicate.prototype.do_ui_describe = function(player) { return null
   * @extends Predicate */
 function HasAltsPredicate(data) {
     goog.base(this, data);
+    this.platforms = data['platforms'] || false;
 }
 goog.inherits(HasAltsPredicate, Predicate);
 HasAltsPredicate.prototype.is_satisfied = function(player, qdata) {
-    return player.has_alts;
+    if(!player.has_alts) { return false; }
+    if(this.platforms) {
+        if(!player.alt_platforms) { return false; }
+        for(var i = 0; i < this.platforms.length; i++) {
+            var platform = this.platforms[i];
+            if(!goog.array.contains(player.alt_platforms, platform)) { return false; }
+        }
+    }
+    return true;
 };
 /** @override */
 HasAltsPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };

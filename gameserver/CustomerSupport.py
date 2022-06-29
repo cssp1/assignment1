@@ -481,6 +481,28 @@ class HandleSelfServiceMigrateSpinID(Handler):
         player['mailbox'].append(self.make_message())
         return ReturnValue(result = 'ok')
 
+class HandleForceMigrateSpinID(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.old_spin_id = int(self.args['spin_id'])
+        self.new_social_id = self.args['new_bh_id']
+
+    def do_exec_online(self, session, retmsg):
+        check_result = self.gamesite.nosql_client.mutate_social_id_to_spinpunch_single(self.new_social_id, self.old_spin_id, reason='PCHECK migration')
+        if check_result == 'ok':
+            invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': self.new_social_id}
+            self.gamesite.do_CONTROLAPI(None, invalidate_args) # broadcast invalidation order so servers clear social ID cache
+            return ReturnValue(result = 'ok')
+        return ReturnValue(error = check_result)
+
+    def do_exec_offline(self, user, player):
+        check_result = self.gamesite.nosql_client.mutate_social_id_to_spinpunch_single(self.new_social_id, self.old_spin_id, reason='PCHECK migration')
+        if check_result == 'ok':
+            invalidate_args = {'method': 'invalidate_social_id', 'server': 'proxyserver', 'broadcast': 1, 'social_id': self.new_social_id}
+            self.gamesite.do_CONTROLAPI(None, invalidate_args) # broadcast invalidation order so servers clear social ID cache
+            return ReturnValue(result = 'ok')
+        return ReturnValue(error = check_result)
+
 class HandleMarkUninstalled(Handler):
     # mark account as uninstalled and scrub PII
     def record_deauthorized_metric(self, social_id, summary_props, reason):
@@ -2312,6 +2334,7 @@ methods = {
     'unignore_alt': HandleUnignoreAlt,
     'clear_alias': HandleClearAlias,
     'migrate_spin_id': HandleMigrateSpinID,
+    'force_migrate_spin_id': HandleForceMigrateSpinID,
     'request_self_service_migrate_spin_id': HandleSelfServiceMigrateSpinID,
     'chat_block': HandleChatBlock,
     'chat_unblock': HandleChatUnblock,
