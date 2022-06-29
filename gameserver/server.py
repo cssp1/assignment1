@@ -12674,7 +12674,7 @@ class Player(AbstractPlayer):
         loss = int(fraction * cur_points)
         if loss <= 0: return 0
         self.modify_scores({'trophies_pvp':-loss}, reason = 'alliance_leave_point_loss')
-        self.modify_scores({'trophies_icw':0}, reason = 'alliance_leave_point_loss') # clan war always gets zeroed on leaving
+        self.modify_scores({'trophies_icw':0, 'method': '='}, reason = 'alliance_leave_point_loss') # clan war always gets zeroed on leaving
         self.mailbox_append(self.make_system_mail(gamedata['strings']['alliance_leave_point_loss_mail'],
                                                   replacements = {'%LOSS': '%d' % loss,
                                                                   '%ALLIANCE_NAME': alliance_ui_name}))
