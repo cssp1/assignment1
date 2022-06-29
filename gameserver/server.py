@@ -1855,7 +1855,8 @@ class User:
             alliance_id = session.get_alliance_id(reason='populate_friends_who_play')
             if alliance_id >= 0 and gamesite.sql_client:
                 alliance_friend_ids = gamesite.sql_client.get_alliance_member_ids(alliance_id, reason = 'populate_friends_who_play')
-                alliance_friend_ids.remove(self.user_id) # skip self, should not show up as a friend
+                if self.user_id in alliance_friend_ids:
+                    alliance_friend_ids.remove(self.user_id) # skip self, should not show up as a friend
                 alliance_friend_pcache_list = gamesite.pcache_client.player_cache_lookup_batch(alliance_friend_ids, fields = ['social_id'], reason = 'populate_friends_who_play')
                 for result in alliance_friend_pcache_list:
                     social_id_list.append(result['social_id'])
