@@ -30,6 +30,7 @@ goog.require('BattleLog');
 goog.require('RaidBattleLog');
 goog.require('BattleReplay');
 goog.require('BattleReplayGUI');
+goog.require('BHSendRequests');
 goog.require('ChatFilter');
 goog.require('Congrats');
 goog.require('GameArt');
@@ -6976,7 +6977,9 @@ player.tutorial_state = 'START';
 player.tutorial_hold = false; // stop tutorial temporarily, e.g. for replay on first visit
 
 player.unit_repair_queue = [];
-player.has_alts = false;
+player.has_alts = 0;
+player.alt_platforms = {};
+player.social_platforms = [];
 player.tech = {};
 player.unit_equipment = {};
 player.player_auras = [];
@@ -8788,7 +8791,7 @@ function home_base_id(user_id) { return 'h' + user_id.toString(); }
     @param {number} user_id
     @param {boolean} is_real_friend
     @param {!Object<string,?>} info
-    @param {string|null} relationship (null, 'mentor', or 'trainee')
+    @param {string|null} relationship (null, 'mentor', 'trainee', 'clan')
  */
 function Friend(user_id, is_real_friend, info, relationship) {
     this.user_id = user_id;
@@ -8814,6 +8817,7 @@ Friend.prototype.is_giftable = function() {
 };
 Friend.prototype.is_mentor = function() { return this.relationship === 'mentor'; };
 Friend.prototype.is_trainee = function() { return this.relationship === 'trainee'; };
+Friend.prototype.is_alliance_member = function() { return this.relationship === 'alliance'; };
 Friend.prototype.is_bh_invite_complete = function() {
     var complete_pred = gamedata['predicate_library']['bh_invite_complete'];
     if(!complete_pred || complete_pred['predicate'] !== 'PLAYER_HISTORY' ||
@@ -20271,6 +20275,10 @@ function invoke_gift_prompt_dialog() {
  * @param {(!Array.<Object>|null)=} info_list - list of PlayerCache entries for giftable friends (if null, we will query)
  */
 function invoke_send_gifts(to_user, reason, info_list) {
+    if(read_predicate({'predicate':'LIBRARY', 'name': 'internal_tester'}).is_satisfied(player, null)) {
+        BHSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list);
+        return null;
+    }
     if(spin_frame_platform === 'fb') {
         call_with_facebook_permissions('user_friends', (function (_to_user, _reason, _info_list) { return function() {
             FBSendRequests.invoke_send_gifts_dialog(_to_user, _reason, _info_list);
@@ -35031,8 +35039,13 @@ function receive_unit_repair_update(data) {
     apply_unit_repair_update();
 }
 
-function receive_has_alts_update(data) {
-    player.has_alts = data;
+function receive_has_alts_update(has_alts, alt_platforms) {
+    player.alt_platforms = alt_platforms;
+    player.has_alts = has_alts;
+}
+
+function receive_social_platforms_update(social_platforms) {
+    player.social_platforms = social_platforms;
 }
 
 // propagate finish times on to individual objects
@@ -53677,7 +53690,9 @@ function handle_server_message(data) {
     } else if(msg == "UNIT_REPAIR_UPDATE") {
         receive_unit_repair_update(data[1]);
     } else if(msg == "HAS_ALTS_UPDATE") {
-        receive_has_alts_update(data[1]);
+        receive_has_alts_update(data[1], data[2]);
+    } else if(msg == "SOCIAL_PLATFORMS_UPDATE") {
+        receive_social_platforms_update(data[1]);
     } else if(msg == "SERVER_MAINTENANCE_WARNING") {
         var s = gamedata['strings']['server_going_down_short'];
         invoke_child_message_dialog(s['ui_title'], s['ui_description'], {'dialog': s['dialog']});

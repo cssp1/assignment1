@@ -2014,7 +2014,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'ALL_BUILDINGS_UNDAMAGED', 'OBJECT_UNDAMAGED', 'OBJECT_UNBUSY', 'BUILDING_DESTROYED', 'BUILDING_QUANTITY', 'SCENERY_QUANTITY',
                    'BUILDING_LEVEL', 'UNIT_QUANTITY', 'TECH_LEVEL', 'ENHANCEMENT_LEVEL', 'QUEST_COMPLETED', 'QUEST_ACTIVE', 'COOLDOWN_ACTIVE', 'COOLDOWN_INACTIVE',
                    'ABTEST', 'ANY_ABTEST', 'RANDOM', 'LIBRARY', 'AI_BASE_ACTIVE', 'AI_BASE_SHOWN', 'PLAYER_HISTORY', 'GAMEDATA_VAR',
-                   'RETAINED', 'TIME_IN_GAME', 'PLAYER_PREFERENCE',
+                   'RETAINED', 'TIME_IN_GAME', 'PLAYER_PREFERENCE', 'SOCIAL_PLATFORM',
                    'ATTACKS_LAUNCHED', 'ATTACKS_VICTORY', 'CONQUESTS', 'UNITS_MANUFACTURED', 'LOGGED_IN_TIMES',
                    'RESOURCE_STORAGE_CAPACITY', 'PATRON',
                    'RESOURCES_HARVESTED_TOTAL', 'RESOURCES_HARVESTED_AT_ONCE', 'FRIENDS_JOINED', 'FACEBOOK_APP_NAMESPACE', 'FACEBOOK_LIKES_SERVER',
@@ -2293,6 +2293,28 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             error |= 1; print '%s: %s predicate must have "method" value of ">=", "==", or "<"' % (reason, pred['predicate'])
         if 'value' not in pred or not isinstance(pred['value'], int) or not pred['value'] in (0, 1, 2, 3):
             error |= 1; print '%s: %s predicate must have "value" value that is an integer between 0 and 3' % (reason, pred['predicate'])
+    elif pred['predicate'] == 'HAS_ALTS':
+        if 'platforms' in pred:
+            for platform in pred['platforms']:
+                if platform not in ('fb','kg','ag','bh'):
+                    error |= 1; print '%s: %s predicate platforms must be supported platform types, currently only "fb", "kg", "ag", and "bh". Value %s is unknown.' % (reason, pred['predicate'], platform)
+    elif pred['predicate'] == 'SOCIAL_PLATFORM':
+        if 'allow' not in pred and 'block' not in pred:
+            error |= 1; print '%s: %s predicate must "allow" and/or "block" a platform. This has neither.' % (reason, pred['predicate'])
+        if 'allow' in pred:
+            if not isinstance(pred['allow'], list):
+                error |= 1; print '%s: %s predicate "allow" value must be a list of allowed platforms, not %r.' % (reason, pred['predicate'], type(pred['allow']))
+            else:
+                for platform in pred['allow']:
+                    if platform not in ('fb','kg','ag','bh'):
+                        error |= 1; print '%s: %s predicate "allow" entries must be supported platform types, currently only "fb", "kg", "ag", and "bh". Value %s is unknown.' % (reason, pred['predicate'], platform)
+        if 'block' in pred:
+            if not isinstance(pred['block'], list):
+                error |= 1; print '%s: %s predicate "block" value must be a list of blocked platforms, not %r.' % (reason, pred['predicate'], type(pred['block']))
+            else:
+                for platform in pred['block']:
+                    if platform not in ('fb','kg','ag','bh'):
+                        error |= 1; print '%s: %s predicate "block" entries must be supported platform types, currently only "fb", "kg", "ag", and "bh". Value %s is unknown.' % (reason, pred['predicate'], platform)
     return error
 
 # check old-style "logic" blocks which are if/then/else compositions of predicates and consequents (used for quest tips)

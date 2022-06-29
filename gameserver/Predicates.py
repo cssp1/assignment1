@@ -68,8 +68,16 @@ class ClientVersionPredicate(Predicate):
 class HasAltsPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
+        self.platforms = data.get('platforms', False)
     def is_satisfied(self, player, qdata):
-        return player.has_alts()
+        has_alts, alt_platforms = player.has_alts()
+        if not has_alts:
+            return False
+        if self.platforms:
+            for platform in self.platforms:
+                if platform not in alt_platforms:
+                    return False
+        return True
 
 class RandomPredicate(Predicate):
     def __init__(self, data):
@@ -518,6 +526,20 @@ class FramePlatformPredicate(Predicate):
         self.platform = data['platform']
     def is_satisfied(self, player, qdata):
         return player.frame_platform == self.platform
+
+class SocialPlatformPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.allow = data.get('allow',[])
+        self.block = data.get('block',[])
+    def is_satisfied(self, player, qdata):
+        for platform in self.block:
+            if platform in player.social_platforms():
+                return False
+        for platform in self.allow:
+            if platform in player.social_platforms():
+                return True
+        return False
 
 class FacebookLikesPredicate(Predicate):
     def __init__(self, data):
@@ -1213,6 +1235,7 @@ def read_predicate(data):
         return FriendsJoinedPredicate(data, 'friends_in_game', data['number'], ">=")
     elif kind == 'AI_INSTANCE_GENERATION': return AIInstanceGenerationPredicate(data)
     elif kind == 'FRAME_PLATFORM': return FramePlatformPredicate(data)
+    elif kind == 'SOCIAL_PLATFORM': return SocialPlatformPredicate(data)
     elif kind == 'FACEBOOK_LIKES_SERVER':
         return FacebookLikesPredicate(data)
     elif kind == 'FACEBOOK_LIKES_CLIENT':

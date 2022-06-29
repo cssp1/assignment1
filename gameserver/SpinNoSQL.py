@@ -1118,6 +1118,16 @@ class NoSQLClient (object):
             ret[socid_list.index(row['_id'])] = int(row['user_id'])
         return ret
 
+    def spinpunch_to_social_id_single(self, spinpunch, reason=''):
+        return self.instrument('spinpunch_to_social_id_single(%s)'%reason, self._spinpunch_to_social_id_single, (spinpunch,))
+    def _spinpunch_to_social_id_single(self, spinpunch):
+        return self._spinpunch_to_social_id_all(spinpunch)[0]
+
+    def spinpunch_to_social_id_all(self, spinpunch, reason=''):
+        return self.instrument('spinpunch_to_social_id_all(%s)'%reason, self._spinpunch_to_social_id_all, (spinpunch,))
+    def _spinpunch_to_social_id_all(self, spinpunch):
+        obj_list = list(self.facebook_id_table().find({'user_id':spinpunch}))
+        return [obj['_id'] for obj in obj_list]
 
     ###### PLAYER CACHE (also embeds player locks) ######
 
