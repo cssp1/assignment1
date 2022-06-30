@@ -2925,7 +2925,7 @@ if __name__ == '__main__':
         commands = []
         for patron_list, prize, patron_level in ((captains, captain_prize, 'Captain'), (majors, major_prize, 'Major'), (colonels, colonel_prize, 'Colonel')):
             for player in patron_list:
-                commands.append(['./check_player.py', '%d' % player['user_id'],
+                commands.append(['./check_player.py', '%d' % player,
                                  '--give-item', 'gamebucks', '--melt-hours', '-1',
                                  '--item-stack', '%d' % (prize),
                                  '--give-item-subject', 'Monthly Patron Reward: %s' % patron_level,
