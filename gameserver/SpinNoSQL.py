@@ -2916,12 +2916,12 @@ if __name__ == '__main__':
         with SpinSingletonProcess.SingletonProcess('SpinNoSQL-global-maint-%s' % (game_id)):
             client.do_maint(time_now, cur_season, cur_week)
     elif mode == 'patron-rewards':
-        captains = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Captains')
+        captains = [] #client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Captains')
         captain_prize = gamedata['server'].get('patron_captain_monthly_prize', 500)
-        majors = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Majors')
+        majors = client.player_cache_query_by_patron_level(2, reason = 'Monthly reward script: Majors')
         major_prize = gamedata['server'].get('patron_major_monthly_prize', 1050)
-        colonels = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Colonels')
-        colonel_prize = gamedata['server'].get('patron_colonel_monthly_prize', 1050)
+        colonels = client.player_cache_query_by_patron_level(3, reason = 'Monthly reward script: Colonels')
+        colonel_prize = gamedata['server'].get('patron_colonel_monthly_prize', 4000)
         commands = []
         for patron_list, prize, patron_level in ((captains, captain_prize, 'Captain'), (majors, major_prize, 'Major'), (colonels, colonel_prize, 'Colonel')):
             for player in patron_list:
