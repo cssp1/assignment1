@@ -2803,7 +2803,7 @@ if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks', 'benchmark',
                                                         'winners', 'send-prizes', 'prize-item=', 'prize-qty=', 'in-the-money-players=', 'in-the-money-alliances=', 'min-participation=', 'min-points=',
                                                         'leaders', 'tournament-stat=', 'tournament-stat-challenge-key=', 'week=', 'season=', 'game-id=',
-                                                        'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=',
+                                                        'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=', 'patron-rewards',
                                                         'recache-alliance-scores', 'test', 'config-name='])
     game_instance = SpinConfig.config['game_id']
     mode = None
@@ -2844,6 +2844,7 @@ if __name__ == '__main__':
         elif key == '--leaders': mode = 'leaders'
         elif key == '--week': week = int(val)
         elif key == '--season': season = int(val)
+        elif key == '--patron-rewards': mode = 'patron-rewards'
         elif key == '--tournament-stat':
             tournament_stat = val
         elif key == '--tournament-stat-challenge-key':
