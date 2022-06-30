@@ -1851,7 +1851,7 @@ class User:
         if self.ag_friend_ids:
             social_id_list += ['ag'+str(x) for x in self.ag_friend_ids]
 
-        if game_id == 'bfm' and Predicates.read_predicate({'predicate':'LIBRARY', 'name':'internal_tester'}).is_satisfied2(session, session.player, None):
+        if game_id in ('bfm', 'tr') and Predicates.read_predicate({'predicate':'LIBRARY', 'name':'internal_tester'}).is_satisfied2(session, session.player, None):
             alliance_id = session.get_alliance_id(reason='populate_friends_who_play')
             if alliance_id >= 0 and gamesite.sql_client:
                 alliance_friend_ids = gamesite.sql_client.get_alliance_member_ids(alliance_id, reason = 'populate_friends_who_play')
