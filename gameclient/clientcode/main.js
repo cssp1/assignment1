@@ -12971,6 +12971,9 @@ function scroll_friend_bar(dialog, page) {
             widget.onclick = click_cbmaker(friend.user_id, friend.get_facebook_id(), friend);
             dialog.widgets['add_friend_button'+row.toString()].show = false;
             dialog.widgets['alliance_friend_icon'+row.toString()].show = friend.is_alliance_member();
+            var alliance_info = AllianceCache.query_info_sync(session.alliance_id);
+            dialog.widgets['alliance_friend_icon'+row.toString()].asset = (alliance_info['logo'] ? 'alicon_'+alliance_info['logo'] : 'inventory_unknown');
+            dialog.widgets['alliance_friend_icon'+row.toString()].alpha = 0.25;            
 
             row += 1;
         }

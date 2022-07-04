@@ -1718,8 +1718,8 @@
 
             "friend_icon": { "show": 0, "kind": "FriendIcon", "xy": [126, 209], "dimensions": [50,73],
                              "array": [7,1], "array_offset": [53,0] },
-            "alliance_friend_icon": { "kind": "StaticImage", "xy": [126, 209], "dimensions": [50,73], "show": 0,
-                             "array": [7,1], "array_offset": [53,0], "asset": "alliances_button" },
+            "alliance_friend_icon": { "kind": "StaticImage", "xy": [126, 209], "dimensions": [50,73], "show": 0, "fixed_tooltip_offset": [126, 209],
+                                      "ui_tooltip": "Clan Member", "array": [7,1], "array_offset": [53,0], "asset": "alliances_button" },
 
             // note: icon #6 is usually covered by add_friend_button6
 
