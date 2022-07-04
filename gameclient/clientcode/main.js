@@ -8791,7 +8791,7 @@ function home_base_id(user_id) { return 'h' + user_id.toString(); }
     @param {number} user_id
     @param {boolean} is_real_friend
     @param {!Object<string,?>} info
-    @param {string|null} relationship (null, 'mentor', 'trainee', 'clan')
+    @param {string|null} relationship (null, 'mentor', 'trainee', 'alliance')
  */
 function Friend(user_id, is_real_friend, info, relationship) {
     this.user_id = user_id;
@@ -12970,6 +12970,8 @@ function scroll_friend_bar(dialog, page) {
             widget.set_user(friend.user_id);
             widget.onclick = click_cbmaker(friend.user_id, friend.get_facebook_id(), friend);
             dialog.widgets['add_friend_button'+row.toString()].show = false;
+            dialog.widgets['alliance_friend_icon'+row.toString()].show = friend.is_alliance_member();
+
             row += 1;
         }
     }
