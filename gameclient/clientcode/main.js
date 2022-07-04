@@ -12975,7 +12975,6 @@ function scroll_friend_bar(dialog, page) {
                 var alliance_info = AllianceCache.query_info_sync(session.alliance_id);
                 if(alliance_info) {
                     dialog.widgets['alliance_friend_icon'+row.toString()].asset = (alliance_info['logo'] ? 'alicon_'+alliance_info['logo'] : 'inventory_unknown');
-                    dialog.widgets['alliance_friend_icon'+row.toString()].alpha = 0.25;
                 }
             }
             row += 1;
