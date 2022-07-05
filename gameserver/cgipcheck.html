@@ -329,7 +329,7 @@ var method_change_region_imprison = function() {
     if(ident && ui_reason) {
         send_request('player', 'change_region', $.extend({}, ident, {'new_region':'prison', 'ui_reason':ui_reason}),
                      (function (_ident, _on_complete) { return function(result) {
-                         send_request('player', 'apply_aura', $.extend({}, _ident, {'aura_name':'region_banished','duration':867240,'data':JSON.stringify({'tag':'imprisoned'})}),
+                         send_request('player', 'apply_aura', $.extend({}, _ident, {'aura_name':'region_banished','duration':3122064000,'data':JSON.stringify({'tag':'imprisoned'})}),
                          (function (__ident, __on_complete) { return function(result) {
                              __on_complete(result);
                          }; })(_ident, _on_complete));
