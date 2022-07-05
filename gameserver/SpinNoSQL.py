@@ -2803,7 +2803,7 @@ if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks', 'benchmark',
                                                         'winners', 'send-prizes', 'prize-item=', 'prize-qty=', 'in-the-money-players=', 'in-the-money-alliances=', 'min-participation=', 'min-points=',
                                                         'leaders', 'tournament-stat=', 'tournament-stat-challenge-key=', 'week=', 'season=', 'game-id=',
-                                                        'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=',
+                                                        'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=', 'patron-rewards',
                                                         'recache-alliance-scores', 'test', 'config-name='])
     game_instance = SpinConfig.config['game_id']
     mode = None
@@ -2844,6 +2844,7 @@ if __name__ == '__main__':
         elif key == '--leaders': mode = 'leaders'
         elif key == '--week': week = int(val)
         elif key == '--season': season = int(val)
+        elif key == '--patron-rewards': mode = 'patron-rewards'
         elif key == '--tournament-stat':
             tournament_stat = val
         elif key == '--tournament-stat-challenge-key':
@@ -2917,14 +2918,14 @@ if __name__ == '__main__':
     elif mode == 'patron-rewards':
         captains = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Captains')
         captain_prize = gamedata['server'].get('patron_captain_monthly_prize', 500)
-        majors = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Majors')
+        majors = client.player_cache_query_by_patron_level(2, reason = 'Monthly reward script: Majors')
         major_prize = gamedata['server'].get('patron_major_monthly_prize', 1050)
-        colonels = client.player_cache_query_by_patron_level(1, reason = 'Monthly reward script: Colonels')
-        colonel_prize = gamedata['server'].get('patron_colonel_monthly_prize', 1050)
+        colonels = client.player_cache_query_by_patron_level(3, reason = 'Monthly reward script: Colonels')
+        colonel_prize = gamedata['server'].get('patron_colonel_monthly_prize', 4000)
         commands = []
         for patron_list, prize, patron_level in ((captains, captain_prize, 'Captain'), (majors, major_prize, 'Major'), (colonels, colonel_prize, 'Colonel')):
             for player in patron_list:
-                commands.append(['./check_player.py', '%d' % player['user_id'],
+                commands.append(['./check_player.py', '%d' % player,
                                  '--give-item', 'gamebucks', '--melt-hours', '-1',
                                  '--item-stack', '%d' % (prize),
                                  '--give-item-subject', 'Monthly Patron Reward: %s' % patron_level,
