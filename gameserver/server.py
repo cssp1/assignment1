@@ -9934,18 +9934,22 @@ class Player(AbstractPlayer):
             return 'human'
     def is_developer(self): return bool(self.developer) # use our copy of the usertable field
 
-    def has_alts(self):
+    def enforceable_alts(self):
         alt_min_logins = gamedata['server'].get('alt_min_logins', 5) # default to 5 logins for an alt to be considered
         alt_ignore_age = gamedata['server'].get('alt_ignore_age', 28*86400) # default to alts in the last 28 days
-        alt_ignore_how_many = gamedata['server'].get('alt_ignore_how_many', 0) # optionally allow server to ignore up to an arbitrary number of alts
         alt_ids = []
-        alt_platforms = []
         for s_other_id, entry in self.known_alt_accounts.iteritems():
             if entry.get('logins', 0) < alt_min_logins: continue
             if entry.get('ignore',False): continue
             if entry.get('last_login', server_time) < (server_time - alt_ignore_age): continue
             if SpinHTTP.is_private_ip(entry.get('last_ip', 'Unknown')): continue
             alt_ids.append(int(s_other_id))
+        return alt_ids
+
+    def has_alts(self):
+        alt_ignore_how_many = gamedata['server'].get('alt_ignore_how_many', 0) # optionally allow server to ignore up to an arbitrary number of alts
+        alt_ids = self.enforceable_alts()
+        alt_platforms = []
         if len(alt_ids) > alt_ignore_how_many:
             pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch(alt_ids, fields = ['social_id'], reason = 'has_alts_data_update')
             for result in pcache_result_list:
@@ -9954,6 +9958,20 @@ class Player(AbstractPlayer):
                     alt_platforms.append(platform)
             return (1, alt_platforms)
         return (0, alt_platforms)
+
+    def alt_regions(self):
+        alt_ignore_how_many = gamedata['server'].get('alt_ignore_how_many', 0) # optionally allow server to ignore up to an arbitrary number of alts
+        alt_ids = self.enforceable_alts()
+        alt_regions = {}
+        if len(alt_ids) > alt_ignore_how_many:
+            pcache_result_list = gamesite.pcache_client.player_cache_lookup_batch(alt_ids, fields = ['home_region'], reason = 'alt_regions_data_update')
+            for result in pcache_result_list:
+                if result.get('home_region', None):
+                    home_region = result['home_region']
+                    if home_region not in alt_regions:
+                        alt_regions[home_region] = 0
+                    alt_regions[home_region] += 1
+        return alt_regions
 
     def social_platforms(self):
         social_platforms = set()
@@ -15797,6 +15815,7 @@ class LivePlayer(Player):
             gamesite.exception_log.event(server_time, 'map: player %d change_region %s %s request_precision %s precision %s' % (self.user_id, repr(new_region), repr(new_loc), repr(request_precision), repr(precision)))
 
         randgen = random.Random(self.user_id ^ gamedata['territory']['map_placement_gen'] ^ int(server_time))
+        alt_regions = self.alt_regions()
 
         if (new_region is None) or (type(new_region) is list):
             # load-balance to lowest-population applicable region
@@ -15818,14 +15837,19 @@ class LivePlayer(Player):
 
             populations = dict([(r, gamesite.nosql_client.get_map_feature_population(r,'home',reason='change_region')) for r in regions])
 
-            # remove overpopulated (hard-capped) regions from consideration
+            # remove overpopulated (hard-capped) and alt-limited regions from consideration
             for r in [temp for temp in regions]:
                 hard_cap = gamedata['regions'][r].get('pop_hard_cap',-1)
                 if (hard_cap >= 0) and populations[r] >= hard_cap:
                     regions.remove(r)
+                anti_alt = 'anti_alt' in gamedata['regions'][r].get('tags',[])
+                if anti_alt and r in alt_regions:
+                    regions.remove(r)
+                if gamedata['regions'][r].get('alt_limit', None) and alt_regions.get(r, 0) >= gamedata['regions'][r]['alt_limit']:
+                    regions.remove(r)
 
             if len(regions) < 1:
-                gamesite.exception_log.event(server_time, 'map: no regions for player %d (all disabled or hard-capped) - pops: %s' % (self.user_id, repr(populations)))
+                gamesite.exception_log.event(server_time, 'map: no regions for player %d (all disabled, hard-capped, or at alt limit) - pops: %s' % (self.user_id, repr(populations)))
                 if self.home_region:
                     # continue with taking player off the map
                     new_region = 'LIMBO'
