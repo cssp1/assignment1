@@ -319,6 +319,24 @@ var has_non_anti_alt_regions = function() {
     return false;
 };
 
+var method_change_region_imprison = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#change_region_reason")[0].value);
+    var on_complete = function(result) {
+        alert("Success! Remember to send the player a message explaining what happened!");
+    };
+
+    if(ident && ui_reason) {
+        send_request('player', 'change_region', $.extend({}, ident, {'new_region':'prison', 'ui_reason':ui_reason}),
+                     (function (_ident, _on_complete) { return function(result) {
+                         send_request('player', 'apply_aura', $.extend({}, _ident, {'aura_name':'region_banished','duration':867240,'data':JSON.stringify({'tag':'imprisoned'})}),
+                         (function (__ident, __on_complete) { return function(result) {
+                             __on_complete(result);
+                         }; })(_ident, _on_complete));
+                     }; })(ident, on_complete));
+    }
+};
+
 var method_change_region = function() {
     var ident = get_ident();
     var new_region = $("#change_region_destination")[0].value;
@@ -2098,20 +2116,23 @@ $(function() {
 
     <div id="player_tools_change_region">
         <p>
+            <button onclick="method_change_region_imprison()" class="spin_button">Imprison Player</button>
+        </p>
+        <p>
             Force player to move to region:
             <br><br>
             <select id="change_region_destination" name="change_region_destination" class="spin_select"></select>
             <button onclick="method_change_region()" class="spin_button">Apply</button>
             <span id="change_region_alt_banishment_controls">
                 <p>
-                    <input id="change_region_do_alt_banish" type="checkbox" checked="1" style="height:initial;"></input>Also banish from anti-alt regions for:
+                    <input id="change_region_do_alt_banish" type="checkbox" style="height:initial;"></input>Also banish from anti-alt regions for:
                     <input type="text" id="region_alt_banish_duration" name="region_alt_banish_duration" value="720" style="width:100px"> Hours
                     <button onclick="method_remove_aura('region_banished', {'tag': 'anti_alt'})" class="spin_button" style="width:260px;">Undo Anti-Alt Banishment</button>
                 </p>
             </span>
             <span id="change_region_vpn_banishment_controls">
                 <p>
-                    <input id="change_region_do_vpn_banish" type="checkbox" checked="1" style="height:initial;"></input>Also banish from anti-VPN regions for:
+                    <input id="change_region_do_vpn_banish" type="checkbox" style="height:initial;"></input>Also banish from anti-VPN regions for:
                     <input type="text" id="region_vpn_banish_duration" name="region_vpn_banish_duration" value="720" style="width:100px"> Hours
                     <button onclick="method_remove_aura('region_banished', {'tag': 'anti_vpn'})" class="spin_button" style="width:260px;">Undo Anti-VPN Banishment</button>
                 </p>
@@ -2126,7 +2147,7 @@ $(function() {
             </span>
             <br>
             <br>
-            <input id="region_include_alts" type="checkbox" style="height:initial;" checked="1"></input>Also banish all alts (will not banish ignored alts)
+            <input id="region_include_alts" type="checkbox" style="height:initial;"></input>Also banish all alts (will not banish ignored alts)
             <br>
             <input id="region_include_alts_recursive" type="checkbox" style="height:initial;"></input>Recursively include alts of alts.
             <br>
