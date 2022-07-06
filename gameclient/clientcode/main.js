@@ -20282,7 +20282,7 @@ function invoke_gift_prompt_dialog() {
  * @param {(!Array.<Object>|null)=} info_list - list of PlayerCache entries for giftable friends (if null, we will query)
  */
 function invoke_send_gifts(to_user, reason, info_list) {
-    if(read_predicate({'predicate':'LIBRARY', 'name': 'internal_tester'}).is_satisfied(player, null)) {
+    if(read_predicate({'predicate':'LIBRARY', 'name': 'pre_release_tester'}).is_satisfied(player, null)) {
         BHSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list);
         return null;
     }
