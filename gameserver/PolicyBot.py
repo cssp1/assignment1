@@ -513,9 +513,10 @@ class AltPolicy(Policy):
         ignore_age = self.IGNORE_AGE
         repeat_offender_override = False
 
-        # update ignore age if player is on a VPN
+        # update ignore age if player is on a VPN and on a pro-VPN map
+        # on anti-VPN maps, the VPN policy will handle this
         last_login_ip = player['history'].get('last_login_ip', 0)
-        if last_login_ip:
+        if last_login_ip and player['home_region'] not in anti_vpn_region_names:
             ip_rep_result = ip_rep_checker.query(last_login_ip)
             if bool(ip_rep_result) and (ip_rep_result.is_proxy() or ip_rep_result.is_datacenter()) and not player['history'].get('vpn_excused', 0):
                 ignore_age = 50 * 365 * 86400 # go back 50 years if player is using a VPN, code below will ensure it stays at 0 or higher
