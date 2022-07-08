@@ -587,8 +587,8 @@ class AltPolicy(Policy):
                                                      [pc['user_id'] for pc in pcaches_list if pc is not master_pcache]+[user_id,], repeat_offender_override, region_alt_limit)
 
                 if region_alt_limit > 0:
-                    involved_ids = [alt['user_id'] for alt in pchaches_list]
-                    banished_ids = [alt['user_id'] for alt in pchaches_list[region_alt_limit_offset:]]
+                    involved_ids = [alt['user_id'] for alt in pcaches_list]
+                    banished_ids = [alt['user_id'] for alt in pcaches_list[region_alt_limit_offset:]]
                     do_CONTROLAPI({'user_id':alt_pcache['user_id'], 'method':'add_note'}, extra_text = 'Relocated from region %s due to alt total exceeding limit of %d. Affected alts: %r. Banished alts: %r' % (alt_pcache['home_region'], region_alt_limit, involved_ids, banished_ids))
                 our_pcache['home_region'] = new_region_name
                 print >> self.msg_fd, 'moved to region %s' % (new_region_name)
