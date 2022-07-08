@@ -586,7 +586,8 @@ class AltPolicy(Policy):
                 new_region_name = self.punish_player(alt_pcache['user_id'], master_pcache['user_id'], master_pcache['home_region'], other_alt_region_names,
                                                      [pc['user_id'] for pc in pcaches_list if pc is not master_pcache]+[user_id,], repeat_offender_override, region_alt_limit)
 
-                do_CONTROLAPI({'user_id':alt_pcache['user_id'], 'method':'add_note'}, extra_text = 'Relocated from region %s due to alt total exceeding limit of %d. Affected alts: %r' % (alt_pcache['home_region'], region_alt_limit, pcaches_list[region_alt_limit_offset:]))
+                if region_alt_limit > 0:
+                    do_CONTROLAPI({'user_id':alt_pcache['user_id'], 'method':'add_note'}, extra_text = 'Relocated from region %s due to alt total exceeding limit of %d. Affected alts: %r' % (alt_pcache['home_region'], region_alt_limit, pcaches_list[region_alt_limit_offset:]))
                 our_pcache['home_region'] = new_region_name
                 print >> self.msg_fd, 'moved to region %s' % (new_region_name)
 
