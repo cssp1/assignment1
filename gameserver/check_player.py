@@ -363,9 +363,9 @@ def do_display_bh_acct_info(bh_id):
         print fmt % ('Creation IP:', bh_user['creation_ip'])
         print fmt % ('Last Login:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('last_login_time',1))))
         print fmt % ('Last IP:', bh_user['last_login_ip'])
-        print fmt % ('Last TOS Accept Time:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('last_tos_accept_time',1))))
+        print fmt % ('Last TOS Accepted:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('last_tos_accept_time',1))))
         if bh_user.get('privacy_consent', False):
-            print fmt % ('Privacy Terms Accept Time:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('privacy_consent_time',1))))
+            print fmt % ('Privacy Terms Accepted:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('privacy_consent_time',1))))
         if bh_user.get('web_push_notifications_enabled') or bh_user.get('facebook_notifications_enabled') or bh_user.get('email_notifications_enabled') or bh_user.get('wns_notifications_enabled'):
             print fmt % ('Enabled Notifications:', '')
             if bh_user.get('web_push_notifications_enabled'):
