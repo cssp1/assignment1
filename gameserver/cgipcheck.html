@@ -498,6 +498,14 @@ var method_unmerge_bh_id = function() {
         send_request('player', 'unmerge_bh_id', $.extend(ident, args), function(result) { display_response("Success!"); });
     }
 }
+var method_undelete_bh_id = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#bh_acct_undelete_reason")[0].value);
+    args = {'ui_reason': ui_reason};
+    if(ident && ui_reason) {
+        send_request('player', 'undelete_bh_id', $.extend(ident, args), function(result) { display_response("Success!"); });
+    }
+}
 var method_vpn_excuse = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
@@ -2371,6 +2379,7 @@ $(function() {
         <div id="bh_acct_tools" style="display:none;">
             <ul>
                 <li><a href="#bh_acct_tools_merge" id="bh_acct_tools_merge_header">Merge/Unmerge</a></li>
+                <li><a href="#bh_acct_tools_undelete" id="bh_acct_tools_undelete_header">Undelete</a></li>
             </ul>
 
             <div id="bh_acct_tools_merge">
@@ -2385,6 +2394,16 @@ $(function() {
                     Reason for this action:
                     <br>
                     <input type="text" id="bh_acct_merge_reason" style="width:500px;">
+                </p>
+            </div>
+            <div id="bh_acct_tools_undelete">
+                <p>
+                    <button onclick="method_undelete_bh_id()" class="spin_button">Undelete</button>
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="bh_acct_undelete_reason" style="width:500px;">
                 </p>
             </div>
         </div>
