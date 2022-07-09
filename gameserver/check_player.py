@@ -630,7 +630,7 @@ if __name__ == '__main__':
                     bh_id = id
                     bh_id_line = 'Battlehouse ID:'
                 else:
-                    if str(id) == str(user['bh_id']): continue
+                    if str(id)[2:] == bh_id: continue
                     bh_id_line = 'Additional Battlehouse ID:'
                 print fmt % (bh_id_line, '"'+str(id)+'"')
             elif id.startswith('kg'):
