@@ -314,7 +314,7 @@ def display_bh_acct_info(user_id, player):
         print fmt % ('---BHAPI not supported, cannot look up---', '')
         return
     bh_id = None
-    if not db_client: db_client = init_db_client()
+    db_client = init_db_client()
     social_ids = db_client.spinpunch_to_social_id_all(user_id)
     for id in social_ids:
         if id.startswith('bh') and not bh_id:
@@ -328,7 +328,7 @@ def display_bh_acct_info(user_id, player):
     if bh_user_raw == 'NOTFOUND':
         print fmt % ('This Battlehouse account has been deleted by the user and is now blank.', '')
     else:
-        print bh_user
+        print bh_user_raw
         print '\n\n\n'
         bh_user = SpinJSON.loads(bh_user_raw)
         if bh_user.get('banned'):
