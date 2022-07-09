@@ -99,7 +99,6 @@ var method_bh_acct_lookup = function() {
     };
     $('#per_bh_acct').hide();
     $('#bh_acct_lookup_output')[0].value = '';
-    $('#bh_acct_lookup_output')[0].css('height', '');
     ident['get-bh-acct-info-only'] = 'get-bh-acct-info-only';
     send_request('player', 'lookup', ident, function(result) {
         $('#per_bh_acct').show();
@@ -114,7 +113,6 @@ var payment_lookup = function() {
     if(payment_id) {
         $('#per_payment').hide();
         $('#payment_lookup_output')[0].value = '';
-        $('#payment_lookup_output')[0].css('height', '');
         send_request('payment', 'lookup', {'payment_id': payment_id}, function(result) {
             var data = JSON.parse(result);
             $('#per_payment').show();
@@ -262,7 +260,6 @@ var method_lookup = function() {
     if(ident) {
         $('#per_player').hide();
         $('#lookup_output')[0].value = '';
-        $('#lookup_output')[0].css('height', '');
         send_request('player', 'lookup', ident, function(result) {
             $('#per_player').show();
             $('#player_tools').show();
@@ -824,7 +821,6 @@ var method_get_all_alts = function() {
     if(ident) {
         $('#per_player').hide();
         $('#lookup_output')[0].value = '';
-        $('#lookup_output')[0].css('height', '');
         ident['get-all-alts'] = 'get-all-alts';
         send_request('player', 'lookup', ident, function(result) {
             $('#per_player').show();
@@ -2361,7 +2357,7 @@ $(function() {
         <div id="bh_acct_lookup_by_user_id">
             User ID: <input type="text" id="bh_acct_user_id" name="bh_acct_user_id" autofocus><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
         </div>
-        <div id="player_lookup_by_battlehouse_id">
+        <div id="bh_acct_lookup_by_battlehouse_id">
             Battlehouse ID: <input type="text" id="bh_acct_battlehouse_id" name="bh_acct_battlehouse_id"><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
         </div>
     </div>
