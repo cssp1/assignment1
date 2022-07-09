@@ -326,22 +326,22 @@ def display_bh_acct_info(user_id, player):
 def do_display_bh_acct_info(bh_id):
     print fmt % ('---Battlehouse Account Info---', '')
     print fmt % ('ID: %s' % bh_id, '')
+    print '\n'
     bh_user_raw = BHAPI.BHAPI_raw('/user/'+bh_id, error_on_404 = False)
     if bh_user_raw == 'NOTFOUND':
         print fmt % ('This Battlehouse account has been deleted by the user and is now blank.', '')
     else:
-        print bh_user_raw
-        print '\n\n\n'
         bh_user = SpinJSON.loads(bh_user_raw)
         if bh_user.get('banned'):
             print fmt % ('THIS BATTLEHOUSE ACCOUNT IS BANNED!', '')
         elif bh_user.get('deleted'):
             print fmt % ('THIS BATTLEHOUSE ACCOUNT IS MARKED DELETED AND IS NOT ACCESSIBLE!', '')
-        elif bh_user.get('merged_to'):
+            deletion_time = bh_user.get('deleted_time', time_now) + 30*86400
+            deletion_time_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(deletion_time))
+            print fmt % ('LOGINSERVER WILL PURGE ACCOUNT RECORD ON %s' % deletion_time_str.upper(), '')
+        if bh_user.get('merged_to'):
             print fmt % ('THIS BATTLEHOUSE ACCOUNT WAS MERGED AND IS NO LONGER ACCESSIBLE!', '')
             ui_merged_to = bh_user['merged_to']
-
-            # look up local game player ID of the merged account
             ui_merged_to += ' (' + trace_bh_account_merges(db_client, bh_user['merged_to']) + ')'
             print fmt % ('Merged to account:', ui_merged_to)
 
@@ -353,11 +353,29 @@ def do_display_bh_acct_info(bh_id):
             print fmt % ('Login Provider ID:', bh_user['creation_provider_id'])
         if bh_user.get('real_name'):
             print fmt % ('Real Name:', bh_user['real_name'])
+        if bh_user.get('ui_name'):
+            print fmt % ('Display Callsign:', bh_user['ui_name'] + (' (custom)' if bh_user.get('name_source','') == 'custom' else ' (assigned)'))
         if bh_user.get('ui_email'):
             print fmt % ('Email Address:', bh_user['ui_email'] + (' (verified)' if bh_user.get('email_verified') else ' (NOT verified)'))
-        bh_creat = bh_user.get('creation_time')
+        bh_creat = bh_user.get('creation_time',1)
         bh_creat_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_creat))
         print fmt % ('BH Account age:', '%0.1f days (created %s)' % (float(time_now - bh_creat)/(24*60*60), bh_creat_str))
+        print fmt % ('Creation IP:', bh_user['creation_ip'])
+        print fmt % ('Last Login:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('last_login_time',1))))
+        print fmt % ('Last IP:', bh_user['last_login_ip'])
+        print fmt % ('Last TOS Accept Time:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('last_tos_accept_time',1))))
+        if bh_user.get('privacy_consent', False):
+            print fmt % ('Privacy Terms Accept Time:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('privacy_consent_time',1))))
+        if bh_user.get('web_push_notifications_enabled') or bh_user.get('facebook_notifications_enabled') or bh_user.get('email_notifications_enabled') or bh_user.get('wns_notifications_enabled'):
+            print fmt % ('Enabled Notifications:', '')
+            if bh_user.get('web_push_notifications_enabled'):
+                print fmt % ('', 'Web Push')
+            if bh_user.get('facebook_notifications_enabled'):
+                print fmt % ('', 'Facebook')
+            if bh_user.get('email_notifications_enabled'):
+                print fmt % ('', 'Emails')
+            if bh_user.get('wns_notifications_enabled'):
+                print fmt % ('', 'WNS')
 
 # main program
 if __name__ == '__main__':
