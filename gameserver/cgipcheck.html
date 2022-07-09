@@ -84,7 +84,29 @@ var confirm_dialog = function(msg, yes_cb) {
 };
 
 var method_bh_acct_lookup = function() {
-    return;
+    var ident = {}
+    if({0: 'bh_acct_lookup_by_user_id', 1: 'player_lookup_by_battlehouse_id'}[$('#bh_com_acct_lookup').tabs("option","active")] == 'bh_acct_lookup_by_user_id') {
+        var suser_id = $("#bh_acct_user_id")[0].value;
+        if(!suser_id) { return null; }
+        var user_id = parseInt(suser_id);
+        if(isNaN(user_id)) { alert("Bad User ID value: "+suser_id); return null; }
+        ident = {'user_id':user_id};
+    } else {
+        var sid = $("#bh_acct_battlehouse_id")[0].value;
+        if(!sid) { return null; }
+        if(sid.length < 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
+        ident = {'battlehouse_id':sid};
+    };
+    $('#per_bh_acct').hide();
+    $('#bh_acct_lookup_output')[0].value = '';
+    $('#bh_acct_lookup_output')[0].css('height', '');
+    ident['get-bh-acct-info-only'] = 'get-bh-acct-info-only';
+    send_request('player', 'lookup', ident, function(result) {
+        $('#per_bh_acct').show();
+        $('#bh_acct_tools').show();
+        $('#bh_acct_lookup_output')[0].value = result.toString();
+        $('#bh_acct_lookup_output').elastic();
+    });
 }
 
 var payment_lookup = function() {
@@ -92,11 +114,12 @@ var payment_lookup = function() {
     if(payment_id) {
         $('#per_payment').hide();
         $('#payment_lookup_output')[0].value = '';
+        $('#payment_lookup_output')[0].css('height', '');
         send_request('payment', 'lookup', {'payment_id': payment_id}, function(result) {
             var data = JSON.parse(result);
             $('#per_payment').show();
             $('#payment_lookup_output')[0].value = JSON.stringify(data, null, 2);
-            $('#payment_lookup_output').elastic("update");
+            $('#payment_lookup_output').elastic();
 
             var status = 'Unknown';
             var is_disputed = false, is_refundable = false;
@@ -184,7 +207,7 @@ var get_ident = function() {
     } else if(t == 'battlehouse_id') {
         var sid = $("#battlehouse_id")[0].value;
         if(!sid) { return null; }
-        //if(sid.length != 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
+        if(sid.length < 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
         return {'battlehouse_id':sid};
     }
 };
@@ -239,11 +262,12 @@ var method_lookup = function() {
     if(ident) {
         $('#per_player').hide();
         $('#lookup_output')[0].value = '';
+        $('#lookup_output')[0].css('height', '');
         send_request('player', 'lookup', ident, function(result) {
             $('#per_player').show();
             $('#player_tools').show();
             $('#lookup_output')[0].value = result.toString();
-            $('#lookup_output').elastic("update");
+            $('#lookup_output').elastic();
         });
     }
 }
@@ -791,12 +815,13 @@ var method_get_all_alts = function() {
     if(ident) {
         $('#per_player').hide();
         $('#lookup_output')[0].value = '';
+        $('#lookup_output')[0].css('height', '');
         ident['get-all-alts'] = 'get-all-alts';
         send_request('player', 'lookup', ident, function(result) {
             $('#per_player').show();
             $('#player_tools').show();
             $('#lookup_output')[0].value = result.toString();
-            $('#lookup_output').elastic("update");
+            $('#lookup_output').elastic();
         });
     }
 }
@@ -2313,13 +2338,314 @@ $(function() {
 <div id="mode_bh_com_acct">
 
     <div id="bh_com_acct_lookup">
-        Battlehouse ID: <input type="text" id="battlehouse_id" name="battlehouse_id"><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
+        <ul>
+            <li><a href="#bh_acct_lookup_by_user_id">Find by User ID</a></li>
+            <li><a href="#bh_acct_lookup_by_battlehouse_id">Find by Battlehouse ID</a></li>
+        </ul>
+        <div id="bh_acct_lookup_by_user_id">
+            User ID: <input type="text" id="bh_acct_user_id" name="bh_acct_user_id" autofocus><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
+        </div>
+        <div id="player_lookup_by_battlehouse_id">
+            Battlehouse ID: <input type="text" id="bh_acct_battlehouse_id" name="bh_acct_battlehouse_id"><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
+        </div>
     </div>
-
     <hr>
     <p>
         This feature is not functional yet. It will display all battlehouse.com account information and give access to Merge, Unmerge, Ban, and Unban functions.
     </p>
+
+    <div id="per_bh_acct" style="position:relative;display:none;">
+        <textarea id="bh_acct_lookup_output" readonly style="width:100%;height:10%;border-style:inset;border-width:2px;font-family:monospace;font-size:11px;"></textarea>
+
+        <hr>
+
+        <div id="bh_acct_tools" style="display:none;">
+            <ul>
+                <li><a href="#player_tools_add_note" id="player_tools_add_note_header">Add Note</a></li>
+                <li><a href="#player_tools_give_item_gamebucks_score" id="player_tools_give_item_gamebucks_score_header">Give Item/$GAMEBUCKS_NAME$/Score</a></li>
+                <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Tools/Abuse</a></li>
+                <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
+                <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
+                <li><a href="#player_tools_alts_vpn_migrate" id="player_tools_alts_vpn_migrate_header">Alts/VPN/Migrate</a></li>
+                <li><a href="#player_tools_change_region" id="player_tools_change_region_header">Map Region</a></li>
+                <li><a href="#player_tools_alliance_player" id="player_tools_alliance_player_header">Player/Clan</a></li>
+                <li><a href="#player_tools_privacy" id="player_tools_privacy_header">Privacy</a></li>
+                <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
+                <li><a href="#player_tools_patron" id="player_tools_patron_header">Patron</a></li>
+                <li><a href="#player_tools_developer" id="player_tools_developer_header">Developer</a></li>
+            </ul>
+
+            <div id="player_tools_add_note">
+                Add an internal note to this account:
+                <br>
+                <textarea id="add_note_body" name="add_note_body" value="" style="width:600px;height:100px"></textarea>
+                <p><button onclick="method_add_note()" class="spin_button" style="width:200px;">Add Note</button></p>
+            </div>
+
+            <div id="player_tools_chat_gag">
+                <p><button onclick="method_chat_get()" class="spin_button" style="width:200px;">Get Recent Messages</button> Include Up To <input type="text" id="chat_message_count" name="chat_message_count" value="1000"> messages</p>
+                <p>
+                    <button onclick="method_chat_ungag()" class="spin_button">Unmute</button>
+                    Duration: <input type="text" id="chat_gag_duration" name="chat_gag_duration" value="12"> Hours
+                    <button onclick="method_chat_gag($('#chat_gag_duration').spinner('value')*3600)" class="spin_button">Mute (Temporary)</button>
+                    <button onclick="method_chat_gag(-1)" class="spin_button">Mute (Permanent)</button>
+                    <br>
+                    <input id="chat_gag_ungag_include_alts" type="checkbox" style="height:initial;"></input>Also mute/unmute all alts (will not affect ignored alts)
+                    <br>
+                    <input id="chat_gag_ungag_include_alts_recursive" type="checkbox" style="height:initial;"></input>Recursively include alts of alts.
+                    <br>
+                    <input id="chat_gag_ungag_aggressive_alt_identification" type="checkbox" style="height:initial;"></input>Aggressively identify alts (check to include alts that last logged in 90+ days ago)
+                </p>
+                <p>
+                    Other Player ID: <input type="text" id="chat_block_other_id" name="chat_block_other_id">
+                    <button onclick="method_chat_block($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Block Communication</button>
+                    <button onclick="method_chat_unblock($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Unblock Communication</button>
+                </p>
+
+                <p>
+                    <button onclick="method_clear_alias($('#clear_alias_duration').spinner('value')*3600)" class="spin_button" style="width:300px;">Remove Alias (Call Sign/Nickname)</button>
+                    Cooldown until new Alias: <input type="text" id="clear_alias_duration" name="clear_alias_duration" value="0"> Hours
+                    <button onclick="method_remove_aura('alias_gagged')" class="spin_button" style="width:180px;">Undo Alias Cooldown</button>
+                </p>
+                <p>
+                    <button onclick="method_chat_abuse_violate()" class="spin_button" style="width:250px;">Add Offense</button>
+                    <button onclick="method_chat_abuse_clear()" class="spin_button" style="width:300px;">Unmute and Remove 1 Offense</button>
+                    Tell the player what they are being muted for:
+                    <br>
+                    <input type="text" id="chat_abuse_player_reason" style="width:500px;">
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="chat_reason" style="width:500px;">
+                </p>
+            </div>
+
+            <div id="player_tools_give_item_gamebucks_score">
+                Pick an item from the list:
+                <br>
+                <select id="item_to_give" name="item_to_give" class="spin_select"></select>
+                <br><br>
+                Or type the internal item name (from items.json) below:
+                <br>
+                <input type="text" id="item_to_give_text" onkeyup="update_item_to_give_widget_state()" style="width:250px;">
+                <br><br>
+                Quantity: <input type="text" id="item_to_give_qty" name="item_to_give_qty" value="1" style="width:80px;">
+                Level: <input type="text" id="item_to_give_level" name="item_to_give_level" value="1" style="width:80px;">
+                <button onclick="method_give_item()" class="spin_button">Give</button>
+                <br><br><hr><br>
+                $GAMEBUCKS_NAME$ amount: <input type="text" id="gamebucks_amount" name="gamebucks_amount" value="100">
+                <button onclick="method_give_gamebucks()" class="spin_button">Give</button> <button onclick="method_fbpayments_get()" class="spin_button" style="width:200px;">List Recent FB Payments</button>
+                <br><br><hr><br>
+                Modify PvP score: <input type="text" id="pvp_score_amount" name="pvp_score_amount" value="1">
+                <button onclick="method_set_pvp_score()" class="spin_button">Set Score</button> <button onclick="method_add_pvp_score()" class="spin_button">Add Score</button>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="give_item_gamebucks_score_reason" style="width:500px;">
+                </p>
+            </div>
+
+            <div id="player_tools_send_message">
+                <table cellpadding="5">
+                    <tr><td>From:</td><td><input type="text" id="send_message_sender" name="send_message_sender" value="Customer Support" style="width:200px"></td></tr>
+                    <tr><td>Subject:</td><td><input type="text" id="send_message_subject" name="send_message_subject" value="Support Issue" style="width:200px"></td></tr>
+                    <tr><td>Body:</td><td><textarea id="send_message_body" name="send_message_body" value="" style="width:600px;height:100px"></textarea></td></tr>
+                    <tr><td><button onclick="method_send_message()" class="spin_button">Send</button></td></tr>
+                </table>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="send_message_reason" style="width:500px;">
+                </p>
+            </div>
+
+            <div id="player_tools_clear_cooldown">
+                <button onclick="method_clear_lockout()" class="spin_button">Clear 48h Lockout</button>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                Cooldown Name: <input type="text" id="cooldown_name" name="cooldown_name" value="alliance_deserter">
+                <button onclick="method_clear_cooldown()" class="spin_button">Clear</button>
+                <p>
+                    <button onclick="method_check_idle()" class="spin_button">Send Anti-Bot CAPTCHA</button>
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="cooldown_reason" style="width:500px;">
+                </p>
+            </div>
+
+            <div id="player_tools_change_region">
+                <p>
+                    <button onclick="method_change_region_imprison()" class="spin_button">Imprison Player</button>
+                    <br>
+                    <button onclick="method_remove_aura('region_banished', {'tag': 'imprisoned'})" class="spin_button" style="width:260px;">Undo Prison Banishment</button>
+                </p>
+                <p>
+                    Force player to move to region:
+                    <br><br>
+                    <select id="change_region_destination" name="change_region_destination" class="spin_select"></select>
+                    <button onclick="method_change_region()" class="spin_button">Apply</button>
+                    <span id="change_region_alt_banishment_controls">
+                        <p>
+                            <input id="change_region_do_alt_banish" type="checkbox" style="height:initial;"></input>Also banish from anti-alt regions for:
+                            <input type="text" id="region_alt_banish_duration" name="region_alt_banish_duration" value="720" style="width:100px"> Hours
+                            <button onclick="method_remove_aura('region_banished', {'tag': 'anti_alt'})" class="spin_button" style="width:260px;">Undo Anti-Alt Banishment</button>
+                        </p>
+                    </span>
+                    <span id="change_region_vpn_banishment_controls">
+                        <p>
+                            <input id="change_region_do_vpn_banish" type="checkbox" style="height:initial;"></input>Also banish from anti-VPN regions for:
+                            <input type="text" id="region_vpn_banish_duration" name="region_vpn_banish_duration" value="720" style="width:100px"> Hours
+                            <button onclick="method_remove_aura('region_banished', {'tag': 'anti_vpn'})" class="spin_button" style="width:260px;">Undo Anti-VPN Banishment</button>
+                        </p>
+                    </span>
+                    <span id="change_region_refresh_banishment_controls">
+                        <p>
+                            <input id="change_region_do_refresh_banish" type="checkbox" style="height:initial;"></input>Also banish from anti-refresh regions for:
+                            <input type="text" id="region_refresh_banish_duration" name="region_refresh_banish_duration" value="720" style="width:100px"> Hours
+                            <button onclick="method_remove_aura('region_banished', {'tag': 'anti_refresh'})" class="spin_button" style="width:260px;">Undo Anti-Refresh Banishment</button>
+                        </p>
+                    </span>
+                    <br><br>
+                    <input id="region_include_alts" type="checkbox" style="height:initial;"></input>Also banish all alts (will not banish ignored alts)
+                    <br>
+                    <input id="region_include_alts_recursive" type="checkbox" style="height:initial;"></input>Recursively include alts of alts.
+                    <br>
+                    <input id="region_aggressive_alt_identification" type="checkbox" style="height:initial;"></input>Aggressively identify alts (check to include alts that last logged in 90+ days ago and alts of alts)
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="change_region_reason" style="width:500px;">
+                </p>
+            </div>
+
+            <div id="player_tools_alts_vpn_migrate">
+                <p>
+                    Other Player ID: <input type="text" id="ignore_alt_other_id" name="ignore_alt_other_id">
+                    <button onclick="method_ignore_alt($('#ignore_alt_other_id').spinner('value'))" class="spin_button" style="width:250px;">Ignore (mark as non-alt)</button>
+                    <button onclick="method_unignore_alt($('#ignore_alt_other_id').spinner('value'))" class="spin_button" style="width:180px;">Un-ignore</button>
+                </p>
+                <p>
+                    <button onclick="method_vpn_excuse()" class="spin_button">Allow VPN</button>
+                    <button onclick="method_vpn_unexcuse()" class="spin_button">Disallow VPN</button>
+                </p>
+                <p>
+                    Migration Player ID: <input type="text" id="migrate_account_other_id" name="migrate_account_other_id">
+                    <button onclick="method_migrate_spin_id($('#migrate_account_other_id').spinner('value'))" class="spin_button" style="width:250px;">Migrate</button>
+                </p>
+                <p>
+                    Migration Battlehouse ID: <input type="text" id="migrate_account_battlehouse_id" name="migrate_account_battlehouse_id"><button onclick="method_force_migrate_spin_id()" class="spin_button">Force Migrate</button>
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="alts_vpn_migrate_reason" style="width:500px;">
+                </p>
+                <p>
+                    <button onclick="method_unmerge_bh_id()" class="spin_button">Unmerge BH IDs</button>
+                </p>
+            </div>
+
+            <div id="player_tools_ban">
+                <p>
+                    <button onclick="method_ban()" class="spin_button">Ban</button>
+                    <button onclick="method_unban()" class="spin_button">Unban</button>
+                    <br>
+                    <input id="ban_remove_from_map" type="checkbox" style="height:initial;" checked="1"></input>Also remove home base and all quarries from regional map
+                    <br>
+                    <input id="ban_include_alts" type="checkbox" style="height:initial;"></input>Also ban all alts. Will not ban ignored alts. Alt accounts must be individually unbanned.
+                    <br>
+                    <input id="ban_include_alts_recursive" type="checkbox" style="height:initial;"></input>Recursively include alts of alts. Will not ban ignored alts. Alt accounts must be individually unbanned.
+                    <br>
+                    <input id="ban_aggressive_alt_identification" type="checkbox" style="height:initial;"></input>Aggressively identify alts (check to include alts that last logged in 90+ days ago)
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="ban_reason" style="width:500px;">
+                </p>
+                <p>
+                    <input id="ban_public_announce" type="checkbox" style="height:initial;" onclick="if(this.checked) { $('#ban_public_message').removeAttr('disabled'); } else { $('#ban_public_message').attr('disabled', 'disabled'); }"></input>
+                    Announce the ban in public chat:
+                    <br>
+                    <input type="text" id="ban_public_message" style="width:800px;" disabled="disabled" value="%player_name in region %region_name has been banned for hacking. Have a nice day!"></input>
+                </p>
+            </div>
+
+            <div id="player_tools_alliance_player">
+                <p>
+                    <button onclick="method_demote_alliance_leader()" class="spin_button">Demote Leader</button>
+                    <button onclick="method_kick_alliance_member()" class="spin_button">Kick from Clan</button>
+                </p>
+                <p>
+                    Change clan name or tag:
+                    <br>
+                    <input type="text" id="alliance_new_value" style="width:500px;">
+                    <button onclick="method_change_alliance_name()" class="spin_button">Change Name</button>
+                    <button onclick="method_change_alliance_tag()" class="spin_button">Change Tag</button>
+                </p>
+                <p>
+                    <button onclick="method_remove_mentor()" class="spin_button">Remove Mentor</button>
+                </p>
+                <p>
+                    Rename player:
+                    <br>
+                    New Call Sign/Name: <input type="text" id="player_updates_new_alias"> <button onclick="method_change_player_alias()" class="spin_button">Rename</button>
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="alliance_player_reason" style="width:500px;">
+                </p>
+            </div>
+
+            <div id="player_tools_privacy">
+                <button onclick="method_get_personal_info()" class="spin_button">Get Personal Info</button>
+                <button onclick="method_mark_uninstalled()" class="spin_button">Clear Personal Info</button>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="privacy_reason" style="width:500px;">
+                </p>
+            </div>
+
+            <div id="player_tools_developer">
+                &quot;Developer Flag&quot; enables developer-only features and excludes this player from analytics.
+                <p>
+                    <button onclick="method_make_developer()" class="spin_button" style="width:200px;">Developer Flag ON</button>
+                    <button onclick="method_unmake_developer()" class="spin_button" style="width:200px;">Developer Flag OFF</button>
+                </p>
+                <p>
+                    <button onclick="method_chat_official()" class="spin_button" style="width:200px;">Blue Chat Text ON</button>
+                    <button onclick="method_chat_unofficial()" class="spin_button" style="width:200px;">Blue Chat Text OFF</button>
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="make_developer_reason" style="width:500px;">
+                </p>
+            </div>
+
+            <div id="player_tools_patron">
+                &quot;Patron Flag&quot; enables in-game content and monthly gold.
+                <p>
+                    <button onclick="method_make_patron(1)" class="spin_button" style="width:200px;">Make Patron (Captain)</button>
+                    <button onclick="method_make_patron(2)" class="spin_button" style="width:200px;">Make Patron (Major)</button>
+                </p>
+                <p>
+                    <button onclick="method_make_patron(3)" class="spin_button" style="width:200px;">Make Patron (Colonel)</button>
+                    <button onclick="method_unmake_patron()" class="spin_button" style="width:200px;">Patron OFF</button>
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="make_patron_reason" style="width:500px;">
+                </p>
+            </div>
+        </div>
+    </div>
 
 </div> <!-- END mode_bh_com_acct -->
 
