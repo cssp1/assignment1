@@ -817,6 +817,8 @@ if __name__ == '__main__':
                 bh_user = SpinJSON.loads(bh_user_raw)
                 if bh_user.get('banned'):
                     print fmt % ('THIS BATTLEHOUSE ACCOUNT IS BANNED!', '')
+                elif bh_user.get('deleted'):
+                    print fmt % ('THIS BATTLEHOUSE ACCOUNT IS MARKED DELETED AND IS NOT ACCESSIBLE!', '')
                 elif bh_user.get('merged_to'):
                     print fmt % ('THIS BATTLEHOUSE ACCOUNT WAS MERGED AND IS NO LONGER ACCESSIBLE!', '')
                     ui_merged_to = bh_user['merged_to']
