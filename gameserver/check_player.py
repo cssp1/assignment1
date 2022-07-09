@@ -623,6 +623,30 @@ if __name__ == '__main__':
         if user.get('facebook_name', None):
             print fmt % ('Facebook Name:', user['facebook_name'])
 
+        social_ids = db_client.spinpunch_to_social_id_all(user_id, False)
+        for id in social_ids:
+            if id.startswith('bh'):
+                if not bh_id:
+                    bh_id = id
+                    bh_id_line = 'Battlehouse ID:'
+                else:
+                    if str(id) == str(user['bh_id']): continue
+                    bh_id_line = 'Additional Battlehouse ID:'
+                print fmt % (bh_id_line, '"'+str(id)+'"')
+            elif id.startswith('kg'):
+                if not user.get('kg_id', None):
+                    kg_id_line = 'Kongregate ID:'
+                else:
+                    if str(id) == str(user['kg_id']): continue
+                    kg_id_line = 'Additional Kongregate ID:'
+                print fmt % (kg_id_line, '"'+str(id)+'"')
+            else:
+                if not user.get('facebook_id', None):
+                    fb_id_line = 'Facebook ID:'
+                else:
+                    if str(id) == str(user['facebook_id']): continue
+                    fb_id_line = 'Additional Facebook ID:'
+                print fmt % (fb_id_line, '"'+str(id)+'"')
 
         print fmt % ('Level:', str(player['resources']['player_level']))
         print fmt % ('CC Level:', str(player['history'].get(gamedata['townhall']+'_level',1)))
