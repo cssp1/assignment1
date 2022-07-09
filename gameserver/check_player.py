@@ -317,13 +317,15 @@ def display_bh_acct_info(user_id, player):
     db_client = init_db_client()
     social_ids = db_client.spinpunch_to_social_id_all(user_id)
     for id in social_ids:
-        if id.startswith('bh') and not bh_id:
+        if id.startswith('bh'):
+            do_display_bh_acct_info(id):
             bh_id = id
-            break
     if not bh_id:
         print fmt % ('---Unable to Locate Battlehouse Account for %d---' % user_id, '')
-        return
+
+def do_display_bh_acct_info(bh_id):
     print fmt % ('---Battlehouse Account Info---', '')
+    print fmt % ('ID: %s' % bh_id, '')
     bh_user_raw = BHAPI.BHAPI_raw('/user/'+bh_id, error_on_404 = False)
     if bh_user_raw == 'NOTFOUND':
         print fmt % ('This Battlehouse account has been deleted by the user and is now blank.', '')
