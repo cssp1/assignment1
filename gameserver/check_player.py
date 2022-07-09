@@ -318,7 +318,7 @@ def display_bh_acct_info(user_id, player):
     social_ids = db_client.spinpunch_to_social_id_all(user_id)
     for id in social_ids:
         if id.startswith('bh'):
-            do_display_bh_acct_info(id)
+            do_display_bh_acct_info(str(id)[2:])
             bh_id = id
     if not bh_id:
         print fmt % ('---Unable to Locate Battlehouse Account for %d---' % user_id, '')
@@ -698,7 +698,7 @@ if __name__ == '__main__':
         for id in social_ids:
             if id.startswith('bh'):
                 if not bh_id:
-                    bh_id = id
+                    bh_id = str(id)[2:]
                     bh_id_line = 'Battlehouse ID:'
                 else:
                     if str(id)[2:] == bh_id: continue
