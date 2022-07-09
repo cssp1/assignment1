@@ -524,8 +524,8 @@ class HandleMergeBHID(Handler):
         self.deferred = TwistedLatency.InstrumentedDeferred('customer_support_merge_bh_id')
 
     def do_exec_loginserver(self):
-        self.gamesite.AsyncHTTP_Battlehouse.queue_request(self.time_now, SpinConfig.config['battlehouse_api_path']+('/account_merge/') + '?service=' + SpinConfig.game() + '?master_id' = self.master_id + '?slave_id' = self.slave_id,
-                                                          lambda result, _d=self.deferred: self.exec_complete(result),
+        self.gamesite.AsyncHTTP_Battlehouse.queue_request(self.time_now, SpinConfig.config['battlehouse_api_path']+('/account_merge/' + '?service=' + SpinConfig.game() + '?master_id=' + self.master_id + '?slave_id=' + self.slave_id),
+                                                          lambda result: self.exec_complete(result),
                                                           headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
 
     def exec_complete(self, result):
@@ -533,13 +533,13 @@ class HandleMergeBHID(Handler):
         return result
 
     def do_exec_online(self, session, retmsg):
-        result = SpinJSON.loads(self.do_exec_loginserver(bh_id))
+        result = SpinJSON.loads(self.do_exec_loginserver())
         if 'error' in result:
             return ReturnValue(error = result['error'])
         return ReturnValue(result = 'ok')
 
     def do_exec_offline(self, user, player):
-        result = SpinJSON.loads(self.do_exec_loginserver(bh_id))
+        result = SpinJSON.loads(self.do_exec_loginserver())
         if 'error' in result:
             return ReturnValue(error = result['error'])
         return ReturnValue(result = 'ok')
