@@ -513,9 +513,9 @@ if __name__ == '__main__':
 
     db_client = None
 
-    if (user_id is None and (facebook_id or battlehouse_id)) or need_lock or give_item or send_message:
-        # need DB client
-        db_client = init_db_client()
+    #if (user_id is None and (facebook_id or battlehouse_id)) or need_lock or give_item or send_message:
+    # always need DB client now to check social IDs
+    db_client = init_db_client()
 
     if force_s3:
         driver = SpinUserDB.S3Driver(game_id = game_id, key_file = s3_key_file,
@@ -623,7 +623,7 @@ if __name__ == '__main__':
         if user.get('facebook_name', None):
             print fmt % ('Facebook Name:', user['facebook_name'])
 
-        social_ids = db_client.spinpunch_to_social_id_all(user_id, False)
+        social_ids = db_client.spinpunch_to_social_id_all(user_id)
         for id in social_ids:
             if id.startswith('bh'):
                 if not bh_id:
