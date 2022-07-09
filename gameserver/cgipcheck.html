@@ -1936,7 +1936,6 @@ $(function() {
 
     $('#player_lookup').tabs();
     $('#user_id').spinner({min:0, step:1});
-
     // Pressing Enter while focused on a "Find by..." field should trigger the user lookup
     ['#user_id','#facebook_id','#battlehouse_id'].forEach(function (id) {
         $(id).keyup(function(event) {
@@ -1945,8 +1944,20 @@ $(function() {
             }
         });
     });
-
     $('#player_tools').tabs();
+
+    $('#bh_com_acct_lookup').tabs();
+    $('#bh_acct_user_id').spinner({min:0, step:1});
+    // Pressing Enter while focused on a "Find by..." field should trigger the user lookup
+    ['#bh_acct_user_id','#bh_acct_battlehouse_id'].forEach(function (id) {
+        $(id).keyup(function(event) {
+            if(event.keyCode === 13) {
+                method_bh_acct_lookup();
+            }
+        });
+    });
+    $('#bh_acct_tools').tabs();
+
     $('#lookup_output').elastic();
     $('#send_message_body').elastic();
     $('#chat_gag_duration').spinner({max:240, min:1, step:1});
@@ -2342,7 +2353,6 @@ $(function() {
 </div> <!-- END mode_player -->
 
 <div id="mode_bh_com_acct">
-
     <div id="bh_com_acct_lookup">
         <ul>
             <li><a href="#bh_acct_lookup_by_user_id">Find by User ID</a></li>
@@ -2356,9 +2366,6 @@ $(function() {
         </div>
     </div>
     <hr>
-    <p>
-        This feature is not functional yet. It will display all battlehouse.com account information and give access to Merge, Unmerge, Ban, and Unban functions.
-    </p>
 
     <div id="per_bh_acct" style="position:relative;display:none;">
         <textarea id="bh_acct_lookup_output" readonly style="width:100%;height:10%;border-style:inset;border-width:2px;font-family:monospace;font-size:11px;"></textarea>
