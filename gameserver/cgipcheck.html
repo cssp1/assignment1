@@ -180,7 +180,7 @@ var get_ident = function() {
     } else if(t == 'battlehouse_id') {
         var sid = $("#battlehouse_id")[0].value;
         if(!sid) { return null; }
-        if(sid.length != 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
+        //if(sid.length != 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
         return {'battlehouse_id':sid};
     }
 };
