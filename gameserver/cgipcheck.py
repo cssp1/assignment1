@@ -377,7 +377,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result':chat_abuse_violate(control_args, 'violate', control_args['ui_player_reason'], None, None)}
             elif method == 'chat_abuse_clear':
                 result = {'result':chat_abuse_clear(control_args)}
-            elif method in ('give_item','send_message','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','unban','vpn_excuse','vpn_unexcuse','make_developer','unmake_developer', 'make_patron', 'unmake_patron', 'modify_scores', 'force_migrate_spin_id',
+            elif method in ('give_item','send_message','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','unban','vpn_excuse','vpn_unexcuse','make_developer','unmake_developer', 'make_patron', 'unmake_patron', 'modify_scores', 'force_migrate_spin_id', 'unmerge_bh_id',
                             'clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member','change_alliance_info','change_player_alias','add_note'):
                 result = do_CONTROLAPI(control_args)
             elif method == 'migrate_spin_id':
