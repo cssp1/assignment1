@@ -309,6 +309,68 @@ def is_expired_alt(entry):
         return True # this is an expired alt
     return False # this is a valid alt
 
+def display_bh_acct_info(user_id, player):
+    if not BHAPI.supported():
+        print fmt % ('---BHAPI not supported, cannot look up---', '')
+        return
+    bh_id = None
+    db_client = init_db_client()
+    social_ids = db_client.spinpunch_to_social_id_all(user_id)
+    for id in social_ids:
+        if id.startswith('bh') and not bh_id:
+            bh_id = id
+            break
+    if not bh_id:
+        print fmt % ('---Unable to Locate Battlehouse Account for %d---' % user_id, '')
+        return
+    print fmt % ('---Battlehouse Account Info---', '')
+    bh_user_raw = BHAPI.BHAPI_raw('/user/'+bh_id, error_on_404 = False)
+    if bh_user_raw == 'NOTFOUND':
+        print fmt % ('This Battlehouse account has been deleted by the user and is now blank.', '')
+    else:
+        print bh_user_raw
+        print '\n\n\n'
+        bh_user = SpinJSON.loads(bh_user_raw)
+        if bh_user.get('banned'):
+            print fmt % ('THIS BATTLEHOUSE ACCOUNT IS BANNED!', '')
+        elif bh_user.get('deleted'):
+            print fmt % ('THIS BATTLEHOUSE ACCOUNT IS MARKED DELETED AND IS NOT ACCESSIBLE!', '')
+        elif bh_user.get('merged_to'):
+            print fmt % ('THIS BATTLEHOUSE ACCOUNT WAS MERGED AND IS NO LONGER ACCESSIBLE!', '')
+            ui_merged_to = bh_user['merged_to']
+
+            # look up local game player ID of the merged account
+            ui_merged_to += ' (' + trace_bh_account_merges(db_client, bh_user['merged_to']) + ')'
+            print fmt % ('Merged to account:', ui_merged_to)
+
+        ui_creation_provider = bh_user.get('creation_provider', 'unknown')
+        if ui_creation_provider == 'local':
+            ui_creation_provider = 'email'
+            print fmt % ('Login Provider:', ui_creation_provider)
+        if bh_user.get('creation_provider_id'):
+            print fmt % ('Login Provider ID:', bh_user['creation_provider_id'])
+        if bh_user.get('real_name'):
+            print fmt % ('Real Name:', bh_user['real_name'])
+        if bh_user.get('ui_email'):
+            print fmt % ('Email Address:', bh_user['ui_email'] + (' (verified)' if bh_user.get('email_verified') else ' (NOT verified)'))
+        bh_creat = bh_user.get('creation_time')
+        bh_creat_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_creat))
+        print fmt % ('BH Account age:', '%0.1f days (created %s)' % (float(time_now - bh_creat)/(24*60*60), bh_creat_str))
+        user_agent = user.get('browser_user_agent','UNKNOWN')
+        if 'bh_electron_' in user_agent:
+            electron_agent = user_agent.replace('bh_electron_','')
+            try:
+                decoded_agent = SpinJSON.loads(electron_agent)
+                client_vendor = decoded_agent.get('client_vendor', 'Unknown')
+                formatted_vendor = 'Unknown'
+                if client_vendor == 'microsoft':
+                    formatted_vendor = 'Windows Store'
+                elif client_vendor == 'battlehouse':
+                    formatted_vendor = 'BH.com downloadable EXE'
+                print fmt % ('Electron client type:', formatted_vendor)
+            except:
+                print fmt % ('Electron client type:', 'Unable to determine, showing: %s' % user_agent)
+
 # main program
 if __name__ == '__main__':
     import codecs
@@ -322,7 +384,7 @@ if __name__ == '__main__':
                                                       'give-alloy=', 'give-protection-time=', 'give-item=', 'melt-hours=', 'item-stack=', 'item-log-reason=',
                                                       'give-item-subject=', 'give-item-body=',
                                                       'send-message', 'message-subject=', 'message-body=', 'message-sender=', 'message-expire-time=', 'message-expire-in=',
-                                                      'check-ip-reputation', 'get-all-alts',
+                                                      'check-ip-reputation', 'get-all-alts', 'get-bh-acct-info-only'
                                                        ])
 
 
@@ -357,6 +419,7 @@ if __name__ == '__main__':
     do_unisolate = False
     do_check_ip_reputation = False
     get_all_alts = False
+    get_bh_acct_info_only = False
     give_item = None
     send_message = False
     message_sender = 'Customer Support'
@@ -455,6 +518,8 @@ if __name__ == '__main__':
             do_check_ip_reputation = True
         elif key == '--get-all-alts':
             get_all_alts = True
+        elif key == '--get-bh-acct-info-only':
+            get_bh_acct_info_only = True
 
     if len(args) > 0:
         user_id = int(args[0])
@@ -554,6 +619,10 @@ if __name__ == '__main__':
                 print ' - The player might not have logged out of the game for the first time yet'
                 print ' - The S3 settings passed on the command line or in config.json may be incorrect'
                 sys.exit(1)
+
+        if get_bh_acct_info_only:
+            display_bh_acct_info(user_id, player)
+            sys.exit(0)
 
         if do_put_user:
             user = SpinJSON.load(open(user_filename))

@@ -84,7 +84,29 @@ var confirm_dialog = function(msg, yes_cb) {
 };
 
 var method_bh_acct_lookup = function() {
-    return;
+    var ident = {}
+    if({0: 'bh_acct_lookup_by_user_id', 1: 'player_lookup_by_battlehouse_id'}[$('#bh_com_acct_lookup').tabs("option","active")] == 'bh_acct_lookup_by_user_id') {
+        var suser_id = $("#bh_acct_user_id")[0].value;
+        if(!suser_id) { return null; }
+        var user_id = parseInt(suser_id);
+        if(isNaN(user_id)) { alert("Bad User ID value: "+suser_id); return null; }
+        ident = {'user_id':user_id};
+    } else {
+        var sid = $("#bh_acct_battlehouse_id")[0].value;
+        if(!sid) { return null; }
+        if(sid.length < 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
+        ident = {'battlehouse_id':sid};
+    };
+    $('#per_bh_acct').hide();
+    $('#bh_acct_lookup_output')[0].value = '';
+    $('#bh_acct_lookup_output')[0].css('height', '');
+    ident['get-bh-acct-info-only'] = 'get-bh-acct-info-only';
+    send_request('player', 'lookup', ident, function(result) {
+        $('#per_bh_acct').show();
+        $('#bh_acct_tools').show();
+        $('#bh_acct_lookup_output')[0].value = result.toString();
+        $('#bh_acct_lookup_output').elastic();
+    });
 }
 
 var payment_lookup = function() {
@@ -92,11 +114,12 @@ var payment_lookup = function() {
     if(payment_id) {
         $('#per_payment').hide();
         $('#payment_lookup_output')[0].value = '';
+        $('#payment_lookup_output')[0].css('height', '');
         send_request('payment', 'lookup', {'payment_id': payment_id}, function(result) {
             var data = JSON.parse(result);
             $('#per_payment').show();
             $('#payment_lookup_output')[0].value = JSON.stringify(data, null, 2);
-            $('#payment_lookup_output').elastic("update");
+            $('#payment_lookup_output').elastic();
 
             var status = 'Unknown';
             var is_disputed = false, is_refundable = false;
@@ -184,7 +207,7 @@ var get_ident = function() {
     } else if(t == 'battlehouse_id') {
         var sid = $("#battlehouse_id")[0].value;
         if(!sid) { return null; }
-        //if(sid.length != 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
+        if(sid.length < 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
         return {'battlehouse_id':sid};
     }
 };
@@ -239,11 +262,12 @@ var method_lookup = function() {
     if(ident) {
         $('#per_player').hide();
         $('#lookup_output')[0].value = '';
+        $('#lookup_output')[0].css('height', '');
         send_request('player', 'lookup', ident, function(result) {
             $('#per_player').show();
             $('#player_tools').show();
             $('#lookup_output')[0].value = result.toString();
-            $('#lookup_output').elastic("update");
+            $('#lookup_output').elastic();
         });
     }
 }
@@ -460,9 +484,18 @@ var method_unban = function() {
         send_request('player', 'unban', $.extend(ident, {'ui_reason':ui_reason}), function(result) { display_response("Success!"); });
     }
 };
+var method_merge_bh_id = function(other_bh_id) {
+    return;
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#bh_acct_merge_reason")[0].value);
+    args = {'ui_reason': ui_reason};
+    if(ident && ui_reason) {
+        send_request('player', 'unmerge_bh_id', $.extend(ident, args), function(result) { display_response("Success!"); });
+    }
+}
 var method_unmerge_bh_id = function() {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
+    var ui_reason = check_ui_reason($("#bh_acct_merge_reason")[0].value);
     args = {'ui_reason': ui_reason};
     if(ident && ui_reason) {
         send_request('player', 'unmerge_bh_id', $.extend(ident, args), function(result) { display_response("Success!"); });
@@ -791,12 +824,13 @@ var method_get_all_alts = function() {
     if(ident) {
         $('#per_player').hide();
         $('#lookup_output')[0].value = '';
+        $('#lookup_output')[0].css('height', '');
         ident['get-all-alts'] = 'get-all-alts';
         send_request('player', 'lookup', ident, function(result) {
             $('#per_player').show();
             $('#player_tools').show();
             $('#lookup_output')[0].value = result.toString();
-            $('#lookup_output').elastic("update");
+            $('#lookup_output').elastic();
         });
     }
 }
@@ -2205,9 +2239,6 @@ $(function() {
                     <br>
                     <input type="text" id="alts_vpn_migrate_reason" style="width:500px;">
                 </p>
-                <p>
-                    <button onclick="method_unmerge_bh_id()" class="spin_button">Unmerge BH IDs</button>
-                </p>
             </div>
 
             <div id="player_tools_ban">
@@ -2313,13 +2344,48 @@ $(function() {
 <div id="mode_bh_com_acct">
 
     <div id="bh_com_acct_lookup">
-        Battlehouse ID: <input type="text" id="battlehouse_id" name="battlehouse_id"><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
+        <ul>
+            <li><a href="#bh_acct_lookup_by_user_id">Find by User ID</a></li>
+            <li><a href="#bh_acct_lookup_by_battlehouse_id">Find by Battlehouse ID</a></li>
+        </ul>
+        <div id="bh_acct_lookup_by_user_id">
+            User ID: <input type="text" id="bh_acct_user_id" name="bh_acct_user_id" autofocus><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
+        </div>
+        <div id="player_lookup_by_battlehouse_id">
+            Battlehouse ID: <input type="text" id="bh_acct_battlehouse_id" name="bh_acct_battlehouse_id"><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
+        </div>
     </div>
-
     <hr>
     <p>
         This feature is not functional yet. It will display all battlehouse.com account information and give access to Merge, Unmerge, Ban, and Unban functions.
     </p>
+
+    <div id="per_bh_acct" style="position:relative;display:none;">
+        <textarea id="bh_acct_lookup_output" readonly style="width:100%;height:10%;border-style:inset;border-width:2px;font-family:monospace;font-size:11px;"></textarea>
+
+        <hr>
+
+        <div id="bh_acct_tools" style="display:none;">
+            <ul>
+                <li><a href="#bh_acct_tools_merge" id="bh_acct_tools_merge_header">Merge/Unmerge</a></li>
+            </ul>
+
+            <div id="bh_acct_tools_merge">
+                <p>
+                    Other Battlehouse ID: <input type="text" id="merge_bh_acct_other_id" name="merge_bh_acct_other_id">
+                    <button onclick="method_merge_bh_id($('#merge_bh_acct_other_id').spinner('value'))" class="spin_button" style="width:250px;">Merge (mark as non-alt)</button>
+                </p>
+                <p>
+                    <button onclick="method_unmerge_bh_id()" class="spin_button">Unmerge</button>
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="bh_acct_merge_reason" style="width:500px;">
+                </p>
+            </div>
+        </div>
+    </div>
 
 </div> <!-- END mode_bh_com_acct -->
 
