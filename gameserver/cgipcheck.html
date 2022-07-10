@@ -84,19 +84,7 @@ var confirm_dialog = function(msg, yes_cb) {
 };
 
 var method_bh_acct_lookup = function() {
-    var ident = {}
-    if({0: 'bh_acct_lookup_by_user_id', 1: 'player_lookup_by_battlehouse_id'}[$('#bh_com_acct_lookup').tabs("option","active")] == 'bh_acct_lookup_by_user_id') {
-        var suser_id = $("#bh_acct_user_id")[0].value;
-        if(!suser_id) { return null; }
-        var user_id = parseInt(suser_id);
-        if(isNaN(user_id)) { alert("Bad User ID value: "+suser_id); return null; }
-        ident = {'user_id':user_id};
-    } else {
-        var sid = $("#bh_acct_battlehouse_id")[0].value;
-        if(!sid) { return null; }
-        if(sid.length < 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
-        ident = {'battlehouse_id':sid};
-    };
+    var ident = get_bh_acct_ident();
     $('#per_bh_acct').hide();
     $('#bh_acct_lookup_output')[0].value = '';
     ident['get-bh-acct-info-only'] = 'get-bh-acct-info-only';
@@ -208,6 +196,21 @@ var get_ident = function() {
         if(sid.length < 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
         return {'battlehouse_id':sid};
     }
+};
+
+var get_bh_acct_ident = function() {
+    if({0: 'bh_acct_lookup_by_user_id', 1: 'player_lookup_by_battlehouse_id'}[$('#bh_com_acct_lookup').tabs("option","active")] == 'bh_acct_lookup_by_user_id') {
+        var suser_id = $("#bh_acct_user_id")[0].value;
+        if(!suser_id) { return null; }
+        var user_id = parseInt(suser_id);
+        if(isNaN(user_id)) { alert("Bad User ID value: "+suser_id); return null; }
+        return {'user_id':user_id};
+    } else {
+        var sid = $("#bh_acct_battlehouse_id")[0].value;
+        if(!sid) { return null; }
+        if(sid.length < 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
+        return {'battlehouse_id':sid};
+    };
 };
 
 var pretty_ident = function(ident) {
@@ -482,7 +485,7 @@ var method_unban = function() {
     }
 };
 var method_merge_bh_id = function(other_bh_id, master_or_slave) {
-    var ident = get_ident();
+    var ident = get_bh_acct_ident();
     var ui_reason = check_ui_reason($("#bh_acct_merge_reason")[0].value);
     var use_first = $("#merge_bh_acct_use_first_acct")[0].value;
     args = {'ui_reason': ui_reason, 'use_first': use_first, 'master_or_slave': master_or_slave, 'other_bh_id':other_bh_id};
@@ -491,7 +494,7 @@ var method_merge_bh_id = function(other_bh_id, master_or_slave) {
     }
 }
 var method_unmerge_bh_id = function() {
-    var ident = get_ident();
+    var ident = get_bh_acct_ident();
     var ui_reason = check_ui_reason($("#bh_acct_merge_reason")[0].value);
     args = {'ui_reason': ui_reason};
     if(ident && ui_reason) {
@@ -499,7 +502,7 @@ var method_unmerge_bh_id = function() {
     }
 }
 var method_undelete_bh_id = function() {
-    var ident = get_ident();
+    var ident = get_bh_acct_ident();
     var ui_reason = check_ui_reason($("#bh_acct_undelete_reason")[0].value);
     args = {'ui_reason': ui_reason};
     if(ident && ui_reason) {
