@@ -764,7 +764,7 @@ def do_pvp_season_prizes(method, season):
         cmd_args += ['--test-prizes']
     continents = []
     for region_name, region in gamedata['regions'].iteritems():
-        if region.get('ladder_on_map_if', {'predicate':'ALWAYS_FALSE'})['predicate'] != 'ALWAYS_FALSE':
+        if region.get('ladder_on_map_if', {'predicate':'ALWAYS_FALSE'})['predicate'] != 'ALWAYS_FALSE' and region['continent_id'] not in continents:
             continents.append(region['continent_id'])
     if len(continents) == 0:
         raise Exception('could not identify any region with ladder enabled')
