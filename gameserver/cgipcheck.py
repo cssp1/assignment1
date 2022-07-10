@@ -492,7 +492,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 del control_args['spin_token']
             control_args['spin_user'] = spin_token_data['spin_user']
             if method == 'pvp_season_list_winners':
-                result = {'result':do_pvp_season_prizes(method, control_args['season'])}
+                result = {'result':do_pvp_season_prizes(method, int(control_args['season']))}
             elif method == 'pvp_season_give_prizes':
                 result = { 'result':'Not yet implemented' }
             elif method == 'pvp_season_disable_pcheck':
