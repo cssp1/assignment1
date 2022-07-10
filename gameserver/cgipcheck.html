@@ -1850,6 +1850,17 @@ var refresh_clock = function() {
     window.setTimeout(refresh_clock, 10*1000);
 };
 
+var method_event_pvp_season_action = function(method, season) {
+    $('#per_event').hide();
+    $('#event_pvp_season_lookup_output')[0].value = '';
+    var args = { 'season':season };
+    send_request('event', method, args, function(result) {
+        $('#per_event').show();
+        $('#event_pvp_season_lookup_output')[0].value = result.toString();
+        $('#event_pvp_season_lookup_output').elastic();
+    });
+}
+
 // see http://stackoverflow.com/questions/14859281/select-tab-by-name-in-jquery-ui-1-10-0
 $.fn.tabIndex = function () {
     return $(this).parent().find(this).index();
@@ -1863,6 +1874,7 @@ $(function() {
     if(spin_token_data['roles'].indexOf('ADMIN') == -1) {
        $('#mode_server_tab').remove();
        $('#mode_server').remove();
+       $('#event_pvp_season_admin').remove();
        //$('#mode_logs_tab').remove(); Logs now viewable by all as of 2022-01-01
        //$('#mode_logs').remove();
     } else {
@@ -1984,6 +1996,8 @@ $(function() {
     } else {
         $('#change_region_refresh_banishment_controls').remove();
     }
+
+    $('#event_pvp_season').spinner({max:1000, min:1, step:1});
 
     $('#gamebucks_amount').spinner({max:50000, min:0, step:100});
     $('#pvp_score_amount').spinner({max:500, min:0, step:1});
@@ -2456,9 +2470,27 @@ $(function() {
 </div> <!-- END mode_exploits -->
 
 <div id="mode_events">
-    <p>
-        This feature is not functional yet. It will display PvP tournament winners, invitational clan war winners, and have buttons to distribute prizes.
-    </p>
+    <div id="event_pvp_season_lookup">
+        PvP Season: <input type="text" id="event_pvp_season" name="event_pvp_season" value="1">
+        <br>
+        <button onclick="method_event_pvp_season_action('pvp_season_list_winners', $('#event_pvp_season').spinner('value'))" class="spin_button">List Winners</button> <button onclick="method_event_pvp_season_action('pvp_season_give_prizes', $('#event_pvp_season').spinner('value'))" class="spin_button">Give Prizes</button>
+    </div>
+    <hr>
+
+    <div id="per_event" style="position:relative;display:none;">
+        <textarea id="event_pvp_season_lookup_output" readonly style="width:100%;height:10%;border-style:inset;border-width:2px;font-family:monospace;font-size:11px;"></textarea>
+
+        <hr>
+
+        <div id="event_pvp_season_admin">
+            Admin Only:<br>
+            <button onclick="method_event_pvp_season_action('pvp_season_disable_pcheck', $('#event_pvp_season').spinner('value'))" class="spin_button">Disable PCHECK</button>
+            <br> Click to mark season as already distributed so PCHECK can't give prizes a second time.
+            <br> Only admin users can see this.
+            <br> The "Give Prizes" button above duplicates this button function after giving out prizes.
+        </div>
+    </div>
+
 </div> <!-- END mode_events -->
 
 <div id="mode_server">
