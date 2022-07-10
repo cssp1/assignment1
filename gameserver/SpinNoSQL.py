@@ -1060,11 +1060,8 @@ class NoSQLClient (object):
         row = tbl.find_one({'season':season})
         if row:
             return row['prizes_sent']
-        try:
-            tbl.insert_one({'season':season, 'prizes_sent':False})
-            return my_id
-        except pymongo.errors.DuplicateKeyError as e:
-            raise
+        tbl.insert_one({'season':season, 'prizes_sent':False})
+        return False
 
     def set_pvp_season_prize_status(self, season, status, reason=''):
         return self.instrument('set_pvp_season_prize_status(%s)'%reason, self._set_pvp_season_prize_status, (season, status))
