@@ -1054,7 +1054,7 @@ class NoSQLClient (object):
         return coll
 
     def check_pvp_season_prize_status(self, season, reason=''):
-        return self.instrument('check_pvp_season_prize_status(%s)'%reason, self._check_pvp_season_prize_status, (season))
+        return self.instrument('check_pvp_season_prize_status(%s)'%reason, self._check_pvp_season_prize_status, (season,))
     def _check_pvp_season_prize_status(self, season):
         tbl = self.pvp_season_prizes_table()
         row = tbl.find_one({'_id':season})
