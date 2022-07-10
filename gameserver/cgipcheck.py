@@ -141,7 +141,7 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_h
     replacements = {
         '$GAME_NAME$': gamedata['strings']['game_name'].upper(),
         '$GAME_LOGO_URL$': (gamedata['virals']['common_image_path']+gamedata['virals']['default_image']).replace('http:','https:'),
-        '$SEASON_UI$': str(SpinConfig.get_pvp_season(gamedata['matchmaking'].get('season_starts',[0]), time_now) - 1), # ensure Events/Prizes tab defaults to correct season
+        '$SEASON_UI$': str(SpinConfig.get_pvp_season(gamedata['matchmaking'].get('season_starts',[0]), time_now) - 1 + gamedata['matchmaking'].get('season_ui_offset',0)), # ensure Events/Prizes tab defaults to correct season
         '$SPIN_TOKEN$': spin_token_raw,
         '$SPIN_TOKEN_DATA$': SpinJSON.dumps(spin_token_data),
         '$SPIN_TOKEN_COOKIE_NAME$': spin_token_cookie_name,
