@@ -754,11 +754,11 @@ def do_pvp_season_prizes(method, season):
 
     season_ui_offset = gamedata['matchmaking'].get('season_ui_offset', 0)
     season = season - season_ui_offset
-    cmd_args += ['--season %d' % season]
+    cmd_args += ['--season=%d' % season]
     if season > len(gamedata['matchmaking']['season_starts']):
         raise Exception('last season configured in matchmaking is %d, prizes can only be calculated or given to season %d' % (len(gamedata['matchmaking']['season_starts']) + season_ui_offset, len(gamedata['matchmaking']['season_starts']) + season_ui_offset - 1))
     week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], gamedata['matchmaking']['season_starts'][season] - 7*86400) # get week number for tournament, before next season starts
-    cmd_args += ['--week %d' % week]
+    cmd_args += ['--week=%d' % week]
 
     if method == 'pvp_season_list_winners':
         cmd_args += ['--test-prizes']
@@ -770,7 +770,7 @@ def do_pvp_season_prizes(method, season):
         raise Exception('could not identify any region with ladder enabled')
     if len(continents) > 1:
         raise Exception('More than one continent with ladder enabled (not yet implemented)')
-    cmd_args += ['--score-space-loc %s' % continents[0]]
+    cmd_args += ['--score-space-loc=%s' % continents[0]]
     p = subprocess.Popen(['./SpinNoSQL.py'] + cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     if err:
