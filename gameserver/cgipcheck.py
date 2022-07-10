@@ -769,7 +769,10 @@ def do_pvp_season_prizes(method, season):
                 '--score-space-scope=continent','--send-prizes','--pcheck-prizes','--season=%d' % season]
     if season > len(gamedata['matchmaking']['season_starts']):
         return 'Last season configured in matchmaking is %d, prizes can only be calculated or given to season %d' % (len(gamedata['matchmaking']['season_starts']) + season_ui_offset, len(gamedata['matchmaking']['season_starts']) + season_ui_offset - 1)
-    week_start = gamedata['matchmaking']['season_starts'][season] - 7*86400
+    try:
+        week_start = gamedata['matchmaking']['season_starts'][season] - 7*86400
+    except IndexError:
+        return 'Last season configured in matchmaking is %d, prizes can only be calculated or given to season %d' % (len(gamedata['matchmaking']['season_starts']) + season_ui_offset, len(gamedata['matchmaking']['season_starts']) + season_ui_offset - 1)
     if time_now < gamedata['matchmaking']['season_starts'][season]:
         return 'Season %d tournament is not finished yet' % season_ui
     week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], week_start) # get week number for tournament, before next season starts
