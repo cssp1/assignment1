@@ -33,7 +33,6 @@ import os
 import twisted.internet.reactor
 import twisted.internet.error
 import twisted.internet.protocol
-import TwistedLatency
 
 def get_leveled_quantity(qty, level): # XXX duplicate
     if type(qty) == list:
