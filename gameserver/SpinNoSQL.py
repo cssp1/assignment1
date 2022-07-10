@@ -3136,7 +3136,7 @@ if __name__ == '__main__':
                 if pcheck_prizes:
                     color_start = ''
                     color_end = ''
-                print '%d) %s%s%d with %d points (id %5d)' % (rank['rank']+1, color_start, info['ui_name'], color_end, rank['absolute'], rank['alliance_id'])
+                print '%d) %s%s%s with %d points (id %5d)' % (rank['rank']+1, color_start, info['ui_name'], color_end, rank['absolute'], rank['alliance_id'])
 
                 if i >= len(PRIZES): continue
                 alliance_prize = PRIZES[i]
