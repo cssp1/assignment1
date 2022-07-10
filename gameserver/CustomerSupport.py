@@ -613,6 +613,37 @@ class HandleUndeleteBHID(Handler):
             return ReturnValue(error = errors)
         return ReturnValue(result = 'ok')
 
+class HandleRenameBHID(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        if not BHAPI.supported(): return ReturnValue(error = 'BHAPI not supported.')
+        self.user_id = self.args['user_id']
+        self.new_name = self.args['new_name']
+        self.force = self.args['force']
+        self.bh_id = self.args.get('battlehouse_id', None)
+        if not self.bh_id:
+            self.bh_id = self.gamesite.nosql_client.spinpunch_to_social_id_single(self.user_id, reason='customer_support_rename_bh_id')[2:]
+
+    def do_exec_loginserver(self, bh_id):
+        bh_args = { 'service': SpinConfig.game(), 'user_id': self.user_id, 'new_name': self.new_name, 'force': self.force }
+        bh_result_raw = BHAPI.BHAPI_raw('/account_rename/', args=bh_args, error_on_404 = False)
+        if isinstance(bh_result_raw, BHAPI.BHAPITechnicalException):
+            return { 'error': bh_result_raw.__str__() }
+        else:
+            return SpinJSON.loads(bh_result_raw)
+
+    def do_exec_online(self, session, retmsg):
+        result = SpinJSON.loads(self.do_exec_loginserver(self.bh_id))
+        if 'error' in result:
+            return ReturnValue(error = result['error'])
+        return ReturnValue(result = 'ok')
+
+    def do_exec_offline(self, user, player):
+        result = SpinJSON.loads(self.do_exec_loginserver(self.bh_id))
+        if 'error' in result:
+            return ReturnValue(error = result['error'])
+        return ReturnValue(result = 'ok')
+
 class HandleMarkUninstalled(Handler):
     # mark account as uninstalled and scrub PII
     def record_deauthorized_metric(self, social_id, summary_props, reason):
@@ -2490,5 +2521,6 @@ methods = {
     'merge_bh_id': HandleMergeBHID,
     'unmerge_bh_id': HandleUnmergeBHID,
     'undelete_bh_id': HandleUndeleteBHID,
+    'rename_bh_id': HandleRenameBHID,
     # not implemented yet: join_abtest, clear_abtest
 }
