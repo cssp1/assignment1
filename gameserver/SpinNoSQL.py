@@ -3103,7 +3103,7 @@ if __name__ == '__main__':
             if pcheck_prizes:
                 color_start = ''
                 color_end = ''
-            print '%sTOP %s %s ALLIANCES FOR %sWEEK %d%s' % \
+            print '%sTOP %s %s ALLIANCES FOR %sWEEK %d%s%s' % \
                   (color_start, ui_score_time_scope, tournament_stat, 'SEASON %d ' % (season+gamedata['matchmaking']['season_ui_offset']) if season >= 0 else '', week,
                    (' IN '+gamedata['continents'][score_space_loc]['ui_name']) if score_space_scope == Scores2.SPACE_CONTINENT else '', color_end)
 
@@ -3288,7 +3288,7 @@ if __name__ == '__main__':
                     for cmd in commands:
                         subprocess.check_call(cmd, stdout=open(os.devnull,"w"))
                     print "PRIZES ALL SENT OK"
-            if check_pvp_season_prize_status(season, reason='checking status of season'):
+            if client.check_pvp_season_prize_status(season, reason='checking status of season'):
                 print 'Prizes already sent'
             else:
                 print 'Prizes not sent yet'
