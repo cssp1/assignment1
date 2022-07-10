@@ -26,6 +26,7 @@ from Raid import recall_squad, RecallSquadException, \
 import ResLoot
 import Notification2
 from Predicates import read_predicate
+import BHAPI
 
 # for process spawning
 import os
@@ -507,6 +508,7 @@ class HandleForceMigrateSpinID(Handler):
 class HandleMergeBHID(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
+        if not BHAPI.supported(): return ReturnValue(error = 'BHAPI not supported.')
         self.user_id = self.args['user_id']
         self.use_first = self.args['use_first']
         self.master_or_slave = self.args['master_or_slave']
@@ -521,16 +523,14 @@ class HandleMergeBHID(Handler):
         else:
             self.master_id = self.args['other_bh_id']
             self.slave_id = self.bh_ids[0]
-        self.deferred = TwistedLatency.InstrumentedDeferred('customer_support_merge_bh_id')
 
     def do_exec_loginserver(self):
-        self.gamesite.AsyncHTTP_Battlehouse.queue_request(self.time_now, SpinConfig.config['battlehouse_api_path']+('/account_merge/' + '?service=' + SpinConfig.game() + '?master_id=' + self.master_id + '?slave_id=' + self.slave_id),
-                                                          lambda result: self.exec_complete(result),
-                                                          headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
-
-    def exec_complete(self, result):
-        self.deferred.callback(True)
-        return result
+        bh_args = { 'service': SpinConfig.game(), 'master_id': self.master_id, 'slave_id': self.slave_id }
+        bh_result_raw = BHAPI.BHAPI_raw('/account_merge/', args=bh_args, error_on_404 = False)
+        if isinstance(bh_result_raw, BHAPI.BHAPITechnicalException):
+            return {'error': bh_result_raw.__str__() }
+        else:
+            return SpinJSON.loads(bh_result_raw)
 
     def do_exec_online(self, session, retmsg):
         result = SpinJSON.loads(self.do_exec_loginserver())
@@ -547,18 +547,17 @@ class HandleMergeBHID(Handler):
 class HandleUnmergeBHID(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
+        if not BHAPI.supported(): return ReturnValue(error = 'BHAPI not supported.')
         self.user_id = self.args['user_id']
         self.bh_ids = [entry['_id'][2:] for entry in self.gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='customer_support_unmerge_bh_id') if entry['_id'].startswith('bh')]
-        self.deferred = TwistedLatency.InstrumentedDeferred('customer_support_unmerge_bh_id')
 
     def do_exec_loginserver(self, bh_id):
-        self.gamesite.AsyncHTTP_Battlehouse.queue_request(self.time_now, SpinConfig.config['battlehouse_api_path']+('/account_unmerge/' + '?user_id=' + bh_id + '?service=' + SpinConfig.game()),
-                                                          lambda result: self.exec_complete(result),
-                                                          headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
-
-    def exec_complete(self, result):
-        self.deferred.callback(True)
-        return result
+        bh_args = { 'service': SpinConfig.game(), 'user_id': bh_id }
+        bh_result_raw = BHAPI.BHAPI_raw('/account_unmerge/', args=bh_args, error_on_404 = False)
+        if isinstance(bh_result_raw, BHAPI.BHAPITechnicalException):
+            return {'error': bh_result_raw.__str__() }
+        else:
+            return SpinJSON.loads(bh_result_raw)
 
     def do_exec_online(self, session, retmsg):
         errors = 'Errors:'
@@ -583,18 +582,17 @@ class HandleUnmergeBHID(Handler):
 class HandleUndeleteBHID(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
+        if not BHAPI.supported(): return ReturnValue(error = 'BHAPI not supported.')
         self.user_id = self.args['user_id']
         self.bh_ids = [entry['_id'][2:] for entry in self.gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='customer_support_undelete_bh_id') if entry['_id'].startswith('bh')]
-        self.deferred = TwistedLatency.InstrumentedDeferred('customer_support_undelete_bh_id')
 
     def do_exec_loginserver(self, bh_id):
-        self.gamesite.AsyncHTTP_Battlehouse.queue_request(self.time_now, SpinConfig.config['battlehouse_api_path']+('/account_undelete/%s/' % bh_id) + '?service=' + SpinConfig.game(),
-                                                          lambda result: self.exec_complete(result),
-                                                          headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
-
-    def exec_complete(self, result):
-        self.deferred.callback(True)
-        return result
+        bh_args = { 'service': SpinConfig.game() }
+        bh_result_raw = BHAPI.BHAPI_raw('/account_undelete/%s/' % bh_id, args=bh_args, error_on_404 = False)
+        if isinstance(bh_result_raw, BHAPI.BHAPITechnicalException):
+            return {'error': bh_result_raw.__str__() }
+        else:
+            return SpinJSON.loads(bh_result_raw)
 
     def do_exec_online(self, session, retmsg):
         errors = 'Errors:'
