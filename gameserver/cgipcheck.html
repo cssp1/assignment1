@@ -1880,6 +1880,10 @@ $(function() {
     } else {
        $('#server_status').bind('show', function() { console.log("HERE"); });
     }
+    if(spin_game_id === 'fs') { // when invitational tournament is ready, ensure they show for FS
+        $('#mode_events_tab').remove();
+        $('#mode_events').remove();
+    }
 
     // whenever server mode is made active, send a status query
     var on_mode_activate = function(panel) {
@@ -2471,7 +2475,7 @@ $(function() {
 
 <div id="mode_events">
     <div id="event_pvp_season_lookup">
-        PvP Season: <input type="text" id="event_pvp_season" name="event_pvp_season" value="1">
+        PvP Season: <input type="text" id="event_pvp_season" name="event_pvp_season" value="$SEASON_UI$">
         <br>
         <button onclick="method_event_pvp_season_action('pvp_season_list_winners', $('#event_pvp_season').spinner('value'))" class="spin_button">List Winners</button> <button onclick="method_event_pvp_season_action('pvp_season_give_prizes', $('#event_pvp_season').spinner('value'))" class="spin_button">Give Prizes</button>
     </div>

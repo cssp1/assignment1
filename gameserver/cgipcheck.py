@@ -141,6 +141,7 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_h
     replacements = {
         '$GAME_NAME$': gamedata['strings']['game_name'].upper(),
         '$GAME_LOGO_URL$': (gamedata['virals']['common_image_path']+gamedata['virals']['default_image']).replace('http:','https:'),
+        '$SEASON_UI$': SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], time_now) - 1, # ensure Events/Prizes tab defaults to correct season
         '$SPIN_TOKEN$': spin_token_raw,
         '$SPIN_TOKEN_DATA$': SpinJSON.dumps(spin_token_data),
         '$SPIN_TOKEN_COOKIE_NAME$': spin_token_cookie_name,
@@ -751,19 +752,26 @@ def do_lookup(args):
 def do_pvp_season_prizes(method, season):
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
     season_ui_offset = gamedata['matchmaking'].get('season_ui_offset', 0)
+    season_ui = season
     season = season - season_ui_offset
     season_done = nosql_client.check_pvp_season_prize_status(season, reason='checking status of season')
     if method == 'pvp_season_disable_pcheck':
-        return nosql_client.set_pvp_season_prize_status(season, True, reason='pvp_season_disable_pcheck')
+        result = nosql_client.set_pvp_season_prize_status(season, True, reason='pvp_season_disable_pcheck')
+        if season != season_ui:
+            result = result.replace ('Season %d' % season, 'Season %d' % season_ui)
+        return result
     elif method == 'pvp_season_give_prizes' and season_done:
-        return 'Prizes already issued for season %d' % season
+        result = 'Prizes already issued for season %d.' % season
+        if season != season_ui:
+            result = result.replace ('season %d' % season, 'Season %d' % season_ui)
+        return result
     cmd_args = ['--winners','--tournament-stat=trophies_pvp','--score-time-scope=season',
                 '--score-space-scope=continent','--send-prizes','--pcheck-prizes','--season=%d' % season]
     if season > len(gamedata['matchmaking']['season_starts']):
         return 'Last season configured in matchmaking is %d, prizes can only be calculated or given to season %d' % (len(gamedata['matchmaking']['season_starts']) + season_ui_offset, len(gamedata['matchmaking']['season_starts']) + season_ui_offset - 1)
     week_start = gamedata['matchmaking']['season_starts'][season] - 7*86400
     if time_now < gamedata['matchmaking']['season_starts'][season]:
-        return 'Season %d tournament is not finished yet' % season
+        return 'Season %d tournament is not finished yet' % season_ui
     week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], week_start) # get week number for tournament, before next season starts
     cmd_args += ['--week=%d' % week]
 
@@ -774,7 +782,7 @@ def do_pvp_season_prizes(method, season):
         if region.get('ladder_on_map_if', {'predicate':'ALWAYS_FALSE'})['predicate'] != 'ALWAYS_FALSE' and region['continent_id'] not in continents:
             continents.append(region['continent_id'])
     if len(continents) == 0:
-        return 'Could not identify any region with ladder enabled'
+        continents = ['fb'] # default to fb, only WSE is an outlier here
     if len(continents) > 1:
         return 'More than one continent with ladder enabled (not yet implemented)'
     cmd_args += ['--score-space-loc=%s' % continents[0]]
