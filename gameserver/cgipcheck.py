@@ -369,10 +369,9 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 del control_args['spin_token']
             control_args['spin_user'] = spin_token_data['spin_user']
 
-            if 'battlehouse_id' in control_args and method in ('merge_bh_id', 'unmerge_bh_id', 'undelete_bh_id'):
+            if 'battlehouse_id' in control_args and method in ('merge_bh_id', 'unmerge_bh_id', 'undelete_bh_id', 'rename_bh_id'):
                 sid = 'bh' + control_args['battlehouse_id']
                 user_id = int(nosql_client.social_id_to_spinpunch_single(sid, False))
-                del control_args['battlehouse_id']
                 control_args['user_id'] = user_id
             if method == 'lookup':
                 result = {'result':do_lookup(control_args)}
