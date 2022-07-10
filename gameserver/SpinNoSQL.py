@@ -1068,10 +1068,10 @@ class NoSQLClient (object):
     def _set_pvp_season_prize_status(self, season, status):
         tbl = self.pvp_season_prizes_table()
         success = tbl.update_one({'_id': season}, {'$set': {'prizes_sent': status}}).matched_count > 0
-        if not success:
-            return 'ok'
+        if success:
+            return 'Season %d prize status set to %r' % (season, success)
         else:
-            return 'season %d not found' % season
+            return 'Season %d not found' % season
 
     ###### SOCIAL (FACEBOOK/KONGREGATE) ID MAP ######
 
