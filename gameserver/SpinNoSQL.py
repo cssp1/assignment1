@@ -3276,7 +3276,7 @@ if __name__ == '__main__':
                                              '--give-item-body', 'Congratulations, here is your Tournament prize%s! Click the prize to collect it.' % (ui_time,),
                                              '--item-log-reason', 'tournament_prize_s%d_w%d' % (season, week)])
 
-            if not test_prizes:
+            if not test_prizes and not client.check_pvp_season_prize_status(season, reason='send_prizes_check'):
                 print "COMMANDS"
                 def quote(s):
                     if ' ' in s: return "'"+s+"'"
@@ -3287,11 +3287,12 @@ if __name__ == '__main__':
                     print "SENDING PRIZES"
                     for cmd in commands:
                         subprocess.check_call(cmd, stdout=open(os.devnull,"w"))
+                    client.set_pvp_season_prize_status(season, True, reason='send_prizes_complete')
                     print "PRIZES ALL SENT OK"
-            if client.check_pvp_season_prize_status(season, reason='checking status of season'):
-                print 'Prizes already sent'
+            if client.check_pvp_season_prize_status(season, reason='send_prizes_check'):
+                print '\nPrizes already sent.'
             else:
-                print 'Prizes not sent yet'
+                print '\nPrizes not sent yet.'
 
 
     elif mode == 'benchmark':
