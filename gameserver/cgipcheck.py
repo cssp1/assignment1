@@ -29,8 +29,6 @@ time_axis_params = {'mode':'time', 'timeformat': '%b %d %H:00', 'minTickSize': [
 
 gamedata = {}
 gamedata['server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("server_compiled.json"))
-gamedata['matchmaking'] = SpinConfig.load(SpinConfig.gamedata_component_filename("matchmaking.json"))
-gamedata['regions'] = SpinConfig.load(SpinConfig.gamedata_component_filename("regions.json"))
 
 ALT_MIN_LOGINS = gamedata['server'].get('alt_min_logins', 5)
 ALT_IGNORE_AGE = gamedata['server'].get('alt_ignore_age', 7*86400)
@@ -756,7 +754,9 @@ def do_pvp_season_prizes(method, season):
     season_ui_offset = gamedata['matchmaking'].get('season_ui_offset', 0)
     season = season - season_ui_offset
     cmd_args += ['--season %d' % season]
-    week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], gamedata['matchmaking'][season - 1] - 7*86400)
+    if season > len(gamedata['matchmaking']):
+        raise Exception('last season configured in matchmaking is %d, prizes can only be calculated or given to season %d' % (len(gamedata['matchmaking']) + season_ui_offset, len(gamedata['matchmaking']) + season_ui_offset - 1))
+    week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], gamedata['matchmaking'][season] - 7*86400) # get week number for tournament, before next season starts
     cmd_args += ['--week %d' % week]
 
     if method == 'pvp_season_list_winners':
