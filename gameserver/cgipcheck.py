@@ -492,11 +492,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             if 'spin_token' in control_args: # do not pass credentials along
                 del control_args['spin_token']
             control_args['spin_user'] = spin_token_data['spin_user']
-            if method == 'pvp_season_list_winners':
-                result = {'result':do_pvp_season_prizes(method, int(control_args['season']))}
-            elif method == 'pvp_season_give_prizes':
-                result = { 'result':'Not yet implemented' }
-            elif method == 'pvp_season_disable_pcheck':
+            if method in ('pvp_season_list_winners','pvp_season_give_prizes','pvp_season_disable_pcheck'):
                 result = {'result':do_pvp_season_prizes(method, int(control_args['season']))}
             else:
                 raise Exception('unknown event method ' + method)
@@ -768,13 +764,13 @@ def do_pvp_season_prizes(method, season):
     cmd_args = ['--winners','--tournament-stat=trophies_pvp','--score-time-scope=season',
                 '--score-space-scope=continent','--send-prizes','--pcheck-prizes','--season=%d' % season]
     if season > len(gamedata['matchmaking']['season_starts']):
-        return 'Last season configured in matchmaking is %d, prizes can only be calculated or given to season %d' % (len(gamedata['matchmaking']['season_starts']) + season_ui_offset, len(gamedata['matchmaking']['season_starts']) + season_ui_offset - 1)
+        return 'Last season configured in matchmaking is %d, prizes can only be calculated or given up to season %d.' % (len(gamedata['matchmaking']['season_starts']) + season_ui_offset, len(gamedata['matchmaking']['season_starts']) + season_ui_offset - 1)
     try:
         week_start = gamedata['matchmaking']['season_starts'][season] - 7*86400
     except IndexError:
-        return 'Last season configured in matchmaking is %d, prizes can only be calculated or given to season %d' % (len(gamedata['matchmaking']['season_starts']) + season_ui_offset, len(gamedata['matchmaking']['season_starts']) + season_ui_offset - 1)
+        return 'Last season configured in matchmaking is %d, prizes can only be calculated or given up to season %d.' % (len(gamedata['matchmaking']['season_starts']) + season_ui_offset, len(gamedata['matchmaking']['season_starts']) + season_ui_offset - 1)
     if time_now < gamedata['matchmaking']['season_starts'][season]:
-        return 'Season %d tournament is not finished yet' % season_ui
+        return 'Season %d tournament is not finished yet.' % season_ui
     week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], week_start) # get week number for tournament, before next season starts
     cmd_args += ['--week=%d' % week]
 
