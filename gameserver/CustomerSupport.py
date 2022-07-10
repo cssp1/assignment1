@@ -548,7 +548,7 @@ class HandleUnmergeBHID(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         self.user_id = self.args['user_id']
-        self.bh_ids = [entry['_id'] for entry in self.gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='customer_support_unmerge_bh_id') if entry['_id'].startswith('bh')]
+        self.bh_ids = [entry['_id'][2:] for entry in self.gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='customer_support_unmerge_bh_id') if entry['_id'].startswith('bh')]
         self.deferred = TwistedLatency.InstrumentedDeferred('customer_support_unmerge_bh_id')
 
     def do_exec_loginserver(self, bh_id):
@@ -584,7 +584,7 @@ class HandleUndeleteBHID(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         self.user_id = self.args['user_id']
-        self.bh_ids = [entry['_id'] for entry in self.gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='customer_support_undelete_bh_id') if entry['_id'].startswith('bh')]
+        self.bh_ids = [entry['_id'][2:] for entry in self.gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='customer_support_undelete_bh_id') if entry['_id'].startswith('bh')]
         self.deferred = TwistedLatency.InstrumentedDeferred('customer_support_undelete_bh_id')
 
     def do_exec_loginserver(self, bh_id):
