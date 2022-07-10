@@ -552,7 +552,7 @@ class HandleUnmergeBHID(Handler):
         self.deferred = TwistedLatency.InstrumentedDeferred('customer_support_unmerge_bh_id')
 
     def do_exec_loginserver(self, bh_id):
-        self.gamesite.AsyncHTTP_Battlehouse.queue_request(self.time_now, SpinConfig.config['battlehouse_api_path']+('/account_unmerge/%s/' % bh_id) + '?service=' + SpinConfig.game(),
+        self.gamesite.AsyncHTTP_Battlehouse.queue_request(self.time_now, SpinConfig.config['battlehouse_api_path']+('/account_unmerge/' + '?user_id=' + bh_id + '?service=' + SpinConfig.game()),
                                                           lambda result: self.exec_complete(result),
                                                           headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
 
