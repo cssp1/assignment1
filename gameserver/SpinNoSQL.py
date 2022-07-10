@@ -198,6 +198,7 @@ class NoSQLClient (object):
         self.seen_player_cache_indexes = set()
         self.seen_player_aliases = False
         self.seen_facebook_ids = False
+        self.seen_pvp_season_prizes = False
         self.seen_messages = False
         self.seen_ctrl_queue = False
         self.seen_player_portraits = False
@@ -1037,6 +1038,40 @@ class NoSQLClient (object):
             else:
                 raise
         # shouldn't get here
+
+
+    ###### PvP Season Award Status ######
+    # keys are season numbers
+    def pvp_season_prizes_table(self):
+        coll = self._table('pvp_season_prizes')
+        if not self.seen_pvp_season_prizes:
+            try:
+                coll.create_index('_id', unique=True)
+            except pymongo.errors.OperationFailure:
+                # temporary - this can complain if the existing index has unique=True
+                pass
+            self.seen_pvp_season_prizes = True
+        return coll
+
+    def check_pvp_season_prize_status(self, season, reason=''):
+        return self.instrument('check_pvp_season_prize_status(%s)'%reason, self._check_pvp_season_prize_status, (season))
+    def _check_pvp_season_prize_status(self, season):
+        tbl = self.pvp_season_prizes_table()
+        row = tbl.find_one({'_id':season})
+        if row:
+            return row['prizes_sent']
+        tbl.insert_one({'_id':season, 'prizes_sent':False})
+        return False
+
+    def set_pvp_season_prize_status(self, season, status, reason=''):
+        return self.instrument('set_pvp_season_prize_status(%s)'%reason, self._set_pvp_season_prize_status, (season, status))
+    def _set_pvp_season_prize_status(self, season, status):
+        tbl = self.pvp_season_prizes_table()
+        success = tbl.update_one({'_id': season}, {'$set': {'prizes_sent': status}}).matched_count > 0
+        if not success:
+            return 'ok'
+        else:
+            return 'season %d not found' % season
 
     ###### SOCIAL (FACEBOOK/KONGREGATE) ID MAP ######
 
