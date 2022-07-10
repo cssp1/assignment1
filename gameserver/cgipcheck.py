@@ -29,6 +29,8 @@ time_axis_params = {'mode':'time', 'timeformat': '%b %d %H:00', 'minTickSize': [
 
 gamedata = {}
 gamedata['server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("server_compiled.json"))
+gamedata['matchmaking'] = SpinConfig.load(SpinConfig.gamedata_component_filename("matchmaking.json"))
+gamedata['regions'] = SpinConfig.load(SpinConfig.gamedata_component_filename("regions.json"))
 
 ALT_MIN_LOGINS = gamedata['server'].get('alt_min_logins', 5)
 ALT_IGNORE_AGE = gamedata['server'].get('alt_ignore_age', 7*86400)
@@ -483,6 +485,23 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 return r
             result = {'result': map(decode_record, records)}
 
+        elif path[0] == 'event':
+            # event methods
+            if (method not in ('pvp_season_list_winners',)):
+                do_log = True # log all write activity
+            control_args = args.copy()
+            if 'spin_token' in control_args: # do not pass credentials along
+                del control_args['spin_token']
+            control_args['spin_user'] = spin_token_data['spin_user']
+            if method == 'pvp_season_list_winners':
+                result = {'result':do_pvp_season_prizes(method, control_args['season'])}
+            elif method == 'pvp_season_give_prizes':
+                result = { 'result':'Not yet implemented' }
+            elif method == 'pvp_season_disable_pcheck':
+                result = { 'result':'Not yet implemented' }
+            else:
+                raise Exception('unknown event method ' + method)
+
         elif path[0] == 'server':
             # server methods
             check_role(spin_token_data, 'ADMIN')
@@ -724,6 +743,34 @@ def do_lookup(args):
     if 'get-bh-acct-info-only' in args:
         cmd_args += ['--get-bh-acct-info-only']
     p = subprocess.Popen(['./check_player.py'] + cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = p.communicate()
+    if err:
+        raise Exception(err)
+    if p.returncode != 0:
+        raise Exception(out)
+    return out
+
+def do_pvp_season_prizes(method, season):
+    cmd_args = ['--winners','--tournament-stat trophies_pvp','--score-time-scope season','--score-space-scope continent','--send-prizes']
+
+    season_ui_offset = gamedata['matchmaking'].get('season_ui_offset', 0)
+    season = season - season_ui_offset
+    cmd_args += ['--season %d' % season]
+    week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], gamedata['matchmaking'][season - 1] - 7*86400)
+    cmd_args += ['--week %d' % week]
+
+    if method == 'pvp_season_list_winners':
+        cmd_args += ['--test-prizes']
+    continents = []
+    for region_name, region in gamedata['regions']:
+        if region.get('ladder_on_map_if', {'predicate':'ALWAYS_FALSE'})['predicate'] != 'ALWAYS_FALSE':
+            continents.append(region['continent_id'])
+    if len(continents) == 0:
+        raise Exception('could not identify any region with ladder enabled')
+    if len(continents) > 1:
+        raise Exception('More than one continent with ladder enabled (not yet implemented)')
+    cmd_args += ['--score-space-loc %s' % continents[0]]
+    p = subprocess.Popen(['./SpinNoSQL.py'] + cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     if err:
         raise Exception(err)
