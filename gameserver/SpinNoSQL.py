@@ -2803,7 +2803,7 @@ if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks', 'benchmark',
                                                         'winners', 'send-prizes', 'prize-item=', 'prize-qty=', 'in-the-money-players=', 'in-the-money-alliances=', 'min-participation=', 'min-points=',
                                                         'leaders', 'tournament-stat=', 'tournament-stat-challenge-key=', 'week=', 'season=', 'game-id=',
-                                                        'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=', 'patron-rewards',
+                                                        'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=', 'patron-rewards', 'test-prizes',
                                                         'recache-alliance-scores', 'test', 'config-name='])
     game_instance = SpinConfig.config['game_id']
     mode = None
@@ -2835,6 +2835,7 @@ if __name__ == '__main__':
         elif key == '--region-maint': mode = 'region-maint'; maint_region = val # region maintenance
         elif key == '--winners': mode = 'winners'
         elif key == '--send-prizes': send_prizes = True
+        elif key == '--test-prizes': test_prizes = True
         elif key == '--prize-item': prize_item = val
         elif key == '--prize-qty': prize_qty = int(val)
         elif key == '--in-the-money-players': in_the_money_players = int(val)
@@ -2925,12 +2926,15 @@ if __name__ == '__main__':
         commands = []
         for patron_list, prize, patron_level in ((captains, captain_prize, 'Captain'), (majors, major_prize, 'Major'), (colonels, colonel_prize, 'Colonel')):
             for player in patron_list:
-                commands.append(['./check_player.py', '%d' % player,
-                                 '--give-item', 'gamebucks', '--melt-hours', '-1',
-                                 '--item-stack', '%d' % (prize),
-                                 '--give-item-subject', 'Monthly Patron Reward: %s' % patron_level,
-                                 '--give-item-body', 'Congratulations, here is your Patron reward for %s! Click the reward to collect it.' % (datetime.datetime.now().strftime('%B'),),
-                                 '--item-log-reason', 'patreon_reward_%s_%s' % (patron_level.lower(), datetime.datetime.now().strftime('%Y-%m'))])
+                if test_prizes:
+                    print 'Test mode: Player %d would receive %d gold if run without --test-prizes' % (player, prize)
+                else:
+                    commands.append(['./check_player.py', '%d' % player,
+                                     '--give-item', 'gamebucks', '--melt-hours', '-1',
+                                     '--item-stack', '%d' % (prize),
+                                     '--give-item-subject', 'Monthly Patron Reward: %s' % patron_level,
+                                     '--give-item-body', 'Congratulations, here is your Patron reward for %s! Click the reward to collect it.' % (datetime.datetime.now().strftime('%B'),),
+                                     '--item-log-reason', 'patreon_reward_%s_%s' % (patron_level.lower(), datetime.datetime.now().strftime('%Y-%m'))])
         if len(commands) > 0:
             print "COMMANDS"
             def quote(s):
@@ -3211,12 +3215,13 @@ if __name__ == '__main__':
                         else:
                             ui_time = ''
 
-                        commands.append(['./check_player.py', '%d' % member['user_id'],
-                                         '--give-item', prize_item, '--melt-hours', '-1',
-                                         '--item-stack', '%d' % (prize_qty if prize_qty > 0 else my_prize),
-                                         '--give-item-subject', 'Tournament Prize',
-                                         '--give-item-body', 'Congratulations, here is your Tournament prize%s! Click the prize to collect it.' % (ui_time,),
-                                         '--item-log-reason', 'tournament_prize_s%d_w%d' % (season, week)])
+                        if not test_prizes:
+                            commands.append(['./check_player.py', '%d' % member['user_id'],
+                                             '--give-item', prize_item, '--melt-hours', '-1',
+                                             '--item-stack', '%d' % (prize_qty if prize_qty > 0 else my_prize),
+                                             '--give-item-subject', 'Tournament Prize',
+                                             '--give-item-body', 'Congratulations, here is your Tournament prize%s! Click the prize to collect it.' % (ui_time,),
+                                             '--item-log-reason', 'tournament_prize_s%d_w%d' % (season, week)])
 
             print "COMMANDS"
             def quote(s):
