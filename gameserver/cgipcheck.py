@@ -492,7 +492,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 del control_args['spin_token']
             control_args['spin_user'] = spin_token_data['spin_user']
             if method == 'pvp_season_list_winners':
-                result = {'result':do_pvp_season_prizes(method, control_args['season'])}
+                result = {'result':do_pvp_season_prizes(method, int(control_args['season']))}
             elif method == 'pvp_season_give_prizes':
                 result = { 'result':'Not yet implemented' }
             elif method == 'pvp_season_disable_pcheck':
@@ -750,19 +750,20 @@ def do_lookup(args):
 
 def do_pvp_season_prizes(method, season):
     cmd_args = ['--winners','--tournament-stat trophies_pvp','--score-time-scope season','--score-space-scope continent','--send-prizes']
+    gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
     season_ui_offset = gamedata['matchmaking'].get('season_ui_offset', 0)
     season = season - season_ui_offset
     cmd_args += ['--season %d' % season]
-    if season > len(gamedata['matchmaking']):
-        raise Exception('last season configured in matchmaking is %d, prizes can only be calculated or given to season %d' % (len(gamedata['matchmaking']) + season_ui_offset, len(gamedata['matchmaking']) + season_ui_offset - 1))
-    week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], gamedata['matchmaking'][season] - 7*86400) # get week number for tournament, before next season starts
+    if season > len(gamedata['matchmaking']['season_starts']):
+        raise Exception('last season configured in matchmaking is %d, prizes can only be calculated or given to season %d' % (len(gamedata['matchmaking']['season_starts']) + season_ui_offset, len(gamedata['matchmaking']['season_starts']) + season_ui_offset - 1))
+    week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], gamedata['matchmaking']['season_starts'][season] - 7*86400) # get week number for tournament, before next season starts
     cmd_args += ['--week %d' % week]
 
     if method == 'pvp_season_list_winners':
         cmd_args += ['--test-prizes']
     continents = []
-    for region_name, region in gamedata['regions']:
+    for region_name, region in gamedata['regions'].iteritems():
         if region.get('ladder_on_map_if', {'predicate':'ALWAYS_FALSE'})['predicate'] != 'ALWAYS_FALSE':
             continents.append(region['continent_id'])
     if len(continents) == 0:
