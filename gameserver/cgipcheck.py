@@ -763,7 +763,7 @@ def do_pvp_season_prizes(method, season):
     if method == 'pvp_season_list_winners':
         cmd_args += ['--test-prizes']
     continents = []
-    for region_name, region in gamedata['regions']:
+    for region_name, region in gamedata['regions'].iteritems():
         if region.get('ladder_on_map_if', {'predicate':'ALWAYS_FALSE'})['predicate'] != 'ALWAYS_FALSE':
             continents.append(region['continent_id'])
     if len(continents) == 0:
