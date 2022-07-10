@@ -754,7 +754,7 @@ def do_pvp_season_prizes(method, season):
     season = season - season_ui_offset
     season_done = nosql_client.check_pvp_season_prize_status(season, reason='checking status of season')
     if method == 'pvp_season_disable_pcheck':
-        nosql_client.set_pvp_season_prize_status(season, True, reason='pvp_season_disable_pcheck')
+        return nosql_client.set_pvp_season_prize_status(season, True, reason='pvp_season_disable_pcheck')
     elif method == 'pvp_season_give_prizes' and season_done:
         return 'Prizes already issued for season %d' % season
     cmd_args = ['--winners','--tournament-stat=trophies_pvp','--score-time-scope=season',
