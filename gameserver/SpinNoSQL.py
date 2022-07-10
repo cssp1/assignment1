@@ -1046,7 +1046,7 @@ class NoSQLClient (object):
         coll = self._table('pvp_season_prizes')
         if not self.seen_pvp_season_prizes:
             try:
-                coll.create_index('season')  #, unique=True)
+                coll.create_index('_id', unique=True)
             except pymongo.errors.OperationFailure:
                 # temporary - this can complain if the existing index has unique=True
                 pass
@@ -1057,17 +1057,17 @@ class NoSQLClient (object):
         return self.instrument('check_pvp_season_prize_status(%s)'%reason, self._check_pvp_season_prize_status, (season))
     def _check_pvp_season_prize_status(self, season):
         tbl = self.pvp_season_prizes_table()
-        row = tbl.find_one({'season':season})
+        row = tbl.find_one({'_id':season})
         if row:
             return row['prizes_sent']
-        tbl.insert_one({'season':season, 'prizes_sent':False})
+        tbl.insert_one({'_id':season, 'prizes_sent':False})
         return False
 
     def set_pvp_season_prize_status(self, season, status, reason=''):
         return self.instrument('set_pvp_season_prize_status(%s)'%reason, self._set_pvp_season_prize_status, (season, status))
     def _set_pvp_season_prize_status(self, season, status):
         tbl = self.pvp_season_prizes_table()
-        success = tbl.update_one({'season': season}, {'$set': {'prizes_sent': status}}).matched_count > 0
+        success = tbl.update_one({'_id': season}, {'$set': {'prizes_sent': status}}).matched_count > 0
         if not success:
             return 'ok'
         else:
