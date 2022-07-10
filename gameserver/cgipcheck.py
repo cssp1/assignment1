@@ -749,7 +749,7 @@ def do_lookup(args):
     return out
 
 def do_pvp_season_prizes(method, season):
-    cmd_args = ['--winners','--tournament-stat trophies_pvp','--score-time-scope season','--score-space-scope continent','--send-prizes']
+    cmd_args = ['--winners','--tournament-stat=trophies_pvp','--score-time-scope=season','--score-space-scope=continent','--send-prizes']
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
     season_ui_offset = gamedata['matchmaking'].get('season_ui_offset', 0)
