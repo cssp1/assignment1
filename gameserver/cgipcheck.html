@@ -84,7 +84,16 @@ var confirm_dialog = function(msg, yes_cb) {
 };
 
 var method_bh_acct_lookup = function() {
-    return;
+    var ident = get_bh_acct_ident();
+    $('#per_bh_acct').hide();
+    $('#bh_acct_lookup_output')[0].value = '';
+    ident['get-bh-acct-info-only'] = 'get-bh-acct-info-only';
+    send_request('player', 'lookup', ident, function(result) {
+        $('#per_bh_acct').show();
+        $('#bh_acct_tools').show();
+        $('#bh_acct_lookup_output')[0].value = result.toString();
+        $('#bh_acct_lookup_output').elastic();
+    });
 }
 
 var payment_lookup = function() {
@@ -96,7 +105,7 @@ var payment_lookup = function() {
             var data = JSON.parse(result);
             $('#per_payment').show();
             $('#payment_lookup_output')[0].value = JSON.stringify(data, null, 2);
-            $('#payment_lookup_output').elastic("update");
+            $('#payment_lookup_output').elastic();
 
             var status = 'Unknown';
             var is_disputed = false, is_refundable = false;
@@ -184,9 +193,24 @@ var get_ident = function() {
     } else if(t == 'battlehouse_id') {
         var sid = $("#battlehouse_id")[0].value;
         if(!sid) { return null; }
-        //if(sid.length != 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
+        if(sid.length < 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
         return {'battlehouse_id':sid};
     }
+};
+
+var get_bh_acct_ident = function() {
+    if({0: 'bh_acct_lookup_by_user_id', 1: 'player_lookup_by_battlehouse_id'}[$('#bh_com_acct_lookup').tabs("option","active")] == 'bh_acct_lookup_by_user_id') {
+        var suser_id = $("#bh_acct_user_id")[0].value;
+        if(!suser_id) { return null; }
+        var user_id = parseInt(suser_id);
+        if(isNaN(user_id)) { alert("Bad User ID value: "+suser_id); return null; }
+        return {'user_id':user_id};
+    } else {
+        var sid = $("#bh_acct_battlehouse_id")[0].value;
+        if(!sid) { return null; }
+        if(sid.length < 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
+        return {'battlehouse_id':sid};
+    };
 };
 
 var pretty_ident = function(ident) {
@@ -243,7 +267,7 @@ var method_lookup = function() {
             $('#per_player').show();
             $('#player_tools').show();
             $('#lookup_output')[0].value = result.toString();
-            $('#lookup_output').elastic("update");
+            $('#lookup_output').elastic();
         });
     }
 }
@@ -460,12 +484,29 @@ var method_unban = function() {
         send_request('player', 'unban', $.extend(ident, {'ui_reason':ui_reason}), function(result) { display_response("Success!"); });
     }
 };
+var method_merge_bh_id = function(other_bh_id, master_or_slave) {
+    var ident = get_bh_acct_ident();
+    var ui_reason = check_ui_reason($("#bh_acct_merge_reason")[0].value);
+    var use_first = $("#merge_bh_acct_use_first_acct")[0].value;
+    args = {'ui_reason': ui_reason, 'use_first': use_first, 'master_or_slave': master_or_slave, 'other_bh_id':other_bh_id};
+    if(ident && ui_reason) {
+        send_request('player', 'merge_bh_id', $.extend(ident, args), function(result) { display_response("Success!"); });
+    }
+}
 var method_unmerge_bh_id = function() {
-    var ident = get_ident();
-    var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
+    var ident = get_bh_acct_ident();
+    var ui_reason = check_ui_reason($("#bh_acct_merge_reason")[0].value);
     args = {'ui_reason': ui_reason};
     if(ident && ui_reason) {
         send_request('player', 'unmerge_bh_id', $.extend(ident, args), function(result) { display_response("Success!"); });
+    }
+}
+var method_undelete_bh_id = function() {
+    var ident = get_bh_acct_ident();
+    var ui_reason = check_ui_reason($("#bh_acct_undelete_reason")[0].value);
+    args = {'ui_reason': ui_reason};
+    if(ident && ui_reason) {
+        send_request('player', 'undelete_bh_id', $.extend(ident, args), function(result) { display_response("Success!"); });
     }
 }
 var method_vpn_excuse = function() {
@@ -796,7 +837,7 @@ var method_get_all_alts = function() {
             $('#per_player').show();
             $('#player_tools').show();
             $('#lookup_output')[0].value = result.toString();
-            $('#lookup_output').elastic("update");
+            $('#lookup_output').elastic();
         });
     }
 }
@@ -1812,6 +1853,17 @@ var refresh_clock = function() {
     window.setTimeout(refresh_clock, 10*1000);
 };
 
+var method_event_pvp_season_action = function(method, season) {
+    $('#per_event').hide();
+    $('#event_pvp_season_lookup_output')[0].value = '';
+    var args = { 'season':season };
+    send_request('event', method, args, function(result) {
+        $('#per_event').show();
+        $('#event_pvp_season_lookup_output')[0].value = result.toString();
+        $('#event_pvp_season_lookup_output').elastic();
+    });
+}
+
 // see http://stackoverflow.com/questions/14859281/select-tab-by-name-in-jquery-ui-1-10-0
 $.fn.tabIndex = function () {
     return $(this).parent().find(this).index();
@@ -1825,11 +1877,18 @@ $(function() {
     if(spin_token_data['roles'].indexOf('ADMIN') == -1) {
        $('#mode_server_tab').remove();
        $('#mode_server').remove();
+       $('#event_pvp_season_admin').remove();
        //$('#mode_logs_tab').remove(); Logs now viewable by all as of 2022-01-01
        //$('#mode_logs').remove();
     } else {
        $('#server_status').bind('show', function() { console.log("HERE"); });
     }
+    if(spin_game_id === 'fs') { // when invitational tournament is ready, ensure they show for FS
+        $('#mode_events_tab').remove();
+        $('#mode_events').remove();
+    }
+    $('#mode_exploits_tab').remove(); // exploits tab not yet implemented
+    $('#mode_exploits').remove(); // exploits tab not yet implemented
 
     // whenever server mode is made active, send a status query
     var on_mode_activate = function(panel) {
@@ -1902,7 +1961,6 @@ $(function() {
 
     $('#player_lookup').tabs();
     $('#user_id').spinner({min:0, step:1});
-
     // Pressing Enter while focused on a "Find by..." field should trigger the user lookup
     ['#user_id','#facebook_id','#battlehouse_id'].forEach(function (id) {
         $(id).keyup(function(event) {
@@ -1911,8 +1969,20 @@ $(function() {
             }
         });
     });
-
     $('#player_tools').tabs();
+
+    $('#bh_com_acct_lookup').tabs();
+    $('#bh_acct_user_id').spinner({min:0, step:1});
+    // Pressing Enter while focused on a "Find by..." field should trigger the user lookup
+    ['#bh_acct_user_id','#bh_acct_battlehouse_id'].forEach(function (id) {
+        $(id).keyup(function(event) {
+            if(event.keyCode === 13) {
+                method_bh_acct_lookup();
+            }
+        });
+    });
+    $('#bh_acct_tools').tabs();
+
     $('#lookup_output').elastic();
     $('#send_message_body').elastic();
     $('#chat_gag_duration').spinner({max:240, min:1, step:1});
@@ -1935,6 +2005,8 @@ $(function() {
     } else {
         $('#change_region_refresh_banishment_controls').remove();
     }
+
+    $('#event_pvp_season').spinner({max:1000, min:1, step:1});
 
     $('#gamebucks_amount').spinner({max:50000, min:0, step:100});
     $('#pvp_score_amount').spinner({max:500, min:0, step:1});
@@ -2205,9 +2277,6 @@ $(function() {
                     <br>
                     <input type="text" id="alts_vpn_migrate_reason" style="width:500px;">
                 </p>
-                <p>
-                    <button onclick="method_unmerge_bh_id()" class="spin_button">Unmerge BH IDs</button>
-                </p>
             </div>
 
             <div id="player_tools_ban">
@@ -2311,15 +2380,60 @@ $(function() {
 </div> <!-- END mode_player -->
 
 <div id="mode_bh_com_acct">
-
     <div id="bh_com_acct_lookup">
-        Battlehouse ID: <input type="text" id="battlehouse_id" name="battlehouse_id"><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
+        <ul>
+            <li><a href="#bh_acct_lookup_by_user_id">Find by User ID</a></li>
+            <li><a href="#bh_acct_lookup_by_battlehouse_id">Find by Battlehouse ID</a></li>
+        </ul>
+        <div id="bh_acct_lookup_by_user_id">
+            User ID: <input type="text" id="bh_acct_user_id" name="bh_acct_user_id" autofocus><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
+        </div>
+        <div id="bh_acct_lookup_by_battlehouse_id">
+            Battlehouse ID: <input type="text" id="bh_acct_battlehouse_id" name="bh_acct_battlehouse_id"><button onclick="method_bh_acct_lookup()" class="spin_button">Lookup</button>
+        </div>
     </div>
-
     <hr>
-    <p>
-        This feature is not functional yet. It will display all battlehouse.com account information and give access to Merge, Unmerge, Ban, and Unban functions.
-    </p>
+
+    <div id="per_bh_acct" style="position:relative;display:none;">
+        <textarea id="bh_acct_lookup_output" readonly style="width:100%;height:10%;border-style:inset;border-width:2px;font-family:monospace;font-size:11px;"></textarea>
+
+        <hr>
+
+        <div id="bh_acct_tools" style="display:none;">
+            <ul>
+                <li><a href="#bh_acct_tools_merge" id="bh_acct_tools_merge_header">Merge/Unmerge</a></li>
+                <li><a href="#bh_acct_tools_undelete" id="bh_acct_tools_undelete_header">Undelete</a></li>
+            </ul>
+
+            <div id="bh_acct_tools_merge">
+                <p>
+                    Other Battlehouse ID: <input type="text" id="merge_bh_acct_other_id" name="merge_bh_acct_other_id">
+                    <button onclick="method_merge_bh_id($('#merge_bh_acct_other_id').spinner('value'), 'master')" class="spin_button" style="width:250px;">Merge as Primary</button>
+                    <button onclick="method_merge_bh_id($('#merge_bh_acct_other_id').spinner('value'), 'slave')" class="spin_button" style="width:250px;">Merge as Secondary</button>
+                    <br>
+                    <input id="merge_bh_acct_use_first_acct" type="checkbox" style="height:initial;"></input>Use first associated BH account. Only check this if you receive an error.
+                </p>
+                <p>
+                    <button onclick="method_unmerge_bh_id()" class="spin_button">Unmerge</button>
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="bh_acct_merge_reason" style="width:500px;">
+                </p>
+            </div>
+            <div id="bh_acct_tools_undelete">
+                <p>
+                    <button onclick="method_undelete_bh_id()" class="spin_button">Undelete</button>
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="bh_acct_undelete_reason" style="width:500px;">
+                </p>
+            </div>
+        </div>
+    </div>
 
 </div> <!-- END mode_bh_com_acct -->
 
@@ -2365,9 +2479,27 @@ $(function() {
 </div> <!-- END mode_exploits -->
 
 <div id="mode_events">
-    <p>
-        This feature is not functional yet. It will display PvP tournament winners, invitational clan war winners, and have buttons to distribute prizes.
-    </p>
+    <div id="event_pvp_season_lookup">
+        PvP Season: <input type="text" id="event_pvp_season" name="event_pvp_season" value="$SEASON_UI$">
+        <br>
+        <button onclick="method_event_pvp_season_action('pvp_season_list_winners', $('#event_pvp_season').spinner('value'))" class="spin_button">List Winners</button> <button onclick="method_event_pvp_season_action('pvp_season_give_prizes', $('#event_pvp_season').spinner('value'))" class="spin_button">Give Prizes</button>
+    </div>
+    <hr>
+
+    <div id="per_event" style="position:relative;display:none;">
+        <textarea id="event_pvp_season_lookup_output" readonly style="width:100%;height:10%;border-style:inset;border-width:2px;font-family:monospace;font-size:11px;"></textarea>
+
+        <hr>
+
+        <div id="event_pvp_season_admin">
+            Admin Only:<br>
+            <button onclick="method_event_pvp_season_action('pvp_season_disable_pcheck', $('#event_pvp_season').spinner('value'))" class="spin_button">Disable PCHECK</button>
+            <br> Click to mark season as already distributed so PCHECK can't give prizes a second time.
+            <br> Only admin users can see this.
+            <br> The "Give Prizes" button above duplicates this button function after giving out prizes.
+        </div>
+    </div>
+
 </div> <!-- END mode_events -->
 
 <div id="mode_server">

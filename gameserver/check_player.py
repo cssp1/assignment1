@@ -309,6 +309,74 @@ def is_expired_alt(entry):
         return True # this is an expired alt
     return False # this is a valid alt
 
+def display_bh_acct_info(user_id, player):
+    if not BHAPI.supported():
+        print fmt % ('---BHAPI not supported, cannot look up---', '')
+        return
+    bh_id = None
+    db_client = init_db_client()
+    social_ids = db_client.spinpunch_to_social_id_all(user_id)
+    for id in social_ids:
+        if id.startswith('bh'):
+            do_display_bh_acct_info(str(id)[2:])
+            bh_id = id
+    if not bh_id:
+        print fmt % ('---Unable to Locate Battlehouse Account for %d---' % user_id, '')
+
+def do_display_bh_acct_info(bh_id):
+    print fmt % ('---Battlehouse Account Info---', '')
+    print fmt % ('ID: %s' % bh_id, '')
+    print '\n'
+    bh_user_raw = BHAPI.BHAPI_raw('/user/'+bh_id, error_on_404 = False)
+    if bh_user_raw == 'NOTFOUND':
+        print fmt % ('This Battlehouse account has been deleted by the user and is now blank.', '')
+    else:
+        bh_user = SpinJSON.loads(bh_user_raw)
+        if bh_user.get('banned'):
+            print fmt % ('THIS BATTLEHOUSE ACCOUNT IS BANNED!', '')
+        elif bh_user.get('deleted'):
+            print fmt % ('THIS BATTLEHOUSE ACCOUNT IS MARKED DELETED AND IS NOT ACCESSIBLE!', '')
+            deletion_time = bh_user.get('deleted_time', time_now) + 30*86400
+            deletion_time_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(deletion_time))
+            print fmt % ('LOGINSERVER WILL PURGE ACCOUNT RECORD ON %s' % deletion_time_str.upper(), '')
+        if bh_user.get('merged_to'):
+            print fmt % ('THIS BATTLEHOUSE ACCOUNT WAS MERGED AND IS NO LONGER ACCESSIBLE!', '')
+            ui_merged_to = bh_user['merged_to']
+            ui_merged_to += ' (' + trace_bh_account_merges(db_client, bh_user['merged_to']) + ')'
+            print fmt % ('Merged to account:', ui_merged_to)
+
+        ui_creation_provider = bh_user.get('creation_provider', 'unknown')
+        if ui_creation_provider == 'local':
+            ui_creation_provider = 'email'
+            print fmt % ('Login Provider:', ui_creation_provider)
+        if bh_user.get('creation_provider_id'):
+            print fmt % ('Login Provider ID:', bh_user['creation_provider_id'])
+        if bh_user.get('real_name'):
+            print fmt % ('Real Name:', bh_user['real_name'])
+        if bh_user.get('ui_name'):
+            print fmt % ('Display Callsign:', bh_user['ui_name'] + (' (custom)' if bh_user.get('name_source','') == 'custom' else ' (assigned)'))
+        if bh_user.get('ui_email'):
+            print fmt % ('Email Address:', bh_user['ui_email'] + (' (verified)' if bh_user.get('email_verified') else ' (NOT verified)'))
+        bh_creat = bh_user.get('creation_time',1)
+        bh_creat_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_creat))
+        print fmt % ('BH Account age:', '%0.1f days (created %s)' % (float(time_now - bh_creat)/(24*60*60), bh_creat_str))
+        print fmt % ('Creation IP:', bh_user['creation_ip'])
+        print fmt % ('Last Login:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('last_login_time',1))))
+        print fmt % ('Last IP:', bh_user['last_login_ip'])
+        print fmt % ('Last TOS Accepted:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('last_tos_accept_time',1))))
+        if bh_user.get('privacy_consent', False):
+            print fmt % ('Privacy Terms Accepted:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('privacy_consent_time',1))))
+        if bh_user.get('web_push_notifications_enabled') or bh_user.get('facebook_notifications_enabled') or bh_user.get('email_notifications_enabled') or bh_user.get('wns_notifications_enabled'):
+            print fmt % ('Enabled Notifications:', '')
+            if bh_user.get('web_push_notifications_enabled'):
+                print fmt % ('', 'Web Push')
+            if bh_user.get('facebook_notifications_enabled'):
+                print fmt % ('', 'Facebook')
+            if bh_user.get('email_notifications_enabled'):
+                print fmt % ('', 'Emails')
+            if bh_user.get('wns_notifications_enabled'):
+                print fmt % ('', 'WNS')
+
 # main program
 if __name__ == '__main__':
     import codecs
@@ -322,7 +390,7 @@ if __name__ == '__main__':
                                                       'give-alloy=', 'give-protection-time=', 'give-item=', 'melt-hours=', 'item-stack=', 'item-log-reason=',
                                                       'give-item-subject=', 'give-item-body=',
                                                       'send-message', 'message-subject=', 'message-body=', 'message-sender=', 'message-expire-time=', 'message-expire-in=',
-                                                      'check-ip-reputation', 'get-all-alts',
+                                                      'check-ip-reputation', 'get-all-alts', 'get-bh-acct-info-only'
                                                        ])
 
 
@@ -357,6 +425,7 @@ if __name__ == '__main__':
     do_unisolate = False
     do_check_ip_reputation = False
     get_all_alts = False
+    get_bh_acct_info_only = False
     give_item = None
     send_message = False
     message_sender = 'Customer Support'
@@ -455,6 +524,8 @@ if __name__ == '__main__':
             do_check_ip_reputation = True
         elif key == '--get-all-alts':
             get_all_alts = True
+        elif key == '--get-bh-acct-info-only':
+            get_bh_acct_info_only = True
 
     if len(args) > 0:
         user_id = int(args[0])
@@ -555,6 +626,10 @@ if __name__ == '__main__':
                 print ' - The S3 settings passed on the command line or in config.json may be incorrect'
                 sys.exit(1)
 
+        if get_bh_acct_info_only:
+            display_bh_acct_info(user_id, player)
+            sys.exit(0)
+
         if do_put_user:
             user = SpinJSON.load(open(user_filename))
         else:
@@ -627,7 +702,7 @@ if __name__ == '__main__':
         for id in social_ids:
             if id.startswith('bh'):
                 if not bh_id:
-                    bh_id = id
+                    bh_id = str(id)[2:]
                     bh_id_line = 'Battlehouse ID:'
                 else:
                     if str(id)[2:] == bh_id: continue

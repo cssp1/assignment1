@@ -198,6 +198,7 @@ class NoSQLClient (object):
         self.seen_player_cache_indexes = set()
         self.seen_player_aliases = False
         self.seen_facebook_ids = False
+        self.seen_pvp_season_prizes = False
         self.seen_messages = False
         self.seen_ctrl_queue = False
         self.seen_player_portraits = False
@@ -1037,6 +1038,40 @@ class NoSQLClient (object):
             else:
                 raise
         # shouldn't get here
+
+
+    ###### PvP Season Award Status ######
+    # keys are season numbers
+    def pvp_season_prizes_table(self):
+        coll = self._table('pvp_season_prizes')
+        if not self.seen_pvp_season_prizes:
+            try:
+                coll.create_index('_id', unique=True)
+            except pymongo.errors.OperationFailure:
+                # temporary - this can complain if the existing index has unique=True
+                pass
+            self.seen_pvp_season_prizes = True
+        return coll
+
+    def check_pvp_season_prize_status(self, season, reason=''):
+        return self.instrument('check_pvp_season_prize_status(%s)'%reason, self._check_pvp_season_prize_status, (season,))
+    def _check_pvp_season_prize_status(self, season):
+        tbl = self.pvp_season_prizes_table()
+        row = tbl.find_one({'_id':season})
+        if row:
+            return row['prizes_sent']
+        tbl.insert_one({'_id':season, 'prizes_sent':False})
+        return False
+
+    def set_pvp_season_prize_status(self, season, status, reason=''):
+        return self.instrument('set_pvp_season_prize_status(%s)'%reason, self._set_pvp_season_prize_status, (season, status))
+    def _set_pvp_season_prize_status(self, season, status):
+        tbl = self.pvp_season_prizes_table()
+        success = tbl.update_one({'_id': season}, {'$set': {'prizes_sent': status}}).matched_count > 0
+        if success:
+            return 'Season %d prize status set to %r' % (season, success)
+        else:
+            return 'Season %d not found' % season
 
     ###### SOCIAL (FACEBOOK/KONGREGATE) ID MAP ######
 
@@ -2803,7 +2838,7 @@ if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks', 'benchmark',
                                                         'winners', 'send-prizes', 'prize-item=', 'prize-qty=', 'in-the-money-players=', 'in-the-money-alliances=', 'min-participation=', 'min-points=',
                                                         'leaders', 'tournament-stat=', 'tournament-stat-challenge-key=', 'week=', 'season=', 'game-id=',
-                                                        'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=', 'patron-rewards',
+                                                        'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=', 'patron-rewards', 'test-prizes', 'pcheck-prizes',
                                                         'recache-alliance-scores', 'test', 'config-name='])
     game_instance = SpinConfig.config['game_id']
     mode = None
@@ -2825,6 +2860,8 @@ if __name__ == '__main__':
     time_now = int(time.time())
     maint_region = None
     config_name = None
+    test_prizes = False
+    pcheck_prizes = False
 
     for key, val in opts:
         if key == '--reset': mode = 'reset'
@@ -2835,6 +2872,8 @@ if __name__ == '__main__':
         elif key == '--region-maint': mode = 'region-maint'; maint_region = val # region maintenance
         elif key == '--winners': mode = 'winners'
         elif key == '--send-prizes': send_prizes = True
+        elif key == '--test-prizes': test_prizes = True
+        elif key == '--pcheck-prizes': pcheck_prizes = True
         elif key == '--prize-item': prize_item = val
         elif key == '--prize-qty': prize_qty = int(val)
         elif key == '--in-the-money-players': in_the_money_players = int(val)
@@ -2925,12 +2964,15 @@ if __name__ == '__main__':
         commands = []
         for patron_list, prize, patron_level in ((captains, captain_prize, 'Captain'), (majors, major_prize, 'Major'), (colonels, colonel_prize, 'Colonel')):
             for player in patron_list:
-                commands.append(['./check_player.py', '%d' % player,
-                                 '--give-item', 'gamebucks', '--melt-hours', '-1',
-                                 '--item-stack', '%d' % (prize),
-                                 '--give-item-subject', 'Monthly Patron Reward: %s' % patron_level,
-                                 '--give-item-body', 'Congratulations, here is your Patron reward for %s! Click the reward to collect it.' % (datetime.datetime.now().strftime('%B'),),
-                                 '--item-log-reason', 'patreon_reward_%s_%s' % (patron_level.lower(), datetime.datetime.now().strftime('%Y-%m'))])
+                if test_prizes:
+                    print 'Test mode: Player %d would receive %d gold if run without --test-prizes' % (player, prize)
+                else:
+                    commands.append(['./check_player.py', '%d' % player,
+                                     '--give-item', 'gamebucks', '--melt-hours', '-1',
+                                     '--item-stack', '%d' % (prize),
+                                     '--give-item-subject', 'Monthly Patron Reward: %s' % patron_level,
+                                     '--give-item-body', 'Congratulations, here is your Patron reward for %s! Click the reward to collect it.' % (datetime.datetime.now().strftime('%B'),),
+                                     '--item-log-reason', 'patreon_reward_%s_%s' % (patron_level.lower(), datetime.datetime.now().strftime('%Y-%m'))])
         if len(commands) > 0:
             print "COMMANDS"
             def quote(s):
@@ -3056,10 +3098,14 @@ if __name__ == '__main__':
             ui_score_time_scope = {Scores2.FREQ_ALL: 'ALL-TIME',
                                    Scores2.FREQ_SEASON: 'SEASONAL',
                                    Scores2.FREQ_WEEK: 'WEEKLY'}[score_time_scope]
-
-            print '[color="#FFFF00"]TOP %s %s ALLIANCES FOR %sWEEK %d%s[/color]' % \
-                  (ui_score_time_scope, tournament_stat, 'SEASON %d ' % (season+gamedata['matchmaking']['season_ui_offset']) if season >= 0 else '', week,
-                   (' IN '+gamedata['continents'][score_space_loc]['ui_name']) if score_space_scope == Scores2.SPACE_CONTINENT else '')
+            color_start = '[color="#FFFF00"]'
+            color_end = '[/color]'
+            if pcheck_prizes:
+                color_start = ''
+                color_end = ''
+            print '%sTOP %s %s ALLIANCES FOR %sWEEK %d%s%s' % \
+                  (color_start, ui_score_time_scope, tournament_stat, 'SEASON %d ' % (season+gamedata['matchmaking']['season_ui_offset']) if season >= 0 else '', week,
+                   (' IN '+gamedata['continents'][score_space_loc]['ui_name']) if score_space_scope == Scores2.SPACE_CONTINENT else '', color_end)
 
             # (ranking data, alliance info, list of member IDs) for each ranked alliance
             data = zip(top_alliances,
@@ -3085,7 +3131,12 @@ if __name__ == '__main__':
                 rank['rank'] = i
 
                 print ''
-                print '%d) [COLOR="#FFD700"]%s[/COLOR] with %d points (id %5d)' % (rank['rank']+1, info['ui_name'], rank['absolute'], rank['alliance_id'])
+                color_start = '[COLOR="#FFD700"]'
+                color_end = '[/COLOR]'
+                if pcheck_prizes:
+                    color_start = ''
+                    color_end = ''
+                print '%d) %s%s%s with %d points (id %5d)' % (rank['rank']+1, color_start, info['ui_name'], color_end, rank['absolute'], rank['alliance_id'])
 
                 if i >= len(PRIZES): continue
                 alliance_prize = PRIZES[i]
@@ -3144,7 +3195,13 @@ if __name__ == '__main__':
                                     reverse = True)
 
                 player_prize = alliance_prize / min(len(scored_members), WINNERS)
-                print '[COLOR="#FFFFFF"]Winners receive %s %s each:[/COLOR]' % (player_prize, gamedata['store']['gamebucks_ui_name'])
+
+                color_start = '[color="#FFFFFF"]'
+                color_end = '[/color]'
+                if pcheck_prizes:
+                    color_start = ''
+                    color_end = ''
+                print '%sWinners receive %s %s each:%s' % (color_start, player_prize, gamedata['store']['gamebucks_ui_name'], color_end)
 
                 for j in xrange(len(scored_members)):
                     member = scored_members[j]
@@ -3211,24 +3268,31 @@ if __name__ == '__main__':
                         else:
                             ui_time = ''
 
-                        commands.append(['./check_player.py', '%d' % member['user_id'],
-                                         '--give-item', prize_item, '--melt-hours', '-1',
-                                         '--item-stack', '%d' % (prize_qty if prize_qty > 0 else my_prize),
-                                         '--give-item-subject', 'Tournament Prize',
-                                         '--give-item-body', 'Congratulations, here is your Tournament prize%s! Click the prize to collect it.' % (ui_time,),
-                                         '--item-log-reason', 'tournament_prize_s%d_w%d' % (season, week)])
+                        if not test_prizes:
+                            commands.append(['./check_player.py', '%d' % member['user_id'],
+                                             '--give-item', prize_item, '--melt-hours', '-1',
+                                             '--item-stack', '%d' % (prize_qty if prize_qty > 0 else my_prize),
+                                             '--give-item-subject', 'Tournament Prize',
+                                             '--give-item-body', 'Congratulations, here is your Tournament prize%s! Click the prize to collect it.' % (ui_time,),
+                                             '--item-log-reason', 'tournament_prize_s%d_w%d' % (season, week)])
 
-            print "COMMANDS"
-            def quote(s):
-                if ' ' in s: return "'"+s+"'"
-                return s
-            print '\n'.join(' '.join(quote(word) for word in cmd) for cmd in commands)
-            if send_prizes:
-                import subprocess, os
-                print "SENDING PRIZES"
-                for cmd in commands:
-                    subprocess.check_call(cmd, stdout=open(os.devnull,"w"))
-                print "PRIZES ALL SENT OK"
+            if not test_prizes and not client.check_pvp_season_prize_status(season, reason='send_prizes_check'):
+                print "COMMANDS"
+                def quote(s):
+                    if ' ' in s: return "'"+s+"'"
+                    return s
+                print '\n'.join(' '.join(quote(word) for word in cmd) for cmd in commands)
+                if send_prizes:
+                    import subprocess, os
+                    print "SENDING PRIZES"
+                    for cmd in commands:
+                        subprocess.check_call(cmd, stdout=open(os.devnull,"w"))
+                    client.set_pvp_season_prize_status(season, True, reason='send_prizes_complete')
+                    print "PRIZES ALL SENT OK"
+            if client.check_pvp_season_prize_status(season, reason='send_prizes_check'):
+                print '\nPrizes already sent.'
+            else:
+                print '\nPrizes not sent yet.'
 
 
     elif mode == 'benchmark':
