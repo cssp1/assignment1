@@ -23273,7 +23273,7 @@ class GAMEAPI(resource.Resource):
             old_name = session.user.get_ui_name(session.player)
 
             if gamesite.nosql_client.player_alias_exists(new_alias) or \
-               not gamesite.nosql_client.player_alias_claim(new_alias.lower()):
+               not gamesite.nosql_client.player_alias_claim(new_alias.lower(), session.player.user_id):
                 retmsg.append(["ERROR", "ALIAS_TAKEN"])
                 return False
             if old_alias:
@@ -29282,6 +29282,10 @@ class GAMEAPI(resource.Resource):
         # tell the browser what we think of the player's alt status
         has_alts, alt_platforms = session.player.has_alts()
         retmsg.append(["HAS_ALTS_UPDATE", has_alts, alt_platforms])
+
+        # check if alias is properly associated with user_id, update if it isn't
+        if session.player.alias and gamesite.nosql_client.player_alias_to_spinpunch(session.player.alias.lower(), reason='checking if alias has user_id') == -1:
+            gamesite.nosql_client.player_alias_update(session.player.alias.lower(), session.player.user_id)
 
         # tell the browser what we think of the player's alt status
         social_platforms = session.player.social_platforms()

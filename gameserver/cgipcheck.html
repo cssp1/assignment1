@@ -173,7 +173,7 @@ var payment_lookup = function() {
 };
 
 var get_ident_type = function() {
-    return {0: 'user_id', 1: 'facebook_id', 2: 'battlehouse_id'}[$('#player_lookup').tabs("option","active")];
+    return {0: 'user_id', 1: 'facebook_id', 2: 'battlehouse_id', 3: 'alias'}[$('#player_lookup').tabs("option","active")];
 };
 
 var get_ident = function() {
@@ -195,6 +195,10 @@ var get_ident = function() {
         if(!sid) { return null; }
         if(sid.length < 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
         return {'battlehouse_id':sid};
+    } else if(t == 'alias') {
+        var sid = $("#alias")[0].value;
+        if(!sid) { return null; }
+        return {'alias':sid};
     }
 };
 
@@ -1972,7 +1976,7 @@ $(function() {
     $('#player_lookup').tabs();
     $('#user_id').spinner({min:0, step:1});
     // Pressing Enter while focused on a "Find by..." field should trigger the user lookup
-    ['#user_id','#facebook_id','#battlehouse_id'].forEach(function (id) {
+    ['#user_id','#facebook_id','#battlehouse_id','#alias'].forEach(function (id) {
         $(id).keyup(function(event) {
             if(event.keyCode === 13) {
                 method_lookup();
@@ -2075,6 +2079,7 @@ $(function() {
             <li><a href="#player_lookup_by_user_id">Find by User ID</a></li>
             <li><a href="#player_lookup_by_facebook_id">Find by Facebook ID</a></li>
             <li><a href="#player_lookup_by_battlehouse_id">Find by Battlehouse ID</a></li>
+            <li><a href="#player_lookup_by_alias">Find by Alias</a></li>
         </ul>
         <div id="player_lookup_by_user_id">
             User ID: <input type="text" id="user_id" name="user_id" autofocus><button onclick="method_lookup()" class="spin_button">Lookup</button>
@@ -2084,6 +2089,9 @@ $(function() {
         </div>
         <div id="player_lookup_by_battlehouse_id">
             Battlehouse ID: <input type="text" id="battlehouse_id" name="battlehouse_id"><button onclick="method_lookup()" class="spin_button">Lookup</button>
+        </div>
+        <div id="player_lookup_by_alias">
+            Alias: <input type="text" id="alias" name="alias"><button onclick="method_lookup()" class="spin_button">Lookup</button>
         </div>
     </div>
 

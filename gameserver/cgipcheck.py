@@ -411,6 +411,14 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                         user_id = int(nosql_client.social_id_to_spinpunch_single(sid, False))
                         del control_args['battlehouse_id']
                         control_args['user_id'] = user_id
+                    elif 'alias' in control_args:
+                        alias = control_args['alias']
+                        user_id = int(nosql_client.player_alias_to_spinpunch(alias, False))
+                        if user_id == -1:
+                            result['error'] = 'Alias returned a user_id of -1. Alias does not exist or player has not logged in since this function was added.'
+                            return result
+                        del control_args['alias']
+                        control_args['user_id'] = user_id
                     if control_args['include_alts'] == '1':
                         alt_set = get_alt_set(user_id, set([user_id]), aggressive_alt_identification)
                     if control_args['include_alts_recursive'] == '1':
@@ -735,6 +743,8 @@ def do_lookup(args):
         cmd_args += ['--facebook-id', args['facebook_id']]
     elif 'battlehouse_id' in args:
         cmd_args += ['--battlehouse-id', args['battlehouse_id']]
+    elif 'alias' in args:
+        cmd_args += ['--alias', args['alias']]
     else:
         raise Exception('must pass user_id, facebook_id, or battlehouse_id')
     if 'get-all-alts' in args:
