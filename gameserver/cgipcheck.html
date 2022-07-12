@@ -509,6 +509,16 @@ var method_undelete_bh_id = function() {
         send_request('player', 'undelete_bh_id', $.extend(ident, args), function(result) { display_response("Success!"); });
     }
 }
+var method_rename_bh_id = function() {
+    var ident = get_bh_acct_ident();
+    var ui_reason = check_ui_reason($("#bh_acct_rename_reason")[0].value);
+    var new_name = $("#bh_acct_rename_new_name")[0].value;
+    var force = $("#bh_acct_rename_force")[0].value;
+    args = {'ui_reason': ui_reason, 'new_name': new_name, 'force':force};
+    if(ident && ui_reason) {
+        send_request('player', 'rename_bh_id', $.extend(ident, args), function(result) { display_response("Success!"); });
+    }
+}
 var method_vpn_excuse = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#alts_vpn_migrate_reason")[0].value);
@@ -2403,6 +2413,7 @@ $(function() {
             <ul>
                 <li><a href="#bh_acct_tools_merge" id="bh_acct_tools_merge_header">Merge/Unmerge</a></li>
                 <li><a href="#bh_acct_tools_undelete" id="bh_acct_tools_undelete_header">Undelete</a></li>
+                <li><a href="#bh_acct_tools_rename" id="bh_acct_tools_rename_header">Rename</a></li>
             </ul>
 
             <div id="bh_acct_tools_merge">
@@ -2432,6 +2443,21 @@ $(function() {
                     <input type="text" id="bh_acct_undelete_reason" style="width:500px;">
                 </p>
             </div>
+            <div id="bh_acct_tools_rename">
+                <p>
+                    New Name: <input type="text" id="bh_acct_rename_new_name" name="bh_acct_rename_new_name">
+                    <button onclick="method_rename_bh_id()" class="spin_button" style="width:250px;">Rename</button>
+                    <br><br>
+                    <input id="bh_acct_rename_force" type="checkbox" style="height:initial;"></input> Force: overrides name content requirements. Will not force if another account already has the provided name
+                </p>
+                <p>
+                    Reason for this action:
+                    <br>
+                    <input type="text" id="bh_acct_rename_reason" style="width:500px;">
+                </p>
+            </div>
+
+
         </div>
     </div>
 
