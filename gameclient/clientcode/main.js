@@ -20282,22 +20282,21 @@ function invoke_gift_prompt_dialog() {
  * @param {(!Array.<Object>|null)=} info_list - list of PlayerCache entries for giftable friends (if null, we will query)
  */
 function invoke_send_gifts(to_user, reason, info_list) {
-    if(read_predicate({'predicate':'LIBRARY', 'name': 'pre_release_tester'}).is_satisfied(player, null)) {
-        BHSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list);
-        return null;
-    }
-    if(spin_frame_platform === 'fb') {
-        call_with_facebook_permissions('user_friends', (function (_to_user, _reason, _info_list) { return function() {
-            FBSendRequests.invoke_send_gifts_dialog(_to_user, _reason, _info_list);
-        }; })(to_user, reason, info_list));
-        return null; // async!
-    } else if(spin_frame_platform === 'ag') {
-        return AGSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list || null);
-    } else if(spin_frame_platform === 'bh') {
-        return BHInvites.invoke_send_gifts_dialog(reason);
-    } else {
-        throw Error('unhandled frame_platform '+spin_frame_platform);
-    }
+    BHSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list);
+    /** old system, deprecated 2022-07-14
+        *if(spin_frame_platform === 'fb') {
+        *    call_with_facebook_permissions('user_friends', (function (_to_user, _reason, _info_list) { return function() {
+        *        FBSendRequests.invoke_send_gifts_dialog(_to_user, _reason, _info_list);
+        *    }; })(to_user, reason, info_list));
+        *    return null; // async!
+        *} else if(spin_frame_platform === 'ag') {
+        *    return AGSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list || null);
+        *} else if(spin_frame_platform === 'bh') {
+        *    return BHInvites.invoke_send_gifts_dialog(reason);
+        *} else {
+        *    throw Error('unhandled frame_platform '+spin_frame_platform);
+        * }
+    */
 };
 
 function invoke_motd_dialog(motd) {
