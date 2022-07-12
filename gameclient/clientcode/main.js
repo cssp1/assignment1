@@ -12718,7 +12718,7 @@ function init_desktop_dialogs() {
             dialog.widgets['friend_bar'].widgets['scroll_left'].onclick = friend_bar_scroller(-1);
             dialog.widgets['friend_bar'].widgets['scroll_right'].onclick = friend_bar_scroller(1);
 
-            dialog.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null) && can_show_friend_bar(player);
+            dialog.widgets['friend_bar'].show = can_show_friend_bar(player);
 
             dialog.widgets['friend_bar'].user_data['transition_start_time'] = -1;
             dialog.widgets['friend_bar'].user_data['maximized'] = !('friend_bar_minimized' in player.preferences && player.preferences['friend_bar_minimized']);
@@ -13007,7 +13007,7 @@ function scroll_friend_bar(dialog, page) {
 
 function update_friend_bar(dialog) {
     if(!dialog.parent) { return; } // dialog was closed
-    dialog.parent.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null) && can_show_friend_bar(player);
+    dialog.parent.widgets['friend_bar'].show = can_show_friend_bar(player);
 
     var t = (dialog.user_data['transition_start_time'] > 0 ? clamp((client_time - dialog.user_data['transition_start_time']) / dialog.data['transition_time'], 0, 1) : 1);
     var base_xy_max = vec_add(dialog.parent.data['widgets']['friend_bar']['xy'], dialog.data['xy']);
