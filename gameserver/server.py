@@ -26366,6 +26366,7 @@ class GAMEAPI(resource.Resource):
     class NotificationMessage(object):
         def __init__(self, sp_ref, fb_ref, replacements, text, frame_platform, format = None, locale = None):
             self.sp_ref = sp_ref
+            self.sp_send = True
             self.fb_ref = fb_ref
             self.format = format or 'game' # 'game' or 'bh', only as a cue to the client for how to display it
 
@@ -26394,7 +26395,7 @@ class GAMEAPI(resource.Resource):
                     self.ui_cta = self.apply_replacements(replacements, email_conf['ui_cta'])
                 elif frame_platform == 'bh':
                     if sp_ref != 'bh_web_push_incentive': # special case
-                        raise Exception('need full "email" data for notification ref %s' % sp_ref)
+                        self.sp_send = False
 
         def serialize(self): # return JSON format to send to client
             ret = {'format': self.format,
@@ -26412,6 +26413,7 @@ class GAMEAPI(resource.Resource):
             return text
 
     def send_offline_notification_bh(self, to_user_id, to_bh_id, message, mirror_to_facebook = False):
+        if not self.sp_send: return [] # bh_web_push_incentive is not present (desktop client. Aboart BH send)
         params = {'service': SpinConfig.game(),
                   'ui_body': message.ui_body.encode('utf-8'),
                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (message.sp_ref, message.fb_ref),
