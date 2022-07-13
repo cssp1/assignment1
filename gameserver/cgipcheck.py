@@ -746,7 +746,7 @@ def do_lookup(args):
     elif 'alias' in args:
         cmd_args += ['--alias', args['alias']]
     else:
-        raise Exception('must pass user_id, facebook_id, or battlehouse_id')
+        raise Exception('must pass user_id, facebook_id, battlehouse_id, or alias')
     if 'get-all-alts' in args:
         cmd_args += ['--get-all-alts']
     if 'get-bh-acct-info-only' in args:
