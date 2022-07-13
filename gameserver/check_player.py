@@ -399,6 +399,7 @@ if __name__ == '__main__':
     user_id = None
     facebook_id = None
     battlehouse_id = None
+    lookup_alias = None
     bloat = False
     abtests = False
     db_host = None
@@ -488,6 +489,8 @@ if __name__ == '__main__':
             facebook_id = str(val)
         elif key == '--battlehouse-id':
             battlehouse_id = str(val)
+        elif key == '--alias':
+            lookup_alias = str(val)
         elif key == '--game-id' or key == '-g':
             game_id = val
         elif key == '--give-alloy':
@@ -539,12 +542,13 @@ if __name__ == '__main__':
         print 'error! item "%s" not found in gamedata.items' % give_item
         sys.exit(1)
 
-    if user_id is None and facebook_id is None and battlehouse_id is None:
+    if user_id is None and facebook_id is None and battlehouse_id is None and lookup_alias is None:
         print 'usage: %s [options]' % sys.argv[0]
         print 'options:'
         print '    --user-id ID        choose player by game player ID'
         print '    --facebook-id ID    choose player by Facebook user ID'
         print '    --battlehouse-id ID    choose player by Battlehouse user ID'
+        print '    --alias ID          choose player by alias (callsign)'
         print ''
         print '    --game-id ID        look up users for game ID (either mf or tr)'
         print ''
@@ -603,6 +607,10 @@ if __name__ == '__main__':
         user_id = db_client.social_id_to_spinpunch_single(sid, False)
         if user_id < 0:
             raise Exception('No user found for this ID')
+    elif user_id is None and lookup_alias:
+        user_id = db_client.player_alias_to_spinpunch(lookup_alias)
+        if user_id < 0:
+            raise Exception('No user found for this alias.\nThis might mean the user has not logged in since this feature was added.')
 
     try:
         user_filename = '%d.txt' % (user_id)
