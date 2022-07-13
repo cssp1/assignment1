@@ -545,6 +545,7 @@ if __name__ == '__main__':
     if user_id is None and facebook_id is None and battlehouse_id is None and lookup_alias is None:
         print 'usage: %s [options]' % sys.argv[0]
         print 'your input: %r' % sys.argv
+        print 'parsed as: %r' % opts
         print 'options:'
         print '    --user-id ID        choose player by game player ID'
         print '    --facebook-id ID    choose player by Facebook user ID'
