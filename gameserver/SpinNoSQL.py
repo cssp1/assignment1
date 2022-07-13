@@ -1024,12 +1024,12 @@ class NoSQLClient (object):
         tbl = self.player_alias_table()
         return bool(tbl.find_one({'_id': alias}))
 
-    def player_alias_claim(self, alias, reason=''):
-        return self.instrument('player_alias_claim(%s)'%reason, self._player_alias_claim, (alias,))
-    def _player_alias_claim(self, alias):
+    def player_alias_claim(self, alias, user_id, reason=''):
+        return self.instrument('player_alias_claim(%s)'%reason, self._player_alias_claim, (alias, user_id,))
+    def _player_alias_claim(self, alias, user_id,):
         tbl = self.player_alias_table()
         try:
-            tbl.insert_one({'_id':alias})
+            tbl.insert_one({'_id':alias}, {'$set': {'user_id':user_id}})
             return True
         except pymongo.errors.DuplicateKeyError as e:
             # E11000 duplicate key error
@@ -1039,6 +1039,23 @@ class NoSQLClient (object):
                 raise
         # shouldn't get here
 
+    def player_alias_update(self, alias, user_id, reason=''):
+        return self.instrument('player_alias_update(%s)'%reason, self._player_alias_update, (alias, user_id, ))
+
+    def _player_alias_update(self, alias, user_id):
+        tbl = self.player_alias_table()
+        success = tbl.update_one({'_id':alias}, {'$set': {'user_id':user_id}}) > 0
+        return success
+
+    def player_alias_to_spinpunch(self, alias, reason=''):
+        return self.instrument('player_alias_to_spinpunch(%s)'%reason, self._player_alias_to_spinpunch, (alias,))
+
+    def _player_alias_to_spinpunch(self, alias):
+        tbl = self.player_alias_table()
+        row = tbl.find_one({'_id':alias})
+        if row and row.get('user_id', False):
+            return int(row['user_id'])
+        return -1
 
     ###### PvP Season Award Status ######
     # keys are season numbers

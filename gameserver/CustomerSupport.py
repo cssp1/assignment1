@@ -2409,6 +2409,7 @@ class HandlePlayerBatch(Handler):
 class HandleRenamePlayer(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
+        self.user_id = int(self.args['user_id'])
         self.new_alias = self.args['new_alias']
         self.old_alias = None
         self.callsign_status = 'ok'
@@ -2431,7 +2432,7 @@ class HandleRenamePlayer(Handler):
         if self.callsign_status != 'ok': return ReturnValue(error = self.callsign_status)
         self.old_alias = session.player.alias
         old_name = session.user.get_ui_name(session.player)
-        if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower()):
+        if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower(), self.user_id):
             if self.old_alias:
                 self.release_old_alias()
             session.player.alias = self.new_alias
@@ -2448,7 +2449,7 @@ class HandleRenamePlayer(Handler):
     def do_exec_offline(self, user, player):
         if self.callsign_status != 'ok': return ReturnValue(error = self.callsign_status)
         self.old_alias = player.get('alias')
-        if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower()):
+        if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower(), self.user_id):
             if self.old_alias:
                 self.release_old_alias()
             player['alias'] = self.new_alias
