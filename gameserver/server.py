@@ -26475,6 +26475,7 @@ class GAMEAPI(resource.Resource):
         return d
 
     def do_send_gifts_bh(self, session, retmsg, arg):
+        return None # deprecated
         client_id_list = arg[1]
         if session.user.frame_platform != 'bh' or 'electron' in session.user.spin_client_platform:
             self.do_send_gifts(session, retmsg, arg)
@@ -26551,9 +26552,9 @@ class GAMEAPI(resource.Resource):
         return None
 
     def do_send_gifts(self, session, retmsg, arg):
-        if session.user.frame_platform == 'bh' and 'electron' not in session.user.spin_client_platform:
-            self.do_send_gifts_bh(session, retmsg, arg)
-            return None
+        #if session.user.frame_platform == 'bh' and 'electron' not in session.user.spin_client_platform:
+            #self.do_send_gifts_bh(session, retmsg, arg)
+            #return None  BH version is deprecated
 
         pred_or_literal = session.player.get_any_abtest_value('enable_resource_gifts', gamedata.get('enable_resource_gifts',False))
         if (not pred_or_literal) or \
