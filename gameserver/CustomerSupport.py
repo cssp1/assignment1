@@ -2409,7 +2409,7 @@ class HandlePlayerBatch(Handler):
 class HandleRenamePlayer(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
-        self.user_id = self.args['user_id']
+        self.user_id = int(self.args['user_id'])
         self.new_alias = self.args['new_alias']
         self.old_alias = None
         self.callsign_status = 'ok'
