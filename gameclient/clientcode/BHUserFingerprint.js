@@ -91,10 +91,7 @@ BHUserFingerprint.pixel_ratio = function() {
  * @return {boolean}
  */
 BHUserFingerprint.cookies_enabled = function() {
-    if(navigator) {
-        return navigator.cookieEnabled;
-    }
-    return false;
+    return (navigator && navigator.cookieEnabled);
 }
 
 /** collects user agent
@@ -102,7 +99,7 @@ BHUserFingerprint.cookies_enabled = function() {
  */
 BHUserFingerprint.user_agent = function() {
     if(navigator && navigator.userAgent) {
-        navigator.userAgent.toString();
+        return navigator.userAgent.toString();
     }
     return 'undefined';
 }
