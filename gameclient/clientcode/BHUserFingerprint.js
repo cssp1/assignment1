@@ -54,6 +54,7 @@ BHUserFingerprint.screen_size = function() {
     if(screen) {
         return [screen.width, screen.height];
     }
+    return [-1,-1];
 }
 
 /** collects available screen dimensions
@@ -63,6 +64,7 @@ BHUserFingerprint.screen_avail_size = function() {
     if(screen) {
         return [screen.availWidth, screen.availHeight];
     }
+    return [-1,-1];
 }
 
 /** collects color depth
