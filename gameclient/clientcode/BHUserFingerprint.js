@@ -25,7 +25,7 @@ BHUserFingerprint.master_key = function() {
  * @param {string} master_key
  */
 BHUserFingerprint.set_master_key = function(master_key) {
-    if(!BHUserFingerprint.local_storage_enabled()) { return }
+    if(!(BHUserFingerprint.local_storage_enabled())) { return }
     window.localStorage.setItem('master_key', master_key);
 }
 
