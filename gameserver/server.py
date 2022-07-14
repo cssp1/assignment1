@@ -1200,6 +1200,8 @@ class UserTable:
               ('chat_mod', None),
               ('developer', None),
               ('patron', None),
+              ('fingerprint', dict),
+              ('alt_master_key', None),
               ]
 
     def __init__(self):
@@ -1477,6 +1479,12 @@ class User:
 
         # 0 = Non-Patron 1 = Captain, 2 = Major, 3 = Colonel
         self.patron = 0
+
+        # holds browser fingerprinting data for alt control system
+        self.fingerprint = {}
+
+        # holds alt master key for alt control system
+        self.alt_master_key = None
 
         # this holds any unrecognized JSON data from the saved file
         # necessary to preserve forwards-compatibility in case we load a file
@@ -9697,6 +9705,9 @@ class Player(AbstractPlayer):
         # 0 = Non-Patron 1 = Captain, 2 = Major, 3 = Colonel
         self.patron = 0
 
+        # holds alt master key for alt control system
+        self.alt_master_key = None
+
         self.mentor_player_id_cache = None
         self.trainee_player_ids_cache = None
 
@@ -9900,6 +9911,7 @@ class Player(AbstractPlayer):
         self.country_tier = SpinConfig.country_tier_map.get(self.country, 4)
         self.developer = user.developer
         self.patron = user.patron
+        self.alt_master_key = user.alt_master_key
         self.locale = user.locale
         self.trust_level = user.get_trust_level()
         self.mentor_player_id_cache = user.bh_mentor_player_id_cache
@@ -28742,6 +28754,45 @@ class GAMEAPI(resource.Resource):
             else:
                 # default to web if there is no valid data
                 user.spin_client_version = 0
+        if user.fingerprint:
+            user.last_fingerprint = copy.deepcopy(user.fingerprint) # stash last fingerprint for comparison / alt-detection
+        user.fingerprint = {} # make empty fingerprint for CLIENT_HELLO update
+        if len(user_demographics) >= 12:
+            user.fingerprint['timezone'] = user_demographics[11]
+        if len(user_demographics) >= 13:
+            user.fingerprint['date_format'] = user_demographics[12]
+        if len(user_demographics) >= 14:
+            user.fingerprint['screen_size'] = user_demographics[13]
+        if len(user_demographics) >= 15:
+            user.fingerprint['screen_avail_size'] = user_demographics[14]
+        if len(user_demographics) >= 16:
+            user.fingerprint['color_depth'] = user_demographics[15]
+        if len(user_demographics) >= 17:
+            user.fingerprint['pixel_ratio'] = user_demographics[16]
+        if len(user_demographics) >= 18:
+            user.fingerprint['cookies_enabled'] = user_demographics[17]
+        if len(user_demographics) >= 19:
+            user.fingerprint['local_storage_enabled'] = user_demographics[18]
+        if len(user_demographics) >= 20:
+            user.fingerprint['user_agent'] = user_demographics[19]
+        if len(user_demographics) >= 21:
+            user.fingerprint['touch_compatibility'] = user_demographics[20]
+        if len(user_demographics) >= 22:
+            user.fingerprint['languages'] = user_demographics[21]
+        if len(user_demographics) >= 23:
+            user.fingerprint['hardware_concurrency'] = user_demographics[22]
+        if len(user_demographics) >= 24:
+            user.fingerprint['platform'] = user_demographics[23]
+        if len(user_demographics) >= 25:
+            user.fingerprint['plugins'] = user_demographics[24]
+        if len(user_demographics) >= 26:
+            user.fingerprint['webgl_vendor'] = user_demographics[25]
+        if len(user_demographics) >= 27:
+            user.fingerprint['webgl_renderer'] = user_demographics[26]
+        if len(user_demographics) >= 28:
+            user.last_alt_master_key = None
+            if user.alt_master_key: user.last_alt_master_key = copy.deepcopy(user.alt_master_key)
+            if user_demographics[27] != 'undefined': user.alt_master_key = user_demographics[27]
 
         for cap in gamedata['browser_caps']:
             if cap in client_browser_caps:
