@@ -1858,7 +1858,7 @@ class User:
                 alliance_friend_ids.remove(self.user_id) # skip self, should not show up as a friend
             alliance_friend_pcache_list = gamesite.pcache_client.player_cache_lookup_batch(alliance_friend_ids, fields = ['social_id'], reason = 'populate_friends_who_play')
             for result in alliance_friend_pcache_list:
-                if result['social_id'] not in social_id_list: social_id_list.append(result['social_id'])
+                if result.get('social_id', False) and result['social_id'] not in social_id_list: social_id_list.append(result['social_id'])
 
         # note: this call is free if social_id_list is empty, it won't hit the database
         friend_id_list = gamesite.social_id_table.social_id_to_spinpunch_batch(social_id_list)
