@@ -26413,7 +26413,7 @@ class GAMEAPI(resource.Resource):
             return text
 
     def send_offline_notification_bh(self, to_user_id, to_bh_id, message, mirror_to_facebook = False):
-        if not self.sp_send: return [] # bh_web_push_incentive is not present (desktop client. Aboart BH send)
+        if not message.sp_send: return [] # bh_web_push_incentive is not present (desktop client. Abort BH send)
         params = {'service': SpinConfig.game(),
                   'ui_body': message.ui_body.encode('utf-8'),
                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (message.sp_ref, message.fb_ref),
