@@ -386,7 +386,7 @@ if __name__ == '__main__':
                                                       'ban', 'ban-days=', 'unban', 'isolate', 'unisolate', 'make-chat-mod', 'unmake-chat-mod',
                                                       'db-host=', 'db-port=', 'db-secret=', 'live',
                                                       's3', 's3-key-file=', 's3-userdb-bucket=', 's3-playerdb-bucket=',
-                                                      'user-id=', 'facebook-id=', 'battlehouse-id=', 'game-id=',
+                                                      'user-id=', 'facebook-id=', 'battlehouse-id=', 'game-id=', 'alias=',
                                                       'give-alloy=', 'give-protection-time=', 'give-item=', 'melt-hours=', 'item-stack=', 'item-log-reason=',
                                                       'give-item-subject=', 'give-item-body=',
                                                       'send-message', 'message-subject=', 'message-body=', 'message-sender=', 'message-expire-time=', 'message-expire-in=',
@@ -544,6 +544,8 @@ if __name__ == '__main__':
 
     if user_id is None and facebook_id is None and battlehouse_id is None and lookup_alias is None:
         print 'usage: %s [options]' % sys.argv[0]
+        print 'your input: %r' % sys.argv
+        print 'parsed as: %r' % opts
         print 'options:'
         print '    --user-id ID        choose player by game player ID'
         print '    --facebook-id ID    choose player by Facebook user ID'

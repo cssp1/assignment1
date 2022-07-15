@@ -1858,7 +1858,7 @@ class User:
                 alliance_friend_ids.remove(self.user_id) # skip self, should not show up as a friend
             alliance_friend_pcache_list = gamesite.pcache_client.player_cache_lookup_batch(alliance_friend_ids, fields = ['social_id'], reason = 'populate_friends_who_play')
             for result in alliance_friend_pcache_list:
-                if result['social_id'] not in social_id_list: social_id_list.append(result['social_id'])
+                if result.get('social_id', False) and result['social_id'] not in social_id_list: social_id_list.append(result['social_id'])
 
         # note: this call is free if social_id_list is empty, it won't hit the database
         friend_id_list = gamesite.social_id_table.social_id_to_spinpunch_batch(social_id_list)
@@ -26366,6 +26366,7 @@ class GAMEAPI(resource.Resource):
     class NotificationMessage(object):
         def __init__(self, sp_ref, fb_ref, replacements, text, frame_platform, format = None, locale = None):
             self.sp_ref = sp_ref
+            self.sp_send = True
             self.fb_ref = fb_ref
             self.format = format or 'game' # 'game' or 'bh', only as a cue to the client for how to display it
 
@@ -26394,7 +26395,7 @@ class GAMEAPI(resource.Resource):
                     self.ui_cta = self.apply_replacements(replacements, email_conf['ui_cta'])
                 elif frame_platform == 'bh':
                     if sp_ref != 'bh_web_push_incentive': # special case
-                        raise Exception('need full "email" data for notification ref %s' % sp_ref)
+                        self.sp_send = False
 
         def serialize(self): # return JSON format to send to client
             ret = {'format': self.format,
@@ -26412,6 +26413,7 @@ class GAMEAPI(resource.Resource):
             return text
 
     def send_offline_notification_bh(self, to_user_id, to_bh_id, message, mirror_to_facebook = False):
+        if not message.sp_send: return [] # bh_web_push_incentive is not present (desktop client. Abort BH send)
         params = {'service': SpinConfig.game(),
                   'ui_body': message.ui_body.encode('utf-8'),
                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (message.sp_ref, message.fb_ref),
@@ -26475,11 +26477,9 @@ class GAMEAPI(resource.Resource):
         return d
 
     def do_send_gifts_bh(self, session, retmsg, arg):
+        return None # deprecated
         client_id_list = arg[1]
-        if session.user.frame_platform != 'bh':
-            session.send([["ERROR", "SERVER_PROTOCOL"]])
-            return None
-        if 'electron' in session.user.spin_client_platform:
+        if session.user.frame_platform != 'bh' or 'electron' in session.user.spin_client_platform:
             self.do_send_gifts(session, retmsg, arg)
             return None
 
@@ -26554,9 +26554,9 @@ class GAMEAPI(resource.Resource):
         return None
 
     def do_send_gifts(self, session, retmsg, arg):
-        if session.user.frame_platform == 'bh' and 'electron' not in session.user.client_platform:
-            session.send([["ERROR", "SERVER_PROTOCOL"]])
-            return None
+        #if session.user.frame_platform == 'bh' and 'electron' not in session.user.spin_client_platform:
+            #self.do_send_gifts_bh(session, retmsg, arg)
+            #return None  BH version is deprecated
 
         pred_or_literal = session.player.get_any_abtest_value('enable_resource_gifts', gamedata.get('enable_resource_gifts',False))
         if (not pred_or_literal) or \
