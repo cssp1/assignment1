@@ -29,7 +29,7 @@ class CheckerResult(object):
 
     def is_alt_factory(self): return self.flags.get('alt_factory',0)
 
-    def is_proxy(self): return self.flags.get('proxy',0) or self.flags.get('tor',0) 
+    def is_proxy(self): return self.flags.get('proxy',0) or self.flags.get('tor',0)
 
     def is_datacenter(self): return self.flags.get('datacenter',0)
 
