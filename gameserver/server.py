@@ -1486,6 +1486,9 @@ class User:
         # holds alt master key for alt control system
         self.alt_master_key = None
 
+        # holds the alt master key sent by the client, if any, for comparison by the alt control system
+        self.client_master_key = None
+
         # this holds any unrecognized JSON data from the saved file
         # necessary to preserve forwards-compatibility in case we load a file
         # that contains data from a future version of the server
@@ -28794,9 +28797,8 @@ class GAMEAPI(resource.Resource):
         if len(user_demographics) >= 29:
             user.fingerprint['fingerprint_schema_version'] = user_demographics[28]
         if len(user_demographics) >= 30:
-            user.last_alt_master_key = None
-            if user.alt_master_key: user.last_alt_master_key = copy.deepcopy(user.alt_master_key)
-            if user_demographics[29] != 'undefined': user.alt_master_key = user_demographics[29]
+            if user_demographics[29] != 'undefined':
+                self.client_master_key = user_demographics[29] # don't assign this to user master_key yet, it will be handled later
 
         for cap in gamedata['browser_caps']:
             if cap in client_browser_caps:
@@ -29336,6 +29338,31 @@ class GAMEAPI(resource.Resource):
         # tell the browser what we think of the player's alt status
         has_alts, alt_platforms = session.player.has_alts()
         retmsg.append(["HAS_ALTS_UPDATE", has_alts, alt_platforms])
+
+        # check alt control systems at this point
+        user_fingerprint_hash = None #PlayerFingerprint.hash_fingerprint(session.user.fingerprint)
+        if not session.user.alt_master_key and not session.user.client_master_key: # no alt master key set by client or user table
+            user_fingerprint_hash = None
+            # need to create a new master_key, assign it to the user and player, and send it to the client
+            #session.user.alt_master_key = PlayerFingerprint.get_master_key_for_user_id(gamesite.nosql_client, session.player.user_id, user_fingerprint_hash, session.user.country)
+            #session.player.alt_master_key = session.user.alt_master_key
+            #retmsg.append(["PLAYER_STATUS_ID_UPDATE", session.user.alt_master_key])
+        elif session.user.client_master_key and not session.user.alt_master_key: # no alt master key set by user table, but one sent by client
+            # make sure alt control table lists this user ID with this master_keys
+            session.user.alt_master_key = session.user.client_master_key
+        elif session.user.alt_master_key and not session.user.client_master_key: # alt master key set by user table, but none sent by client
+            # send the master key to the client.
+            # retmsg.append(["PLAYER_STATUS_ID_UPDATE", session.user.alt_master_key])
+            user_fingerprint_hash = None
+        # if client sends a master key and user table has a master key, all that's left to do is compare fingerprints and check for
+        # suspicious activity, so do that via handle_client_report
+        #if not session.player.alt_master_key:
+        #session.player.alt_master_key = PlayerFingerprint.set_master_key_for_user_id(gamesite.nosql_client, pfp_master_key, pfp_fingerprint, session.player.user_id, session.user.country)
+        #elif session.player.alt_master_key != pfp_master_key:
+        # client sent a valid master key, and the player has a master key, but it doesn't match
+        # handle_client_report() will log this as a metric event, but also record to the exception log to alert admin to research
+        #gamesite.exception_log.event(server_time, 'user %d logged on with alt control client master_key value %s which mismatches player record %s. This may be account sharing.' % (session.player.user_id, str(pfp_master_key), str(session.player.alt_master_key)))
+        #PlayerFingerprint.handle_client_report(gamesite.nosql_client, session, pfp_master_key, pfp_fingerprint, session.player.user_id, session.user.country)
 
         # ensure alias is properly associated with user_id
         if session.player.alias:
