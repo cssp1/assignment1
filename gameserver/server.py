@@ -29340,9 +29340,9 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["HAS_ALTS_UPDATE", has_alts, alt_platforms])
 
         # check alt control systems at this point
-        user_fingerprint_hash = None #PlayerFingerprint.hash_fingerprint(session.user.fingerprint)
+        user_fingerprint_hash = 0 #PlayerFingerprint.hash_fingerprint(session.user.fingerprint)
         if not session.user.alt_master_key and not session.user.client_master_key: # no alt master key set by client or user table
-            user_fingerprint_hash = None
+            user_fingerprint_hash += 1
             # need to create a new master_key, assign it to the user and player, and send it to the client
             #session.user.alt_master_key = PlayerFingerprint.get_master_key_for_user_id(gamesite.nosql_client, session.player.user_id, user_fingerprint_hash, session.user.country)
             #session.player.alt_master_key = session.user.alt_master_key
@@ -29353,7 +29353,7 @@ class GAMEAPI(resource.Resource):
         elif session.user.alt_master_key and not session.user.client_master_key: # alt master key set by user table, but none sent by client
             # send the master key to the client.
             # retmsg.append(["PLAYER_STATUS_ID_UPDATE", session.user.alt_master_key])
-            user_fingerprint_hash = None
+            user_fingerprint_hash += 1
         # if client sends a master key and user table has a master key, all that's left to do is compare fingerprints and check for
         # suspicious activity, so do that via handle_client_report
         #if not session.player.alt_master_key:
