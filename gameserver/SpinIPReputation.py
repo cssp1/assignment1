@@ -108,7 +108,7 @@ class Checker(object):
                 assert ('cidr' in entry)
                 if '/' not in entry['cidr']:
                     # place solo IP into ip dict and proceed
-                    ip = entry['cidr']
+                    ip = entry['cidr'].lower()
                     entry['source'] = intern(str(entry['source']))
                     self.ip_dict[ip] = entry
                     continue
@@ -147,8 +147,8 @@ class Checker(object):
     def query(self, ipaddr):
 
         # a solo entry from tor lists or ip-reputation-manual.json can be returned directly to save time
-        if ipaddr in self.ip_dict:
-            return CheckerResult(self.ip_dict[ip])
+        if ipaddr.lower() in self.ip_dict:
+            return CheckerResult(self.ip_dict[ipaddr.lower()])
 
         # convert the ipaddr to binary string
         if ':' in ipaddr:
