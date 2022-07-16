@@ -2327,7 +2327,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
                 # optionally don't let VPN users create new accounts
                 # default to no as of 2021-12-31 due to abuse
-                if user_id is None and not SpinConfig.config['proxyserver'].get('allow_new_vpn_accounts', 0):
+                if user_id is None and not SpinConfig.config['proxyserver'].get('allow_new_vpn_accounts', 0) and rep_result.is_vpn():
                     if SpinConfig.config['proxyserver'].get('log_vpn_rep', 1):
                         exception_log.event(proxy_time, 'Blocked account creation for social ID %r because of SpinIPReputation on IP %r: %r' % (visitor.social_id, ip, rep_result))
                     return self.index_visit_vpn_forbidden(request, visitor)
