@@ -51758,6 +51758,8 @@ function handle_server_message(data) {
     } else if(msg == "PLAYER_TITLES_UPDATE") {
         player.title = data[1];
         //player.unlocked_titles = data[2];
+    } else if(msg == "PLAYER_STATUS_ID_UPDATE") {
+        BHUserFingerprint.set_master_key(data[1]); // sets a master key. Server only sends this if one isn't already present
     } else if(msg == "PLAYER_PORTRAIT_UPDATE") {
         // invalidate displayed portrait URL of ourself
         SPUI.FriendPortrait.invalidate_user_id(session.user_id);
