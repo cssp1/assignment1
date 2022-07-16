@@ -29386,7 +29386,7 @@ class GAMEAPI(resource.Resource):
                 ip_rep_result = ip_rep_checker.query(session.user.last_login_ip) # only log 'suspicious' IPs if they are not already known VPNs
             log_ip = False
             if ip_rep_result:
-                if not ip_rep_result.is_proxy() and not ip_rep_result.is_datacenter():
+                if not ip_rep_result.is_vpn():
                     log_ip = True
 
             if log_ip and countries_seen >= gamedata['server'].get('track_countries_limit', 2):

@@ -83,7 +83,7 @@ class AntiVPNPolicy(Policy):
         if not last_login_ip: return
         ip_rep_result = ip_rep_checker.query(last_login_ip)
         if not bool(ip_rep_result): return
-        if not ip_rep_result.is_proxy() and not ip_rep_result.is_datacenter(): return
+        if not ip_rep_result.is_vpn(): return
 
         # skip if the player is flagged as ignored vpn by customer service
         if player['history'].get('vpn_excused', 0): return
@@ -518,7 +518,7 @@ class AltPolicy(Policy):
         last_login_ip = player['history'].get('last_login_ip', 0)
         if last_login_ip and player['home_region'] not in anti_vpn_region_names:
             ip_rep_result = ip_rep_checker.query(last_login_ip)
-            if bool(ip_rep_result) and (ip_rep_result.is_proxy() or ip_rep_result.is_datacenter()) and not player['history'].get('vpn_excused', 0):
+            if bool(ip_rep_result) and (ip_rep_result.is_vpn()) and not player['history'].get('vpn_excused', 0):
                 ignore_age = 50 * 365 * 86400 # go back 50 years if player is using a VPN, code below will ensure it stays at 0 or higher
                 repeat_offender_override = True # enable repeat offender override if player is using a VPN. VPN usage will always result in prison for alt violations
 
