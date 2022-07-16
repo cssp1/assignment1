@@ -28780,19 +28780,23 @@ class GAMEAPI(resource.Resource):
         if len(user_demographics) >= 22:
             user.fingerprint['languages'] = user_demographics[21]
         if len(user_demographics) >= 23:
-            user.fingerprint['hardware_concurrency'] = user_demographics[22]
+            user.fingerprint['do_not_track'] = user_demographics[22]
         if len(user_demographics) >= 24:
-            user.fingerprint['platform'] = user_demographics[23]
+            user.fingerprint['hardware_concurrency'] = user_demographics[23]
         if len(user_demographics) >= 25:
-            user.fingerprint['plugins'] = user_demographics[24]
+            user.fingerprint['platform'] = user_demographics[24]
         if len(user_demographics) >= 26:
-            user.fingerprint['webgl_vendor'] = user_demographics[25]
+            user.fingerprint['plugins'] = user_demographics[25]
         if len(user_demographics) >= 27:
-            user.fingerprint['webgl_renderer'] = user_demographics[26]
+            user.fingerprint['webgl_vendor'] = user_demographics[26]
         if len(user_demographics) >= 28:
+            user.fingerprint['webgl_renderer'] = user_demographics[27]
+        if len(user_demographics) >= 29:
+            user.fingerprint['fingerprint_schema_version'] = user_demographics[28]
+        if len(user_demographics) >= 30:
             user.last_alt_master_key = None
             if user.alt_master_key: user.last_alt_master_key = copy.deepcopy(user.alt_master_key)
-            if user_demographics[27] != 'undefined': user.alt_master_key = user_demographics[27]
+            if user_demographics[29] != 'undefined': user.alt_master_key = user_demographics[29]
 
         for cap in gamedata['browser_caps']:
             if cap in client_browser_caps:

@@ -8,6 +8,9 @@ goog.provide('BHUserFingerprint');
     @suppress {reportUnknownTypes} XXX we are not typesafe yet
 */
 
+// got
+BHUserFingerprint.VERSION = 1 // update this if the fingerprint schema changes
+
 /** @return {boolean} */
 BHUserFingerprint.local_storage_enabled = function() {
     return (typeof(Storage) !== "undefined");
@@ -48,7 +51,7 @@ BHUserFingerprint.date_format = function() {
 }
 
 /** collects screen dimensions
- * @return {Array<number>|null}
+ * @return {!Array<number>}
  */
 BHUserFingerprint.screen_size = function() {
     if(screen) {
@@ -58,7 +61,7 @@ BHUserFingerprint.screen_size = function() {
 }
 
 /** collects available screen dimensions
- * @return {Array<number>|null}
+ * @return {!Array<number>}
  */
 BHUserFingerprint.screen_avail_size = function() {
     if(screen) {
@@ -149,35 +152,34 @@ BHUserFingerprint.platform = function() {
 }
 
 /** collects browser plugins
- * @return {string}
+ * @return {!Array<number>}
  */
 BHUserFingerprint.plugins = function() {
+    var plugins = [];
     if(navigator && navigator.plugins) {
-        return navigator.plugins.toString();
+        for(var i = 0; i < navigator.plugins.length; i++) {
+            plugins.push(navigator.plugins[i].name);
+        }
     }
-    return 'undefined';
+    if(plugins.length === 0) {
+        plugins.push('undefined');
+    }
+    return plugins;
 }
 
 /** collects webgl vendor information
- * @return {string}
+ * @return {!Array<number>}
  */
-BHUserFingerprint.webgl_vendor = function() {
-    var gl = document.createElement("canvas").getContext("webgl");
-    if(gl) {
+BHUserFingerprint.webgl = function() {
+    var vendor = 'undefined';
+    var renderer = 'undefined';
+    try {
+        var gl = document.createElement("canvas").getContext("webgl");
         var ext = gl.getExtension("WEBGL_debug_renderer_info");
-        if(ext) { return gl.getParameter(ext.UNMASKED_VENDOR_WEBGL).toString(); }
+        vendor = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL).toString();
+        renderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL).toString();
+        return [vendor, renderer];
+    } catch (e) {
+        return [vendor, renderer];
     }
-    return 'undefined';
-}
-
-/** collects webgl renderer information
- * @return {string}
- */
-BHUserFingerprint.webgl_renderer = function() {
-    var gl = document.createElement("canvas").getContext("webgl");
-    if(gl) {
-        var ext = gl.getExtension("WEBGL_debug_renderer_info");
-        if(ext) { return gl.getParameter(ext.UNMASKED_RENDERER_WEBGL).toString(); }
-    }
-    return 'undefined';
 }

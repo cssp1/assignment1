@@ -12389,9 +12389,11 @@ SPINPUNCHGAME.init = function() {
     var spin_fingerprint_hardware_concurrency = BHUserFingerprint.hardware_concurrency();
     var spin_fingerprint_platform = BHUserFingerprint.platform();
     var spin_fingerprint_plugins = BHUserFingerprint.plugins();
-    var spin_fingerprint_webgl_vendor = BHUserFingerprint.webgl_vendor();
-    var spin_fingerprint_webgl_renderer = BHUserFingerprint.webgl_renderer();
+    var spin_fingerprint_webgl = BHUserFingerprint.webgl();
+    var spin_fingerprint_webgl_vendor = spin_fingerprint_webgl[0];
+    var spin_fingerprint_webgl_renderer = spin_fingerprint_webgl[1];
     var spin_fingerprint_master_key = BHUserFingerprint.master_key();
+    var spin_fingerprint_schema_version = BHUserFingerprint.VERSION;
 
     // send CLIENT_HELLO first to try to make sure it doesn't get pushed behind graphics download
     var user_demographics = [spin_demographics['browser_name'] || 'unknown',
@@ -12411,7 +12413,7 @@ SPINPUNCHGAME.init = function() {
                              spin_fingerprint_languages, spin_fingerprint_do_not_track,
                              spin_fingerprint_hardware_concurrency, spin_fingerprint_platform,
                              spin_fingerprint_plugins, spin_fingerprint_webgl_vendor, spin_fingerprint_webgl_renderer,
-                             spin_fingerprint_master_key
+                             spin_fingerprint_schema_version, spin_fingerprint_master_key
                             ];
 
     // send browser caps metric
