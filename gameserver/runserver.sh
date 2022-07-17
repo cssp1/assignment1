@@ -34,11 +34,6 @@ if [[ "$DO_ART" == 1 ]]; then
         echo "Downloading IP reputation database..."
         ./SpinIPReputation.py --get -q
     fi
-
-    if ./SpinConfig.py --hasvar ip_asn_database; then
-        echo "Downloading IP ASN database..."
-        ./SpinIPReputation.py --get -q --db-filename=ip-asn.json --s3-key-name=ip-asn.json
-    fi
 fi
 
 echo "Running SCM maintenance..."
