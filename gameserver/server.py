@@ -471,6 +471,7 @@ chat_filter = None
 
 # global SpinIPReputation instance
 ip_rep_checker = None
+ip_asn_checker = None
 
 def reload_gamedata():
     global gamedata, gameclient_build_date, localized_gamedata_cache, chat_filter
