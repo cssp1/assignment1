@@ -34574,10 +34574,10 @@ class GameSite(server.Site):
                 gamesite.exception_log.event(server_time, 'Error reloading SpinIPReputation database: %r' % e)
         if ip_asn_checker:
             try:
-                if ip_asn_checker.reload()
+                if ip_asn_checker.reload():
                     gamesite.exception_log.event(server_time, 'Updated SpinIPReputation ASN database (gameserver %s)' % spin_server_name)
-                except Exception as e:
-                    gamesite.exception_log.event(server_time, 'Error reloading SpinIPReputation database: %r' % e)
+            except Exception as e:
+                gamesite.exception_log.event(server_time, 'Error reloading SpinIPReputation database: %r' % e)
 
         # if we're about to go down for maintenance, kick all logged-in players
         maint_kicks = 0
