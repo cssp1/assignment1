@@ -505,13 +505,9 @@ def reload_gamedata():
             gamesite.exception_log.event(server_time, 'config.json "ip_reputation_database" file is missing, will skip IP reputation checks')
         else: # on initial load, gamesite won't be initialized yet
             sys.stderr.write('config.json "ip_reputation_database" file is missing, will skip IP reputation checks\n')
-        global ip_asn_checker
+        global ip_asn_checker # unlike v, don't warn of failure. This has a large footprint and doesn't need to be on staging servers
         if SpinConfig.config.get('ip_asn_database') and os.path.exists(SpinConfig.config['ip_asn_database']):
             ip_asn_checker = SpinIPReputation.Checker(SpinConfig.config['ip_asn_database'])
-        elif gamesite:
-            gamesite.exception_log.event(server_time, 'config.json "ip_asn_database" file is missing, will skip IP ASN/country checks for fingerprinting\n')
-        else: # on initial load, gamesite won't be initialized yet
-            sys.stderr.write('config.json "ip_asn_database" file is missing, will skip IP ASN/country checks for fingerprinting\n')
 
         # make sure config.json setting for min_user_id is correct
         if 'max_ai_user_id' in gamedata:
