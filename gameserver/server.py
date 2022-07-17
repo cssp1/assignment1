@@ -471,7 +471,6 @@ chat_filter = None
 
 # global SpinIPReputation instance
 ip_rep_checker = None
-ip_asn_checker = None
 
 def reload_gamedata():
     global gamedata, gameclient_build_date, localized_gamedata_cache, chat_filter
@@ -505,9 +504,6 @@ def reload_gamedata():
             gamesite.exception_log.event(server_time, 'config.json "ip_reputation_database" file is missing, will skip IP reputation checks')
         else: # on initial load, gamesite won't be initialized yet
             sys.stderr.write('config.json "ip_reputation_database" file is missing, will skip IP reputation checks\n')
-        global ip_asn_checker # unlike v, don't warn of failure. This has a large footprint and doesn't need to be on staging servers
-        if SpinConfig.config.get('ip_asn_database') and os.path.exists(SpinConfig.config['ip_asn_database']):
-            ip_asn_checker = SpinIPReputation.Checker(SpinConfig.config['ip_asn_database'])
 
         # make sure config.json setting for min_user_id is correct
         if 'max_ai_user_id' in gamedata:
@@ -28678,15 +28674,7 @@ class GAMEAPI(resource.Resource):
             if ip_rep_result:
                 user.vpn_status = repr(ip_rep_result) # this becomes a string that describes what is going on
         user.fingerprint['asn'] = 'not loaded'
-        user.fingerprint['asn_country'] = 'zz'
-        if ip_asn_checker:
-            ip_asn_result = ip_asn_checker.query(client_ip)
-            if ip_asn_result:
-                user.fingerprint['asn'] = ip_asn_result.asn
-                user.fingerprint['asn_country'] = ip_asn_result.country
-            else:
-                user.fingerprint['asn'] = 'undetermined'
-                user.fingerprint['asn_country'] = 'zz'
+        user.fingerprint['asn_country'] = 'zz' # removing in-memory version. replace with mongo or whoiscymru
         user.uninstalled = 0
         user.uninstalled_reason = None
 
@@ -34567,12 +34555,6 @@ class GameSite(server.Site):
             try:
                 if ip_rep_checker.reload():
                     gamesite.exception_log.event(server_time, 'Updated SpinIPReputation database (gameserver %s)' % spin_server_name)
-            except Exception as e:
-                gamesite.exception_log.event(server_time, 'Error reloading SpinIPReputation database: %r' % e)
-        if ip_asn_checker:
-            try:
-                if ip_asn_checker.reload():
-                    gamesite.exception_log.event(server_time, 'Updated SpinIPReputation ASN database (gameserver %s)' % spin_server_name)
             except Exception as e:
                 gamesite.exception_log.event(server_time, 'Error reloading SpinIPReputation database: %r' % e)
 
