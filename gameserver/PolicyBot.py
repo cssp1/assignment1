@@ -83,7 +83,7 @@ class AntiVPNPolicy(Policy):
         if not last_login_ip: return
         ip_rep_result = ip_rep_checker.query(last_login_ip)
         if not bool(ip_rep_result): return
-        if not ip_rep_result.is_proxy() and not ip_rep_result.is_datacenter(): return
+        if not ip_rep_result.is_vpn(): return
 
         # skip if the player is flagged as ignored vpn by customer service
         if player['history'].get('vpn_excused', 0): return
@@ -513,11 +513,12 @@ class AltPolicy(Policy):
         ignore_age = self.IGNORE_AGE
         repeat_offender_override = False
 
-        # update ignore age if player is on a VPN
+        # update ignore age if player is on a VPN and on a pro-VPN map
+        # on anti-VPN maps, the VPN policy will handle this
         last_login_ip = player['history'].get('last_login_ip', 0)
-        if last_login_ip:
+        if last_login_ip and player['home_region'] not in anti_vpn_region_names:
             ip_rep_result = ip_rep_checker.query(last_login_ip)
-            if bool(ip_rep_result) and (ip_rep_result.is_proxy() or ip_rep_result.is_datacenter()) and not player['history'].get('vpn_excused', 0):
+            if bool(ip_rep_result) and (ip_rep_result.is_vpn()) and not player['history'].get('vpn_excused', 0):
                 ignore_age = 50 * 365 * 86400 # go back 50 years if player is using a VPN, code below will ensure it stays at 0 or higher
                 repeat_offender_override = True # enable repeat offender override if player is using a VPN. VPN usage will always result in prison for alt violations
 
@@ -585,6 +586,10 @@ class AltPolicy(Policy):
                 new_region_name = self.punish_player(alt_pcache['user_id'], master_pcache['user_id'], master_pcache['home_region'], other_alt_region_names,
                                                      [pc['user_id'] for pc in pcaches_list if pc is not master_pcache]+[user_id,], repeat_offender_override, region_alt_limit)
 
+                if region_alt_limit > 0:
+                    involved_ids = [alt['user_id'] for alt in pcaches_list]
+                    banished_ids = [alt['user_id'] for alt in pcaches_list[region_alt_limit_offset:]]
+                    do_CONTROLAPI({'user_id':alt_pcache['user_id'], 'method':'add_note'}, extra_text = 'Relocated from region %s due to alt total exceeding limit of %d. Affected alts: %r. Banished alts: %r' % (alt_pcache['home_region'], region_alt_limit, involved_ids, banished_ids))
                 our_pcache['home_region'] = new_region_name
                 print >> self.msg_fd, 'moved to region %s' % (new_region_name)
 

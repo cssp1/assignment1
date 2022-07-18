@@ -51,6 +51,7 @@ goog.require('FBInviteFriends');
 goog.require('FBSendRequests');
 goog.require('AGSendRequests');
 goog.require('BHInvites');
+goog.require('BHUserFingerprint');
 goog.require('SPClockRace');
 goog.require('SPay');
 goog.require('SProbe');
@@ -8791,7 +8792,7 @@ function home_base_id(user_id) { return 'h' + user_id.toString(); }
     @param {number} user_id
     @param {boolean} is_real_friend
     @param {!Object<string,?>} info
-    @param {string|null} relationship (null, 'mentor', 'trainee', 'clan')
+    @param {string|null} relationship (null, 'mentor', 'trainee', 'alliance')
  */
 function Friend(user_id, is_real_friend, info, relationship) {
     this.user_id = user_id;
@@ -12372,6 +12373,28 @@ SPINPUNCHGAME.init = function() {
         spin_game_use_websocket = true;
     }
 
+    // obtain user fingerprint to include in CLIENT_HELLO
+    var spin_fingerprint_timezone = BHUserFingerprint.timezone();
+    var spin_fingerprint_date_format = BHUserFingerprint.date_format();
+    var spin_fingerprint_screen_size = BHUserFingerprint.screen_size();
+    var spin_fingerprint_screen_avail_size = BHUserFingerprint.screen_avail_size();
+    var spin_fingerprint_color_depth = BHUserFingerprint.color_depth();
+    var spin_fingerprint_pixel_ratio = BHUserFingerprint.pixel_ratio();
+    var spin_fingerprint_cookies_enabled = BHUserFingerprint.cookies_enabled();
+    var spin_fingerprint_local_storage_enabled = BHUserFingerprint.local_storage_enabled();
+    var spin_fingerprint_user_agent = BHUserFingerprint.user_agent();
+    var spin_fingerprint_touch_compatibility = BHUserFingerprint.touch_compatibility();
+    var spin_fingerprint_languages = BHUserFingerprint.languages();
+    var spin_fingerprint_do_not_track = BHUserFingerprint.do_not_track();
+    var spin_fingerprint_hardware_concurrency = BHUserFingerprint.hardware_concurrency();
+    var spin_fingerprint_platform = BHUserFingerprint.platform();
+    var spin_fingerprint_plugins = BHUserFingerprint.plugins();
+    var spin_fingerprint_webgl = BHUserFingerprint.webgl();
+    var spin_fingerprint_webgl_vendor = spin_fingerprint_webgl[0];
+    var spin_fingerprint_webgl_renderer = spin_fingerprint_webgl[1];
+    var spin_fingerprint_master_key = BHUserFingerprint.master_key();
+    var spin_fingerprint_schema_version = BHUserFingerprint.VERSION;
+
     // send CLIENT_HELLO first to try to make sure it doesn't get pushed behind graphics download
     var user_demographics = [spin_demographics['browser_name'] || 'unknown',
                              spin_demographics['browser_version'] || 'unknown',
@@ -12381,7 +12404,16 @@ SPINPUNCHGAME.init = function() {
                              (screen.width.toString() + 'x' + screen.height.toString()),
                              (canvas_width.toString() + 'x' + canvas_height.toString()),
                              window['devicePixelRatio'] || 1,
-                             spin_client_platform, spin_client_vendor, spin_client_version
+                             spin_client_platform, spin_client_vendor, spin_client_version,
+                             spin_fingerprint_timezone, spin_fingerprint_date_format,
+                             spin_fingerprint_screen_size, spin_fingerprint_screen_avail_size,
+                             spin_fingerprint_color_depth, spin_fingerprint_pixel_ratio,
+                             spin_fingerprint_cookies_enabled, spin_fingerprint_local_storage_enabled,
+                             spin_fingerprint_user_agent, spin_fingerprint_touch_compatibility,
+                             spin_fingerprint_languages, spin_fingerprint_do_not_track,
+                             spin_fingerprint_hardware_concurrency, spin_fingerprint_platform,
+                             spin_fingerprint_plugins, spin_fingerprint_webgl_vendor, spin_fingerprint_webgl_renderer,
+                             spin_fingerprint_schema_version, spin_fingerprint_master_key
                             ];
 
     // send browser caps metric
@@ -12718,7 +12750,7 @@ function init_desktop_dialogs() {
             dialog.widgets['friend_bar'].widgets['scroll_left'].onclick = friend_bar_scroller(-1);
             dialog.widgets['friend_bar'].widgets['scroll_right'].onclick = friend_bar_scroller(1);
 
-            dialog.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null) && can_show_friend_bar(player);
+            dialog.widgets['friend_bar'].show = can_show_friend_bar(player);
 
             dialog.widgets['friend_bar'].user_data['transition_start_time'] = -1;
             dialog.widgets['friend_bar'].user_data['maximized'] = !('friend_bar_minimized' in player.preferences && player.preferences['friend_bar_minimized']);
@@ -12970,6 +13002,13 @@ function scroll_friend_bar(dialog, page) {
             widget.set_user(friend.user_id);
             widget.onclick = click_cbmaker(friend.user_id, friend.get_facebook_id(), friend);
             dialog.widgets['add_friend_button'+row.toString()].show = false;
+            if(session.is_in_alliance()) {
+                dialog.widgets['alliance_friend_icon'+row.toString()].show = friend.is_alliance_member();
+                var alliance_info = AllianceCache.query_info_sync(session.alliance_id);
+                if(alliance_info) {
+                    dialog.widgets['alliance_friend_icon'+row.toString()].asset = (alliance_info['logo'] ? 'alicon_'+alliance_info['logo'] : 'inventory_unknown');
+                }
+            }
             row += 1;
         }
     }
@@ -13000,7 +13039,7 @@ function scroll_friend_bar(dialog, page) {
 
 function update_friend_bar(dialog) {
     if(!dialog.parent) { return; } // dialog was closed
-    dialog.parent.widgets['friend_bar'].show = read_predicate(gamedata['client']['friend_bar_enabled']).is_satisfied(player, null) && can_show_friend_bar(player);
+    dialog.parent.widgets['friend_bar'].show = can_show_friend_bar(player);
 
     var t = (dialog.user_data['transition_start_time'] > 0 ? clamp((client_time - dialog.user_data['transition_start_time']) / dialog.data['transition_time'], 0, 1) : 1);
     var base_xy_max = vec_add(dialog.parent.data['widgets']['friend_bar']['xy'], dialog.data['xy']);
@@ -20275,22 +20314,21 @@ function invoke_gift_prompt_dialog() {
  * @param {(!Array.<Object>|null)=} info_list - list of PlayerCache entries for giftable friends (if null, we will query)
  */
 function invoke_send_gifts(to_user, reason, info_list) {
-    if(read_predicate({'predicate':'LIBRARY', 'name': 'internal_tester'}).is_satisfied(player, null)) {
-        BHSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list);
-        return null;
-    }
-    if(spin_frame_platform === 'fb') {
-        call_with_facebook_permissions('user_friends', (function (_to_user, _reason, _info_list) { return function() {
-            FBSendRequests.invoke_send_gifts_dialog(_to_user, _reason, _info_list);
-        }; })(to_user, reason, info_list));
-        return null; // async!
-    } else if(spin_frame_platform === 'ag') {
-        return AGSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list || null);
-    } else if(spin_frame_platform === 'bh') {
-        return BHInvites.invoke_send_gifts_dialog(reason);
-    } else {
-        throw Error('unhandled frame_platform '+spin_frame_platform);
-    }
+    BHSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list);
+    /** old system, deprecated 2022-07-14
+        *if(spin_frame_platform === 'fb') {
+        *    call_with_facebook_permissions('user_friends', (function (_to_user, _reason, _info_list) { return function() {
+        *        FBSendRequests.invoke_send_gifts_dialog(_to_user, _reason, _info_list);
+        *    }; })(to_user, reason, info_list));
+        *    return null; // async!
+        *} else if(spin_frame_platform === 'ag') {
+        *    return AGSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list || null);
+        *} else if(spin_frame_platform === 'bh') {
+        *    return BHInvites.invoke_send_gifts_dialog(reason);
+        *} else {
+        *    throw Error('unhandled frame_platform '+spin_frame_platform);
+        * }
+    */
 };
 
 function invoke_motd_dialog(motd) {
@@ -51720,6 +51758,8 @@ function handle_server_message(data) {
     } else if(msg == "PLAYER_TITLES_UPDATE") {
         player.title = data[1];
         //player.unlocked_titles = data[2];
+    } else if(msg == "PLAYER_STATUS_ID_UPDATE") {
+        BHUserFingerprint.set_master_key(data[1]); // sets a master key. Server only sends this if one isn't already present
     } else if(msg == "PLAYER_PORTRAIT_UPDATE") {
         // invalidate displayed portrait URL of ourself
         SPUI.FriendPortrait.invalidate_user_id(session.user_id);

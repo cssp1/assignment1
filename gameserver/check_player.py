@@ -309,6 +309,74 @@ def is_expired_alt(entry):
         return True # this is an expired alt
     return False # this is a valid alt
 
+def display_bh_acct_info(user_id, player):
+    if not BHAPI.supported():
+        print fmt % ('---BHAPI not supported, cannot look up---', '')
+        return
+    bh_id = None
+    db_client = init_db_client()
+    social_ids = db_client.spinpunch_to_social_id_all(user_id)
+    for id in social_ids:
+        if id.startswith('bh'):
+            do_display_bh_acct_info(str(id)[2:])
+            bh_id = id
+    if not bh_id:
+        print fmt % ('---Unable to Locate Battlehouse Account for %d---' % user_id, '')
+
+def do_display_bh_acct_info(bh_id):
+    print fmt % ('---Battlehouse Account Info---', '')
+    print fmt % ('ID: %s' % bh_id, '')
+    print '\n'
+    bh_user_raw = BHAPI.BHAPI_raw('/user/'+bh_id, error_on_404 = False)
+    if bh_user_raw == 'NOTFOUND':
+        print fmt % ('This Battlehouse account has been deleted by the user and is now blank.', '')
+    else:
+        bh_user = SpinJSON.loads(bh_user_raw)
+        if bh_user.get('banned'):
+            print fmt % ('THIS BATTLEHOUSE ACCOUNT IS BANNED!', '')
+        elif bh_user.get('deleted'):
+            print fmt % ('THIS BATTLEHOUSE ACCOUNT IS MARKED DELETED AND IS NOT ACCESSIBLE!', '')
+            deletion_time = bh_user.get('deleted_time', time_now) + 30*86400
+            deletion_time_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(deletion_time))
+            print fmt % ('LOGINSERVER WILL PURGE ACCOUNT RECORD ON %s' % deletion_time_str.upper(), '')
+        if bh_user.get('merged_to'):
+            print fmt % ('THIS BATTLEHOUSE ACCOUNT WAS MERGED AND IS NO LONGER ACCESSIBLE!', '')
+            ui_merged_to = bh_user['merged_to']
+            ui_merged_to += ' (' + trace_bh_account_merges(db_client, bh_user['merged_to']) + ')'
+            print fmt % ('Merged to account:', ui_merged_to)
+
+        ui_creation_provider = bh_user.get('creation_provider', 'unknown')
+        if ui_creation_provider == 'local':
+            ui_creation_provider = 'email'
+            print fmt % ('Login Provider:', ui_creation_provider)
+        if bh_user.get('creation_provider_id'):
+            print fmt % ('Login Provider ID:', bh_user['creation_provider_id'])
+        if bh_user.get('real_name'):
+            print fmt % ('Real Name:', bh_user['real_name'])
+        if bh_user.get('ui_name'):
+            print fmt % ('Display Callsign:', bh_user['ui_name'] + (' (custom)' if bh_user.get('name_source','') == 'custom' else ' (assigned)'))
+        if bh_user.get('ui_email'):
+            print fmt % ('Email Address:', bh_user['ui_email'] + (' (verified)' if bh_user.get('email_verified') else ' (NOT verified)'))
+        bh_creat = bh_user.get('creation_time',1)
+        bh_creat_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_creat))
+        print fmt % ('BH Account age:', '%0.1f days (created %s)' % (float(time_now - bh_creat)/(24*60*60), bh_creat_str))
+        print fmt % ('Creation IP:', bh_user['creation_ip'])
+        print fmt % ('Last Login:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('last_login_time',1))))
+        print fmt % ('Last IP:', bh_user['last_login_ip'])
+        print fmt % ('Last TOS Accepted:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('last_tos_accept_time',1))))
+        if bh_user.get('privacy_consent', False):
+            print fmt % ('Privacy Terms Accepted:', time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_user.get('privacy_consent_time',1))))
+        if bh_user.get('web_push_notifications_enabled') or bh_user.get('facebook_notifications_enabled') or bh_user.get('email_notifications_enabled') or bh_user.get('wns_notifications_enabled'):
+            print fmt % ('Enabled Notifications:', '')
+            if bh_user.get('web_push_notifications_enabled'):
+                print fmt % ('', 'Web Push')
+            if bh_user.get('facebook_notifications_enabled'):
+                print fmt % ('', 'Facebook')
+            if bh_user.get('email_notifications_enabled'):
+                print fmt % ('', 'Emails')
+            if bh_user.get('wns_notifications_enabled'):
+                print fmt % ('', 'WNS')
+
 # main program
 if __name__ == '__main__':
     import codecs
@@ -318,11 +386,11 @@ if __name__ == '__main__':
                                                       'ban', 'ban-days=', 'unban', 'isolate', 'unisolate', 'make-chat-mod', 'unmake-chat-mod',
                                                       'db-host=', 'db-port=', 'db-secret=', 'live',
                                                       's3', 's3-key-file=', 's3-userdb-bucket=', 's3-playerdb-bucket=',
-                                                      'user-id=', 'facebook-id=', 'battlehouse-id=', 'game-id=',
+                                                      'user-id=', 'facebook-id=', 'battlehouse-id=', 'game-id=', 'alias=',
                                                       'give-alloy=', 'give-protection-time=', 'give-item=', 'melt-hours=', 'item-stack=', 'item-log-reason=',
                                                       'give-item-subject=', 'give-item-body=',
                                                       'send-message', 'message-subject=', 'message-body=', 'message-sender=', 'message-expire-time=', 'message-expire-in=',
-                                                      'check-ip-reputation', 'get-all-alts',
+                                                      'check-ip-reputation', 'get-all-alts', 'get-bh-acct-info-only'
                                                        ])
 
 
@@ -331,6 +399,7 @@ if __name__ == '__main__':
     user_id = None
     facebook_id = None
     battlehouse_id = None
+    lookup_alias = None
     bloat = False
     abtests = False
     db_host = None
@@ -357,6 +426,7 @@ if __name__ == '__main__':
     do_unisolate = False
     do_check_ip_reputation = False
     get_all_alts = False
+    get_bh_acct_info_only = False
     give_item = None
     send_message = False
     message_sender = 'Customer Support'
@@ -419,6 +489,8 @@ if __name__ == '__main__':
             facebook_id = str(val)
         elif key == '--battlehouse-id':
             battlehouse_id = str(val)
+        elif key == '--alias':
+            lookup_alias = str(val)
         elif key == '--game-id' or key == '-g':
             game_id = val
         elif key == '--give-alloy':
@@ -455,6 +527,8 @@ if __name__ == '__main__':
             do_check_ip_reputation = True
         elif key == '--get-all-alts':
             get_all_alts = True
+        elif key == '--get-bh-acct-info-only':
+            get_bh_acct_info_only = True
 
     if len(args) > 0:
         user_id = int(args[0])
@@ -468,12 +542,15 @@ if __name__ == '__main__':
         print 'error! item "%s" not found in gamedata.items' % give_item
         sys.exit(1)
 
-    if user_id is None and facebook_id is None and battlehouse_id is None:
+    if user_id is None and facebook_id is None and battlehouse_id is None and lookup_alias is None:
         print 'usage: %s [options]' % sys.argv[0]
+        print 'your input: %r' % sys.argv
+        print 'parsed as: %r' % opts
         print 'options:'
         print '    --user-id ID        choose player by game player ID'
         print '    --facebook-id ID    choose player by Facebook user ID'
         print '    --battlehouse-id ID    choose player by Battlehouse user ID'
+        print '    --alias ID          choose player by alias (callsign)'
         print ''
         print '    --game-id ID        look up users for game ID (either mf or tr)'
         print ''
@@ -513,9 +590,9 @@ if __name__ == '__main__':
 
     db_client = None
 
-    if (user_id is None and (facebook_id or battlehouse_id)) or need_lock or give_item or send_message:
-        # need DB client
-        db_client = init_db_client()
+    #if (user_id is None and (facebook_id or battlehouse_id)) or need_lock or give_item or send_message:
+    # always need DB client now to check social IDs
+    db_client = init_db_client()
 
     if force_s3:
         driver = SpinUserDB.S3Driver(game_id = game_id, key_file = s3_key_file,
@@ -532,6 +609,10 @@ if __name__ == '__main__':
         user_id = db_client.social_id_to_spinpunch_single(sid, False)
         if user_id < 0:
             raise Exception('No user found for this ID')
+    elif user_id is None and lookup_alias:
+        user_id = db_client.player_alias_to_spinpunch(lookup_alias)
+        if user_id < 0:
+            raise Exception('No user found for this alias.\nThis might mean the user has not logged in since this feature was added.')
 
     try:
         user_filename = '%d.txt' % (user_id)
@@ -554,6 +635,10 @@ if __name__ == '__main__':
                 print ' - The player might not have logged out of the game for the first time yet'
                 print ' - The S3 settings passed on the command line or in config.json may be incorrect'
                 sys.exit(1)
+
+        if get_bh_acct_info_only:
+            display_bh_acct_info(user_id, player)
+            sys.exit(0)
 
         if do_put_user:
             user = SpinJSON.load(open(user_filename))
@@ -623,6 +708,30 @@ if __name__ == '__main__':
         if user.get('facebook_name', None):
             print fmt % ('Facebook Name:', user['facebook_name'])
 
+        social_ids = db_client.spinpunch_to_social_id_all(user_id)
+        for id in social_ids:
+            if id.startswith('bh'):
+                if not bh_id:
+                    bh_id = str(id)[2:]
+                    bh_id_line = 'Battlehouse ID:'
+                else:
+                    if str(id)[2:] == bh_id: continue
+                    bh_id_line = 'Additional Battlehouse ID:'
+                print fmt % (bh_id_line, '"'+str(id)+'"')
+            elif id.startswith('kg'):
+                if not user.get('kg_id', None):
+                    kg_id_line = 'Kongregate ID:'
+                else:
+                    if str(id) == str(user['kg_id']): continue
+                    kg_id_line = 'Additional Kongregate ID:'
+                print fmt % (kg_id_line, '"'+str(id)+'"')
+            else:
+                if not user.get('facebook_id', None):
+                    fb_id_line = 'Facebook ID:'
+                else:
+                    if str(id) == str(user['facebook_id']): continue
+                    fb_id_line = 'Additional Facebook ID:'
+                print fmt % (fb_id_line, '"'+str(id)+'"')
 
         print fmt % ('Level:', str(player['resources']['player_level']))
         print fmt % ('CC Level:', str(player['history'].get(gamedata['townhall']+'_level',1)))
@@ -817,6 +926,8 @@ if __name__ == '__main__':
                 bh_user = SpinJSON.loads(bh_user_raw)
                 if bh_user.get('banned'):
                     print fmt % ('THIS BATTLEHOUSE ACCOUNT IS BANNED!', '')
+                elif bh_user.get('deleted'):
+                    print fmt % ('THIS BATTLEHOUSE ACCOUNT IS MARKED DELETED AND IS NOT ACCESSIBLE!', '')
                 elif bh_user.get('merged_to'):
                     print fmt % ('THIS BATTLEHOUSE ACCOUNT WAS MERGED AND IS NO LONGER ACCESSIBLE!', '')
                     ui_merged_to = bh_user['merged_to']

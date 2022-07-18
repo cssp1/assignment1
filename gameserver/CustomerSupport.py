@@ -26,6 +26,7 @@ from Raid import recall_squad, RecallSquadException, \
 import ResLoot
 import Notification2
 from Predicates import read_predicate
+import BHAPI
 
 # for process spawning
 import os
@@ -502,6 +503,146 @@ class HandleForceMigrateSpinID(Handler):
             self.gamesite.do_CONTROLAPI(None, invalidate_args) # broadcast invalidation order so servers clear social ID cache
             return ReturnValue(result = 'ok')
         return ReturnValue(error = check_result)
+
+class HandleMergeBHID(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        if not BHAPI.supported(): return ReturnValue(error = 'BHAPI not supported.')
+        self.user_id = self.args['user_id']
+        self.use_first = self.args['use_first']
+        self.master_or_slave = self.args['master_or_slave']
+        self.bh_ids = [entry['_id'] for entry in self.gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='player.social_platforms() check') if entry['_id'].startswith('bh')]
+        if len(self.bh_ids) == 0:
+            return ReturnValue(error = 'No associated bh_id.')
+        if len(self.bh_ids) > 1 and not self.use_first:
+            return ReturnValue(error = 'More than one associated bh_id. Contact admin or select "Use first associated BH account".')
+        if self.master_or_slave == 'master':
+            self.master_id = self.bh_ids[0]
+            self.slave_id = self.args['other_bh_id']
+        else:
+            self.master_id = self.args['other_bh_id']
+            self.slave_id = self.bh_ids[0]
+
+    def do_exec_loginserver(self):
+        bh_args = { 'service': SpinConfig.game(), 'master_id': self.master_id, 'slave_id': self.slave_id }
+        bh_result_raw = BHAPI.BHAPI_raw('/account_merge/', args=bh_args, error_on_404 = False)
+        if isinstance(bh_result_raw, BHAPI.BHAPITechnicalException):
+            return {'error': bh_result_raw.__str__() }
+        else:
+            return SpinJSON.loads(bh_result_raw)
+
+    def do_exec_online(self, session, retmsg):
+        result = SpinJSON.loads(self.do_exec_loginserver())
+        if 'error' in result:
+            return ReturnValue(error = result['error'])
+        return ReturnValue(result = 'ok')
+
+    def do_exec_offline(self, user, player):
+        result = SpinJSON.loads(self.do_exec_loginserver())
+        if 'error' in result:
+            return ReturnValue(error = result['error'])
+        return ReturnValue(result = 'ok')
+
+class HandleUnmergeBHID(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        if not BHAPI.supported(): return ReturnValue(error = 'BHAPI not supported.')
+        self.user_id = self.args['user_id']
+        self.bh_ids = [entry['_id'][2:] for entry in self.gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='customer_support_unmerge_bh_id') if entry['_id'].startswith('bh')]
+
+    def do_exec_loginserver(self, bh_id):
+        bh_args = { 'service': SpinConfig.game(), 'user_id': bh_id }
+        bh_result_raw = BHAPI.BHAPI_raw('/account_unmerge/', args=bh_args, error_on_404 = False)
+        if isinstance(bh_result_raw, BHAPI.BHAPITechnicalException):
+            return {'error': bh_result_raw.__str__() }
+        else:
+            return SpinJSON.loads(bh_result_raw)
+
+    def do_exec_online(self, session, retmsg):
+        errors = 'Errors:'
+        for bh_id in self.bh_ids:
+            result = SpinJSON.loads(self.do_exec_loginserver(bh_id))
+            if 'error' in result:
+                errors += '\n' + result['error']
+        if errors != 'Errors:':
+            return ReturnValue(error = errors)
+        return ReturnValue(result = 'ok')
+
+    def do_exec_offline(self, user, player):
+        errors = 'Errors:'
+        for bh_id in self.bh_ids:
+            result = SpinJSON.loads(self.do_exec_loginserver(bh_id))
+            if 'error' in result:
+                errors += '\n' + result['error']
+        if errors != 'Errors:':
+            return ReturnValue(error = errors)
+        return ReturnValue(result = 'ok')
+
+class HandleUndeleteBHID(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        if not BHAPI.supported(): return ReturnValue(error = 'BHAPI not supported.')
+        self.user_id = self.args['user_id']
+        self.bh_ids = [entry['_id'][2:] for entry in self.gamesite.nosql_client.spinpunch_to_social_id_all(self.user_id, reason='customer_support_undelete_bh_id') if entry['_id'].startswith('bh')]
+
+    def do_exec_loginserver(self, bh_id):
+        bh_args = { 'service': SpinConfig.game() }
+        bh_result_raw = BHAPI.BHAPI_raw('/account_undelete/%s/' % bh_id, args=bh_args, error_on_404 = False)
+        if isinstance(bh_result_raw, BHAPI.BHAPITechnicalException):
+            return {'error': bh_result_raw.__str__() }
+        else:
+            return SpinJSON.loads(bh_result_raw)
+
+    def do_exec_online(self, session, retmsg):
+        errors = 'Errors:'
+        for bh_id in self.bh_ids:
+            result = SpinJSON.loads(self.do_exec_loginserver(bh_id))
+            if 'error' in result:
+                errors += '\n' + result['error']
+        if errors != 'Errors:':
+            return ReturnValue(error = errors)
+        return ReturnValue(result = 'ok')
+
+    def do_exec_offline(self, user, player):
+        errors = 'Errors:'
+        for bh_id in self.bh_ids:
+            result = SpinJSON.loads(self.do_exec_loginserver(bh_id))
+            if 'error' in result:
+                errors += '\n' + result['error']
+        if errors != 'Errors:':
+            return ReturnValue(error = errors)
+        return ReturnValue(result = 'ok')
+
+class HandleRenameBHID(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        if not BHAPI.supported(): return ReturnValue(error = 'BHAPI not supported.')
+        self.user_id = self.args['user_id']
+        self.new_name = self.args['new_name']
+        self.force = self.args['force']
+        self.bh_id = self.args.get('battlehouse_id', None)
+        if not self.bh_id:
+            self.bh_id = self.gamesite.nosql_client.spinpunch_to_social_id_single(self.user_id, reason='customer_support_rename_bh_id')[2:]
+
+    def do_exec_loginserver(self, bh_id):
+        bh_args = { 'service': SpinConfig.game(), 'user_id': self.user_id, 'new_name': self.new_name, 'force': self.force }
+        bh_result_raw = BHAPI.BHAPI_raw('/account_rename/', args=bh_args, error_on_404 = False)
+        if isinstance(bh_result_raw, BHAPI.BHAPITechnicalException):
+            return { 'error': bh_result_raw.__str__() }
+        else:
+            return SpinJSON.loads(bh_result_raw)
+
+    def do_exec_online(self, session, retmsg):
+        result = SpinJSON.loads(self.do_exec_loginserver(self.bh_id))
+        if 'error' in result:
+            return ReturnValue(error = result['error'])
+        return ReturnValue(result = 'ok')
+
+    def do_exec_offline(self, user, player):
+        result = SpinJSON.loads(self.do_exec_loginserver(self.bh_id))
+        if 'error' in result:
+            return ReturnValue(error = result['error'])
+        return ReturnValue(result = 'ok')
 
 class HandleMarkUninstalled(Handler):
     # mark account as uninstalled and scrub PII
@@ -2268,6 +2409,7 @@ class HandlePlayerBatch(Handler):
 class HandleRenamePlayer(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
+        self.user_id = int(self.args['user_id'])
         self.new_alias = self.args['new_alias']
         self.old_alias = None
         self.callsign_status = 'ok'
@@ -2290,7 +2432,7 @@ class HandleRenamePlayer(Handler):
         if self.callsign_status != 'ok': return ReturnValue(error = self.callsign_status)
         self.old_alias = session.player.alias
         old_name = session.user.get_ui_name(session.player)
-        if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower()):
+        if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower(), self.user_id):
             if self.old_alias:
                 self.release_old_alias()
             session.player.alias = self.new_alias
@@ -2307,7 +2449,7 @@ class HandleRenamePlayer(Handler):
     def do_exec_offline(self, user, player):
         if self.callsign_status != 'ok': return ReturnValue(error = self.callsign_status)
         self.old_alias = player.get('alias')
-        if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower()):
+        if self.gamesite.nosql_client.player_alias_claim(self.new_alias.lower(), self.user_id):
             if self.old_alias:
                 self.release_old_alias()
             player['alias'] = self.new_alias
@@ -2377,5 +2519,9 @@ methods = {
     'modify_scores': HandleModifyScores,
     'player_batch': HandlePlayerBatch,
     'change_player_alias': HandleRenamePlayer,
+    'merge_bh_id': HandleMergeBHID,
+    'unmerge_bh_id': HandleUnmergeBHID,
+    'undelete_bh_id': HandleUndeleteBHID,
+    'rename_bh_id': HandleRenameBHID,
     # not implemented yet: join_abtest, clear_abtest
 }
