@@ -1200,6 +1200,8 @@ class UserTable:
               ('chat_mod', None),
               ('developer', None),
               ('patron', None),
+              ('fingerprint', dict),
+              ('alt_master_key', None),
               ]
 
     def __init__(self):
@@ -1477,6 +1479,15 @@ class User:
 
         # 0 = Non-Patron 1 = Captain, 2 = Major, 3 = Colonel
         self.patron = 0
+
+        # holds browser fingerprinting data for alt control system
+        self.fingerprint = {}
+
+        # holds alt master key for alt control system
+        self.alt_master_key = None
+
+        # holds the alt master key sent by the client, if any, for comparison by the alt control system
+        self.client_master_key = None
 
         # this holds any unrecognized JSON data from the saved file
         # necessary to preserve forwards-compatibility in case we load a file
@@ -9697,6 +9708,9 @@ class Player(AbstractPlayer):
         # 0 = Non-Patron 1 = Captain, 2 = Major, 3 = Colonel
         self.patron = 0
 
+        # holds alt master key for alt control system
+        self.alt_master_key = None
+
         self.mentor_player_id_cache = None
         self.trainee_player_ids_cache = None
 
@@ -9900,6 +9914,7 @@ class Player(AbstractPlayer):
         self.country_tier = SpinConfig.country_tier_map.get(self.country, 4)
         self.developer = user.developer
         self.patron = user.patron
+        self.alt_master_key = user.alt_master_key
         self.locale = user.locale
         self.trust_level = user.get_trust_level()
         self.mentor_player_id_cache = user.bh_mentor_player_id_cache
@@ -28658,6 +28673,8 @@ class GAMEAPI(resource.Resource):
             ip_rep_result = ip_rep_checker.query(client_ip)
             if ip_rep_result:
                 user.vpn_status = repr(ip_rep_result) # this becomes a string that describes what is going on
+        user.fingerprint['asn'] = 'not loaded'
+        user.fingerprint['asn_country'] = 'zz' # removing in-memory version. replace with mongo or whoiscymru
         user.uninstalled = 0
         user.uninstalled_reason = None
 
@@ -28742,6 +28759,48 @@ class GAMEAPI(resource.Resource):
             else:
                 # default to web if there is no valid data
                 user.spin_client_version = 0
+        if user.fingerprint:
+            user.last_fingerprint = copy.deepcopy(user.fingerprint) # stash last fingerprint for comparison / alt-detection
+        user.fingerprint = {} # make empty fingerprint for CLIENT_HELLO update
+        if len(user_demographics) >= 12:
+            user.fingerprint['timezone'] = user_demographics[11]
+        if len(user_demographics) >= 13:
+            user.fingerprint['date_format'] = user_demographics[12]
+        if len(user_demographics) >= 14:
+            user.fingerprint['screen_size'] = user_demographics[13]
+        if len(user_demographics) >= 15:
+            user.fingerprint['screen_avail_size'] = user_demographics[14]
+        if len(user_demographics) >= 16:
+            user.fingerprint['color_depth'] = user_demographics[15]
+        if len(user_demographics) >= 17:
+            user.fingerprint['pixel_ratio'] = user_demographics[16]
+        if len(user_demographics) >= 18:
+            user.fingerprint['cookies_enabled'] = user_demographics[17]
+        if len(user_demographics) >= 19:
+            user.fingerprint['local_storage_enabled'] = user_demographics[18]
+        if len(user_demographics) >= 20:
+            user.fingerprint['user_agent'] = user_demographics[19]
+        if len(user_demographics) >= 21:
+            user.fingerprint['touch_compatibility'] = user_demographics[20]
+        if len(user_demographics) >= 22:
+            user.fingerprint['languages'] = user_demographics[21]
+        if len(user_demographics) >= 23:
+            user.fingerprint['do_not_track'] = user_demographics[22]
+        if len(user_demographics) >= 24:
+            user.fingerprint['hardware_concurrency'] = user_demographics[23]
+        if len(user_demographics) >= 25:
+            user.fingerprint['platform'] = user_demographics[24]
+        if len(user_demographics) >= 26:
+            user.fingerprint['plugins'] = user_demographics[25]
+        if len(user_demographics) >= 27:
+            user.fingerprint['webgl_vendor'] = user_demographics[26]
+        if len(user_demographics) >= 28:
+            user.fingerprint['webgl_renderer'] = user_demographics[27]
+        if len(user_demographics) >= 29:
+            user.fingerprint['fingerprint_schema_version'] = user_demographics[28]
+        if len(user_demographics) >= 30:
+            if user_demographics[29] != 'undefined':
+                self.client_master_key = user_demographics[29] # don't assign this to user master_key yet, it will be handled later
 
         for cap in gamedata['browser_caps']:
             if cap in client_browser_caps:
@@ -29282,6 +29341,31 @@ class GAMEAPI(resource.Resource):
         has_alts, alt_platforms = session.player.has_alts()
         retmsg.append(["HAS_ALTS_UPDATE", has_alts, alt_platforms])
 
+        # check alt control systems at this point
+        user_fingerprint_hash = 0 #PlayerFingerprint.hash_fingerprint(session.user.fingerprint)
+        if not session.user.alt_master_key and not session.user.client_master_key: # no alt master key set by client or user table
+            user_fingerprint_hash += 1
+            # need to create a new master_key, assign it to the user and player, and send it to the client
+            #session.user.alt_master_key = PlayerFingerprint.get_master_key_for_user_id(gamesite.nosql_client, session.player.user_id, user_fingerprint_hash, session.user.country)
+            #session.player.alt_master_key = session.user.alt_master_key
+            #retmsg.append(["PLAYER_STATUS_ID_UPDATE", session.user.alt_master_key])
+        elif session.user.client_master_key and not session.user.alt_master_key: # no alt master key set by user table, but one sent by client
+            # make sure alt control table lists this user ID with this master_keys
+            session.user.alt_master_key = session.user.client_master_key
+        elif session.user.alt_master_key and not session.user.client_master_key: # alt master key set by user table, but none sent by client
+            # send the master key to the client.
+            # retmsg.append(["PLAYER_STATUS_ID_UPDATE", session.user.alt_master_key])
+            user_fingerprint_hash += 1
+        # if client sends a master key and user table has a master key, all that's left to do is compare fingerprints and check for
+        # suspicious activity, so do that via handle_client_report
+        #if not session.player.alt_master_key:
+        #session.player.alt_master_key = PlayerFingerprint.set_master_key_for_user_id(gamesite.nosql_client, pfp_master_key, pfp_fingerprint, session.player.user_id, session.user.country)
+        #elif session.player.alt_master_key != pfp_master_key:
+        # client sent a valid master key, and the player has a master key, but it doesn't match
+        # handle_client_report() will log this as a metric event, but also record to the exception log to alert admin to research
+        #gamesite.exception_log.event(server_time, 'user %d logged on with alt control client master_key value %s which mismatches player record %s. This may be account sharing.' % (session.player.user_id, str(pfp_master_key), str(session.player.alt_master_key)))
+        #PlayerFingerprint.handle_client_report(gamesite.nosql_client, session, pfp_master_key, pfp_fingerprint, session.player.user_id, session.user.country)
+
         # ensure alias is properly associated with user_id
         if session.player.alias:
             gamesite.nosql_client.player_alias_update(session.player.alias.lower(), session.player.user_id, reason='ensuring alias is associated with user_id')
@@ -29304,7 +29388,7 @@ class GAMEAPI(resource.Resource):
                 ip_rep_result = ip_rep_checker.query(session.user.last_login_ip) # only log 'suspicious' IPs if they are not already known VPNs
             log_ip = False
             if ip_rep_result:
-                if not ip_rep_result.is_proxy() and not ip_rep_result.is_datacenter():
+                if not ip_rep_result.is_vpn():
                     log_ip = True
 
             if log_ip and countries_seen >= gamedata['server'].get('track_countries_limit', 2):

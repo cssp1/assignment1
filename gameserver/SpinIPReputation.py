@@ -17,6 +17,8 @@ class CheckerResult(object):
         self.entry = entry
         self.flags = entry.get('flags',{})
         self.description = entry['description']
+        self.asn = entry.get('asn', -1)
+        self.country = entry.get('country','zz')
 
     def __repr__(self):
         flag_list = sorted(self.flags.keys())
@@ -29,9 +31,13 @@ class CheckerResult(object):
 
     def is_alt_factory(self): return self.flags.get('alt_factory',0)
 
-    def is_proxy(self): return self.flags.get('proxy',0) or self.flags.get('tor',0)
+    def is_proxy(self): return self.flags.get('proxy',0)
+
+    def is_tor(self): return self.flags.get('tor',0)
 
     def is_datacenter(self): return self.flags.get('datacenter',0)
+
+    def is_vpn(self): return self.is_tor() or self.is_proxy() or self.is_datacenter()
 
 class Checker(object):
     @classmethod
@@ -47,6 +53,7 @@ class Checker(object):
     def __init__(self, path_to_db_file):
         self.path_to_db_file = path_to_db_file
         self.cached_db_file_hash = None
+        self.ip_dict = {} # stores single entries to prevent conflicts with lo/hi and CIDR entries.
         self.ip_list4 = tuple()
         self.ip_list6 = tuple()
         self.reload()
@@ -99,6 +106,12 @@ class Checker(object):
             else:
                 # convert CIDR entries to pure lo/hi ranges
                 assert ('cidr' in entry)
+                if '/' not in entry['cidr']:
+                    # place solo IP into ip dict and proceed
+                    ip = entry['cidr'].lower()
+                    entry['source'] = intern(str(entry['source']))
+                    self.ip_dict[ip] = entry
+                    continue
                 if ':' in entry['cidr']:
                     # IPv6 network
                     net = IPv6Network(entry['cidr'])
@@ -132,6 +145,11 @@ class Checker(object):
         self.ip_list6 = tuple(ip_dict6[k] for k in sorted(ip_dict6.keys()))
 
     def query(self, ipaddr):
+
+        # a solo entry from tor lists or ip-reputation-manual.json can be returned directly to save time
+        if ipaddr.lower() in self.ip_dict:
+            return CheckerResult(self.ip_dict[ipaddr.lower()])
+
         # convert the ipaddr to binary string
         if ':' in ipaddr:
             # IPv6
