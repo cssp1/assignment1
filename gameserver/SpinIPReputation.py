@@ -116,13 +116,13 @@ class Checker(object):
                     # IPv6 network
                     net = IPv6Network(entry['cidr'])
                     entry['lo*'] = v6_int_to_packed(int(IPv6Address(net[0])))
-                    entry['hi*'] = v6_int_to_packed(int(IPv6Address(net[-1])))
+                    entry['hi*'] = max(v6_int_to_packed(int(IPv6Address(net[-1]))), ip_dict4.get(entry['lo*'], {'hi*': v6_int_to_packed(0)})['hi*'])
                     ipv = 6
                 else:
                     # IPv4 network
                     net = IPv4Network(entry['cidr'])
                     entry['lo*'] = v4_int_to_packed(int(IPv4Address(net[0])))
-                    entry['hi*'] = v4_int_to_packed(int(IPv4Address(net[-1])))
+                    entry['hi*'] = max(v4_int_to_packed(int(IPv4Address(net[-1]))), ip_dict4.get(entry['lo*'], {'hi*': v4_int_to_packed(0)})['hi*'])
                     ipv = 4
 
             # remove some fields to save memory
