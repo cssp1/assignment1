@@ -4794,7 +4794,6 @@ def main(args):
     for name, data in gamedata['fb_notifications']['notifications'].iteritems():
         error |= check_notification(name, data)
 
-
     # this must come last, because it depends on required_art_assets being filled out by previous code
     error |= check_art(gamedata['art'],
                        report_unreferenced_art_files = report_unreferenced_art_files,
