@@ -11,6 +11,7 @@ import SpinConfig
 import GameDataUtil
 import sys, traceback, os, copy, time, re
 import getopt
+from copy import deepcopy
 
 # optionally use the Damerau-Levenshtein string distance metric to check for mis-spelled JSON keys
 has_damerau_levenshtein = False
@@ -4204,7 +4205,8 @@ def get_art_source_files(name, asset, ref_list):
                     substate = 'normal'
                 error |= require_art_asset(subname, name+':'+statename+':subassets')
                 if not error:
-                    if substate not in gamedata['art'][subname]['states']:
+                    data = gamedata['art'][subname]['states']
+                    if substate not in data:
                         error |= 1; print 'art asset %s references missing subasset %s (state %s)' % (name, subname, substate)
 
         if 'images' in state:

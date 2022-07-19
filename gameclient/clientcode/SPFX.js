@@ -1481,8 +1481,7 @@ SPFX.Explosion = function(fxworld, where, height, assetname, when, enable_audio,
 
     this.rotation = (instance_data && 'rotation' in instance_data ? /** @type {number} */ (instance_data['rotation']) : (data && ('rotation' in data) ? /** @type {number} */ (data['rotation']) : 0));
     this.rotate_speed = (instance_data && 'rotate_speed' in instance_data ? /** @type {number} */ (instance_data['rotate_speed']) : (data && ('rotate_speed' in data) ? /** @type {number} */ (data['rotate_speed']) : 0));
-
-    var old_data = /** @type {!Object} */ (gamedata['art'][assetname]['states']['normal']);
+    var old_data = /** @type {!Object} */ (GameArt.assets[assetname].get_data()['states']['normal']);
     if('particles' in old_data) {
         var particles = new SPFX.Particles(fxworld, [this.where[0], this.height, this.where[1]], when, this.duration, /** @type {!Object} */ (old_data['particles']));
         fxworld.add(particles);

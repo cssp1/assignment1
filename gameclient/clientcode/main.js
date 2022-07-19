@@ -58276,7 +58276,7 @@ function draw_unit(world, unit) {
         }
 
         // special movement states
-        var sprite_data = gamedata['art'][sprite];
+        var sprite_data = GameArt.assets[sprite].get_data();
         var mystates = sprite_data['states'];
         if((unit.control_state === control_states.CONTROL_SHOOT) && unit.control_spellname && ('melee_cycle' in sprite_data)) {
             // melee strikes
