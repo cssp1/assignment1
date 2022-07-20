@@ -6,11 +6,11 @@ FROM python:2.7.18-alpine
 RUN apk update && \
     apk add --virtual build-deps gcc g++ libc-dev \
     	    python-dev libffi-dev libpng-dev jpeg-dev freetype-dev postgresql-dev && \
-    apk add make curl git grep ca-certificates && \
+    apk add make curl git grep ca-certificates bash && \
     apk add nodejs npm bind-tools # these are for update-ip-reputation.py
 
 # install envkey-source binary
-RUN VERSION=$(curl https://envkey-releases.s3.amazonaws.com/latest/envkeysource-version.txt) && curl -s https://envkey-releases.s3.amazonaws.com/envkeysource/release_artifacts/$VERSION/install.sh | /bin/sh
+RUN VERSION=$(curl https://envkey-releases.s3.amazonaws.com/latest/envkeysource-version.txt) && curl -s https://envkey-releases.s3.amazonaws.com/envkeysource/release_artifacts/$VERSION/install.sh | /bin/bash
 
 # note: the 'game' and 'game-spinpunch-private' master code
 # will be "baked" into this Docker image under /usr/src/app
