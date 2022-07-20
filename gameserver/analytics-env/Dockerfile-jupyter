@@ -11,10 +11,10 @@ RUN apt-get update && \
     apt-get install -y curl libmysqlclient-dev ssh git && \
     rm -rf /var/lib/apt/lists/*
 
-# install Envkey-source binary
-RUN curl -s https://raw.githubusercontent.com/envkey/envkey-source/master/install.sh | /bin/sh
+# install envkey-source binary
+RUN VERSION=$(curl https://envkey-releases.s3.amazonaws.com/latest/envkeysource-version.txt) && curl -s https://envkey-releases.s3.amazonaws.com/envkeysource/release_artifacts/$VERSION/install.sh | /bin/bash
 
-RUN pip install envkey mysqlclient awscli
+RUN pip install envkey==2.0.7 mysqlclient awscli
 # 'boto3>=1.7.84' 'botocore>=1.12.13'
 
 # COPY aws aws
