@@ -16,7 +16,7 @@ brotlipy==0.7.0
 certifi>=2018.1.18
 cffi==1.15.1
 cryptography>=2.1.4
-flake8==3.9.2
+flake8==4.0.1
 futures==3.2.0
 geoip2==3.0.0
 google_api_python_client==1.12.8
