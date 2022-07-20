@@ -10,7 +10,7 @@ RUN apk update && \
     apk add nodejs npm bind-tools # these are for update-ip-reputation.py
 
 # install envkey-source binary
-RUN VERSION=$(curl https://envkey-releases.s3.amazonaws.com/latest/envkeysource-version.txt) && curl -s https://envkey-releases.s3.amazonaws.com/envkeysource/release_artifacts/$VERSION/install.sh | /bin/bash
+RUN VERSION=$(curl https://envkey-releases.s3.amazonaws.com/latest/envkeysource-version.txt) && curl -s https://envkey-releases.s3.amazonaws.com/envkeysource/release_artifacts/$VERSION/install.sh | /bin/sh
 
 # note: the 'game' and 'game-spinpunch-private' master code
 # will be "baked" into this Docker image under /usr/src/app
