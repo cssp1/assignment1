@@ -9,6 +9,6 @@ if [ -z $ENVKEY ]; then
     exit 1
 fi
 
-eval "$(envkey-source --no-cache --force)"
+eval "$(envkey-source --force)"
 
 exec "$@"

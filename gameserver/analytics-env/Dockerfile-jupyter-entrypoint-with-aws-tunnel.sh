@@ -9,7 +9,7 @@ if [ -z $ENVKEY ]; then
     exit 1
 fi
 
-eval "$(envkey-source --no-cache --force)"
+eval "$(envkey-source --force)"
 
 # set up MySQL tunnel via SSH_JUMP_HOST using the private key ANALYTICS_SSH_KEY
 mkdir -p ~/.ssh
