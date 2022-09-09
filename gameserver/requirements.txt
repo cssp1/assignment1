@@ -56,7 +56,7 @@ git+https://github.com/spinpunch/spin-py-libs.git@v0.1.0#egg=spinlibs==0.1.0
 # note: the version string on the end only tells pip to skip this
 # intall if the currently installed version matches that version. It
 # does NOT enforce which version is pulled from Git.
-git+https://github.com/spinpunch/twisted.git@spinpunch-20.3.0dev1#egg=Twisted==20.3.0.dev1
+git+https://github.com/spinpunch/twisted.git@spinpunch-20.3.0dev1#egg=Twisted==22.8.0
 
 # note: this might require running pip with the --no-use-pep517 flag
 # to avoid errors about "__legacy__"
