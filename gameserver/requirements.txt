@@ -63,7 +63,7 @@ git+https://github.com/spinpunch/twisted.git@spinpunch-20.3.0dev1#egg=Twisted==2
 
 # ujson MUST be this customized version, which adds extra options like
 # buffer size hints and adjusts whitespace handling
-git+https://github.com/spinpunch/ultrajson.git@spinpunch#egg=ujson==2.0
+git+https://github.com/spinpunch/ultrajson.git@spinpunch#egg=ujson==5.6.0
 
 
 # note: if this install fails, it might be because of a legacy setuptools configuration that
