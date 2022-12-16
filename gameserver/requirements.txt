@@ -42,7 +42,7 @@ pywebpush==1.14.0
 requests==2.27.1
 service-identity>=18.1.0
 six==1.16.0
-SQLAlchemy==1.4.39
+SQLAlchemy==1.4.45
 txpostgres==1.7.0
 signxml==2.9.0
 
